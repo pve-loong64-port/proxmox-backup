@@ -8,7 +8,53 @@ Proxmox File Archive Format (``.pxar``)
 
 .. graphviz:: pxar-format-overview.dot
 
+.. _pxar-meta-format:
 
+Proxmox File Archive Format - Meta (``.mpxar``)
+-----------------------------------------------
+
+Pxar metadata archive with same structure as a regular pxar archive, with the
+exception of regular file payloads not being contained within the archive
+itself, but rather being stored as payload references to the corresponding pxar
+payload (``.ppxar``) file.
+
+Can be used to lookup all the archive entries and metadata without the size
+overhead introduced by the file payloads.
+
+.. graphviz:: meta-format-overview.dot
+
+.. _ppxar-format:
+
+Proxmox File Archive Format - Payload (``.ppxar``)
+--------------------------------------------------
+
+Pxar payload file storing regular file payloads to be referenced and accessed by
+the corresponding pxar metadata (``.mpxar``) archive. Contains a concatenation
+of regular file payloads, each prefixed by a `PAYLOAD` header. Further, the
+actual referenced payload entries might be separated by padding (full/partial
+payloads not referenced), introduced when reusing chunks of a previous backup
+run, when chunk boundaries did not aligned to payload entry offsets.
+
+All headers are stored as little-endian.
+
+.. list-table::
+   :widths: auto
+
+   * - ``PAYLOAD_START_MARKER``
+     - header of ``[u8; 16]`` consisting of type hash and size;
+       marks start
+   * - ``PAYLOAD``
+     - header of ``[u8; 16]`` cosisting of type hash and size;
+       referenced by metadata archive
+   * - Payload
+     - raw regular file payload
+   * - Padding
+     - partial/full unreferenced payloads, caused by unaligned chunk boundary
+   * - ...
+     - further concatenation of payload header, payload and padding
+   * - ``PAYLOAD_TAIL_MARKER``
+     - header of ``[u8; 16]`` consisting of type hash and size;
+       marks end
 .. _data-blob-format:
 
 Data Blob Format (``.blob``)
