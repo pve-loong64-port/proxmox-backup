@@ -280,6 +280,53 @@ Multiple paths can be excluded like this:
 
     # proxmox-backup-client backup.pxar:./linux --exclude=/usr --exclude=/rust
 
+.. _client_change_detection_mode:
+
+Change Detection Mode
+~~~~~~~~~~~~~~~~~~~~~
+
+File-based backups containing a lot of data can take a long time, as the default
+behavior for the Proxmox backup client is to read all data and encode it into a
+pxar archive.
+The encoded stream is split into variable sized chunks. For each chunk, a digest
+is calculated and used to decide whether the chunk needs to be uploaded or can
+be indexed without upload, as it is already available on the server (and
+therefore deduplicated). If the backed up files are largely unchanged,
+re-reading and then detecting the corresponding chunks don't need to be uploaded
+after all is time consuming and undesired.
+
+The backup client's `change-detection-mode` can be switched from default to
+`metadata` based detection to reduce limitations as described above, instructing
+the client to avoid re-reading files with unchanged metadata whenever possible.
+When using this mode, instead of the regular pxar archive, the backup snapshot
+is stored into two separate files: the `mpxar` containing the archive's metadata
+and the `ppxar` containing a concatenation of the file contents. This splitting
+allows for efficient metadata lookups.
+
+Using the `change-detection-mode` set to `data` allows to create the same split
+archive as when using the `metadata` mode, but without using a previous
+reference and therefore reencoding all file payloads.
+When creating the backup archives, the current file metadata is compared to the
+one looked up in the previous `mpxar` archive.
+The metadata comparison includes file size, file type, ownership and permission
+information, as well as acls and attributes and most importantly the file's
+mtime, for details see the
+:ref:`pxar metadata archive format <pxar-meta-format>`.
+
+If unchanged, the entry is cached for possible re-use of content chunks without
+re-reading, by indexing the already present chunks containing the contents from
+the previous backup snapshot. Since the file might only partially re-use chunks
+(thereby introducing wasted space in the form of padding), the decision whether
+to re-use or re-encode the currently cached entries is postponed to when enough
+information is available, comparing the possible padding to a threshold value.
+
+The following shows an example for the client invocation with the `metadata`
+mode:
+
+.. code-block:: console
+
+    # proxmox-backup-client backup.pxar:./linux --change-detection-mode=metadata
+
 .. _client_encryption:
 
 Encryption

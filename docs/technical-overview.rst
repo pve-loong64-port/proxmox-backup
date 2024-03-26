@@ -28,6 +28,9 @@ which are not chunked, e.g. the client log), or one or more indexes
 
 When uploading an index, the client first has to read the source data, chunk it
 and send the data as chunks with their identifying checksum to the server.
+When using the :ref:`change detection mode <change_detection_mode>` payload
+chunks for unchanged files are reused from the previous snapshot, thereby not
+reading the source data again.
 
 If there is a previous Snapshot in the backup group, the client can first
 download the chunk list of the previous Snapshot. If it detects a chunk that
