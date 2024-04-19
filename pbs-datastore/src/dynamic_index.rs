@@ -23,7 +23,7 @@ use crate::data_blob::{DataBlob, DataChunkBuilder};
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
 use crate::read_chunk::ReadChunk;
-use crate::Chunker;
+use crate::{Chunker, ChunkerImpl};
 
 /// Header format definition for dynamic index files (`.dixd`)
 #[repr(C)]
@@ -397,7 +397,7 @@ impl DynamicIndexWriter {
 pub struct DynamicChunkWriter {
     index: DynamicIndexWriter,
     closed: bool,
-    chunker: Chunker,
+    chunker: ChunkerImpl,
     stat: ChunkStat,
     chunk_offset: usize,
     last_chunk: usize,
@@ -409,7 +409,7 @@ impl DynamicChunkWriter {
         Self {
             index,
             closed: false,
-            chunker: Chunker::new(chunk_size),
+            chunker: ChunkerImpl::new(chunk_size),
             stat: ChunkStat::new(0),
             chunk_offset: 0,
             last_chunk: 0,
@@ -494,7 +494,8 @@ impl Write for DynamicChunkWriter {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
         let chunker = &mut self.chunker;
 
-        let pos = chunker.scan(data);
+        let ctx = crate::chunker::Context::default();
+        let pos = chunker.scan(data, &ctx);
 
         if pos > 0 {
             self.chunk_buffer.extend_from_slice(&data[0..pos]);

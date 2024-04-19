@@ -1,6 +1,6 @@
 extern crate proxmox_backup;
 
-use pbs_datastore::Chunker;
+use pbs_datastore::{Chunker, ChunkerImpl};
 
 fn main() {
     let mut buffer = Vec::new();
@@ -12,7 +12,7 @@ fn main() {
             buffer.push(byte);
         }
     }
-    let mut chunker = Chunker::new(64 * 1024);
+    let mut chunker = ChunkerImpl::new(64 * 1024);
 
     let count = 5;
 
@@ -23,8 +23,9 @@ fn main() {
     for _i in 0..count {
         let mut pos = 0;
         let mut _last = 0;
+        let ctx = pbs_datastore::chunker::Context::default();
         while pos < buffer.len() {
-            let k = chunker.scan(&buffer[pos..]);
+            let k = chunker.scan(&buffer[pos..], &ctx);
             if k == 0 {
                 //println!("LAST {}", pos);
                 break;

@@ -5,10 +5,10 @@ extern crate proxmox_backup;
 use anyhow::Error;
 use std::io::{Read, Write};
 
-use pbs_datastore::Chunker;
+use pbs_datastore::{Chunker, ChunkerImpl};
 
 struct ChunkWriter {
-    chunker: Chunker,
+    chunker: ChunkerImpl,
     last_chunk: usize,
     chunk_offset: usize,
 
@@ -23,7 +23,7 @@ struct ChunkWriter {
 impl ChunkWriter {
     fn new(chunk_size: usize) -> Self {
         ChunkWriter {
-            chunker: Chunker::new(chunk_size),
+            chunker: ChunkerImpl::new(chunk_size),
             last_chunk: 0,
             chunk_offset: 0,
             chunk_count: 0,
@@ -69,7 +69,8 @@ impl Write for ChunkWriter {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
         let chunker = &mut self.chunker;
 
-        let pos = chunker.scan(data);
+        let ctx = pbs_datastore::chunker::Context::default();
+        let pos = chunker.scan(data, &ctx);
 
         if pos > 0 {
             self.chunk_offset += pos;

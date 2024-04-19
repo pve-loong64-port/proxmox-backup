@@ -196,7 +196,7 @@ pub use backup_info::{BackupDir, BackupGroup, BackupInfo};
 pub use checksum_reader::ChecksumReader;
 pub use checksum_writer::ChecksumWriter;
 pub use chunk_store::ChunkStore;
-pub use chunker::Chunker;
+pub use chunker::{Chunker, ChunkerImpl};
 pub use crypt_reader::CryptReader;
 pub use crypt_writer::CryptWriter;
 pub use data_blob::DataBlob;

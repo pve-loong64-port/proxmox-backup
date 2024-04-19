@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use futures::ready;
 use futures::stream::{Stream, TryStream};
 
-use pbs_datastore::Chunker;
+use pbs_datastore::{Chunker, ChunkerImpl};
 
 use crate::inject_reused_chunks::InjectChunks;
 
@@ -16,7 +16,6 @@ pub struct InjectionData {
     boundaries: mpsc::Receiver<InjectChunks>,
     next_boundary: Option<InjectChunks>,
     injections: mpsc::Sender<InjectChunks>,
-    consumed: u64,
 }
 
 impl InjectionData {
@@ -28,7 +27,6 @@ impl InjectionData {
             boundaries,
             next_boundary: None,
             injections,
-            consumed: 0,
         }
     }
 }
@@ -36,19 +34,22 @@ impl InjectionData {
 /// Split input stream into dynamic sized chunks
 pub struct ChunkStream<S: Unpin> {
     input: S,
-    chunker: Chunker,
+    chunker: Box<dyn Chunker + Send>,
     buffer: BytesMut,
     scan_pos: usize,
+    consumed: u64,
     injection_data: Option<InjectionData>,
 }
 
 impl<S: Unpin> ChunkStream<S> {
     pub fn new(input: S, chunk_size: Option<usize>, injection_data: Option<InjectionData>) -> Self {
+        let chunk_size = chunk_size.unwrap_or(4 * 1024 * 1024);
         Self {
             input,
-            chunker: Chunker::new(chunk_size.unwrap_or(4 * 1024 * 1024)),
+            chunker: Box::new(ChunkerImpl::new(chunk_size)),
             buffer: BytesMut::new(),
             scan_pos: 0,
+            consumed: 0,
             injection_data,
         }
     }
@@ -68,11 +69,15 @@ where
         let this = self.get_mut();
 
         loop {
+            let ctx = pbs_datastore::chunker::Context {
+                base: this.consumed,
+                total: this.buffer.len() as u64,
+            };
+
             if let Some(InjectionData {
                 boundaries,
                 next_boundary,
                 injections,
-                consumed,
             }) = this.injection_data.as_mut()
             {
                 if next_boundary.is_none() {
@@ -84,29 +89,29 @@ where
                 if let Some(inject) = next_boundary.take() {
                     // require forced boundary, lookup next regular boundary
                     let pos = if this.scan_pos < this.buffer.len() {
-                        this.chunker.scan(&this.buffer[this.scan_pos..])
+                        this.chunker.scan(&this.buffer[this.scan_pos..], &ctx)
                     } else {
                         0
                     };
 
                     let chunk_boundary = if pos == 0 {
-                        *consumed + this.buffer.len() as u64
+                        this.consumed + this.buffer.len() as u64
                     } else {
-                        *consumed + (this.scan_pos + pos) as u64
+                        this.consumed + (this.scan_pos + pos) as u64
                     };
 
                     if inject.boundary <= chunk_boundary {
                         // forced boundary is before next boundary, force within current buffer
-                        let chunk_size = (inject.boundary - *consumed) as usize;
+                        let chunk_size = (inject.boundary - this.consumed) as usize;
                         let raw_chunk = this.buffer.split_to(chunk_size);
                         this.chunker.reset();
                         this.scan_pos = 0;
 
-                        *consumed += chunk_size as u64;
+                        this.consumed += chunk_size as u64;
 
                         // add the size of the injected chunks to consumed, so chunk stream offsets
                         // are in sync with the rest of the archive.
-                        *consumed += inject.size as u64;
+                        this.consumed += inject.size as u64;
 
                         injections.send(inject).unwrap();
 
@@ -118,7 +123,7 @@ where
                         // forced boundary is after next boundary, split off chunk from buffer
                         let chunk_size = this.scan_pos + pos;
                         let raw_chunk = this.buffer.split_to(chunk_size);
-                        *consumed += chunk_size as u64;
+                        this.consumed += chunk_size as u64;
                         this.scan_pos = 0;
 
                         return Poll::Ready(Some(Ok(raw_chunk)));
@@ -131,7 +136,7 @@ where
             }
 
             if this.scan_pos < this.buffer.len() {
-                let boundary = this.chunker.scan(&this.buffer[this.scan_pos..]);
+                let boundary = this.chunker.scan(&this.buffer[this.scan_pos..], &ctx);
 
                 let chunk_size = this.scan_pos + boundary;
 
@@ -140,9 +145,7 @@ where
                 } else if chunk_size <= this.buffer.len() {
                     // found new chunk boundary inside buffer, split off chunk from buffer
                     let raw_chunk = this.buffer.split_to(chunk_size);
-                    if let Some(InjectionData { consumed, .. }) = this.injection_data.as_mut() {
-                        *consumed += chunk_size as u64;
-                    }
+                    this.consumed += chunk_size as u64;
                     this.scan_pos = 0;
                     return Poll::Ready(Some(Ok(raw_chunk)));
                 } else {

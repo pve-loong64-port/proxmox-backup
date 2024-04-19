@@ -5,6 +5,20 @@
 /// use hash value 0 to detect a boundary.
 const CA_CHUNKER_WINDOW_SIZE: usize = 64;
 
+/// Additional context for chunker to find possible boundaries in payload streams
+#[derive(Default)]
+pub struct Context {
+    /// Already consumed bytes of the chunk stream consumer
+    pub base: u64,
+    /// Total size currently buffered
+    pub total: u64,
+}
+
+pub trait Chunker {
+    fn scan(&mut self, data: &[u8], ctx: &Context) -> usize;
+    fn reset(&mut self);
+}
+
 /// Sliding window chunker (Buzhash)
 ///
 /// This is a rewrite of *casync* chunker (cachunker.h) in rust.
@@ -15,7 +29,7 @@ const CA_CHUNKER_WINDOW_SIZE: usize = 64;
 /// Hash](https://en.wikipedia.org/wiki/Rolling_hash) article from
 /// Wikipedia.
 
-pub struct Chunker {
+pub struct ChunkerImpl {
     h: u32,
     window_size: usize,
     chunk_size: usize,
@@ -67,7 +81,7 @@ const BUZHASH_TABLE: [u32; 256] = [
     0x5eff22f4, 0x6027f4cc, 0x77178b3c, 0xae507131, 0x7bf7cabc, 0xf9c18d66, 0x593ade65, 0xd95ddf11,
 ];
 
-impl Chunker {
+impl ChunkerImpl {
     /// Create a new Chunker instance, which produces and average
     /// chunk size of `chunk_size_avg` (need to be a power of two). We
     /// allow variation from `chunk_size_avg/4` up to a maximum of
@@ -105,11 +119,44 @@ impl Chunker {
         }
     }
 
+    // fast implementation avoiding modulo
+    // #[inline(always)]
+    fn shall_break(&self) -> bool {
+        if self.chunk_size >= self.chunk_size_max {
+            return true;
+        }
+
+        if self.chunk_size < self.chunk_size_min {
+            return false;
+        }
+
+        //(self.h & 0x1ffff) <= 2 //THIS IS SLOW!!!
+
+        //(self.h & self.break_test_mask) <= 2 // Bad on 0 streams
+
+        (self.h & self.break_test_mask) >= self.break_test_minimum
+    }
+
+    // This is the original implementation from casync
+    /*
+    #[inline(always)]
+    fn shall_break_orig(&self) -> bool {
+
+        if self.chunk_size >= self.chunk_size_max { return true; }
+
+        if self.chunk_size < self.chunk_size_min { return false; }
+
+        (self.h % self.discriminator) == (self.discriminator - 1)
+    }
+     */
+}
+
+impl Chunker for ChunkerImpl {
     /// Scans the specified data for a chunk border. Returns 0 if none
     /// was found (and the function should be called with more data
     /// later on), or another value indicating the position of a
     /// border.
-    pub fn scan(&mut self, data: &[u8]) -> usize {
+    fn scan(&mut self, data: &[u8], _ctx: &Context) -> usize {
         let window_len = self.window.len();
         let data_len = data.len();
 
@@ -167,42 +214,11 @@ impl Chunker {
         0
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.h = 0;
         self.chunk_size = 0;
         self.window_size = 0;
     }
-
-    // fast implementation avoiding modulo
-    // #[inline(always)]
-    fn shall_break(&self) -> bool {
-        if self.chunk_size >= self.chunk_size_max {
-            return true;
-        }
-
-        if self.chunk_size < self.chunk_size_min {
-            return false;
-        }
-
-        //(self.h & 0x1ffff) <= 2 //THIS IS SLOW!!!
-
-        //(self.h & self.break_test_mask) <= 2 // Bad on 0 streams
-
-        (self.h & self.break_test_mask) >= self.break_test_minimum
-    }
-
-    // This is the original implementation from casync
-    /*
-    #[inline(always)]
-    fn shall_break_orig(&self) -> bool {
-
-        if self.chunk_size >= self.chunk_size_max { return true; }
-
-        if self.chunk_size < self.chunk_size_min { return false; }
-
-        (self.h % self.discriminator) == (self.discriminator - 1)
-    }
-     */
 }
 
 #[test]
@@ -215,17 +231,18 @@ fn test_chunker1() {
             buffer.push(byte);
         }
     }
-    let mut chunker = Chunker::new(64 * 1024);
+    let mut chunker = ChunkerImpl::new(64 * 1024);
 
     let mut pos = 0;
     let mut last = 0;
 
     let mut chunks1: Vec<(usize, usize)> = vec![];
     let mut chunks2: Vec<(usize, usize)> = vec![];
+    let ctx = Context::default();
 
     // test1: feed single bytes
     while pos < buffer.len() {
-        let k = chunker.scan(&buffer[pos..pos + 1]);
+        let k = chunker.scan(&buffer[pos..pos + 1], &ctx);
         pos += 1;
         if k != 0 {
             let prev = last;
@@ -235,13 +252,13 @@ fn test_chunker1() {
     }
     chunks1.push((last, buffer.len() - last));
 
-    let mut chunker = Chunker::new(64 * 1024);
+    let mut chunker = ChunkerImpl::new(64 * 1024);
 
     let mut pos = 0;
 
     // test2: feed with whole buffer
     while pos < buffer.len() {
-        let k = chunker.scan(&buffer[pos..]);
+        let k = chunker.scan(&buffer[pos..], &ctx);
         if k != 0 {
             chunks2.push((pos, k));
             pos += k;
