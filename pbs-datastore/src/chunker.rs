@@ -1,3 +1,5 @@
+use std::sync::mpsc::Receiver;
+
 /// Note: window size 32 or 64, is faster because we can
 /// speedup modulo operations, but always computes hash 0
 /// for constant data streams .. 0,0,0,0,0,0
@@ -44,6 +46,16 @@ pub struct ChunkerImpl {
     break_test_minimum: u32,
 
     window: [u8; CA_CHUNKER_WINDOW_SIZE],
+}
+
+/// Sliding window chunker (Buzhash) with boundary suggestions
+///
+/// Suggest to chunk at a given boundary instead of the regular chunk boundary for better alignment
+/// with file payload boundaries.
+pub struct PayloadChunker {
+    chunker: ChunkerImpl,
+    current_suggested: Option<u64>,
+    suggested_boundaries: Receiver<u64>,
 }
 
 const BUZHASH_TABLE: [u32; 256] = [
@@ -218,6 +230,84 @@ impl Chunker for ChunkerImpl {
         self.h = 0;
         self.chunk_size = 0;
         self.window_size = 0;
+    }
+}
+
+impl PayloadChunker {
+    /// Create a new PayloadChunker instance, which produces and average
+    /// chunk size of `chunk_size_avg` (need to be a power of two), if no
+    /// suggested boundaries are provided.
+    /// Use suggested boundaries instead,  whenever the chunk size is within
+    /// the min - max range.
+    pub fn new(chunk_size_avg: usize, suggested_boundaries: Receiver<u64>) -> Self {
+        Self {
+            chunker: ChunkerImpl::new(chunk_size_avg),
+            current_suggested: None,
+            suggested_boundaries,
+        }
+    }
+}
+
+impl Chunker for PayloadChunker {
+    fn scan(&mut self, data: &[u8], ctx: &Context) -> usize {
+        assert!(ctx.total >= data.len() as u64);
+        let pos = ctx.total - data.len() as u64;
+
+        loop {
+            if let Some(boundary) = self.current_suggested {
+                if boundary < ctx.base + pos {
+                    log::debug!("Boundary {boundary} in past");
+                    // ignore passed boundaries
+                    self.current_suggested = None;
+                    continue;
+                }
+
+                if boundary > ctx.base + ctx.total {
+                    log::debug!("Boundary {boundary} in future");
+                    // boundary in future, cannot decide yet
+                    return self.chunker.scan(data, ctx);
+                }
+
+                let chunk_size = (boundary - ctx.base) as usize;
+                if chunk_size < self.chunker.chunk_size_min {
+                    log::debug!("Chunk size {chunk_size} below minimum chunk size");
+                    // chunk to small, ignore boundary
+                    self.current_suggested = None;
+                    continue;
+                }
+
+                if chunk_size <= self.chunker.chunk_size_max {
+                    self.current_suggested = None;
+                    // calculate boundary relative to start of given data buffer
+                    let len = chunk_size - pos as usize;
+                    if len == 0 {
+                        // passed this one, previous scan did not know about boundary just yet
+                        return self.chunker.scan(data, ctx);
+                    }
+                    self.chunker.reset();
+                    log::debug!(
+                        "Chunk at suggested boundary: {boundary}, chunk size: {chunk_size}"
+                    );
+                    return len;
+                }
+
+                log::debug!("Chunk {chunk_size} to big, regular scan");
+                // chunk to big, cannot decide yet
+                // scan for hash based chunk boundary instead
+                return self.chunker.scan(data, ctx);
+            }
+
+            if let Ok(boundary) = self.suggested_boundaries.try_recv() {
+                self.current_suggested = Some(boundary);
+            } else {
+                log::debug!("No suggested boundary, regular scan");
+                return self.chunker.scan(data, ctx);
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.chunker.reset();
     }
 }
 
