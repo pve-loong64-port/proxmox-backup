@@ -27,6 +27,7 @@ use crate::pxar::create::PxarWriters;
 /// consumer.
 pub struct PxarBackupStream {
     rx: Option<std::sync::mpsc::Receiver<Result<Vec<u8>, Error>>>,
+    pub suggested_boundaries: Option<std::sync::mpsc::Receiver<u64>>,
     handle: Option<AbortHandle>,
     error: Arc<Mutex<Option<String>>>,
 }
@@ -55,22 +56,26 @@ impl PxarBackupStream {
         ));
         let writer = pxar::encoder::sync::StandardWriter::new(writer);
 
-        let (writer, payload_rx) = if separate_payload_stream {
-            let (tx, rx) = std::sync::mpsc::sync_channel(10);
-            let payload_writer = TokioWriterAdapter::new(std::io::BufWriter::with_capacity(
-                buffer_size,
-                StdChannelWriter::new(tx),
-            ));
-            (
-                pxar::PxarVariant::Split(
-                    writer,
-                    pxar::encoder::sync::StandardWriter::new(payload_writer),
-                ),
-                Some(rx),
-            )
-        } else {
-            (pxar::PxarVariant::Unified(writer), None)
-        };
+        let (writer, payload_rx, suggested_boundaries_tx, suggested_boundaries_rx) =
+            if separate_payload_stream {
+                let (tx, rx) = std::sync::mpsc::sync_channel(10);
+                let (suggested_boundaries_tx, suggested_boundaries_rx) = std::sync::mpsc::channel();
+                let payload_writer = TokioWriterAdapter::new(std::io::BufWriter::with_capacity(
+                    buffer_size,
+                    StdChannelWriter::new(tx),
+                ));
+                (
+                    pxar::PxarVariant::Split(
+                        writer,
+                        pxar::encoder::sync::StandardWriter::new(payload_writer),
+                    ),
+                    Some(rx),
+                    Some(suggested_boundaries_tx),
+                    Some(suggested_boundaries_rx),
+                )
+            } else {
+                (pxar::PxarVariant::Unified(writer), None, None, None)
+            };
 
         let error = Arc::new(Mutex::new(None));
         let error2 = Arc::clone(&error);
@@ -85,6 +90,7 @@ impl PxarBackupStream {
                 },
                 options,
                 boundaries,
+                suggested_boundaries_tx,
             )
             .await
             {
@@ -99,12 +105,14 @@ impl PxarBackupStream {
 
         let backup_stream = Self {
             rx: Some(rx),
+            suggested_boundaries: None,
             handle: Some(handle.clone()),
             error: Arc::clone(&error),
         };
 
         let backup_payload_stream = payload_rx.map(|rx| Self {
             rx: Some(rx),
+            suggested_boundaries: suggested_boundaries_rx,
             handle: Some(handle),
             error,
         });

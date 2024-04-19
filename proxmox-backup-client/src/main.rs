@@ -209,7 +209,7 @@ async fn backup_directory<P: AsRef<Path>>(
         payload_target.is_some(),
     )?;
 
-    let mut chunk_stream = ChunkStream::new(pxar_stream, chunk_size, None);
+    let mut chunk_stream = ChunkStream::new(pxar_stream, chunk_size, None, None);
     let (tx, rx) = mpsc::channel(10); // allow to buffer 10 chunks
 
     let stream = ReceiverStream::new(rx).map_err(Error::from);
@@ -223,14 +223,19 @@ async fn backup_directory<P: AsRef<Path>>(
 
     let stats = client.upload_stream(archive_name, stream, upload_options.clone(), None);
 
-    if let Some(payload_stream) = payload_stream {
+    if let Some(mut payload_stream) = payload_stream {
         let payload_target = payload_target
             .ok_or_else(|| format_err!("got payload stream, but no target archive name"))?;
 
         let (payload_injections_tx, payload_injections_rx) = std::sync::mpsc::channel();
         let injection_data = InjectionData::new(payload_boundaries_rx, payload_injections_tx);
-        let mut payload_chunk_stream =
-            ChunkStream::new(payload_stream, chunk_size, Some(injection_data));
+        let suggested_boundaries = payload_stream.suggested_boundaries.take();
+        let mut payload_chunk_stream = ChunkStream::new(
+            payload_stream,
+            chunk_size,
+            Some(injection_data),
+            suggested_boundaries,
+        );
         let (payload_tx, payload_rx) = mpsc::channel(10); // allow to buffer 10 chunks
         let stream = ReceiverStream::new(payload_rx).map_err(Error::from);
 
@@ -573,7 +578,8 @@ fn spawn_catalog_upload(
     let (catalog_tx, catalog_rx) = std::sync::mpsc::sync_channel(10); // allow to buffer 10 writes
     let catalog_stream = proxmox_async::blocking::StdChannelStream(catalog_rx);
     let catalog_chunk_size = 512 * 1024;
-    let catalog_chunk_stream = ChunkStream::new(catalog_stream, Some(catalog_chunk_size), None);
+    let catalog_chunk_stream =
+        ChunkStream::new(catalog_stream, Some(catalog_chunk_size), None, None);
 
     let catalog_writer = Arc::new(Mutex::new(CatalogWriter::new(TokioWriterAdapter::new(
         StdChannelWriter::new(catalog_tx),

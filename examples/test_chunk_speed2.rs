@@ -26,7 +26,7 @@ async fn run() -> Result<(), Error> {
         .map_err(Error::from);
 
     //let chunk_stream = FixedChunkStream::new(stream, 4*1024*1024);
-    let mut chunk_stream = ChunkStream::new(stream, None, None);
+    let mut chunk_stream = ChunkStream::new(stream, None, None, None);
 
     let start_time = std::time::Instant::now();
 

@@ -169,6 +169,7 @@ struct Archiver {
     file_copy_buffer: Vec<u8>,
     skip_e2big_xattr: bool,
     forced_boundaries: Option<mpsc::Sender<InjectChunks>>,
+    suggested_boundaries: Option<mpsc::Sender<u64>>,
     previous_payload_index: Option<DynamicIndexReader>,
     cache: PxarLookaheadCache,
     reuse_stats: ReuseStats,
@@ -197,6 +198,7 @@ pub async fn create_archive<T, F>(
     callback: F,
     options: PxarCreateOptions,
     forced_boundaries: Option<mpsc::Sender<InjectChunks>>,
+    suggested_boundaries: Option<mpsc::Sender<u64>>,
 ) -> Result<(), Error>
 where
     T: SeqWrite + Send,
@@ -271,6 +273,7 @@ where
         file_copy_buffer: vec::undefined(4 * 1024 * 1024),
         skip_e2big_xattr: options.skip_e2big_xattr,
         forced_boundaries,
+        suggested_boundaries,
         previous_payload_index,
         cache: PxarLookaheadCache::new(None),
         reuse_stats: ReuseStats::default(),
@@ -860,6 +863,11 @@ impl Archiver {
                         .lock()
                         .unwrap()
                         .add_file(c_file_name, file_size, stat.st_mtime)?;
+                }
+
+                if let Some(sender) = self.suggested_boundaries.as_mut() {
+                    let offset = encoder.payload_position()?.raw();
+                    sender.send(offset)?;
                 }
 
                 let offset: LinkOffset = if let Some(payload_offset) = payload_offset {

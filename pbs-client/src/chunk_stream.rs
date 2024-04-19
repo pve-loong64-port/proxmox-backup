@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use futures::ready;
 use futures::stream::{Stream, TryStream};
 
-use pbs_datastore::{Chunker, ChunkerImpl};
+use pbs_datastore::{Chunker, ChunkerImpl, PayloadChunker};
 
 use crate::inject_reused_chunks::InjectChunks;
 
@@ -42,11 +42,20 @@ pub struct ChunkStream<S: Unpin> {
 }
 
 impl<S: Unpin> ChunkStream<S> {
-    pub fn new(input: S, chunk_size: Option<usize>, injection_data: Option<InjectionData>) -> Self {
+    pub fn new(
+        input: S,
+        chunk_size: Option<usize>,
+        injection_data: Option<InjectionData>,
+        suggested_boundaries: Option<mpsc::Receiver<u64>>,
+    ) -> Self {
         let chunk_size = chunk_size.unwrap_or(4 * 1024 * 1024);
         Self {
             input,
-            chunker: Box::new(ChunkerImpl::new(chunk_size)),
+            chunker: if let Some(suggested) = suggested_boundaries {
+                Box::new(PayloadChunker::new(chunk_size, suggested))
+            } else {
+                Box::new(ChunkerImpl::new(chunk_size))
+            },
             buffer: BytesMut::new(),
             scan_pos: 0,
             consumed: 0,

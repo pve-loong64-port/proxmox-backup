@@ -442,6 +442,7 @@ async fn create_archive(
         },
         options,
         None,
+        None,
     )
     .await?;
 

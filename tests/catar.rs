@@ -40,6 +40,7 @@ fn run_test(dir_name: &str) -> Result<(), Error> {
         |_| Ok(()),
         options,
         None,
+        None,
     ))?;
 
     Command::new("cmp")
