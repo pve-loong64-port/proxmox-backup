@@ -158,13 +158,6 @@ impl DataStore {
             }
         }
 
-        if let Some(operation) = operation {
-            update_active_operations(name, operation, 1)?;
-        }
-
-        // Our operation is registered, unlock the config.
-        drop(config_lock);
-
         let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
         let entry = datastore_cache.get(name);
 
@@ -172,6 +165,9 @@ impl DataStore {
         let chunk_store = if let Some(datastore) = &entry {
             let last_digest = datastore.last_digest.as_ref();
             if let Some(true) = last_digest.map(|last_digest| last_digest == &digest) {
+                if let Some(operation) = operation {
+                    update_active_operations(name, operation, 1)?;
+                }
                 return Ok(Arc::new(Self {
                     inner: Arc::clone(datastore),
                     operation,
@@ -194,6 +190,10 @@ impl DataStore {
 
         let datastore = Arc::new(datastore);
         datastore_cache.insert(name.to_string(), datastore.clone());
+
+        if let Some(operation) = operation {
+            update_active_operations(name, operation, 1)?;
+        }
 
         Ok(Arc::new(Self {
             inner: datastore,
