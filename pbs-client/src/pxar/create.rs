@@ -578,6 +578,10 @@ impl Archiver {
 
         let mut metadata = Metadata::default();
         metadata.stat.mode = pxar::format::mode::IFREG | 0o600;
+        // use uid/gid of client process so the backup snapshot might be restored by the same
+        // potentially non-root user
+        metadata.stat.uid = unsafe { libc::getuid() };
+        metadata.stat.gid = unsafe { libc::getgid() };
 
         let mut file = encoder
             .create_file(&metadata, ".pxarexclude-cli", content.len() as u64)
