@@ -1715,3 +1715,246 @@ fn generate_pxar_excludes_cli(patterns: &[MatchEntry]) -> Vec<u8> {
 
     content
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+    use std::fs::File;
+    use std::fs::OpenOptions;
+    use std::io::{self, BufReader, Seek, SeekFrom, Write};
+    use std::pin::Pin;
+    use std::process::Command;
+    use std::sync::mpsc;
+    use std::task::{Context, Poll};
+
+    use pbs_datastore::dynamic_index::DynamicIndexReader;
+    use pxar::accessor::sync::FileReader;
+    use pxar::encoder::SeqWrite;
+
+    use crate::pxar::extract::Extractor;
+    use crate::pxar::OverwriteFlags;
+
+    use super::*;
+
+    struct DummyWriter {
+        file: Option<File>,
+    }
+
+    impl DummyWriter {
+        fn new<P: AsRef<Path>>(path: Option<P>) -> Result<Self, Error> {
+            let file = if let Some(path) = path {
+                Some(
+                    OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .truncate(true)
+                        .create(true)
+                        .open(path)?,
+                )
+            } else {
+                None
+            };
+            Ok(Self { file })
+        }
+    }
+
+    impl Write for DummyWriter {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            if let Some(file) = self.file.as_mut() {
+                file.write_all(data)?;
+            }
+            Ok(data.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if let Some(file) = self.file.as_mut() {
+                file.flush()?;
+            }
+            Ok(())
+        }
+    }
+
+    impl SeqWrite for DummyWriter {
+        fn poll_seq_write(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Poll::Ready(self.as_mut().write(buf))
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), io::Error>> {
+            Poll::Ready(self.as_mut().flush())
+        }
+    }
+
+    fn prepare<P: AsRef<Path>>(dir_path: P) -> Result<(), Error> {
+        let dir = nix::dir::Dir::open(dir_path.as_ref(), OFlag::O_DIRECTORY, Mode::empty())?;
+
+        let fs_magic = detect_fs_type(dir.as_raw_fd()).unwrap();
+        let stat = nix::sys::stat::fstat(dir.as_raw_fd()).unwrap();
+        let mut fs_feature_flags = Flags::from_magic(fs_magic);
+        let metadata = get_metadata(
+            dir.as_raw_fd(),
+            &stat,
+            fs_feature_flags,
+            fs_magic,
+            &mut fs_feature_flags,
+            false,
+        )?;
+
+        let mut extractor = Extractor::new(
+            dir,
+            metadata.clone(),
+            true,
+            OverwriteFlags::empty(),
+            fs_feature_flags,
+        );
+
+        let dir_metadata = Metadata {
+            stat: pxar::Stat::default().mode(0o777u64).set_dir().gid(0).uid(0),
+            ..Default::default()
+        };
+
+        let file_metadata = Metadata {
+            stat: pxar::Stat::default()
+                .mode(0o777u64)
+                .set_regular_file()
+                .gid(0)
+                .uid(0),
+            ..Default::default()
+        };
+
+        extractor.enter_directory(
+            OsString::from(format!("testdir")),
+            dir_metadata.clone(),
+            true,
+        )?;
+
+        let size = 1024 * 1024;
+        let mut cursor = BufReader::new(std::io::Cursor::new(vec![0u8; size]));
+        for i in 0..10 {
+            extractor.enter_directory(
+                OsString::from(format!("folder_{i}")),
+                dir_metadata.clone(),
+                true,
+            )?;
+            for j in 0..10 {
+                cursor.seek(SeekFrom::Start(0))?;
+                extractor.extract_file(
+                    CString::new(format!("file_{j}").as_str())?.as_c_str(),
+                    &file_metadata,
+                    size as u64,
+                    &mut cursor,
+                    true,
+                )?;
+            }
+            extractor.leave_directory()?;
+        }
+
+        extractor.leave_directory()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_archive_with_reference() -> Result<(), Error> {
+        let mut testdir = PathBuf::from("./target/testout");
+        testdir.push(std::module_path!());
+
+        let _ = std::fs::remove_dir_all(&testdir);
+        let _ = std::fs::create_dir_all(&testdir);
+
+        prepare(testdir.as_path())?;
+
+        let previous_payload_index = Some(DynamicIndexReader::new(File::open(
+            "../tests/pxar/backup-client-pxar-data.ppxar.didx",
+        )?)?);
+        let metadata_archive = File::open("../tests/pxar/backup-client-pxar-data.mpxar").unwrap();
+        let metadata_size = metadata_archive.metadata()?.len();
+        let reader: MetadataArchiveReader = Arc::new(FileReader::new(metadata_archive));
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let (suggested_boundaries, _rx) = mpsc::channel();
+        let (forced_boundaries, _rx) = mpsc::channel();
+
+        rt.block_on(async move {
+            testdir.push("testdir");
+            let source_dir =
+                nix::dir::Dir::open(testdir.as_path(), OFlag::O_DIRECTORY, Mode::empty()).unwrap();
+
+            let fs_magic = detect_fs_type(source_dir.as_raw_fd()).unwrap();
+            let stat = nix::sys::stat::fstat(source_dir.as_raw_fd()).unwrap();
+            let mut fs_feature_flags = Flags::from_magic(fs_magic);
+
+            let metadata = get_metadata(
+                source_dir.as_raw_fd(),
+                &stat,
+                fs_feature_flags,
+                fs_magic,
+                &mut fs_feature_flags,
+                false,
+            )?;
+
+            let writer = DummyWriter::new(Some("./target/backup-client-pxar-run.mpxar")).unwrap();
+            let payload_writer = DummyWriter::new::<PathBuf>(None).unwrap();
+
+            let mut encoder = Encoder::new(
+                pxar::PxarVariant::Split(writer, payload_writer),
+                &metadata,
+                Some(&[]),
+            )
+            .await?;
+
+            let mut archiver = Archiver {
+                feature_flags: Flags::from_magic(fs_magic),
+                fs_feature_flags: Flags::from_magic(fs_magic),
+                fs_magic,
+                callback: Box::new(|_| Ok(())),
+                patterns: Vec::new(),
+                catalog: None,
+                path: PathBuf::new(),
+                entry_counter: 0,
+                entry_limit: 1024,
+                current_st_dev: stat.st_dev,
+                device_set: None,
+                hardlinks: HashMap::new(),
+                file_copy_buffer: vec::undefined(4 * 1024 * 1024),
+                skip_e2big_xattr: false,
+                forced_boundaries: Some(forced_boundaries),
+                previous_payload_index,
+                suggested_boundaries: Some(suggested_boundaries),
+                cache: PxarLookaheadCache::new(),
+                reuse_stats: ReuseStats::default(),
+            };
+
+            let accessor = Accessor::new(pxar::PxarVariant::Unified(reader), metadata_size)
+                .await
+                .unwrap();
+            let root = accessor.open_root().await.ok();
+            archiver
+                .archive_dir_contents(&mut encoder, root, source_dir, true)
+                .await
+                .unwrap();
+
+            archiver
+                .flush_cached_reusing_if_below_threshold(&mut encoder, false)
+                .await
+                .unwrap();
+
+            encoder.finish().await.unwrap();
+            encoder.close().await.unwrap();
+
+            let status = Command::new("diff")
+                .args([
+                    "../tests/pxar/backup-client-pxar-expected.mpxar",
+                    "./target/backup-client-pxar-run.mpxar",
+                ])
+                .status()
+                .expect("failed to execute diff");
+            assert!(status.success());
+
+            Ok::<(), Error>(())
+        })
+    }
+}
