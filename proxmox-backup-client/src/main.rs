@@ -41,7 +41,7 @@ use pbs_client::tools::{
         crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
         KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
     },
-    CHUNK_SIZE_SCHEMA, REPO_URL_SCHEMA,
+    raise_nofile_limit, CHUNK_SIZE_SCHEMA, REPO_URL_SCHEMA,
 };
 use pbs_client::{
     delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
@@ -1074,7 +1074,8 @@ async fn create_backup(
                     .start_directory(std::ffi::CString::new(target.as_str())?.as_c_str())?;
 
                 let mut previous_ref = None;
-                if detection_mode.is_metadata() {
+                let max_cache_size = if detection_mode.is_metadata() {
+                    let old_rlimit = raise_nofile_limit()?;
                     if let Some(ref manifest) = previous_manifest {
                         // BackupWriter::start created a new snapshot, get the one before
                         if let Some(backup_time) = client.previous_backup_time().await? {
@@ -1100,7 +1101,20 @@ async fn create_backup(
                             .await?
                         }
                     }
-                }
+
+                    if old_rlimit.rlim_max <= 4096 {
+                        log::info!(
+                            "resource limit for open file handles low: {}",
+                            old_rlimit.rlim_max,
+                        );
+                    }
+
+                    Some(usize::try_from(
+                        old_rlimit.rlim_max - old_rlimit.rlim_cur / 2,
+                    )?)
+                } else {
+                    None
+                };
 
                 let pxar_options = pbs_client::pxar::PxarCreateOptions {
                     device_set: devices.clone(),
@@ -1109,6 +1123,7 @@ async fn create_backup(
                     skip_lost_and_found,
                     skip_e2big_xattr,
                     previous_ref,
+                    max_cache_size,
                 };
 
                 let upload_options = UploadOptions {

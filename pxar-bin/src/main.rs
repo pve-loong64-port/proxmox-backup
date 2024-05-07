@@ -376,6 +376,7 @@ async fn create_archive(
         skip_lost_and_found: false,
         skip_e2big_xattr: false,
         previous_ref: None,
+        max_cache_size: None,
     };
 
     let source = PathBuf::from(source);

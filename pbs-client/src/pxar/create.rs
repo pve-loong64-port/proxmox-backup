@@ -56,6 +56,8 @@ pub struct PxarCreateOptions {
     pub skip_e2big_xattr: bool,
     /// Reference state for partial backups
     pub previous_ref: Option<PxarPrevRef>,
+    /// Maximum number of lookahead cache entries
+    pub max_cache_size: Option<usize>,
 }
 
 pub type MetadataArchiveReader = Arc<dyn ReadAt + Send + Sync + 'static>;
@@ -275,7 +277,7 @@ where
         forced_boundaries,
         suggested_boundaries,
         previous_payload_index,
-        cache: PxarLookaheadCache::new(None),
+        cache: PxarLookaheadCache::new(options.max_cache_size),
         reuse_stats: ReuseStats::default(),
     };
 
@@ -1924,7 +1926,7 @@ mod tests {
                 forced_boundaries: Some(forced_boundaries),
                 previous_payload_index,
                 suggested_boundaries: Some(suggested_boundaries),
-                cache: PxarLookaheadCache::new(),
+                cache: PxarLookaheadCache::new(None),
                 reuse_stats: ReuseStats::default(),
             };
 
