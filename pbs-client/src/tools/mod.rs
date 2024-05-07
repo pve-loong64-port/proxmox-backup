@@ -612,3 +612,26 @@ pub fn handle_root_with_optional_format_version_prelude<R: pxar::decoder::SeqRea
         _ => bail!("unexpected entry kind {:?}", first.kind()),
     }
 }
+
+/// Raise the soft limit for open file handles to the hard limit
+///
+/// Returns the values set before raising the limit as libc::rlimit64
+pub fn raise_nofile_limit() -> Result<libc::rlimit64, Error> {
+    let mut old = libc::rlimit64 {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    if 0 != unsafe { libc::getrlimit64(libc::RLIMIT_NOFILE, &mut old as *mut libc::rlimit64) } {
+        bail!("Failed to get nofile rlimit");
+    }
+
+    let mut new = libc::rlimit64 {
+        rlim_cur: old.rlim_max,
+        rlim_max: old.rlim_max,
+    };
+    if 0 != unsafe { libc::setrlimit64(libc::RLIMIT_NOFILE, &mut new as *mut libc::rlimit64) } {
+        bail!("Failed to set nofile rlimit");
+    }
+
+    Ok(old)
+}
