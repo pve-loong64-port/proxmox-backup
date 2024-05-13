@@ -382,3 +382,97 @@ fn test_chunker1() {
         panic!("got different chunks");
     }
 }
+
+#[test]
+fn test_suggested_boundary() {
+    let mut buffer = Vec::new();
+
+    for i in 0..(256 * 1024) {
+        for j in 0..4 {
+            let byte = ((i >> (j << 3)) & 0xff) as u8;
+            buffer.push(byte);
+        }
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut chunker = PayloadChunker::new(64 * 1024, rx);
+
+    // Suggest chunk boundary within regular chunk
+    tx.send(32 * 1024).unwrap();
+    // Suggest chunk boundary within regular chunk, resulting chunk being 0
+    tx.send(32 * 1024).unwrap();
+    // Suggest chunk boundary in the past, must be ignored
+    tx.send(0).unwrap();
+    // Suggest chunk boundary aligned with regular boundary
+    tx.send(405521).unwrap();
+
+    let mut pos = 0;
+    let mut last = 0;
+
+    let mut chunks1: Vec<(usize, usize)> = vec![];
+    let mut chunks2: Vec<(usize, usize)> = vec![];
+    let mut ctx = Context::default();
+
+    // test1: feed single bytes with suggeset boundary
+    while pos < buffer.len() {
+        ctx.total += 1;
+        let k = chunker.scan(&buffer[pos..pos + 1], &ctx);
+        pos += 1;
+        if k != 0 {
+            let prev = last;
+            last = pos;
+            ctx.base += pos as u64;
+            ctx.total = 0;
+            chunks1.push((prev, pos - prev));
+        }
+    }
+    chunks1.push((last, buffer.len() - last));
+
+    let mut pos = 0;
+    let mut ctx = Context::default();
+    ctx.total = buffer.len() as u64;
+    chunker.reset();
+    // Suggest chunk boundary within regular chunk
+    tx.send(32 * 1024).unwrap();
+    // Suggest chunk boundary within regular chunk,
+    // resulting chunk being to small and therefore ignored
+    tx.send(32 * 1024).unwrap();
+    // Suggest chunk boundary in the past, must be ignored
+    tx.send(0).unwrap();
+    // Suggest chunk boundary aligned with regular boundary
+    tx.send(405521).unwrap();
+
+    while pos < buffer.len() {
+        let k = chunker.scan(&buffer[pos..], &ctx);
+        if k != 0 {
+            chunks2.push((pos, k));
+            pos += k;
+            ctx.base += pos as u64;
+            ctx.total = (buffer.len() - pos) as u64;
+        } else {
+            break;
+        }
+    }
+
+    chunks2.push((pos, buffer.len() - pos));
+
+    if chunks1 != chunks2 {
+        let mut size1 = 0;
+        for (_offset, len) in &chunks1 {
+            size1 += len;
+        }
+        println!("Chunks1: {size1}\n{chunks1:?}\n");
+
+        let mut size2 = 0;
+        for (_offset, len) in &chunks2 {
+            size2 += len;
+        }
+        println!("Chunks2: {size2}\n{chunks2:?}\n");
+
+        panic!("got different chunks");
+    }
+
+    let expected_sizes = [32768, 110609, 229376, 32768, 262144, 262144, 118767];
+    for ((_, chunk_size), expected) in chunks1.iter().zip(expected_sizes.iter()) {
+        assert_eq!(chunk_size, expected);
+    }
+}
