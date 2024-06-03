@@ -177,6 +177,7 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-
 	    --bin proxmox-restore-daemon \
 	    --package proxmox-backup \
 	    --bin docgen \
+	    --bin pbs2to3 \
 	    --bin proxmox-backup-api \
 	    --bin proxmox-backup-manager \
 	    --bin proxmox-backup-proxy \
