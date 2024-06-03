@@ -63,20 +63,29 @@ use pbs_key_config::{decrypt_key, rsa_encrypt_key_config, KeyConfig};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json;
 
-mod benchmark;
-pub use benchmark::*;
-mod mount;
-pub use mount::*;
-mod task;
-pub use task::*;
-mod catalog;
-pub use catalog::*;
-mod snapshot;
-pub use snapshot::*;
-mod helper;
-pub(crate) use helper::*;
 pub mod key;
 pub mod namespace;
+
+mod benchmark;
+pub use benchmark::*;
+
+mod catalog;
+pub use catalog::*;
+
+mod group;
+pub use group::*;
+
+mod helper;
+pub(crate) use helper::*;
+
+mod mount;
+pub use mount::*;
+
+mod snapshot;
+pub use snapshot::*;
+
+mod task;
+pub use task::*;
 
 fn record_repository(repo: &BackupRepository) {
     let base = match BaseDirectories::with_prefix("proxmox-backup") {
@@ -2017,6 +2026,7 @@ fn main() {
         .insert("benchmark", benchmark_cmd_def)
         .insert("change-owner", change_owner_cmd_def)
         .insert("namespace", namespace::cli_map())
+        .insert("group", group_mgmt_cli())
         .alias(&["files"], &["snapshot", "files"])
         .alias(&["forget"], &["snapshot", "forget"])
         .alias(&["upload-log"], &["snapshot", "upload-log"])
