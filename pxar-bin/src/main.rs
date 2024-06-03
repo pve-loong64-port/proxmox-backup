@@ -328,6 +328,10 @@ fn extract_archive(
                 minimum: 0,
                 maximum: isize::MAX,
             },
+            "payload-output": {
+                description: "'ppxar' payload output data file to create split archive.",
+                optional: true,
+            },
         },
     },
 )]
@@ -345,6 +349,7 @@ async fn create_archive(
     no_sockets: bool,
     exclude: Option<Vec<String>>,
     entries_max: isize,
+    payload_output: Option<String>,
 ) -> Result<(), Error> {
     let patterns = {
         let input = exclude.unwrap_or_default();
@@ -387,6 +392,16 @@ async fn create_archive(
         .mode(0o640)
         .open(archive)?;
 
+    let payload_file = payload_output
+        .map(|payload_output| {
+            OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .mode(0o640)
+                .open(payload_output)
+        })
+        .transpose()?;
+
     let writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
     let mut feature_flags = Flags::DEFAULT;
     if no_xattrs {
@@ -408,7 +423,15 @@ async fn create_archive(
         feature_flags.remove(Flags::WITH_SOCKETS);
     }
 
-    let writer = pxar::PxarVariant::Unified(pxar::encoder::sync::StandardWriter::new(writer));
+    let writer = if let Some(payload_file) = payload_file {
+        let payload_writer = std::io::BufWriter::with_capacity(1024 * 1024, payload_file);
+        pxar::PxarVariant::Split(
+            pxar::encoder::sync::StandardWriter::new(writer),
+            pxar::encoder::sync::StandardWriter::new(payload_writer),
+        )
+    } else {
+        pxar::PxarVariant::Unified(pxar::encoder::sync::StandardWriter::new(writer))
+    };
     pbs_client::pxar::create_archive(
         dir,
         PxarWriters::new(writer, None),
@@ -535,7 +558,8 @@ fn main() {
             CliCommand::new(&API_METHOD_CREATE_ARCHIVE)
                 .arg_param(&["archive", "source"])
                 .completion_cb("archive", complete_file_name)
-                .completion_cb("source", complete_file_name),
+                .completion_cb("source", complete_file_name)
+                .completion_cb("payload-output", complete_file_name),
         )
         .insert(
             "extract",
