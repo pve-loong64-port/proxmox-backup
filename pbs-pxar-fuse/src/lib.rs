@@ -61,12 +61,24 @@ impl Session {
         options: &OsStr,
         verbose: bool,
         mountpoint: &Path,
+        payload_input_path: Option<&Path>,
     ) -> Result<Self, Error> {
         // TODO: Add a buffered/caching ReadAt layer?
         let file = std::fs::File::open(archive_path)?;
         let file_size = file.metadata()?.len();
         let reader: Reader = Arc::new(accessor::sync::FileReader::new(file));
-        let accessor = Accessor::new(pxar::PxarVariant::Unified(reader), file_size).await?;
+        let accessor = if let Some(payload_input) = payload_input_path {
+            let payload_file = std::fs::File::open(payload_input)?;
+            let payload_size = payload_file.metadata()?.len();
+            let payload_reader: Reader = Arc::new(accessor::sync::FileReader::new(payload_file));
+            Accessor::new(
+                pxar::PxarVariant::Split(reader, (payload_reader, payload_size)),
+                file_size,
+            )
+            .await?
+        } else {
+            Accessor::new(pxar::PxarVariant::Unified(reader), file_size).await?
+        };
         Self::mount(accessor, options, verbose, mountpoint)
     }
 

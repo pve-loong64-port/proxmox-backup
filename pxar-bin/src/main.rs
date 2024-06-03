@@ -458,18 +458,34 @@ async fn create_archive(
                 optional: true,
                 default: false,
             },
+            "payload-input": {
+                description: "'ppxar' payload input data file to restore split archive.",
+                optional: true,
+            },
         },
     },
 )]
 /// Mount the archive to the provided mountpoint via FUSE.
-async fn mount_archive(archive: String, mountpoint: String, verbose: bool) -> Result<(), Error> {
+async fn mount_archive(
+    archive: String,
+    mountpoint: String,
+    verbose: bool,
+    payload_input: Option<String>,
+) -> Result<(), Error> {
     let archive = Path::new(&archive);
     let mountpoint = Path::new(&mountpoint);
     let options = OsStr::new("ro,default_permissions");
+    let payload_input = payload_input.map(|payload_input| PathBuf::from(payload_input));
 
-    let session = pbs_pxar_fuse::Session::mount_path(archive, options, verbose, mountpoint)
-        .await
-        .map_err(|err| format_err!("pxar mount failed: {}", err))?;
+    let session = pbs_pxar_fuse::Session::mount_path(
+        archive,
+        options,
+        verbose,
+        mountpoint,
+        payload_input.as_deref(),
+    )
+    .await
+    .map_err(|err| format_err!("pxar mount failed: {}", err))?;
 
     let mut interrupt = signal(SignalKind::interrupt())?;
 
@@ -576,7 +592,8 @@ fn main() {
             CliCommand::new(&API_METHOD_MOUNT_ARCHIVE)
                 .arg_param(&["archive", "mountpoint"])
                 .completion_cb("archive", complete_file_name)
-                .completion_cb("mountpoint", complete_file_name),
+                .completion_cb("mountpoint", complete_file_name)
+                .completion_cb("payload-input", complete_file_name),
         )
         .insert(
             "list",
