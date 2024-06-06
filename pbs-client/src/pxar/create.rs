@@ -1814,16 +1814,14 @@ mod tests {
         );
 
         let dir_metadata = Metadata {
-            stat: pxar::Stat::default().mode(0o777u64).set_dir().gid(0).uid(0),
+            stat: pxar::Stat::default().mode(0o777u64).set_dir(),
             ..Default::default()
         };
 
         let file_metadata = Metadata {
             stat: pxar::Stat::default()
                 .mode(0o777u64)
-                .set_regular_file()
-                .gid(0)
-                .uid(0),
+                .set_regular_file(),
             ..Default::default()
         };
 
