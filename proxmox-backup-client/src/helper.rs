@@ -16,8 +16,13 @@ pub(crate) async fn get_pxar_fuse_accessor(
     let (archive_name, payload_archive_name) =
         pbs_client::tools::get_pxar_archive_names(archive_name, &manifest)?;
 
-    let (reader, archive_size) =
-        get_pxar_fuse_reader(&archive_name, client.clone(), manifest, crypt_config.clone()).await?;
+    let (reader, archive_size) = get_pxar_fuse_reader(
+        &archive_name,
+        client.clone(),
+        manifest,
+        crypt_config.clone(),
+    )
+    .await?;
 
     let reader = if let Some(payload_archive_name) = payload_archive_name {
         let (payload_reader, payload_size) = get_pxar_fuse_reader(
