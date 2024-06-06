@@ -1859,6 +1859,14 @@ mod tests {
 
     #[test]
     fn test_create_archive_with_reference() -> Result<(), Error> {
+        let euid = unsafe { libc::geteuid() };
+        let egid = unsafe { libc::getegid() };
+
+        if euid != 1000 || egid != 1000 {
+            // skip test, cannot create test folder structure with correct ownership
+            return Ok(());
+        }
+
         let mut testdir = PathBuf::from("./target/testout");
         testdir.push(std::module_path!());
 
