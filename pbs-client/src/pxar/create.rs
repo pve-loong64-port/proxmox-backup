@@ -1819,9 +1819,7 @@ mod tests {
         };
 
         let file_metadata = Metadata {
-            stat: pxar::Stat::default()
-                .mode(0o777u64)
-                .set_regular_file(),
+            stat: pxar::Stat::default().mode(0o777u64).set_regular_file(),
             ..Default::default()
         };
 
