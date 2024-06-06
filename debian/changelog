@@ -1,3 +1,9 @@
+rust-proxmox-backup (2.4.7-1) bullseye; urgency=medium
+
+  * rebuild with pxar 0.10.3 for nicer error messages on pxar v2 archives
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 06 Jun 2024 13:47:23 +0200
+
 rust-proxmox-backup (2.4.6-2) bullseye; urgency=medium
 
   * ui: add notice for the nearing PBS 2.4 End-of-Life on 2024-07-31
