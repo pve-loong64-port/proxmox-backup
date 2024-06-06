@@ -84,7 +84,7 @@ pathpatterns = "0.1.2"
 proxmox-acme-rs = "0.4"
 proxmox-apt = "0.9.4"
 proxmox-openid = "0.9.9"
-pxar = "0.10.2"
+pxar = "0.10.3"
 
 # PBS workspace
 pbs-api-types = { path = "pbs-api-types" }
