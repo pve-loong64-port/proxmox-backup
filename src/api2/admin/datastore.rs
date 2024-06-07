@@ -1766,6 +1766,7 @@ pub const API_METHOD_PXAR_FILE_DOWNLOAD: ApiMethod = ApiMethod::new(
             ("backup-time", false, &BACKUP_TIME_SCHEMA),
             ("filepath", false, &StringSchema::new("Base64 encoded path").schema()),
             ("tar", true, &BooleanSchema::new("Download as .tar.zst").schema()),
+            ("archive-name", true, &StringSchema::new("Archive name").schema()),
         ]),
     )
 ).access(
@@ -1833,9 +1834,16 @@ pub fn pxar_file_download(
             components.remove(0);
         }
 
-        let mut split = components.splitn(2, |c| *c == b'/');
-        let pxar_name = std::str::from_utf8(split.next().unwrap())?;
-        let file_path = split.next().unwrap_or(b"/");
+        let (pxar_name, file_path) = if let Some(archive_name) = param["archive-name"].as_str() {
+            let archive_name = archive_name.as_bytes().to_owned();
+            (archive_name, base64::decode(&filepath)?)
+        } else {
+            let mut split = components.splitn(2, |c| *c == b'/');
+            let pxar_name = split.next().unwrap();
+            let file_path = split.next().unwrap_or(b"/");
+            (pxar_name.to_owned(), file_path.to_owned())
+        };
+        let pxar_name = std::str::from_utf8(&pxar_name)?;
         let (manifest, files) = read_backup_index(&backup_dir)?;
         for file in files {
             if file.filename == pxar_name && file.crypt_mode == Some(CryptMode::Encrypt) {
@@ -1858,7 +1866,7 @@ pub fn pxar_file_download(
         let decoder = Accessor::new(reader, archive_size).await?;
 
         let root = decoder.open_root().await?;
-        let path = OsStr::from_bytes(file_path).to_os_string();
+        let path = OsStr::from_bytes(&file_path).to_os_string();
         let file = root
             .lookup(&path)
             .await?
