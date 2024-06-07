@@ -54,7 +54,7 @@ pub fn parse_backup_specification(value: &str) -> Result<BackupSpecification, Er
 pub enum BackupDetectionMode {
     /// Encode backup as self contained pxar archive
     #[default]
-    Default,
+    Legacy,
     /// Split backup mode, re-encode payload data
     Data,
     /// Compare metadata, reuse payload chunks if metadata unchanged
