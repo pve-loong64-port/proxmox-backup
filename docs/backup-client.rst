@@ -320,6 +320,18 @@ the previous backup snapshot. Since the file might only partially re-use chunks
 to re-use or re-encode the currently cached entries is postponed to when enough
 information is available, comparing the possible padding to a threshold value.
 
+.. _client_change_detection_mode_table:
+
+============ ===================================================================
+Mode         Description
+============ ===================================================================
+``legacy``   (current default): Encode all files into a self contained pxar
+             archive.
+``data``     Encode all files into a split data and metadata pxar archive.
+``metadata`` Encode changed files, reuse unchanged from previous snapshot,
+             creating a split archive.
+============ ===================================================================
+
 The following shows an example for the client invocation with the `metadata`
 mode:
 
