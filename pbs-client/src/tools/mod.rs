@@ -1,9 +1,12 @@
 //! Shared tools useful for common CLI clients.
 use std::collections::HashMap;
 use std::env::VarError::{NotPresent, NotUnicode};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::FromRawFd;
+use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{bail, format_err, Context, Error};
@@ -16,7 +19,12 @@ use proxmox_schema::*;
 use proxmox_sys::fs::file_get_json;
 
 use pbs_api_types::{Authid, BackupNamespace, RateLimitConfig, UserWithTokens, BACKUP_REPO_URL};
+use pbs_datastore::catalog::{ArchiveEntry, DirEntryAttribute};
 use pbs_datastore::BackupManifest;
+use pxar::accessor::aio::Accessor;
+use pxar::accessor::ReadAt;
+use pxar::format::SignedDuration;
+use pxar::{mode, EntryKind};
 
 use crate::{BackupRepository, HttpClient, HttpClientOptions};
 
@@ -634,4 +642,80 @@ pub fn raise_nofile_limit() -> Result<libc::rlimit64, Error> {
     }
 
     Ok(old)
+}
+
+/// Look up the directory entries of the given directory `path` in a pxar archive via it's given
+/// `accessor` and return the entries formatted as [`ArchiveEntry`]'s, compatible with reading
+/// entries from the catalog.
+///
+/// If the optional `path_prefix` is given, all returned entry paths will be prefixed with it.
+pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
+    accessor: Accessor<T>,
+    path: &OsStr,
+    path_prefix: Option<&str>,
+) -> Result<Vec<ArchiveEntry>, Error> {
+    let root = accessor.open_root().await?;
+    let dir_entry = root
+        .lookup(&path)
+        .await
+        .map_err(|err| format_err!("lookup failed - {err}"))?
+        .ok_or_else(|| format_err!("lookup failed - error opening '{path:?}'"))?;
+
+    let mut entries = Vec::new();
+    if let EntryKind::Directory = dir_entry.kind() {
+        let dir_entry = dir_entry
+            .enter_directory()
+            .await
+            .map_err(|err| format_err!("failed to enter directory - {err}"))?;
+
+        let mut entries_iter = dir_entry.read_dir();
+        while let Some(entry) = entries_iter.next().await {
+            let entry = entry?.decode_entry().await?;
+
+            let entry_attr = match entry.kind() {
+                EntryKind::Version(_) | EntryKind::Prelude(_) | EntryKind::GoodbyeTable => continue,
+                EntryKind::Directory => DirEntryAttribute::Directory {
+                    start: entry.entry_range_info().entry_range.start,
+                },
+                EntryKind::File { size, .. } => {
+                    let mtime = match entry.metadata().mtime_as_duration() {
+                        SignedDuration::Positive(val) => i64::try_from(val.as_secs())?,
+                        SignedDuration::Negative(val) => -1 * i64::try_from(val.as_secs())?,
+                    };
+                    DirEntryAttribute::File { size: *size, mtime }
+                }
+                EntryKind::Device(_) => match entry.metadata().file_type() {
+                    mode::IFBLK => DirEntryAttribute::BlockDevice,
+                    mode::IFCHR => DirEntryAttribute::CharDevice,
+                    _ => bail!("encountered unknown device type"),
+                },
+                EntryKind::Symlink(_) => DirEntryAttribute::Symlink,
+                EntryKind::Hardlink(_) => DirEntryAttribute::Hardlink,
+                EntryKind::Fifo => DirEntryAttribute::Fifo,
+                EntryKind::Socket => DirEntryAttribute::Socket,
+            };
+
+            let entry_path = if let Some(prefix) = path_prefix {
+                let mut entry_path = PathBuf::from(prefix);
+                match entry.path().strip_prefix("/") {
+                    Ok(path) => entry_path.push(path),
+                    Err(_) => entry_path.push(entry.path()),
+                }
+                entry_path
+            } else {
+                PathBuf::from(entry.path())
+            };
+            entries.push(ArchiveEntry::new(
+                entry_path.as_os_str().as_bytes(),
+                Some(&entry_attr),
+            ));
+        }
+    } else {
+        bail!(format!(
+            "expected directory entry, got entry kind '{:?}'",
+            dir_entry.kind()
+        ));
+    }
+
+    Ok(entries)
 }
