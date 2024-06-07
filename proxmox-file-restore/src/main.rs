@@ -147,24 +147,63 @@ async fn list_files(
             Ok(entries)
         }
         ExtractPath::Pxar(file, mut path) => {
-            let index = client
-                .download_dynamic_index(&manifest, CATALOG_NAME)
+            if let Ok(file_info) = manifest.lookup_file_info(CATALOG_NAME) {
+                let index = client
+                    .download_dynamic_index(&manifest, CATALOG_NAME)
+                    .await?;
+                let most_used = index.find_most_used_chunks(8);
+                let chunk_reader = RemoteChunkReader::new(
+                    client.clone(),
+                    crypt_config,
+                    file_info.chunk_crypt_mode(),
+                    most_used,
+                );
+                let reader = BufferedDynamicReader::new(index, chunk_reader);
+                let mut catalog_reader = CatalogReader::new(reader);
+
+                let mut fullpath = file.into_bytes();
+                fullpath.append(&mut path);
+
+                catalog_reader.list_dir_contents(&fullpath)
+            } else {
+                if path.is_empty() {
+                    path = vec![b'/'];
+                }
+
+                let (archive_name, payload_archive_name) =
+                    pbs_client::tools::get_pxar_archive_names(&file, &manifest)?;
+
+                let (reader, archive_size) = get_remote_pxar_reader(
+                    &archive_name,
+                    client.clone(),
+                    &manifest,
+                    crypt_config.clone(),
+                )
                 .await?;
-            let most_used = index.find_most_used_chunks(8);
-            let file_info = manifest.lookup_file_info(CATALOG_NAME)?;
-            let chunk_reader = RemoteChunkReader::new(
-                client.clone(),
-                crypt_config,
-                file_info.chunk_crypt_mode(),
-                most_used,
-            );
-            let reader = BufferedDynamicReader::new(index, chunk_reader);
-            let mut catalog_reader = CatalogReader::new(reader);
 
-            let mut fullpath = file.into_bytes();
-            fullpath.append(&mut path);
+                let reader = if let Some(payload_archive_name) = payload_archive_name {
+                    let (payload_reader, payload_size) = get_remote_pxar_reader(
+                        &payload_archive_name,
+                        client,
+                        &manifest,
+                        crypt_config,
+                    )
+                    .await?;
+                    pxar::PxarVariant::Split(reader, (payload_reader, payload_size))
+                } else {
+                    pxar::PxarVariant::Unified(reader)
+                };
 
-            catalog_reader.list_dir_contents(&fullpath)
+                let accessor = Accessor::new(reader, archive_size).await?;
+                let path = OsStr::from_bytes(&path);
+
+                pbs_client::tools::pxar_metadata_catalog_lookup(
+                    accessor,
+                    &path,
+                    Some(&archive_name),
+                )
+                .await
+            }
         }
         ExtractPath::VM(file, path) => {
             let details = SnapRestoreDetails {
