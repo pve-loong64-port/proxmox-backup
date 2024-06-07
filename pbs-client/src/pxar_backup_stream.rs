@@ -15,7 +15,7 @@ use nix::sys::stat::Mode;
 use proxmox_async::blocking::TokioWriterAdapter;
 use proxmox_io::StdChannelWriter;
 
-use pbs_datastore::catalog::CatalogWriter;
+use pbs_datastore::catalog::{BackupCatalogWriter, CatalogWriter};
 
 use crate::inject_reused_chunks::InjectChunks;
 use crate::pxar::create::PxarWriters;
@@ -42,7 +42,7 @@ impl Drop for PxarBackupStream {
 impl PxarBackupStream {
     pub fn new<W: Write + Send + 'static>(
         dir: Dir,
-        catalog: Arc<Mutex<CatalogWriter<W>>>,
+        catalog: Option<Arc<Mutex<CatalogWriter<W>>>>,
         options: crate::pxar::PxarCreateOptions,
         boundaries: Option<mpsc::Sender<InjectChunks>>,
         separate_payload_stream: bool,
@@ -82,7 +82,10 @@ impl PxarBackupStream {
         let handler = async move {
             if let Err(err) = crate::pxar::create_archive(
                 dir,
-                PxarWriters::new(writer, Some(catalog)),
+                PxarWriters::new(
+                    writer,
+                    catalog.map(|c| c as Arc<Mutex<dyn BackupCatalogWriter + Send>>),
+                ),
                 crate::pxar::Flags::DEFAULT,
                 move |path| {
                     log::debug!("{:?}", path);
@@ -122,7 +125,7 @@ impl PxarBackupStream {
 
     pub fn open<W: Write + Send + 'static>(
         dirname: &Path,
-        catalog: Arc<Mutex<CatalogWriter<W>>>,
+        catalog: Option<Arc<Mutex<CatalogWriter<W>>>>,
         options: crate::pxar::PxarCreateOptions,
         boundaries: Option<mpsc::Sender<InjectChunks>>,
         separate_payload_stream: bool,

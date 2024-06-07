@@ -192,7 +192,7 @@ async fn backup_directory<P: AsRef<Path>>(
     archive_name: &str,
     payload_target: Option<&str>,
     chunk_size: Option<usize>,
-    catalog: Arc<Mutex<CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>>>,
+    catalog: Option<Arc<Mutex<CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>>>>,
     pxar_create_options: pbs_client::pxar::PxarCreateOptions,
     upload_options: UploadOptions,
 ) -> Result<(BackupStats, Option<BackupStats>), Error> {
@@ -1059,19 +1059,20 @@ async fn create_backup(
                     };
 
                 // start catalog upload on first use
-                if catalog.is_none() {
+                if catalog.is_none() && !detection_mode.is_data() && !detection_mode.is_metadata() {
                     let catalog_upload_res =
                         spawn_catalog_upload(client.clone(), crypto.mode == CryptMode::Encrypt)?;
                     catalog = Some(catalog_upload_res.catalog_writer);
                     catalog_result_rx = Some(catalog_upload_res.result);
                 }
-                let catalog = catalog.as_ref().unwrap();
 
                 log_file("directory", &filename, &target);
-                catalog
-                    .lock()
-                    .unwrap()
-                    .start_directory(std::ffi::CString::new(target.as_str())?.as_c_str())?;
+                if let Some(catalog) = catalog.as_ref() {
+                    catalog
+                        .lock()
+                        .unwrap()
+                        .start_directory(std::ffi::CString::new(target.as_str())?.as_c_str())?;
+                }
 
                 let mut previous_ref = None;
                 let max_cache_size = if detection_mode.is_metadata() {
@@ -1139,7 +1140,7 @@ async fn create_backup(
                     &target,
                     payload_target.as_deref(),
                     chunk_size_opt,
-                    catalog.clone(),
+                    catalog.as_ref().cloned(),
                     pxar_options,
                     upload_options,
                 )
@@ -1155,7 +1156,9 @@ async fn create_backup(
                     )?;
                 }
                 manifest.add_file(target, stats.size, stats.csum, crypto.mode)?;
-                catalog.lock().unwrap().end_directory()?;
+                if let Some(catalog) = catalog.as_ref() {
+                    catalog.lock().unwrap().end_directory()?;
+                }
             }
             (BackupSpecificationType::IMAGE, false) => {
                 log_file("image", &filename, &target);
