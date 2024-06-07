@@ -1681,7 +1681,9 @@ pub async fn catalog(
     archive_name: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<ArchiveEntry>, Error> {
-    let file_name = archive_name.clone().unwrap_or_else(|| CATALOG_NAME.to_string());
+    let file_name = archive_name
+        .clone()
+        .unwrap_or_else(|| CATALOG_NAME.to_string());
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
