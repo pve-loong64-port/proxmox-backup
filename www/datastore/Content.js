@@ -786,6 +786,9 @@ Ext.define('PBS.DataStoreContent', {
 		'backup-time': (time.getTime()/1000).toFixed(0),
 		'backup-type': type,
 	    };
+	    if (rec.data.filename.endsWith(".mpxar.didx")) {
+		extraParams['archive-name'] = rec.data.filename;
+	    }
 	    if (view.namespace && view.namespace !== '') {
 		extraParams.ns = view.namespace;
 	    }
