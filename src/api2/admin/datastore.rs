@@ -1659,7 +1659,12 @@ fn decode_path(path: &str) -> Result<Vec<u8>, Error> {
             "filepath": {
                 description: "Base64 encoded path.",
                 type: String,
-            }
+            },
+            "archive-name": {
+                type: String,
+                description: "Name of the archive to use for lookup",
+                optional: true,
+            },
         },
     },
     access: {
@@ -1674,8 +1679,11 @@ pub async fn catalog(
     ns: Option<BackupNamespace>,
     backup_dir: pbs_api_types::BackupDir,
     filepath: String,
+    archive_name: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<ArchiveEntry>, Error> {
+    let file_name = archive_name.clone().unwrap_or_else(|| CATALOG_NAME.to_string());
+
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     let ns = ns.unwrap_or_default();
@@ -1692,8 +1700,6 @@ pub async fn catalog(
 
     let backup_dir = datastore.backup_dir(ns, backup_dir)?;
 
-    let file_name = CATALOG_NAME;
-
     let (manifest, files) = read_backup_index(&backup_dir)?;
     for file in files {
         if file.filename == file_name && file.crypt_mode == Some(CryptMode::Encrypt) {
@@ -1701,26 +1707,50 @@ pub async fn catalog(
         }
     }
 
-    tokio::task::spawn_blocking(move || {
-        let mut path = datastore.base_path();
-        path.push(backup_dir.relative_path());
-        path.push(file_name);
+    if archive_name.is_none() {
+        tokio::task::spawn_blocking(move || {
+            let mut path = datastore.base_path();
+            path.push(backup_dir.relative_path());
+            path.push(&file_name);
 
-        let index = DynamicIndexReader::open(&path)
-            .map_err(|err| format_err!("unable to read dynamic index '{:?}' - {}", &path, err))?;
+            let index = DynamicIndexReader::open(&path)
+                .map_err(|err| format_err!("unable to read dynamic index '{path:?}' - {err}"))?;
 
-        let (csum, size) = index.compute_csum();
-        manifest.verify_file(file_name, &csum, size)?;
+            let (csum, size) = index.compute_csum();
+            manifest.verify_file(&file_name, &csum, size)?;
 
-        let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
-        let reader = BufferedDynamicReader::new(index, chunk_reader);
+            let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
+            let reader = BufferedDynamicReader::new(index, chunk_reader);
 
-        let mut catalog_reader = CatalogReader::new(reader);
+            let mut catalog_reader = CatalogReader::new(reader);
 
-        let path = decode_path(&filepath)?;
-        catalog_reader.list_dir_contents(&path)
-    })
-    .await?
+            let path = decode_path(&filepath)?;
+            catalog_reader.list_dir_contents(&path)
+        })
+        .await?
+    } else {
+        let (archive_name, payload_archive_name) =
+            pbs_client::tools::get_pxar_archive_names(&file_name, &manifest)?;
+        let (reader, archive_size) =
+            get_local_pxar_reader(datastore.clone(), &manifest, &backup_dir, &archive_name)?;
+
+        let reader = if let Some(payload_archive_name) = payload_archive_name {
+            let payload_input =
+                get_local_pxar_reader(datastore, &manifest, &backup_dir, &payload_archive_name)?;
+            pxar::PxarVariant::Split(reader, payload_input)
+        } else {
+            pxar::PxarVariant::Unified(reader)
+        };
+        let accessor = Accessor::new(reader, archive_size).await?;
+
+        let file_path = decode_path(&filepath)?;
+        pbs_client::tools::pxar_metadata_catalog_lookup(
+            accessor,
+            OsStr::from_bytes(&file_path),
+            None,
+        )
+        .await
+    }
 }
 
 #[sortable]
