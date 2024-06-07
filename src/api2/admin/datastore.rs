@@ -1636,6 +1636,14 @@ pub fn upload_backup_log(
     .boxed()
 }
 
+fn decode_path(path: &str) -> Result<Vec<u8>, Error> {
+    if path != "root" && path != "/" {
+        base64::decode(path).map_err(|err| format_err!("base64 decoding of path failed - {err}"))
+    } else {
+        Ok(vec![b'/'])
+    }
+}
+
 #[api(
     input: {
         properties: {
@@ -1709,12 +1717,7 @@ pub async fn catalog(
 
         let mut catalog_reader = CatalogReader::new(reader);
 
-        let path = if filepath != "root" && filepath != "/" {
-            base64::decode(filepath)?
-        } else {
-            vec![b'/']
-        };
-
+        let path = decode_path(&filepath)?;
         catalog_reader.list_dir_contents(&path)
     })
     .await?
