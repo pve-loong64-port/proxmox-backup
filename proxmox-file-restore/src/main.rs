@@ -124,7 +124,8 @@ async fn list_files(
         ExtractPath::ListArchives => {
             let mut entries = vec![];
             for file in manifest.files() {
-                if !has_pxar_filename_extension(&file.filename, true)
+                if !file.filename.ends_with(".pxar.didx")
+                    && !file.filename.ends_with(".mpxar.didx")
                     && !file.filename.ends_with(".img.fidx")
                 {
                     continue;
