@@ -1678,30 +1678,30 @@ pub async fn catalog(
 ) -> Result<Vec<ArchiveEntry>, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
-    tokio::task::spawn_blocking(move || {
-        let ns = ns.unwrap_or_default();
+    let ns = ns.unwrap_or_default();
 
-        let datastore = check_privs_and_load_store(
-            &store,
-            &ns,
-            &auth_id,
-            PRIV_DATASTORE_READ,
-            PRIV_DATASTORE_BACKUP,
-            Some(Operation::Read),
-            &backup_dir.group,
-        )?;
+    let datastore = check_privs_and_load_store(
+        &store,
+        &ns,
+        &auth_id,
+        PRIV_DATASTORE_READ,
+        PRIV_DATASTORE_BACKUP,
+        Some(Operation::Read),
+        &backup_dir.group,
+    )?;
 
-        let backup_dir = datastore.backup_dir(ns, backup_dir)?;
+    let backup_dir = datastore.backup_dir(ns, backup_dir)?;
 
-        let file_name = CATALOG_NAME;
+    let file_name = CATALOG_NAME;
 
-        let (manifest, files) = read_backup_index(&backup_dir)?;
-        for file in files {
-            if file.filename == file_name && file.crypt_mode == Some(CryptMode::Encrypt) {
-                bail!("cannot decode '{}' - is encrypted", file_name);
-            }
+    let (manifest, files) = read_backup_index(&backup_dir)?;
+    for file in files {
+        if file.filename == file_name && file.crypt_mode == Some(CryptMode::Encrypt) {
+            bail!("cannot decode '{file_name}' - is encrypted");
         }
+    }
 
+    tokio::task::spawn_blocking(move || {
         let mut path = datastore.base_path();
         path.push(backup_dir.relative_path());
         path.push(file_name);
