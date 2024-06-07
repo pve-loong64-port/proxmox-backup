@@ -1661,8 +1661,7 @@ fn decode_path(path: &str) -> Result<Vec<u8>, Error> {
                 type: String,
             },
             "archive-name": {
-                type: String,
-                description: "Name of the archive to use for lookup",
+                schema: BACKUP_ARCHIVE_NAME_SCHEMA,
                 optional: true,
             },
         },
@@ -1766,7 +1765,7 @@ pub const API_METHOD_PXAR_FILE_DOWNLOAD: ApiMethod = ApiMethod::new(
             ("backup-time", false, &BACKUP_TIME_SCHEMA),
             ("filepath", false, &StringSchema::new("Base64 encoded path").schema()),
             ("tar", true, &BooleanSchema::new("Download as .tar.zst").schema()),
-            ("archive-name", true, &StringSchema::new("Archive name").schema()),
+            ("archive-name", true, &BACKUP_ARCHIVE_NAME_SCHEMA),
         ]),
     )
 ).access(
