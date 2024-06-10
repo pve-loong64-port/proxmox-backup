@@ -16,6 +16,7 @@ use nix::dir::Dir;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::stat::{FileStat, Mode};
+use serde::{Deserialize, Serialize};
 
 use pathpatterns::{MatchEntry, MatchFlag, MatchList, MatchType, PatternFlag};
 use proxmox_sys::error::SysError;
@@ -154,6 +155,13 @@ struct ReuseStats {
     total_reencoded_size: u64,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct PbsClientPrelude {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exclude_patterns: Option<String>,
+}
+
 struct Archiver {
     feature_flags: Flags,
     fs_feature_flags: Flags,
@@ -239,9 +247,13 @@ where
         )?);
     }
 
-    let cli_params_content = generate_pxar_excludes_cli(&patterns[..]);
-    let cli_params = if options.previous_ref.is_some() {
-        Some(cli_params_content.as_slice())
+    let prelude = if options.previous_ref.is_some() && !patterns.is_empty() {
+        let prelude = PbsClientPrelude {
+            exclude_patterns: Some(String::from_utf8(generate_pxar_excludes_cli(
+                &patterns[..],
+            ))?),
+        };
+        Some(serde_json::to_vec(&prelude)?)
     } else {
         None
     };
@@ -257,7 +269,7 @@ where
             (None, None)
         };
 
-    let mut encoder = Encoder::new(writers.archive, &metadata, cli_params).await?;
+    let mut encoder = Encoder::new(writers.archive, &metadata, prelude.as_deref()).await?;
 
     let mut archiver = Archiver {
         feature_flags,
