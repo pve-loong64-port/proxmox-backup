@@ -183,6 +183,7 @@ struct Archiver {
     previous_payload_index: Option<DynamicIndexReader>,
     cache: PxarLookaheadCache,
     reuse_stats: ReuseStats,
+    split_archive: bool,
 }
 
 type Encoder<'a, T> = pxar::encoder::aio::Encoder<'a, T>;
@@ -247,7 +248,8 @@ where
         )?);
     }
 
-    let prelude = if options.previous_ref.is_some() && !patterns.is_empty() {
+    let split_archive = writers.archive.payload().is_some();
+    let prelude = if split_archive && !patterns.is_empty() {
         let prelude = PbsClientPrelude {
             exclude_patterns: Some(String::from_utf8(generate_pxar_excludes_cli(
                 &patterns[..],
@@ -258,7 +260,7 @@ where
         None
     };
 
-    let metadata_mode = options.previous_ref.is_some() && writers.archive.payload().is_some();
+    let metadata_mode = options.previous_ref.is_some() && split_archive;
     let (previous_payload_index, previous_metadata_accessor) =
         if let Some(refs) = options.previous_ref {
             (
@@ -291,6 +293,7 @@ where
         previous_payload_index,
         cache: PxarLookaheadCache::new(options.max_cache_size),
         reuse_stats: ReuseStats::default(),
+        split_archive,
     };
 
     archiver
@@ -388,12 +391,11 @@ impl Archiver {
             for file_entry in file_list {
                 let file_name = file_entry.name.to_bytes();
 
-                if is_root
-                    && file_name == b".pxarexclude-cli"
-                    && previous_metadata_accessor.is_none()
-                {
-                    self.encode_pxarexclude_cli(encoder, &file_entry.name, old_patterns_count)
-                        .await?;
+                if is_root && file_name == b".pxarexclude-cli" {
+                    if !self.split_archive {
+                        self.encode_pxarexclude_cli(encoder, &file_entry.name, old_patterns_count)
+                            .await?;
+                    }
                     continue;
                 }
 
@@ -1944,6 +1946,7 @@ mod tests {
                 suggested_boundaries: Some(suggested_boundaries),
                 cache: PxarLookaheadCache::new(None),
                 reuse_stats: ReuseStats::default(),
+                split_archive: true,
             };
 
             let accessor = Accessor::new(pxar::PxarVariant::Unified(reader), metadata_size)
