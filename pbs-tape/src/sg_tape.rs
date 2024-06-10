@@ -804,34 +804,16 @@ impl SgTape {
         Ok(())
     }
 
-    /// Set important drive options
-    #[allow(clippy::vec_init_then_push)]
-    pub fn set_drive_options(
+    // tries to set the given page with either mode sense 6 or 10 depending on
+    // the given header size
+    fn drive_mode_select<T: Endian>(
         &mut self,
-        compression: Option<bool>,
-        block_length: Option<u32>,
-        buffer_mode: Option<bool>,
+        head: ModeParameterHeader,
+        block_descriptor: ModeBlockDescriptor,
+        page: T,
     ) -> Result<(), Error> {
-        // Note: Read/Modify/Write
-
-        let (mut head, mut block_descriptor, mut page) = self.read_compression_page()?;
-
         let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
-
-        head.reset_mode_data_len(); // mode_data_len need to be zero
-
-        if let Some(compression) = compression {
-            page.set_compression(compression);
-        }
-
-        if let Some(block_length) = block_length {
-            block_descriptor.set_block_length(block_length)?;
-        }
-
-        if let Some(buffer_mode) = buffer_mode {
-            head.set_buffer_mode(buffer_mode);
-        }
 
         match head {
             ModeParameterHeader::Long(head) => {
@@ -878,7 +860,36 @@ impl SgTape {
                         format_err!("set drive options (mode select(6)) failed - {err}")
                     })?;
             }
+        };
+        Ok(())
+    }
+
+    /// Set important drive options
+    #[allow(clippy::vec_init_then_push)]
+    pub fn set_drive_options(
+        &mut self,
+        compression: Option<bool>,
+        block_length: Option<u32>,
+        buffer_mode: Option<bool>,
+    ) -> Result<(), Error> {
+        // Note: Read/Modify/Write
+        let (mut head, mut block_descriptor, mut page) = self.read_compression_page()?;
+
+        head.reset_mode_data_len(); // mode_data_len need to be zero
+
+        if let Some(compression) = compression {
+            page.set_compression(compression);
         }
+
+        if let Some(block_length) = block_length {
+            block_descriptor.set_block_length(block_length)?;
+        }
+
+        if let Some(buffer_mode) = buffer_mode {
+            head.set_buffer_mode(buffer_mode);
+        }
+
+        self.drive_mode_select(head, block_descriptor, page)?;
 
         Ok(())
     }
