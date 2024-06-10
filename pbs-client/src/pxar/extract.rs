@@ -138,7 +138,7 @@ where
                     .open(path)
                     .with_context(|| format!("error creating prelude file '{path:?}'"))?;
                 if let pxar::EntryKind::Prelude(ref prelude) = entry.kind() {
-                    prelude_file.write_all(prelude.as_os_str().as_bytes())?;
+                    prelude_file.write_all(prelude.as_ref())?;
                 } else {
                     log::info!("unexpected entry kind for prelude");
                 }
