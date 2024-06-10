@@ -1,3 +1,21 @@
+rust-proxmox-backup (3.2.5-1) bookworm; urgency=medium
+
+  * pxar: add support for split archives
+
+  * fix #3174: pxar: enable caching and meta comparison
+
+  * docs: file formats: describe split pxar archive file layout
+
+  * docs: add section describing change detection mode
+
+  * api: datastore: add optional archive-name to file-restore
+
+  * client: backup: conditionally write catalog for file level backups
+
+  * docs: add table listing possible change detection modes
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 10 Jun 2024 13:39:54 +0200
+
 rust-proxmox-backup (3.2.4-1) bookworm; urgency=medium
 
   * fix: network api: permission using wrong pathname
