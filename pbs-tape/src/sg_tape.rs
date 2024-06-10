@@ -626,8 +626,8 @@ impl SgTape {
             Err(ScsiError::Sense(SenseInfo {
                 sense_key: 0,
                 asc: 0,
-                ascq: 2,
-            })) => { /* LEOM - ignore */ }
+                ascq: 2 | 7,
+            })) => { /* LEOM or PEWZ - ignore */ }
             Err(err) => {
                 proxmox_lang::io_bail!("write filemark  failed - {err}");
             }
@@ -742,9 +742,9 @@ impl SgTape {
             Err(ScsiError::Sense(SenseInfo {
                 sense_key: 0,
                 asc: 0,
-                ascq: 2,
+                ascq: 2 | 7,
             })) => {
-                Ok(true) // LEOM
+                Ok(true) // LEOM or PEWZ
             }
             Err(err) => {
                 proxmox_lang::io_bail!("write failed - {err}");
