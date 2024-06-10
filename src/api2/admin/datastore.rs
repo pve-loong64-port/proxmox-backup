@@ -1730,18 +1730,13 @@ pub async fn catalog(
         })
         .await?
     } else {
-        let (archive_name, payload_archive_name) =
+        let (archive_name, _payload_archive_name) =
             pbs_client::tools::get_pxar_archive_names(&file_name, &manifest)?;
         let (reader, archive_size) =
             get_local_pxar_reader(datastore.clone(), &manifest, &backup_dir, &archive_name)?;
 
-        let reader = if let Some(payload_archive_name) = payload_archive_name {
-            let payload_input =
-                get_local_pxar_reader(datastore, &manifest, &backup_dir, &payload_archive_name)?;
-            pxar::PxarVariant::Split(reader, payload_input)
-        } else {
-            pxar::PxarVariant::Unified(reader)
-        };
+        // only care about the metadata, don't attach a payload reader
+        let reader = pxar::PxarVariant::Unified(reader);
         let accessor = Accessor::new(reader, archive_size).await?;
 
         let file_path = decode_path(&filepath)?;
