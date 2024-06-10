@@ -83,6 +83,32 @@ impl DataCompressionModePage {
 }
 
 #[repr(C, packed)]
+#[derive(Endian, Debug, Copy, Clone)]
+struct DeviceConfigurationExtensionModePage {
+    page_code: u8,     // 0x10
+    sub_page_code: u8, // 0x01
+    page_length: u16,  // 0x1C
+    flags4: u8,
+    modes: u8,
+    pews: u16,
+    flags8: u8,
+    reserved: [u8; 23],
+}
+
+impl DeviceConfigurationExtensionModePage {
+    /// Sets the Programmable Early Warning Zone to the given amount, rounded up to the next
+    /// Megabyte (10^6 bytes) up to 2^16 Megabyte (the value will be clamped)
+    pub fn set_pewz(&mut self, bytes: usize) {
+        let mbytes = if bytes == 0 {
+            0
+        } else {
+            (bytes / 1000 / 1000) + 1
+        };
+        self.pews = mbytes.clamp(0, u16::MAX as usize) as u16;
+    }
+}
+
+#[repr(C, packed)]
 #[derive(Endian)]
 struct MediumConfigurationModePage {
     page_code: u8,   // 0x1d
@@ -891,6 +917,16 @@ impl SgTape {
 
         self.drive_mode_select(head, block_descriptor, page)?;
 
+        // LTO-4 does not support this page, but try to write it if we can read it
+        if let Ok((mut head, block_descriptor, mut page)) =
+            self.read_device_configuration_extension_page()
+        {
+            head.reset_mode_data_len(); // mode_data_len need to be zero
+            page.set_pewz(0); // disable PEWZ
+
+            let _ = self.drive_mode_select(head, block_descriptor, page);
+        }
+
         Ok(())
     }
 
@@ -954,6 +990,41 @@ impl SgTape {
             Ok((head, block_descriptor, page))
         })
         .map_err(|err| format_err!("read_compression_page failed: {err}"))
+    }
+
+    fn read_device_configuration_extension_page(
+        &mut self,
+    ) -> Result<
+        (
+            ModeParameterHeader,
+            ModeBlockDescriptor,
+            DeviceConfigurationExtensionModePage,
+        ),
+        Error,
+    > {
+        let (head, block_descriptor, page): (_, _, DeviceConfigurationExtensionModePage) =
+            scsi_mode_sense(&mut self.file, false, 0x10, 0x01)?;
+
+        proxmox_lang::try_block!({
+            if (page.page_code & 0b0011_1111) != 0x10 {
+                bail!("wrong page code {}", page.page_code);
+            }
+            if page.sub_page_code != 0x01 {
+                bail!("wrong sub page code {}", page.sub_page_code);
+            }
+            let page_length = page.page_length;
+            if page_length != 0x1C {
+                bail!("wrong page length {page_length}");
+            }
+
+            let block_descriptor = match block_descriptor {
+                Some(block_descriptor) => block_descriptor,
+                None => bail!("missing block descriptor"),
+            };
+
+            Ok((head, block_descriptor, page))
+        })
+        .map_err(|err| format_err!("read_device_configuration_extension_page failed: {err}"))
     }
 
     /// Read drive options/status
