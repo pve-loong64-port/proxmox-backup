@@ -170,7 +170,7 @@ async fn list_files(
                     path = vec![b'/'];
                 }
 
-                let (archive_name, payload_archive_name) =
+                let (archive_name, _payload_archive_name) =
                     pbs_client::tools::get_pxar_archive_names(&file, &manifest)?;
 
                 let (reader, archive_size) = get_remote_pxar_reader(
@@ -181,19 +181,8 @@ async fn list_files(
                 )
                 .await?;
 
-                let reader = if let Some(payload_archive_name) = payload_archive_name {
-                    let (payload_reader, payload_size) = get_remote_pxar_reader(
-                        &payload_archive_name,
-                        client,
-                        &manifest,
-                        crypt_config,
-                    )
-                    .await?;
-                    pxar::PxarVariant::Split(reader, (payload_reader, payload_size))
-                } else {
-                    pxar::PxarVariant::Unified(reader)
-                };
-
+                // only care about the metadata, don't attach a payload reader
+                let reader = pxar::PxarVariant::Unified(reader);
                 let accessor = Accessor::new(reader, archive_size).await?;
                 let path = OsStr::from_bytes(&path);
 
