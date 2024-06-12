@@ -1748,7 +1748,7 @@ fn try_restore_snapshot_archive<R: pxar::decoder::SeqRead>(
         }
 
         let filename = entry.file_name();
-        let mut contents = match decoder.contents() {
+        let mut contents = match decoder.contents()? {
             None => bail!("missing file content"),
             Some(contents) => contents,
         };
