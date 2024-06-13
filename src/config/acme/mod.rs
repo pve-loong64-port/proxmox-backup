@@ -27,19 +27,15 @@ fn root_only() -> CreateOptions {
         .perm(nix::sys::stat::Mode::from_bits_truncate(0o700))
 }
 
-fn create_acme_subdir(dir: &str) -> nix::Result<()> {
-    match proxmox_sys::fs::create_dir(dir, root_only()) {
-        Ok(()) => Ok(()),
-        Err(err) if err.already_exists() => Ok(()),
-        Err(err) => Err(err),
-    }
+fn create_acme_subdir(dir: &str) -> Result<(), Error> {
+    proxmox_sys::fs::ensure_dir_exists(dir, &root_only(), false)
 }
 
-pub(crate) fn make_acme_dir() -> nix::Result<()> {
+pub(crate) fn make_acme_dir() -> Result<(), Error> {
     create_acme_subdir(ACME_DIR)
 }
 
-pub(crate) fn make_acme_account_dir() -> nix::Result<()> {
+pub(crate) fn make_acme_account_dir() -> Result<(), Error> {
     make_acme_dir()?;
     create_acme_subdir(ACME_ACCOUNT_DIR)
 }
