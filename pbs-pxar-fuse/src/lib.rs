@@ -5,7 +5,6 @@ use std::ffi::{OsStr, OsString};
 use std::future::Future;
 use std::io;
 use std::mem;
-use std::ops::Range;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::pin::Pin;
@@ -20,7 +19,7 @@ use futures::sink::SinkExt;
 use futures::stream::{StreamExt, TryStreamExt};
 
 use proxmox_io::vec;
-use pxar::accessor::{self, EntryRangeInfo, ReadAt};
+use pxar::accessor::{self, ContentRange, EntryRangeInfo, ReadAt};
 
 use proxmox_fuse::requests::{self, FuseRequest};
 use proxmox_fuse::{EntryParam, Fuse, ReplyBufState, Request, ROOT_ID};
@@ -130,7 +129,7 @@ struct Lookup {
     inode: u64,
     parent: u64,
     entry_range_info: EntryRangeInfo,
-    content_range: Option<Range<u64>>,
+    content_range: Option<ContentRange>,
 }
 
 impl Lookup {
@@ -138,7 +137,7 @@ impl Lookup {
         inode: u64,
         parent: u64,
         entry_range_info: EntryRangeInfo,
-        content_range: Option<Range<u64>>,
+        content_range: Option<ContentRange>,
     ) -> Box<Lookup> {
         Box::new(Self {
             refs: AtomicUsize::new(1),
@@ -433,13 +432,17 @@ impl SessionImpl {
         }
     }
 
-    fn open_content(&self, lookup: &LookupRef) -> Result<FileContents, Error> {
+    async fn open_content<'a>(&'a self, lookup: &'a LookupRef<'a>) -> Result<FileContents, Error> {
         if is_dir_inode(lookup.inode) {
             io_return!(libc::EISDIR);
         }
 
-        match lookup.content_range.clone() {
-            Some(range) => Ok(unsafe { self.accessor.open_contents_at_range(range) }),
+        match &lookup.content_range {
+            Some(range) => self
+                .accessor
+                .open_contents_at_range(range)
+                .await
+                .map_err(|err| err.into()),
             None => io_return!(libc::EBADF),
         }
     }
@@ -581,7 +584,7 @@ impl SessionImpl {
 
     async fn read(&self, inode: u64, len: usize, offset: u64) -> Result<Vec<u8>, Error> {
         let file = self.get_lookup(inode)?;
-        let content = self.open_content(&file)?;
+        let content = self.open_content(&file).await?;
         let mut buf = vec::undefined(len);
         let mut pos = 0;
         // fuse' read is different from normal read - no short reads allowed except for EOF!

@@ -373,26 +373,22 @@ where
                     Ok(())
                 }
             }
-            (true, EntryKind::File { size, .. }) => {
-                let contents = self.decoder.contents();
-
-                if let Some(mut contents) = contents {
-                    self.extractor.extract_file(
-                        &file_name,
-                        metadata,
-                        *size,
-                        &mut contents,
-                        self.extractor
-                            .overwrite_flags
-                            .contains(OverwriteFlags::FILE),
-                    )
-                } else {
-                    Err(format_err!(
-                        "found regular file entry without contents in archive"
-                    ))
-                }
-                .context(PxarExtractContext::ExtractFile)
+            (true, EntryKind::File { size, .. }) => match self.decoder.contents() {
+                Ok(Some(mut contents)) => self.extractor.extract_file(
+                    &file_name,
+                    metadata,
+                    *size,
+                    &mut contents,
+                    self.extractor
+                        .overwrite_flags
+                        .contains(OverwriteFlags::FILE),
+                ),
+                Ok(None) => Err(format_err!(
+                    "found regular file entry without contents in archive"
+                )),
+                Err(err) => Err(err.into()),
             }
+            .context(PxarExtractContext::ExtractFile),
             (false, _) => Ok(()), // skip this
         };
 
@@ -872,7 +868,8 @@ where
             match entry.kind() {
                 EntryKind::File { .. } => {
                     let size = decoder.content_size().unwrap_or(0);
-                    tar_add_file(&mut tarencoder, decoder.contents(), size, metadata, path).await?
+                    let contents = decoder.contents().await?;
+                    tar_add_file(&mut tarencoder, contents, size, metadata, path).await?
                 }
                 EntryKind::Hardlink(link) => {
                     if !link.data.is_empty() {
@@ -894,14 +891,9 @@ where
                                     path
                                 } else {
                                     let size = decoder.content_size().unwrap_or(0);
-                                    tar_add_file(
-                                        &mut tarencoder,
-                                        decoder.contents(),
-                                        size,
-                                        metadata,
-                                        path,
-                                    )
-                                    .await?;
+                                    let contents = decoder.contents().await?;
+                                    tar_add_file(&mut tarencoder, contents, size, metadata, path)
+                                        .await?;
                                     hardlinks.insert(realpath.to_owned(), path.to_owned());
                                     continue;
                                 }
@@ -1038,7 +1030,8 @@ where
                         metadata.stat.mode as u16,
                         true,
                     );
-                    zip.add_entry(entry, decoder.contents())
+                    let contents = decoder.contents().await?;
+                    zip.add_entry(entry, contents)
                         .await
                         .context("could not send file entry")?;
                 }
@@ -1056,7 +1049,8 @@ where
                         metadata.stat.mode as u16,
                         true,
                     );
-                    zip.add_entry(entry, decoder.contents())
+                    let contents = decoder.contents().await?;
+                    zip.add_entry(entry, contents)
                         .await
                         .context("could not send file entry")?;
                 }
@@ -1279,14 +1273,16 @@ where
                         .with_context(|| format!("error at entry {file_name_os:?}"))?;
                 }
                 EntryKind::File { size, .. } => {
+                    let mut contents = decoder
+                        .contents()
+                        .await?
+                        .context("found regular file entry without contents in archive")?;
                     extractor
                         .async_extract_file(
                             &file_name,
                             metadata,
                             *size,
-                            &mut decoder
-                                .contents()
-                                .context("found regular file entry without contents in archive")?,
+                            &mut contents,
                             extractor.overwrite_flags.contains(OverwriteFlags::FILE),
                         )
                         .await?

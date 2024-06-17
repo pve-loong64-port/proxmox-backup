@@ -1,5 +1,5 @@
 [workspace.package]
-version = "3.2.5"
+version = "3.2.6"
 authors = [
     "Dietmar Maurer <dietmar@proxmox.com>",
     "Dominik Csapak <d.csapak@proxmox.com>",
@@ -86,7 +86,7 @@ proxmox-uuid = "1"
 # other proxmox crates
 pathpatterns = "0.3"
 proxmox-acme = "0.5"
-pxar = "0.11.1"
+pxar = "0.12"
 
 # PBS workspace
 pbs-api-types = { path = "pbs-api-types" }
