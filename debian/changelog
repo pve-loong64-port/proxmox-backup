@@ -1,3 +1,15 @@
+rust-proxmox-backup (3.2.6-1) bookworm; urgency=medium
+
+  * tape: disable Programmable Early Warning Zone (PEWZ)
+
+  * tape: handle PEWZ like regular early warning
+
+  * docs: add note for not using remote storages
+
+  * client: pxar: fix fuse mount performance for split archives
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 17 Jun 2024 10:18:13 +0200
+
 rust-proxmox-backup (3.2.5-1) bookworm; urgency=medium
 
   * pxar: add support for split archives
