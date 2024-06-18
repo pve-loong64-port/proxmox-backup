@@ -23,6 +23,6 @@ Ext.define('PBS.window.GCJobEdit', {
 	xtype: 'pbsCalendarEvent',
 	name: 'gc-schedule',
 	fieldLabel: gettext("GC Schedule"),
-	emptyText: gettext(Proxmox.Utils.NoneText + " (disabled)"),
+	emptyText: gettext('none (disabled)'),
     },
 });
