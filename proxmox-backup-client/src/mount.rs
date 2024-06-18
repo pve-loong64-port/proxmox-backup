@@ -183,7 +183,17 @@ fn mount(
         Ok(ForkResult::Parent { .. }) => {
             drop(pw);
             // Blocks the parent process until we are ready to go in the child
-            let _res = nix::unistd::read(pr.as_raw_fd(), &mut [0]).unwrap();
+            let mut buffer = [0u8];
+            nix::unistd::read(pr.as_raw_fd(), &mut buffer).unwrap();
+
+            // Read buffer didn't change, which indicates that nothing has been read and the file
+            // descriptor has probably been closed. This means that there was an error in the child
+            // process and it did not daemonize correctly.
+            if buffer[0] == 0 {
+                // Wait for the child process to finish, so it can return a nice error.
+                nix::sys::wait::wait().unwrap();
+            }
+
             Ok(Value::Null)
         }
         Ok(ForkResult::Child) => {
@@ -264,7 +274,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
             }
             // Signal the parent process that we are done with the setup and it can
             // terminate.
-            nix::unistd::write(pipe.as_raw_fd(), &[0u8])?;
+            nix::unistd::write(pipe.as_raw_fd(), &[1u8])?;
             let _: OwnedFd = pipe;
         }
 
