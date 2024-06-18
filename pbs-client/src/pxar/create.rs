@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, OsStr};
-use std::fmt;
 use std::io::{self, Read};
 use std::mem::size_of;
 use std::ops::Range;
@@ -117,25 +116,11 @@ pub fn is_virtual_file_system(magic: i64) -> bool {
         SYSFS_MAGIC)
 }
 
-#[derive(Debug)]
-struct ArchiveError {
-    path: PathBuf,
-    error: Error,
 }
 
-impl ArchiveError {
-    fn new(path: PathBuf, error: Error) -> Self {
-        Self { path, error }
     }
 }
 
-impl std::error::Error for ArchiveError {}
-
-impl fmt::Display for ArchiveError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "error at {:?}: {}", self.path, self.error)
-    }
-}
 
 #[derive(Eq, PartialEq, Hash)]
 pub(crate) struct HardLinkInfo {
@@ -353,14 +338,6 @@ impl Archiver {
         self.feature_flags & self.fs_feature_flags
     }
 
-    fn wrap_err(&self, err: Error) -> Error {
-        if err.downcast_ref::<ArchiveError>().is_some() {
-            err
-        } else {
-            ArchiveError::new(self.path.clone(), err).into()
-        }
-    }
-
     fn archive_dir_contents<'a, T: SeqWrite + Send>(
         &'a mut self,
         encoder: &'a mut Encoder<'_, T>,
@@ -409,7 +386,7 @@ impl Archiver {
                     &file_entry.stat,
                 )
                 .await
-                .map_err(|err| self.wrap_err(err))?;
+                .context(format!("error at {:?}", self.path))?;
             }
             self.path = old_path;
             self.entry_counter = entry_counter;
