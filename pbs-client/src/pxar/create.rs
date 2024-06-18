@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, OsStr};
+use std::fmt::Display;
 use std::io::{self, Read};
 use std::mem::size_of;
 use std::ops::Range;
@@ -116,11 +117,31 @@ pub fn is_virtual_file_system(magic: i64) -> bool {
         SYSFS_MAGIC)
 }
 
+trait UniqueContext<T> {
+    fn unique_context<S>(self, context: S) -> Result<T, anyhow::Error>
+    where
+        S: Display + Send + Sync + 'static;
 }
 
+impl<T> UniqueContext<T> for Result<T, anyhow::Error> {
+    fn unique_context<S>(self, context: S) -> Result<T, anyhow::Error>
+    where
+        S: Display + Send + Sync + 'static,
+    {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(err) => {
+                let last_error = err.chain().next();
+                if let Some(e) = last_error {
+                    if e.to_string() == context.to_string() {
+                        return Err(err);
+                    }
+                }
+                Err(err.context(context))
+            }
+        }
     }
 }
-
 
 #[derive(Eq, PartialEq, Hash)]
 pub(crate) struct HardLinkInfo {
@@ -386,7 +407,7 @@ impl Archiver {
                     &file_entry.stat,
                 )
                 .await
-                .context(format!("error at {:?}", self.path))?;
+                .unique_context(format!("error at {:?}", self.path))?;
             }
             self.path = old_path;
             self.entry_counter = entry_counter;
