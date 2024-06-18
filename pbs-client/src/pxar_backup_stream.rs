@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll};
 
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use futures::future::{AbortHandle, Abortable};
 use futures::stream::Stream;
 use nix::dir::Dir;
@@ -29,7 +29,7 @@ pub struct PxarBackupStream {
     rx: Option<std::sync::mpsc::Receiver<Result<Vec<u8>, Error>>>,
     pub suggested_boundaries: Option<std::sync::mpsc::Receiver<u64>>,
     handle: Option<AbortHandle>,
-    error: Arc<Mutex<Option<String>>>,
+    error: Arc<Mutex<Option<Error>>>,
 }
 
 impl Drop for PxarBackupStream {
@@ -98,7 +98,7 @@ impl PxarBackupStream {
             .await
             {
                 let mut error = error2.lock().unwrap();
-                *error = Some(err.to_string());
+                *error = Some(err);
             }
         };
 
@@ -142,18 +142,18 @@ impl Stream for PxarBackupStream {
     fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
         {
             // limit lock scope
-            let error = self.error.lock().unwrap();
-            if let Some(ref msg) = *error {
-                return Poll::Ready(Some(Err(format_err!("{}", msg))));
+            let mut error = self.error.lock().unwrap();
+            if let Some(err) = error.take() {
+                return Poll::Ready(Some(Err(err)));
             }
         }
 
         match proxmox_async::runtime::block_in_place(|| self.rx.as_ref().unwrap().recv()) {
             Ok(data) => Poll::Ready(Some(data)),
             Err(_) => {
-                let error = self.error.lock().unwrap();
-                if let Some(ref msg) = *error {
-                    return Poll::Ready(Some(Err(format_err!("{}", msg))));
+                let mut error = self.error.lock().unwrap();
+                if let Some(err) = error.take() {
+                    return Poll::Ready(Some(Err(err)));
                 }
                 Poll::Ready(None) // channel closed, no error
             }
