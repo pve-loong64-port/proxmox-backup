@@ -38,9 +38,9 @@ SUBCRATES != cargo metadata --no-deps --format-version=1 \
 
 ifeq ($(BUILD_MODE), release)
 CARGO_BUILD_ARGS += --release
-COMPILEDIR := target/release
+COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/release
 else
-COMPILEDIR := target/debug
+COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/debug
 endif
 
 ifeq ($(valgrind), yes)

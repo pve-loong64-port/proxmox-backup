@@ -90,10 +90,10 @@ SPHINXBUILD   = sphinx-build
 BUILDDIR      = output
 
 ifeq ($(BUILD_MODE), release)
-COMPILEDIR := ../target/release
+COMPILEDIR := ../target/$(DEB_HOST_RUST_TYPE)/release
 SPHINXOPTS    += -t release
 else
-COMPILEDIR := ../target/debug
+COMPILEDIR := ../target/$(DEB_HOST_RUST_TYPE)/debug
 SPHINXOPTS    += -t devbuild
 endif
 

@@ -7,15 +7,17 @@ fn pxar_create_and_extract() {
     let src_dir = "../tests/catar_data/test_xattrs_src/";
     let dest_dir = "../tests/catar_data/test_xattrs_dest/";
 
+    let target_subdir = std::env::var("DEB_HOST_RUST_TYPE").unwrap_or(String::new());
+
     let exec_path = if cfg!(debug_assertions) {
-        "../target/debug/pxar"
+        format!("../target/{target_subdir}/debug/pxar")
     } else {
-        "../target/release/pxar"
+        format!("../target/{target_subdir}/release/pxar")
     };
 
     println!("run '{} create archive.pxar {}'", exec_path, src_dir);
 
-    Command::new(exec_path)
+    Command::new(&exec_path)
         .arg("create")
         .arg("./tests/archive.pxar")
         .arg(src_dir)
@@ -24,7 +26,7 @@ fn pxar_create_and_extract() {
 
     println!("run '{} extract archive.pxar {}'", exec_path, dest_dir);
 
-    Command::new(exec_path)
+    Command::new(&exec_path)
         .arg("extract")
         .arg("./tests/archive.pxar")
         .arg("--target")
@@ -81,13 +83,15 @@ fn pxar_create_and_extract() {
 
 #[test]
 fn pxar_list_with_payload_input() {
+    let target_subdir = std::env::var("DEB_HOST_RUST_TYPE").unwrap_or(String::new());
+
     let exec_path = if cfg!(debug_assertions) {
-        "../target/debug/pxar"
+        format!("../target/{target_subdir}/debug/pxar")
     } else {
-        "../target/release/pxar"
+        format!("../target/{target_subdir}/release/pxar")
     };
 
-    let output = Command::new(exec_path)
+    let output = Command::new(&exec_path)
         .args([
             "list",
             "../tests/pxar/backup-client-pxar-expected.mpxar",
