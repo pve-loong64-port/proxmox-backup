@@ -126,6 +126,23 @@ pub fn get_default_repository() -> Option<String> {
     std::env::var("PBS_REPOSITORY").ok()
 }
 
+pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
+    if let Some(url) = param
+        .as_object_mut()
+        .ok_or_else(|| format_err!("unable to get repository (parameter is not an object)"))?
+        .remove("repository")
+    {
+        return url
+            .as_str()
+            .ok_or_else(|| format_err!("invalid repository value (must be a string)"))?
+            .parse();
+    }
+
+    get_default_repository()
+        .ok_or_else(|| format_err!("unable to get default repository"))?
+        .parse()
+}
+
 pub fn extract_repository_from_value(param: &Value) -> Result<BackupRepository, Error> {
     let repo_url = param["repository"]
         .as_str()
