@@ -33,7 +33,8 @@ RESTORE_BIN := \
 
 SUBCRATES != cargo metadata --no-deps --format-version=1 \
 	| jq -r .workspace_members'[]' \
-	| awk '!/^proxmox-backup[[:space:]]/ { printf "%s ", $$1 }'
+	| grep 'proxmox-backup/' \
+	| sed -e 's!.*proxmox-backup/!!g' -e 's/\#.*$$//g' -e 's/)$$//g'
 
 ifeq ($(BUILD_MODE), release)
 CARGO_BUILD_ARGS += --release
