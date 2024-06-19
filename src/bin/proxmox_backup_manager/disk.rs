@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_schema::api;
-use std::io::{IsTerminal, Write};
+use std::io::IsTerminal;
 
 use pbs_api_types::{
     ZfsCompressionType, ZfsRaidLevel, BLOCKDEVICE_DISK_AND_PARTITION_NAME_SCHEMA,
@@ -155,17 +155,16 @@ async fn wipe_disk(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<
 
     // If we're on a TTY, query the user
     if std::io::stdin().is_terminal() {
-        println!("You are about to wipe block device {}.", param["disk"]);
-        print!("Are you sure you want to continue? (y/N): ");
-        let _ = std::io::stdout().flush();
-        use std::io::{BufRead, BufReader};
-        let mut line = String::new();
-        match BufReader::new(std::io::stdin()).read_line(&mut line) {
-            Ok(_) => match line.trim() {
-                "y" | "Y" => (), // continue
-                _ => bail!("Aborting."),
-            },
-            Err(err) => bail!("Failed to read line - {err}."),
+        let confirmation = Confirmation::query_with_default(
+            format!(
+                "You are about to wipe block device {}. Are you sure you want to continue?",
+                param["disk"]
+            )
+            .as_str(),
+            Confirmation::No,
+        )?;
+        if confirmation.is_no() {
+            bail!("Aborting.");
         }
     }
 
