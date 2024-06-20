@@ -70,7 +70,7 @@ proxmox-openid = "0.10.0"
 proxmox-rest-server = { version = "0.5.1", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "2.0.0", default-features = false }
-proxmox-rrd = { version = "0.1" }
+proxmox-rrd = { version = "0.2" }
 # everything but pbs-config and pbs-client use "api-macro"
 proxmox-schema = "3"
 proxmox-section-config = "2"
@@ -80,7 +80,7 @@ proxmox-sortable-macro = "0.1.2"
 proxmox-subscription = { version = "0.4.2", features = [ "api-types" ] }
 proxmox-sys = "0.5.7"
 proxmox-tfa = { version = "4.0.4", features = [ "api", "api-types" ] }
-proxmox-time = "1.1.6"
+proxmox-time = "2"
 proxmox-uuid = "1"
 
 # other proxmox crates
