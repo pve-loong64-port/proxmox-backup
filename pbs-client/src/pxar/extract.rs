@@ -42,7 +42,7 @@ pub struct PxarExtractOptions<'a> {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
     pub struct OverwriteFlags: u8 {
         /// Overwrite existing entries file content
         const FILE = 0x1;

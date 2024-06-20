@@ -75,6 +75,7 @@ pub struct BlockHeader {
 
 bitflags! {
     /// Header flags (e.g. `END_OF_STREAM` or `INCOMPLETE`)
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
     pub struct BlockHeaderFlags: u8 {
         /// Marks the last block in a stream.
         const END_OF_STREAM = 0b00000001;

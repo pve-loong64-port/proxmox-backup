@@ -8,6 +8,7 @@ use libc::c_long;
 use bitflags::bitflags;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct Flags: u64 {
         /// FAT-style 2s time granularity
         const WITH_2SEC_TIME                   = 0x40;
