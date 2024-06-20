@@ -13,8 +13,8 @@ pub async fn fs_info(path: PathBuf) -> Result<proxmox_sys::fs::FileSystemInforma
 
 /// `proxmox_sys::fs::fs_into` wrapped in a `spawn_blocking` call.
 ///
-/// We cannot use `&'static CStr` in the above as we get from `proxmox_lang::c_str!` because
-/// `NixPath` is only implemented directly on `CStr`, not on `&CStr`.
+/// We cannot use `&'static CStr` in the above as we get from a C-string literal
+/// because `NixPath` is only implemented directly on `CStr`, not on `&CStr`.
 pub async fn fs_info_static(
     path: &'static CStr,
 ) -> Result<proxmox_sys::fs::FileSystemInformation, Error> {
