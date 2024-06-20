@@ -188,7 +188,7 @@ fn add_fcaps(
     c_result!(unsafe {
         libc::setxattr(
             c_proc_path,
-            xattr::xattr_name_fcaps().as_ptr(),
+            xattr::XATTR_NAME_FCAPS.as_ptr(),
             fcaps.data.as_ptr() as *const libc::c_void,
             fcaps.data.len(),
             0,

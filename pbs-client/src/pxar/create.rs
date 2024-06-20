@@ -1403,7 +1403,7 @@ fn get_fcaps(
         return Ok(());
     }
 
-    match xattr::fgetxattr(fd, xattr::xattr_name_fcaps()) {
+    match xattr::fgetxattr(fd, xattr::XATTR_NAME_FCAPS) {
         Ok(data) => {
             meta.fcaps = Some(pxar::format::FCaps { data });
             Ok(())

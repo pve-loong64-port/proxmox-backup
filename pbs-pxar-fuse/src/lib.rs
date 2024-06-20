@@ -620,7 +620,7 @@ impl SessionImpl {
         use pxar::format::XAttr;
 
         if let Some(fcaps) = metadata.fcaps {
-            xattrs.push(XAttr::new(xattr::xattr_name_fcaps().to_bytes(), fcaps.data));
+            xattrs.push(XAttr::new(xattr::XATTR_NAME_FCAPS.to_bytes(), fcaps.data));
         }
 
         // TODO: Special cases:
