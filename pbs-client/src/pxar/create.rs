@@ -27,7 +27,6 @@ use pxar::{EntryKind, Metadata, PxarVariant};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::vec;
-use proxmox_lang::c_str;
 use proxmox_sys::fs::{self, acl, xattr};
 
 use pbs_datastore::catalog::BackupCatalogWriter;
@@ -496,7 +495,7 @@ impl Archiver {
     }
 
     fn read_pxar_excludes(&mut self, parent: RawFd) -> Result<(), Error> {
-        let fd = match self.open_file(parent, c_str!(".pxarexclude"), OFlag::O_RDONLY, false)? {
+        let fd = match self.open_file(parent, c".pxarexclude", OFlag::O_RDONLY, false)? {
             Some(fd) => fd,
             None => return Ok(()),
         };

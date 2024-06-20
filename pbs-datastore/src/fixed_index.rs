@@ -349,7 +349,7 @@ impl FixedIndexWriter {
 
         self.unmap()?;
 
-        let csum_offset = proxmox_lang::offsetof!(FixedIndexHeader, index_csum);
+        let csum_offset = std::mem::offset_of!(FixedIndexHeader, index_csum);
         self.file.seek(SeekFrom::Start(csum_offset as u64))?;
         self.file.write_all(&index_csum)?;
         self.file.flush()?;

@@ -353,7 +353,7 @@ impl DynamicIndexWriter {
 
         self.writer.flush()?;
 
-        let csum_offset = proxmox_lang::offsetof!(DynamicIndexHeader, index_csum);
+        let csum_offset = std::mem::offset_of!(DynamicIndexHeader, index_csum);
         self.writer.seek(SeekFrom::Start(csum_offset as u64))?;
 
         let csum = self.csum.take().unwrap();

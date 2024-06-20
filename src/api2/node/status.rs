@@ -98,7 +98,7 @@ async fn get_status(
         uname.machine(),
     );
 
-    let disk = crate::tools::fs::fs_info_static(proxmox_lang::c_str!("/")).await?;
+    let disk = crate::tools::fs::fs_info_static(c"/").await?;
 
     let boot_info = boot_mode_to_info(boot_mode::BootMode::query(), boot_mode::SecureBoot::query());
 

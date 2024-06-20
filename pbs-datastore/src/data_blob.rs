@@ -56,13 +56,13 @@ impl DataBlob {
 
     /// accessor to crc32 checksum
     pub fn crc(&self) -> u32 {
-        let crc_o = proxmox_lang::offsetof!(DataBlobHeader, crc);
+        let crc_o = std::mem::offset_of!(DataBlobHeader, crc);
         u32::from_le_bytes(self.raw_data[crc_o..crc_o + 4].try_into().unwrap())
     }
 
     // set the CRC checksum field
     pub fn set_crc(&mut self, crc: u32) {
-        let crc_o = proxmox_lang::offsetof!(DataBlobHeader, crc);
+        let crc_o = std::mem::offset_of!(DataBlobHeader, crc);
         self.raw_data[crc_o..crc_o + 4].copy_from_slice(&crc.to_le_bytes());
     }
 
