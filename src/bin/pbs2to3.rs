@@ -5,7 +5,8 @@ use anyhow::{format_err, Error};
 use regex::Regex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use proxmox_apt::repositories::{self, APTRepositoryFile, APTRepositoryPackageType};
+use proxmox_apt::repositories;
+use proxmox_apt_api_types::{APTRepositoryFile, APTRepositoryPackageType};
 use proxmox_backup::api2::node::apt;
 
 const OLD_SUITE: &str = "bullseye";
@@ -50,19 +51,18 @@ impl Checker {
     fn check_upgradable_packages(&mut self) -> Result<(), Error> {
         self.output.log_info("Checking for package updates..")?;
 
-        let result = Self::get_upgradable_packages();
+        let result = apt::apt_update_available();
         match result {
             Err(err) => {
                 self.output.log_warn(format!("{err}"))?;
                 self.output
                     .log_fail("unable to retrieve list of package updates!")?;
             }
-            Ok(cache) => {
-                if cache.package_status.is_empty() {
+            Ok(package_status) => {
+                if package_status.is_empty() {
                     self.output.log_pass("all packages up-to-date")?;
                 } else {
-                    let pkgs = cache
-                        .package_status
+                    let pkgs = package_status
                         .iter()
                         .map(|pkg| pkg.package.clone())
                         .collect::<Vec<String>>()
@@ -451,20 +451,6 @@ impl Checker {
             )?;
         }
         Ok(())
-    }
-
-    fn get_upgradable_packages() -> Result<proxmox_backup::tools::apt::PkgState, Error> {
-        let cache = if let Ok(false) = proxmox_backup::tools::apt::pkg_cache_expired() {
-            if let Ok(Some(cache)) = proxmox_backup::tools::apt::read_pkg_state() {
-                cache
-            } else {
-                proxmox_backup::tools::apt::update_cache()?
-            }
-        } else {
-            proxmox_backup::tools::apt::update_cache()?
-        };
-
-        Ok(cache)
     }
 }
 

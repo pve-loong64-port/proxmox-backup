@@ -6,7 +6,6 @@ use anyhow::{bail, Error};
 
 use proxmox_http::{client::Client, HttpOptions, ProxyConfig};
 
-pub mod apt;
 pub mod config;
 pub mod disks;
 pub mod fs;

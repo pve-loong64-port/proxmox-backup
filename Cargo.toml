@@ -53,7 +53,9 @@ path = "src/lib.rs"
 
 [workspace.dependencies]
 # proxmox workspace
-proxmox-apt = "0.10.5"
+proxmox-config-digest = "0.1.0"
+proxmox-apt = { version = "0.11", features = [ "cache" ] }
+proxmox-apt-api-types = "1.0"
 proxmox-async = "0.4"
 proxmox-auth-api = "0.4"
 proxmox-borrow = "1"
@@ -203,9 +205,11 @@ zstd.workspace = true
 
 # proxmox workspace
 proxmox-apt.workspace = true
+proxmox-apt-api-types.workspace = true
 proxmox-async.workspace = true
 proxmox-auth-api = { workspace = true, features = [ "api", "pam-authenticator" ] }
 proxmox-compression.workspace = true
+proxmox-config-digest.workspace = true
 proxmox-http = { workspace = true, features = [ "client-trait", "proxmox-async", "rate-limited-stream" ] } # pbs-client doesn't use these
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true

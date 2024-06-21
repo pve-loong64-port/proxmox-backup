@@ -98,6 +98,8 @@ pub const PROXMOX_BACKUP_KERNEL_FN: &str =
 
 pub const PROXMOX_BACKUP_SUBSCRIPTION_FN: &str = configdir!("/subscription");
 
+pub const APT_PKG_STATE_FN: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/pkg-state.json");
+
 /// Prepend configuration directory to a file name
 ///
 /// This is a simply way to get the full path for configuration files.
