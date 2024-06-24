@@ -469,7 +469,6 @@ impl HttpClient {
                     }
                     Err(err) => {
                         log::error!("re-authentication failed: {}", err);
-                        return;
                     }
                 }
             }
