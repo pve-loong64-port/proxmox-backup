@@ -902,7 +902,7 @@ fn get_partitions_info(
                         _ => used,
                     };
                     if used == PartitionUsageType::FileSystem {
-                        filesystem = info.file_system_type.clone();
+                        filesystem.clone_from(&info.file_system_type);
                     }
                 }
             }

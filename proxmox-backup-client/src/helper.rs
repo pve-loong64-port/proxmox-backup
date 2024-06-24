@@ -14,7 +14,7 @@ pub(crate) async fn get_pxar_fuse_accessor(
     crypt_config: Option<Arc<CryptConfig>>,
 ) -> Result<pbs_pxar_fuse::Accessor, Error> {
     let (archive_name, payload_archive_name) =
-        pbs_client::tools::get_pxar_archive_names(archive_name, &manifest)?;
+        pbs_client::tools::get_pxar_archive_names(archive_name, manifest)?;
 
     let (reader, archive_size) = get_pxar_fuse_reader(
         &archive_name,

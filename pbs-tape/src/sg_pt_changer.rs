@@ -412,9 +412,9 @@ pub fn read_element_status<F: AsRawFd>(file: &mut F) -> Result<MtxStatus, Error>
         for drive in drives.iter_mut() {
             for drive2 in &page.drives {
                 if drive2.element_address == drive.element_address {
-                    drive.vendor = drive2.vendor.clone();
-                    drive.model = drive2.model.clone();
-                    drive.drive_serial_number = drive2.drive_serial_number.clone();
+                    drive.vendor.clone_from(&drive2.vendor);
+                    drive.model.clone_from(&drive2.model);
+                    drive.drive_serial_number.clone_from(&drive2.drive_serial_number);
                 }
             }
         }

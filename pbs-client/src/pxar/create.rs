@@ -1835,7 +1835,7 @@ mod tests {
         };
 
         extractor.enter_directory(
-            OsString::from(format!("testdir")),
+            OsString::from("testdir".to_string()),
             dir_metadata.clone(),
             true,
         )?;

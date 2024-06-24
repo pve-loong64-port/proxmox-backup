@@ -479,7 +479,7 @@ fn restore_full_worker(
                     if encryption_key_fingerprint.is_none()
                         && set.encryption_key_fingerprint.is_some()
                     {
-                        encryption_key_fingerprint = set.encryption_key_fingerprint.clone();
+                        encryption_key_fingerprint.clone_from(&set.encryption_key_fingerprint);
                     }
                 }
                 media_id_list.push(media_id);

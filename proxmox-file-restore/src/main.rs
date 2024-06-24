@@ -188,7 +188,7 @@ async fn list_files(
 
                 pbs_client::tools::pxar_metadata_catalog_lookup(
                     accessor,
-                    &path,
+                    path,
                     Some(&archive_name),
                 )
                 .await
@@ -364,11 +364,11 @@ async fn get_remote_pxar_reader(
     crypt_config: Option<Arc<CryptConfig>>,
 ) -> Result<(LocalDynamicReadAt<RemoteChunkReader>, u64), Error> {
     let index = client
-        .download_dynamic_index(&manifest, &archive_name)
+        .download_dynamic_index(manifest, archive_name)
         .await?;
     let most_used = index.find_most_used_chunks(8);
 
-    let file_info = manifest.lookup_file_info(&archive_name)?;
+    let file_info = manifest.lookup_file_info(archive_name)?;
     let chunk_reader = RemoteChunkReader::new(
         client.clone(),
         crypt_config,

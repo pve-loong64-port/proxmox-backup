@@ -79,7 +79,7 @@ async fn complete_api_path_do(mut complete_me: &str, capability: Option<&str>) -
 
         if list.len() == 1 && old_len != 1 && list[0].ends_with('/') {
             // we added only one match and it was a directory, lookup again
-            lookup_path = list[0].clone();
+            lookup_path.clone_from(&list[0]);
             filter = "";
             continue;
         }

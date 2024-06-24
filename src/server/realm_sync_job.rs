@@ -463,9 +463,9 @@ impl LdapSyncSettings {
             let value = LdapSyncAttributes::API_SCHEMA.parse_property_string(sync_attributes)?;
             let sync_attributes: LdapSyncAttributes = serde_json::from_value(value)?;
 
-            email = sync_attributes.email.clone();
-            firstname = sync_attributes.firstname.clone();
-            lastname = sync_attributes.lastname.clone();
+            email.clone_from(&sync_attributes.email);
+            firstname.clone_from(&sync_attributes.firstname);
+            lastname.clone_from(&sync_attributes.lastname);
 
             if let Some(email_attr) = &sync_attributes.email {
                 attributes.push(email_attr.clone());

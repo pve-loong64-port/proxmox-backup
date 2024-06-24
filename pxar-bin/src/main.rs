@@ -233,7 +233,7 @@ fn extract_archive(
         overwrite_flags,
         extract_match_default,
         on_error,
-        prelude_path: prelude_target.map(|path| PathBuf::from(path)),
+        prelude_path: prelude_target.map(PathBuf::from),
     };
 
     if archive == "-" {
@@ -477,7 +477,7 @@ async fn mount_archive(
     let archive = Path::new(&archive);
     let mountpoint = Path::new(&mountpoint);
     let options = OsStr::new("ro,default_permissions");
-    let payload_input = payload_input.map(|payload_input| PathBuf::from(payload_input));
+    let payload_input = payload_input.map(PathBuf::from);
 
     let session = pbs_pxar_fuse::Session::mount_path(
         archive,

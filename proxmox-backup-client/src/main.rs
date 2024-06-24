@@ -256,7 +256,7 @@ async fn backup_directory<P: AsRef<Path>>(
         });
 
         let payload_stats = client.upload_stream(
-            &payload_target,
+            payload_target,
             stream,
             upload_options,
             Some(payload_injections_rx),
@@ -1641,7 +1641,7 @@ async fn restore(
 
         let prelude_path = param["prelude-target"]
             .as_str()
-            .map(|path| PathBuf::from(path));
+            .map(PathBuf::from);
 
         let options = pbs_client::pxar::PxarExtractOptions {
             match_list: &[],
