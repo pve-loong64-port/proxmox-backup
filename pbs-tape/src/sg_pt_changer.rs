@@ -414,7 +414,9 @@ pub fn read_element_status<F: AsRawFd>(file: &mut F) -> Result<MtxStatus, Error>
                 if drive2.element_address == drive.element_address {
                     drive.vendor.clone_from(&drive2.vendor);
                     drive.model.clone_from(&drive2.model);
-                    drive.drive_serial_number.clone_from(&drive2.drive_serial_number);
+                    drive
+                        .drive_serial_number
+                        .clone_from(&drive2.drive_serial_number);
                 }
             }
         }

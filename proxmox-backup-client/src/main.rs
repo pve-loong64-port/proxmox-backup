@@ -1639,9 +1639,7 @@ async fn restore(
             overwrite_flags.insert(pbs_client::pxar::OverwriteFlags::all());
         }
 
-        let prelude_path = param["prelude-target"]
-            .as_str()
-            .map(PathBuf::from);
+        let prelude_path = param["prelude-target"].as_str().map(PathBuf::from);
 
         let options = pbs_client::pxar::PxarExtractOptions {
             match_list: &[],
