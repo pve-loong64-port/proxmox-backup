@@ -100,7 +100,7 @@ impl Bucket {
         let ty = ty.as_ref();
         haystack.iter_mut().find(|b| match b {
             Bucket::Partition(data) => {
-                if let Some(comp) = comp.get(0) {
+                if let Some(comp) = comp.first() {
                     ty == "part" && comp.as_ref().parse::<i32>().unwrap() == data.number
                 } else {
                     false
@@ -108,14 +108,14 @@ impl Bucket {
             }
             Bucket::RawFs(_) => ty == "raw",
             Bucket::ZPool(data) => {
-                if let Some(ref comp) = comp.get(0) {
+                if let Some(ref comp) = comp.first() {
                     ty == "zpool" && comp.as_ref() == data.name
                 } else {
                     false
                 }
             }
             Bucket::LVM(data) => {
-                if let (Some(ref vg), Some(ref lv)) = (comp.get(0), comp.get(1)) {
+                if let (Some(ref vg), Some(ref lv)) = (comp.first(), comp.get(1)) {
                     ty == "lvm" && vg.as_ref() == data.vg_name && lv.as_ref() == data.lv_name
                 } else {
                     false
