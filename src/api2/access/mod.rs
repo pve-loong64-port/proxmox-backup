@@ -32,7 +32,7 @@ pub mod user;
 /// This means that user admins need to type in their own password while editing a user, and
 /// regular users, which can only change their own settings (checked at the API level), can change
 /// their own settings using their own password.
-pub(self) async fn user_update_auth<S: AsRef<str>>(
+async fn user_update_auth<S: AsRef<str>>(
     rpcenv: &mut dyn RpcEnvironment,
     userid: &Userid,
     password: Option<S>,
