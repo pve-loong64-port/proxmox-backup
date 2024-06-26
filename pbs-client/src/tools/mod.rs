@@ -697,7 +697,7 @@ pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
                 EntryKind::File { size, .. } => {
                     let mtime = match entry.metadata().mtime_as_duration() {
                         SignedDuration::Positive(val) => i64::try_from(val.as_secs())?,
-                        SignedDuration::Negative(val) => -1 * i64::try_from(val.as_secs())?,
+                        SignedDuration::Negative(val) => -i64::try_from(val.as_secs())?,
                     };
                     DirEntryAttribute::File { size: *size, mtime }
                 }
