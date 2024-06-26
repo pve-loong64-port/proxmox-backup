@@ -147,7 +147,7 @@ pub fn config() -> Result<(PluginData, [u8; 32]), Error> {
     let digest = openssl::sha::sha256(content.as_bytes());
     let mut data = CONFIG.parse(ACME_PLUGIN_CFG_FILENAME, &content)?;
 
-    if data.sections.get("standalone").is_none() {
+    if !data.sections.contains_key("standalone") {
         let standalone = StandalonePlugin::default();
         data.set_data("standalone", "standalone", &standalone)
             .unwrap();

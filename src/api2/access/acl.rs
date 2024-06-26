@@ -233,7 +233,7 @@ pub fn update_acl(
         if !delete {
             // Note: we allow to delete non-existent users
             let user_cfg = pbs_config::user::cached_config()?;
-            if user_cfg.sections.get(&auth_id.to_string()).is_none() {
+            if !user_cfg.sections.contains_key(&auth_id.to_string()) {
                 bail!(format!(
                     "no such {}.",
                     if auth_id.is_token() {

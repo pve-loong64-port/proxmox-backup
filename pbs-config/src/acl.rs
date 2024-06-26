@@ -1047,7 +1047,7 @@ acl:1:/storage/store1:user1@pbs:DatastoreBackup
             let node = tree.find_node(path);
             assert!(node.is_some());
             if let Some(node) = node {
-                assert!(node.users.get(&user1).is_none());
+                assert!(!node.users.contains_key(&user1));
             }
         }
         for path in &user2_paths {
@@ -1064,7 +1064,7 @@ acl:1:/storage/store1:user1@pbs:DatastoreBackup
             let node = tree.find_node(path);
             assert!(node.is_some());
             if let Some(node) = node {
-                assert!(node.users.get(&user2).is_none());
+                assert!(!node.users.contains_key(&user2));
             }
         }
 

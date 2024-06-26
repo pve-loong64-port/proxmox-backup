@@ -495,7 +495,7 @@ pub fn label_media(
     if let Some(ref pool) = pool {
         let (pool_config, _digest) = pbs_config::media_pool::config()?;
 
-        if pool_config.sections.get(pool).is_none() {
+        if !pool_config.sections.contains_key(pool) {
             bail!("no such pool ('{}')", pool);
         }
     }
@@ -1056,7 +1056,7 @@ pub fn barcode_label_media(
     if let Some(ref pool) = pool {
         let (pool_config, _digest) = pbs_config::media_pool::config()?;
 
-        if pool_config.sections.get(pool).is_none() {
+        if !pool_config.sections.contains_key(pool) {
             bail!("no such pool ('{}')", pool);
         }
     }
