@@ -251,8 +251,9 @@ impl ChunkStore {
     pub fn get_chunk_iterator(
         &self,
     ) -> Result<
-        impl Iterator<Item = (Result<proxmox_sys::fs::ReadDirEntry, Error>, usize, bool)>
-            + std::iter::FusedIterator,
+        impl std::iter::FusedIterator<
+            Item = (Result<proxmox_sys::fs::ReadDirEntry, Error>, usize, bool),
+        >,
         Error,
     > {
         // unwrap: only `None` in unit tests
