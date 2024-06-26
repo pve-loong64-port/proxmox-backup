@@ -80,6 +80,7 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V: Clone + Send + 'static> AsyncL
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
