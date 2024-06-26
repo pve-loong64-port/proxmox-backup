@@ -946,7 +946,7 @@ impl MediaSetCatalog {
 
     /// Add a catalog
     pub fn append_catalog(&mut self, catalog: MediaCatalog) -> Result<(), Error> {
-        if self.catalog_list.get(&catalog.uuid).is_some() {
+        if self.catalog_list.contains_key(&catalog.uuid) {
             bail!("MediaSetCatalog already contains media '{}'", catalog.uuid);
         }
 

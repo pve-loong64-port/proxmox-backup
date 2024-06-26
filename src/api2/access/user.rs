@@ -147,11 +147,7 @@ pub fn create_user(
 
     let (mut section_config, _digest) = pbs_config::user::config()?;
 
-    if section_config
-        .sections
-        .get(config.userid.as_str())
-        .is_some()
-    {
+    if section_config.sections.contains_key(config.userid.as_str()) {
         bail!("user '{}' already exists.", config.userid);
     }
 
@@ -375,11 +371,10 @@ pub fn delete_user(userid: Userid, digest: Option<String>) -> Result<(), Error> 
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    match config.sections.get(userid.as_str()) {
-        Some(_) => {
-            config.sections.remove(userid.as_str());
-        }
-        None => bail!("user '{}' does not exist.", userid),
+    if config.sections.contains_key(userid.as_str()) {
+        config.sections.remove(userid.as_str());
+    } else {
+        bail!("user '{}' does not exist.", userid);
     }
 
     pbs_config::user::save_config(&config)?;
@@ -503,7 +498,7 @@ pub fn generate_token(
     let tokenid = Authid::from((userid.clone(), Some(token_name.clone())));
     let tokenid_string = tokenid.to_string();
 
-    if config.sections.get(&tokenid_string).is_some() {
+    if config.sections.contains_key(&tokenid_string) {
         bail!(
             "token '{}' for user '{}' already exists.",
             token_name.as_str(),
@@ -654,15 +649,14 @@ pub fn delete_token(
     let tokenid = Authid::from((userid.clone(), Some(token_name.clone())));
     let tokenid_string = tokenid.to_string();
 
-    match config.sections.get(&tokenid_string) {
-        Some(_) => {
-            config.sections.remove(&tokenid_string);
-        }
-        None => bail!(
+    if config.sections.contains_key(&tokenid_string) {
+        config.sections.remove(&tokenid_string);
+    } else {
+        bail!(
             "token '{}' of user '{}' does not exist.",
             token_name.as_str(),
             userid
-        ),
+        );
     }
 
     token_shadow::delete_secret(&tokenid)?;

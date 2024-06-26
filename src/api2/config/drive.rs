@@ -34,7 +34,7 @@ pub fn create_drive(config: LtoTapeDrive) -> Result<(), Error> {
 
     let (mut section_config, _digest) = pbs_config::drive::config()?;
 
-    if section_config.sections.get(&config.name).is_some() {
+    if section_config.sections.contains_key(&config.name) {
         param_bail!("name", "Entry '{}' already exists", config.name);
     }
 

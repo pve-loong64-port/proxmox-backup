@@ -118,7 +118,7 @@ pub fn create_datastore(
 
     let (section_config, _digest) = pbs_config::datastore::config()?;
 
-    if section_config.sections.get(&config.name).is_some() {
+    if section_config.sections.contains_key(&config.name) {
         param_bail!("name", "datastore '{}' already exists.", config.name);
     }
 

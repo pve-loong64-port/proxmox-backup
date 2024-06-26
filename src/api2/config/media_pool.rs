@@ -31,7 +31,7 @@ pub fn create_pool(config: MediaPoolConfig) -> Result<(), Error> {
 
     let (mut section_config, _digest) = pbs_config::media_pool::config()?;
 
-    if section_config.sections.get(&config.name).is_some() {
+    if section_config.sections.contains_key(&config.name) {
         param_bail!("name", "Media pool '{}' already exists", config.name);
     }
 
@@ -225,11 +225,10 @@ pub fn delete_pool(name: String) -> Result<(), Error> {
 
     let (mut config, _digest) = pbs_config::media_pool::config()?;
 
-    match config.sections.get(&name) {
-        Some(_) => {
-            config.sections.remove(&name);
-        }
-        None => http_bail!(NOT_FOUND, "delete pool '{}' failed - no such pool", name),
+    if config.sections.contains_key(&name) {
+        config.sections.remove(&name);
+    } else {
+        http_bail!(NOT_FOUND, "delete pool '{}' failed - no such pool", name);
     }
 
     pbs_config::media_pool::save_config(&config)?;

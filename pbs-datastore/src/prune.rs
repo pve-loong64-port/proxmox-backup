@@ -55,7 +55,7 @@ fn mark_selections<F: Fn(&BackupInfo) -> Result<String, Error>>(
 
     for info in list {
         let backup_id = info.backup_dir.relative_path();
-        if mark.get(&backup_id).is_some() {
+        if mark.contains_key(&backup_id) {
             continue;
         }
         if info.protected {

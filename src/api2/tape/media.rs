@@ -244,7 +244,7 @@ pub async fn list_media(
         let media_id = inventory.lookup_media(uuid).unwrap();
 
         if let Some(pool) = media_id.pool() {
-            if config.sections.get(&pool).is_some() {
+            if config.sections.contains_key(&pool) {
                 continue;
             }
 

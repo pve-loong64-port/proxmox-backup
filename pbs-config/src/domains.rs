@@ -65,7 +65,7 @@ pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
 
 /// Check if a realm with the given name exists
 pub fn exists(domains: &SectionConfigData, realm: &str) -> bool {
-    realm == "pbs" || realm == "pam" || domains.sections.get(realm).is_some()
+    realm == "pbs" || realm == "pam" || domains.sections.contains_key(realm)
 }
 
 // shell completion helper

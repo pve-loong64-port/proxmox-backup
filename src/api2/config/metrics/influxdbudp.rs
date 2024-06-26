@@ -67,7 +67,7 @@ pub async fn create_influxdb_udp_server(config: InfluxDbUdp) -> Result<(), Error
 
     let (mut metrics, _digest) = metrics::config()?;
 
-    if metrics.sections.get(&config.name).is_some() {
+    if metrics.sections.contains_key(&config.name) {
         bail!("metric server '{}' already exists.", config.name);
     }
 

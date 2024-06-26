@@ -66,7 +66,7 @@ pub fn do_create_prune_job(
 
     let (mut section_config, _digest) = prune::config()?;
 
-    if section_config.sections.get(&config.id).is_some() {
+    if section_config.sections.contains_key(&config.id) {
         param_bail!("id", "job '{}' already exists.", config.id);
     }
 

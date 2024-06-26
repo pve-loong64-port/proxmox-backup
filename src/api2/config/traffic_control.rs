@@ -59,7 +59,7 @@ pub fn create_traffic_control(config: TrafficControlRule) -> Result<(), Error> {
 
     let (mut section_config, _digest) = pbs_config::traffic_control::config()?;
 
-    if section_config.sections.get(&config.name).is_some() {
+    if section_config.sections.contains_key(&config.name) {
         param_bail!(
             "name",
             "traffic control rule '{}' already exists.",
@@ -258,11 +258,10 @@ pub fn delete_traffic_control(name: String, digest: Option<String>) -> Result<()
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    match config.sections.get(&name) {
-        Some(_) => {
-            config.sections.remove(&name);
-        }
-        None => http_bail!(NOT_FOUND, "traffic control rule '{}' does not exist.", name),
+    if config.sections.contains_key(&name) {
+        config.sections.remove(&name);
+    } else {
+        http_bail!(NOT_FOUND, "traffic control rule '{}' does not exist.", name);
     }
 
     pbs_config::traffic_control::save_config(&config)?;

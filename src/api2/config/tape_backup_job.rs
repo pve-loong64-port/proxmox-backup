@@ -75,7 +75,7 @@ pub fn create_tape_backup_job(
 
     let (mut config, _digest) = pbs_config::tape_job::config()?;
 
-    if config.sections.get(&job.id).is_some() {
+    if config.sections.contains_key(&job.id) {
         param_bail!("id", "job '{}' already exists.", job.id);
     }
 

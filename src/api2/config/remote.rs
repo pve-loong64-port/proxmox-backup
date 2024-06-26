@@ -89,7 +89,7 @@ pub fn create_remote(name: String, config: RemoteConfig, password: String) -> Re
 
     let (mut section_config, _digest) = pbs_config::remote::config()?;
 
-    if section_config.sections.get(&name).is_some() {
+    if section_config.sections.contains_key(&name) {
         param_bail!("name", "remote '{}' already exists.", name);
     }
 
@@ -288,11 +288,10 @@ pub fn delete_remote(name: String, digest: Option<String>) -> Result<(), Error> 
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    match config.sections.get(&name) {
-        Some(_) => {
-            config.sections.remove(&name);
-        }
-        None => http_bail!(NOT_FOUND, "remote '{}' does not exist.", name),
+    if config.sections.contains_key(&name) {
+        config.sections.remove(&name);
+    } else {
+        http_bail!(NOT_FOUND, "remote '{}' does not exist.", name);
     }
 
     pbs_config::remote::save_config(&config)?;

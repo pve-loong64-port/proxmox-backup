@@ -209,7 +209,7 @@ pub fn create_datastore_disk(
 
                 let (config, _digest) = pbs_config::datastore::config()?;
 
-                if config.sections.get(&datastore.name).is_some() {
+                if config.sections.contains_key(&datastore.name) {
                     bail!("datastore '{}' already exists.", datastore.name);
                 }
 
