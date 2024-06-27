@@ -109,10 +109,14 @@ proxmox-backup-docs: build
 	cd build; dpkg-buildpackage -b -us -uc --no-pre-clean
 	lintian $(DOC_DEB)
 
-.PHONY: deb dsc deb-nodoc
+.PHONY: deb dsc deb-nodoc deb-nostrip
 deb-nodoc: build
 	cd build; dpkg-buildpackage -b -us -uc --no-pre-clean --build-profiles=nodoc
 	lintian $(DEBS)
+
+deb-nostrip: build
+	cd build; DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage -b -us -uc
+	lintian $(DEBS) $(DOC_DEB)
 
 $(DEBS): deb
 deb: build
