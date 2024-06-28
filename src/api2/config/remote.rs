@@ -288,9 +288,7 @@ pub fn delete_remote(name: String, digest: Option<String>) -> Result<(), Error> 
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    if config.sections.contains_key(&name) {
-        config.sections.remove(&name);
-    } else {
+    if config.sections.remove(&name).is_none() {
         http_bail!(NOT_FOUND, "remote '{}' does not exist.", name);
     }
 

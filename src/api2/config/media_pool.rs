@@ -225,9 +225,7 @@ pub fn delete_pool(name: String) -> Result<(), Error> {
 
     let (mut config, _digest) = pbs_config::media_pool::config()?;
 
-    if config.sections.contains_key(&name) {
-        config.sections.remove(&name);
-    } else {
+    if config.sections.remove(&name).is_none() {
         http_bail!(NOT_FOUND, "delete pool '{}' failed - no such pool", name);
     }
 

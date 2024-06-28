@@ -371,9 +371,7 @@ pub fn delete_user(userid: Userid, digest: Option<String>) -> Result<(), Error> 
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    if config.sections.contains_key(userid.as_str()) {
-        config.sections.remove(userid.as_str());
-    } else {
+    if config.sections.remove(userid.as_str()).is_none() {
         bail!("user '{}' does not exist.", userid);
     }
 
@@ -649,9 +647,7 @@ pub fn delete_token(
     let tokenid = Authid::from((userid.clone(), Some(token_name.clone())));
     let tokenid_string = tokenid.to_string();
 
-    if config.sections.contains_key(&tokenid_string) {
-        config.sections.remove(&tokenid_string);
-    } else {
+    if config.sections.remove(&tokenid_string).is_none() {
         bail!(
             "token '{}' of user '{}' does not exist.",
             token_name.as_str(),

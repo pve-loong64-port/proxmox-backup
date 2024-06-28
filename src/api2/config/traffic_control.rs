@@ -258,9 +258,7 @@ pub fn delete_traffic_control(name: String, digest: Option<String>) -> Result<()
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    if config.sections.contains_key(&name) {
-        config.sections.remove(&name);
-    } else {
+    if config.sections.remove(&name).is_none() {
         http_bail!(NOT_FOUND, "traffic control rule '{}' does not exist.", name);
     }
 
