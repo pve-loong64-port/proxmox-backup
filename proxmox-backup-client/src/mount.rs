@@ -302,7 +302,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
             }
         }
     } else if server_archive_name.ends_with(".fidx") {
-        let file_info = manifest.lookup_file_info(archive_name)?;
+        let file_info = manifest.lookup_file_info(&server_archive_name)?;
         let index = client
             .download_fixed_index(&manifest, &server_archive_name)
             .await?;
