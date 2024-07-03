@@ -844,7 +844,7 @@ impl DataStore {
         ListGroupsType::new(Arc::clone(self), ns, ty)
     }
 
-    /// Get a streaming iter over top-level backup groups of a datatstore of a particular type,
+    /// Get a streaming iter over top-level backup groups of a datastore of a particular type,
     /// filtered by `Ok` results
     ///
     /// The iterated item's result is already unwrapped, if it contained an error it will be
