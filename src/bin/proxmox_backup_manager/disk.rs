@@ -157,7 +157,7 @@ async fn wipe_disk(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<
     if std::io::stdin().is_terminal() {
         let confirmation = Confirmation::query_with_default(
             format!(
-                "You are about to wipe block device {}. Are you sure you want to continue?",
+                "You are about to wipe block device {}.\nAre you sure you want to continue?",
                 param["disk"]
             )
             .as_str(),
