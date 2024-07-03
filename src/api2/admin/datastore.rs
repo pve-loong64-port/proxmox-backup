@@ -505,7 +505,7 @@ unsafe fn list_snapshots_blocking(
             group: group.into(),
             time: info.backup_dir.backup_time(),
         };
-        let protected = info.backup_dir.is_protected();
+        let protected = info.protected;
 
         match get_all_snapshot_files(&info) {
             Ok((manifest, files)) => {
