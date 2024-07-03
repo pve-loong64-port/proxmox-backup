@@ -30,7 +30,7 @@ use pbs_config::CachedUserInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{archive_type, ArchiveType, BackupManifest, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::{ArchiveType, BackupManifest, MANIFEST_BLOB_NAME};
 use pbs_datastore::{DataBlob, DataStore};
 use pbs_tape::{
     BlockReadError, MediaContentHeader, TapeRead, PROXMOX_BACKUP_CONTENT_HEADER_MAGIC_1_0,
@@ -1061,7 +1061,7 @@ fn restore_snapshots_to_tmpdir(
                     let mut archive_path = tmp_path.to_owned();
                     archive_path.push(&item.filename);
 
-                    let index: Box<dyn IndexFile> = match archive_type(&item.filename)? {
+                    let index: Box<dyn IndexFile> = match ArchiveType::from_path(&item.filename)? {
                         ArchiveType::DynamicIndex => {
                             Box::new(DynamicIndexReader::open(&archive_path)?)
                         }

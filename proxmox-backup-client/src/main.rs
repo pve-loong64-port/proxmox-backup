@@ -55,7 +55,7 @@ use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, Lo
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{
-    archive_type, ArchiveType, BackupManifest, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
+    ArchiveType, BackupManifest, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::CATALOG_NAME;
@@ -1361,7 +1361,7 @@ async fn dump_image<W: Write>(
 
 fn parse_archive_type(name: &str) -> (String, ArchiveType) {
     if name.ends_with(".didx") || name.ends_with(".fidx") || name.ends_with(".blob") {
-        (name.into(), archive_type(name).unwrap())
+        (name.into(), ArchiveType::from_path(name).unwrap())
     } else if has_pxar_filename_extension(name, false) {
         (format!("{}.didx", name), ArchiveType::DynamicIndex)
     } else if name.ends_with(".img") {

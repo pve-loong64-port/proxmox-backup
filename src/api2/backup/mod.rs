@@ -25,7 +25,7 @@ use pbs_api_types::{
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{archive_type, ArchiveType};
+use pbs_datastore::manifest::ArchiveType;
 use pbs_datastore::{DataStore, PROXMOX_BACKUP_PROTOCOL_ID_V1};
 use pbs_tools::json::{required_array_param, required_integer_param, required_string_param};
 
@@ -842,7 +842,7 @@ fn download_previous(
         path.push(&archive_name);
 
         {
-            let index: Option<Box<dyn IndexFile>> = match archive_type(&archive_name)? {
+            let index: Option<Box<dyn IndexFile>> = match ArchiveType::from_path(&archive_name)? {
                 ArchiveType::FixedIndex => {
                     let index = env.datastore.open_fixed_reader(&path)?;
                     Some(Box::new(index))

@@ -26,7 +26,7 @@ use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{
-    archive_type, ArchiveType, BackupManifest, FileInfo, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
+    ArchiveType, BackupManifest, FileInfo, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{
@@ -709,7 +709,7 @@ async fn pull_single_archive<'a>(
 
     let mut tmpfile = std::fs::OpenOptions::new().read(true).open(&tmp_path)?;
 
-    match archive_type(archive_name)? {
+    match ArchiveType::from_path(archive_name)? {
         ArchiveType::DynamicIndex => {
             let index = DynamicIndexReader::new(tmpfile).map_err(|err| {
                 format_err!("unable to read dynamic index {:?} - {}", tmp_path, err)
@@ -825,7 +825,7 @@ async fn pull_snapshot<'a>(
         path.push(&item.filename);
 
         if path.exists() {
-            match archive_type(&item.filename)? {
+            match ArchiveType::from_path(&item.filename)? {
                 ArchiveType::DynamicIndex => {
                     let index = DynamicIndexReader::open(&path)?;
                     let (csum, size) = index.compute_csum();

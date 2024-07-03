@@ -76,11 +76,6 @@ impl ArchiveType {
     }
 }
 
-//#[deprecated(note = "use ArchivType::from_path instead")] later...
-pub fn archive_type<P: AsRef<Path>>(archive_name: P) -> Result<ArchiveType, Error> {
-    ArchiveType::from_path(archive_name)
-}
-
 impl BackupManifest {
     pub fn new(snapshot: pbs_api_types::BackupDir) -> Self {
         Self {

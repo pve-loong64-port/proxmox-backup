@@ -14,7 +14,7 @@ use crate::backup_info::BackupDir;
 use crate::dynamic_index::DynamicIndexReader;
 use crate::fixed_index::FixedIndexReader;
 use crate::index::IndexFile;
-use crate::manifest::{archive_type, ArchiveType, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
+use crate::manifest::{ArchiveType, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use crate::DataStore;
 
 /// Helper to access the contents of a datastore backup snapshot
@@ -138,13 +138,16 @@ impl<'a, F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'a, F> {
                 if self.current_index.is_none() {
                     if let Some(filename) = self.todo_list.pop() {
                         let file = self.snapshot_reader.open_file(&filename)?;
-                        let index: Box<dyn IndexFile + Send> = match archive_type(&filename)? {
-                            ArchiveType::FixedIndex => Box::new(FixedIndexReader::new(file)?),
-                            ArchiveType::DynamicIndex => Box::new(DynamicIndexReader::new(file)?),
-                            _ => bail!(
-                                "SnapshotChunkIterator: got unknown file type - internal error"
-                            ),
-                        };
+                        let index: Box<dyn IndexFile + Send> =
+                            match ArchiveType::from_path(&filename)? {
+                                ArchiveType::FixedIndex => Box::new(FixedIndexReader::new(file)?),
+                                ArchiveType::DynamicIndex => {
+                                    Box::new(DynamicIndexReader::new(file)?)
+                                }
+                                _ => bail!(
+                                    "SnapshotChunkIterator: got unknown file type - internal error"
+                                ),
+                            };
 
                         let datastore = DataStore::lookup_datastore(
                             self.snapshot_reader.datastore_name(),
@@ -178,7 +181,7 @@ impl<'a, F: Fn(&[u8; 32]) -> bool> SnapshotChunkIterator<'a, F> {
         let mut todo_list = Vec::new();
 
         for filename in snapshot_reader.file_list() {
-            match archive_type(filename)? {
+            match ArchiveType::from_path(filename)? {
                 ArchiveType::FixedIndex | ArchiveType::DynamicIndex => {
                     todo_list.push(filename.to_owned());
                 }

@@ -29,7 +29,7 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
-use crate::manifest::{archive_type, ArchiveType};
+use crate::manifest::ArchiveType;
 use crate::task_tracking::{self, update_active_operations};
 use crate::DataBlob;
 
@@ -377,7 +377,7 @@ impl DataStore {
         P: AsRef<Path>,
     {
         let filename = filename.as_ref();
-        let out: Box<dyn IndexFile + Send> = match archive_type(filename)? {
+        let out: Box<dyn IndexFile + Send> = match ArchiveType::from_path(filename)? {
             ArchiveType::DynamicIndex => Box::new(self.open_dynamic_reader(filename)?),
             ArchiveType::FixedIndex => Box::new(self.open_fixed_reader(filename)?),
             _ => bail!("cannot open index file of unknown type: {:?}", filename),
@@ -936,7 +936,7 @@ impl DataStore {
                     continue;
                 }
             };
-            if let Ok(archive_type) = archive_type(&path) {
+            if let Ok(archive_type) = ArchiveType::from_path(&path) {
                 if archive_type == ArchiveType::FixedIndex
                     || archive_type == ArchiveType::DynamicIndex
                 {
@@ -1011,7 +1011,7 @@ impl DataStore {
 
             match std::fs::File::open(&img) {
                 Ok(file) => {
-                    if let Ok(archive_type) = archive_type(&img) {
+                    if let Ok(archive_type) = ArchiveType::from_path(&img) {
                         if archive_type == ArchiveType::FixedIndex {
                             let index = FixedIndexReader::new(file).map_err(|e| {
                                 format_err!("can't read index '{}' - {}", img.to_string_lossy(), e)

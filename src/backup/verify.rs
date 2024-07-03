@@ -16,7 +16,7 @@ use pbs_api_types::{
 };
 use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{archive_type, ArchiveType, BackupManifest, FileInfo};
+use pbs_datastore::manifest::{ArchiveType, BackupManifest, FileInfo};
 use pbs_datastore::{DataBlob, DataStore, StoreProgress};
 
 use crate::tools::parallel_handler::ParallelHandler;
@@ -371,7 +371,7 @@ pub fn verify_backup_dir_with_lock(
     for info in manifest.files() {
         let result = proxmox_lang::try_block!({
             info!("  check {}", info.filename);
-            match archive_type(&info.filename)? {
+            match ArchiveType::from_path(&info.filename)? {
                 ArchiveType::FixedIndex => verify_fixed_index(verify_worker, backup_dir, info),
                 ArchiveType::DynamicIndex => verify_dynamic_index(verify_worker, backup_dir, info),
                 ArchiveType::Blob => verify_blob(backup_dir, info),
