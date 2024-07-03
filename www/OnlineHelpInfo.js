@@ -11,6 +11,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/backup-client.html#client-creating-backups",
     "title": "Creating Backups"
   },
+  "client-change-detection-mode": {
+    "link": "/docs/backup-client.html#client-change-detection-mode",
+    "title": "Change Detection Mode"
+  },
   "client-encryption": {
     "link": "/docs/backup-client.html#client-encryption",
     "title": "Encryption"
@@ -39,6 +43,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/configuration-files.html#notifications-cfg",
     "title": "``notifications.cfg``"
   },
+  "notifications-priv-cfg": {
+    "link": "/docs/configuration-files.html#notifications-priv-cfg",
+    "title": "``notifications-priv.cfg``"
+  },
   "faq-support-table": {
     "link": "/docs/faq.html#faq-support-table",
     "title": "How long will my Proxmox Backup Server version be supported?"
@@ -50,6 +58,14 @@ const proxmoxOnlineHelpInfo = {
   "pxar-format": {
     "link": "/docs/file-formats.html#pxar-format",
     "title": "Proxmox File Archive Format (``.pxar``)"
+  },
+  "pxar-meta-format": {
+    "link": "/docs/file-formats.html#pxar-meta-format",
+    "title": "Proxmox File Archive Format - Meta (``.mpxar``)"
+  },
+  "ppxar-format": {
+    "link": "/docs/file-formats.html#ppxar-format",
+    "title": "Proxmox File Archive Format - Payload (``.ppxar``)"
   },
   "data-blob-format": {
     "link": "/docs/file-formats.html#data-blob-format",
@@ -143,6 +159,14 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/network-management.html#sysadmin-traffic-control",
     "title": "Traffic Control"
   },
+  "notifications": {
+    "link": "/docs/notifications.html#notifications",
+    "title": "Notifications"
+  },
+  "notification-targets": {
+    "link": "/docs/notifications.html#notification-targets",
+    "title": "Notification Targets"
+  },
   "notification-targets-sendmail": {
     "link": "/docs/notifications.html#notification-targets-sendmail",
     "title": "Sendmail"
@@ -162,6 +186,10 @@ const proxmoxOnlineHelpInfo = {
   "notification-events": {
     "link": "/docs/notifications.html#notification-events",
     "title": "Notification Events"
+  },
+  "notification-mode": {
+    "link": "/docs/notifications.html#notification-mode",
+    "title": "Notification Mode"
   },
   "pve-integration": {
     "link": "/docs/pve-integration.html#pve-integration",
