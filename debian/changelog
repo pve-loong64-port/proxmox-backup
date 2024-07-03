@@ -1,3 +1,33 @@
+rust-proxmox-backup (3.2.7-1) bookworm; urgency=medium
+
+  * docs: drop blanket statement recommending against remote storage
+
+  * ui: gc job edit: fix i18n gettext usage
+
+  * pxar: improve error handling, e.g., avoiding duplicate information
+
+  * close #4763: client: add command to forget (delete) whole backup group
+    with all its snapshots
+
+  * close #5571: client: fix regression for `map` command
+
+  * client: mount: wait for child to return before exiting to provide better
+    UX for some edge paths
+
+  * fix #5304: client: set process uid/gid for `.pxarexclude-cli` to avoid
+    issues when trying to backup and restore the backup as non-root user.
+
+  * http client: keep renewal future running on failed re-auth to make it more
+    resilient against some transient errors, like the request just failing due
+    to network instability.
+
+  * datastore: fix problem with operations counting for the case where the
+   `.chunks/` directory is not available (deleted/moved)
+
+  * manager: use confirmation helper in wipe-disk command
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 03 Jul 2024 13:33:51 +0200
+
 rust-proxmox-backup (3.2.6-1) bookworm; urgency=medium
 
   * tape: disable Programmable Early Warning Zone (PEWZ)
