@@ -415,7 +415,9 @@ impl BackupDir {
 
     /// Returns the absolute path for backup_dir, using the cached formatted time string.
     pub fn full_path(&self) -> PathBuf {
-        self.store.snapshot_path(&self.ns, &self.dir)
+        let mut path = self.store.base_path();
+        path.push(self.relative_path());
+        path
     }
 
     pub fn protected_file(&self) -> PathBuf {
