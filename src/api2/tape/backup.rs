@@ -2,11 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, format_err, Error};
 use serde_json::Value;
+use tracing::{info, warn};
 
 use proxmox_lang::try_block;
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::api;
-use proxmox_sys::{task_log, task_warn, WorkerTaskContext};
+use proxmox_sys::WorkerTaskContext;
 
 use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, Authid, MediaPoolConfig, Operation,
@@ -176,7 +177,7 @@ pub fn do_tape_backup_job(
             let job_result = try_block!({
                 if schedule.is_some() {
                     // for scheduled tape backup jobs, we wait indefinitely for the lock
-                    task_log!(worker, "waiting for drive lock...");
+                    info!("waiting for drive lock...");
                     loop {
                         worker.check_abort()?;
                         match lock_tape_device(&drive_config, &setup.drive) {
@@ -191,9 +192,9 @@ pub fn do_tape_backup_job(
                 }
                 set_tape_device_state(&setup.drive, &worker.upid().to_string())?;
 
-                task_log!(worker, "Starting tape backup job '{}'", job_id);
+                info!("Starting tape backup job '{job_id}'");
                 if let Some(event_str) = schedule {
-                    task_log!(worker, "task triggered by schedule '{}'", event_str);
+                    info!("task triggered by schedule '{event_str}'");
                 }
 
                 backup_worker(
@@ -369,7 +370,7 @@ fn backup_worker(
 ) -> Result<(), Error> {
     let start = std::time::Instant::now();
 
-    task_log!(worker, "update media online status");
+    info!("update media online status");
     let changer_name = update_media_online_status(&setup.drive)?;
 
     let root_namespace = setup.ns.clone().unwrap_or_default();
@@ -381,7 +382,6 @@ fn backup_worker(
     let mut pool_writer = PoolWriter::new(
         pool,
         &setup.drive,
-        worker,
         notification_mode,
         force_media_set,
         ns_magic,
@@ -405,11 +405,9 @@ fn backup_worker(
         None => group_list,
     };
 
-    task_log!(
-        worker,
-        "found {} groups (out of {} total)",
-        group_list.len(),
-        group_count_full
+    info!(
+        "found {} groups (out of {group_count_full} total)",
+        group_list.len()
     );
 
     let mut progress = StoreProgress::new(group_list.len() as u64);
@@ -417,10 +415,7 @@ fn backup_worker(
     let latest_only = setup.latest_only.unwrap_or(false);
 
     if latest_only {
-        task_log!(
-            worker,
-            "latest-only: true (only considering latest snapshots)"
-        );
+        info!("latest-only: true (only considering latest snapshots)");
     }
 
     let datastore_name = datastore.name();
@@ -443,8 +438,7 @@ fn backup_worker(
             .collect();
 
         if snapshot_list.is_empty() {
-            task_log!(
-                worker,
+            info!(
                 "{}, group {} was empty",
                 print_store_and_ns(datastore_name, group.backup_ns()),
                 group.group()
@@ -464,7 +458,7 @@ fn backup_worker(
                     info.backup_dir.backup_ns(),
                     info.backup_dir.as_ref(),
                 ) {
-                    task_log!(worker, "skip snapshot {}", rel_path);
+                    info!("skip snapshot {rel_path}");
                     continue;
                 }
 
@@ -477,7 +471,7 @@ fn backup_worker(
                     SnapshotBackupResult::Ignored => {}
                 }
                 progress.done_snapshots = 1;
-                task_log!(worker, "percentage done: {}", progress);
+                info!("percentage done: {progress}");
             }
         } else {
             progress.group_snapshots = snapshot_list.len() as u64;
@@ -490,7 +484,7 @@ fn backup_worker(
                     info.backup_dir.backup_ns(),
                     info.backup_dir.as_ref(),
                 ) {
-                    task_log!(worker, "skip snapshot {}", rel_path);
+                    info!("skip snapshot {rel_path}");
                     continue;
                 }
 
@@ -503,7 +497,7 @@ fn backup_worker(
                     SnapshotBackupResult::Ignored => {}
                 }
                 progress.done_snapshots = snapshot_number as u64 + 1;
-                task_log!(worker, "percentage done: {}", progress);
+                info!("percentage done: {progress}");
             }
         }
     }
@@ -511,18 +505,15 @@ fn backup_worker(
     pool_writer.commit()?;
 
     if need_catalog {
-        task_log!(worker, "append media catalog");
+        info!("append media catalog");
 
         let uuid = pool_writer.load_writable_media(worker)?;
-        let done = pool_writer.append_catalog_archive(worker)?;
+        let done = pool_writer.append_catalog_archive()?;
         if !done {
-            task_log!(
-                worker,
-                "catalog does not fit on tape, writing to next volume"
-            );
+            info!("catalog does not fit on tape, writing to next volume");
             pool_writer.set_media_status_full(&uuid)?;
             pool_writer.load_writable_media(worker)?;
-            let done = pool_writer.append_catalog_archive(worker)?;
+            let done = pool_writer.append_catalog_archive()?;
             if !done {
                 bail!("write_catalog_archive failed on second media");
             }
@@ -530,9 +521,9 @@ fn backup_worker(
     }
 
     if setup.export_media_set.unwrap_or(false) {
-        pool_writer.export_media_set(worker)?;
+        pool_writer.export_media_set()?;
     } else if setup.eject_media.unwrap_or(false) {
-        pool_writer.eject_media(worker)?;
+        pool_writer.eject_media()?;
     }
 
     if errors {
@@ -542,7 +533,7 @@ fn backup_worker(
     summary.used_tapes = match pool_writer.get_used_media_labels() {
         Ok(tapes) => Some(tapes),
         Err(err) => {
-            task_warn!(worker, "could not collect list of used tapes: {err}");
+            warn!("could not collect list of used tapes: {err}");
             None
         }
     };
@@ -576,7 +567,7 @@ fn backup_snapshot(
     snapshot: BackupDir,
 ) -> Result<SnapshotBackupResult, Error> {
     let snapshot_path = snapshot.relative_path();
-    task_log!(worker, "backup snapshot {:?}", snapshot_path);
+    info!("backup snapshot {snapshot_path:?}");
 
     let snapshot_reader = match snapshot.locked_reader() {
         Ok(reader) => reader,
@@ -584,15 +575,10 @@ fn backup_snapshot(
             if !snapshot.full_path().exists() {
                 // we got an error and the dir does not exist,
                 // it probably just vanished, so continue
-                task_log!(worker, "snapshot {:?} vanished, skipping", snapshot_path);
+                info!("snapshot {snapshot_path:?} vanished, skipping");
                 return Ok(SnapshotBackupResult::Ignored);
             }
-            task_warn!(
-                worker,
-                "failed opening snapshot {:?}: {}",
-                snapshot_path,
-                err
-            );
+            warn!("failed opening snapshot {snapshot_path:?}: {err}");
             return Ok(SnapshotBackupResult::Error);
         }
     };
@@ -638,7 +624,7 @@ fn backup_snapshot(
 
     let snapshot_reader = snapshot_reader.lock().unwrap();
 
-    let (done, _bytes) = pool_writer.append_snapshot_archive(worker, &snapshot_reader)?;
+    let (done, _bytes) = pool_writer.append_snapshot_archive(&snapshot_reader)?;
 
     if !done {
         // does not fit on tape, so we try on next volume
@@ -647,19 +633,14 @@ fn backup_snapshot(
         worker.check_abort()?;
 
         pool_writer.load_writable_media(worker)?;
-        let (done, _bytes) = pool_writer.append_snapshot_archive(worker, &snapshot_reader)?;
+        let (done, _bytes) = pool_writer.append_snapshot_archive(&snapshot_reader)?;
 
         if !done {
             bail!("write_snapshot_archive failed on second media");
         }
     }
 
-    task_log!(
-        worker,
-        "end backup {}:{:?}",
-        datastore.name(),
-        snapshot_path
-    );
+    info!("end backup {}:{snapshot_path:?}", datastore.name());
 
     Ok(SnapshotBackupResult::Success)
 }

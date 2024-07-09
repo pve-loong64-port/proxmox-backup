@@ -1,9 +1,9 @@
 use anyhow::{bail, Error};
 use serde_json::{json, Value};
+use tracing::{error, info};
 
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::api;
-use proxmox_sys::{task_error, task_log};
 
 use pbs_api_types::{
     DataStoreConfig, ZfsCompressionType, ZfsRaidLevel, ZpoolListItem, DATASTORE_SCHEMA,
@@ -228,14 +228,8 @@ pub fn create_zpool(
         Some(name.clone()),
         auth_id,
         to_stdout,
-        move |worker| {
-            task_log!(
-                worker,
-                "create {:?} zpool '{}' on devices '{}'",
-                raidlevel,
-                name,
-                devices_text
-            );
+        move |_worker| {
+            info!("create {raidlevel:?} zpool '{name}' on devices '{devices_text}'");
 
             let mut command = std::process::Command::new("zpool");
             command.args([
@@ -275,12 +269,12 @@ pub fn create_zpool(
                 }
             }
 
-            task_log!(worker, "# {:?}", command);
+            info!("# {command:?}");
 
             match proxmox_sys::command::run_command(command, None) {
-                Ok(output) => task_log!(worker, "{output}"),
+                Ok(output) => info!("{output}"),
                 Err(err) => {
-                    task_error!(worker, "{err}");
+                    error!("{err}");
                     bail!("Error during 'zpool create', see task log for more details");
                 }
             };
@@ -299,11 +293,11 @@ pub fn create_zpool(
                 command.arg(&format!("compression={}", compression));
             }
             command.args(["relatime=on", &name]);
-            task_log!(worker, "# {:?}", command);
+            info!("# {command:?}");
             match proxmox_sys::command::run_command(command, None) {
-                Ok(output) => task_log!(worker, "{output}"),
+                Ok(output) => info!("{output}"),
                 Err(err) => {
-                    task_error!(worker, "{err}");
+                    error!("{err}");
                     bail!("Error during 'zfs set', see task log for more details");
                 }
             };
@@ -319,12 +313,7 @@ pub fn create_zpool(
                     bail!("datastore '{}' already exists.", datastore.name);
                 }
 
-                crate::api2::config::datastore::do_create_datastore(
-                    lock,
-                    config,
-                    datastore,
-                    Some(&worker),
-                )?;
+                crate::api2::config::datastore::do_create_datastore(lock, config, datastore)?;
             }
 
             Ok(())

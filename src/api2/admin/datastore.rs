@@ -13,6 +13,7 @@ use hyper::{header, Body, Response, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_stream::wrappers::ReceiverStream;
+use tracing::{info, warn};
 
 use proxmox_async::blocking::WrappedReaderStream;
 use proxmox_async::{io::AsyncChannelWriter, stream::AsyncReaderStream};
@@ -26,7 +27,6 @@ use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::{
     file_read_firstline, file_read_optional_string, replace_file, CreateOptions,
 };
-use proxmox_sys::{task_log, task_warn};
 use proxmox_time::CalendarEvent;
 
 use pxar::accessor::aio::Accessor;
@@ -909,9 +909,9 @@ pub fn verify(
                 )?
             };
             if !failed_dirs.is_empty() {
-                task_log!(worker, "Failed to verify the following snapshots/groups:");
+                info!("Failed to verify the following snapshots/groups:");
                 for dir in failed_dirs {
-                    task_log!(worker, "\t{}", dir);
+                    info!("\t{dir}");
                 }
                 bail!("verification failed - please check the log for details");
             }
@@ -1031,9 +1031,9 @@ pub fn prune(
         return Ok(json!(prune_result));
     }
 
-    let prune_group = move |worker: Arc<WorkerTask>| {
+    let prune_group = move |_worker: Arc<WorkerTask>| {
         if keep_all {
-            task_log!(worker, "No prune selection - keeping all files.");
+            info!("No prune selection - keeping all files.");
         } else {
             let mut opts = Vec::new();
             if !ns.is_root() {
@@ -1041,9 +1041,8 @@ pub fn prune(
             }
             crate::server::cli_keep_options(&mut opts, &keep_options);
 
-            task_log!(worker, "retention options: {}", opts.join(" "));
-            task_log!(
-                worker,
+            info!("retention options: {}", opts.join(" "));
+            info!(
                 "Starting prune on {} group \"{}\"",
                 print_store_and_ns(&store, &ns),
                 group.group(),
@@ -1060,7 +1059,7 @@ pub fn prune(
 
             let msg = format!("{}/{}/{timestamp} {mark}", group.ty, group.id);
 
-            task_log!(worker, "{msg}");
+            info!("{msg}");
 
             prune_result.push(PruneResult {
                 backup_type: group.ty,
@@ -1073,8 +1072,7 @@ pub fn prune(
 
             if !keep {
                 if let Err(err) = backup_dir.destroy(false) {
-                    task_warn!(
-                        worker,
+                    warn!(
                         "failed to remove dir {:?}: {}",
                         backup_dir.relative_path(),
                         err,
@@ -1098,7 +1096,7 @@ pub fn prune(
         )?;
         Ok(json!(upid))
     } else {
-        let worker = WorkerTask::new("prune", Some(worker_id), auth_id.to_string(), true)?;
+        let (worker, _) = WorkerTask::new("prune", Some(worker_id), auth_id.to_string(), true)?;
         let result = prune_group(worker.clone());
         worker.log_result(&Ok(()));
         Ok(json!(result))
@@ -1161,9 +1159,7 @@ pub fn prune_datastore(
         Some(worker_id),
         auth_id.to_string(),
         to_stdout,
-        move |worker| {
-            crate::server::prune_datastore(worker, auth_id, prune_options, datastore, dry_run)
-        },
+        move |_worker| crate::server::prune_datastore(auth_id, prune_options, datastore, dry_run),
     )?;
 
     Ok(upid_str)

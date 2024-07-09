@@ -4,11 +4,11 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use hex::FromHex;
 use serde_json::Value;
+use tracing::warn;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::{api, param_bail, ApiType};
 use proxmox_section_config::SectionConfigData;
-use proxmox_sys::{task_warn, WorkerTaskContext};
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
@@ -70,7 +70,6 @@ pub(crate) fn do_create_datastore(
     _lock: BackupLockGuard,
     mut config: SectionConfigData,
     datastore: DataStoreConfig,
-    worker: Option<&dyn WorkerTaskContext>,
 ) -> Result<(), Error> {
     let path: PathBuf = datastore.path.clone().into();
 
@@ -84,7 +83,6 @@ pub(crate) fn do_create_datastore(
         path,
         backup_user.uid,
         backup_user.gid,
-        worker,
         tuning.sync_level.unwrap_or_default(),
     )?;
 
@@ -155,11 +153,11 @@ pub fn create_datastore(
         Some(config.name.to_string()),
         auth_id.to_string(),
         to_stdout,
-        move |worker| {
-            do_create_datastore(lock, section_config, config, Some(&worker))?;
+        move |_worker| {
+            do_create_datastore(lock, section_config, config)?;
 
             if let Some(prune_job_config) = prune_job_config {
-                do_create_prune_job(prune_job_config, Some(&worker))
+                do_create_prune_job(prune_job_config)
             } else {
                 Ok(())
             }
@@ -528,8 +526,8 @@ pub async fn delete_datastore(
         Some(name.clone()),
         auth_id.to_string(),
         to_stdout,
-        move |worker| {
-            pbs_datastore::DataStore::destroy(&name, destroy_data, &worker)?;
+        move |_worker| {
+            pbs_datastore::DataStore::destroy(&name, destroy_data)?;
 
             // ignore errors
             let _ = jobstate::remove_state_file("prune", &name);
@@ -538,7 +536,7 @@ pub async fn delete_datastore(
             if let Err(err) =
                 proxmox_async::runtime::block_on(crate::server::notify_datastore_removed())
             {
-                task_warn!(worker, "failed to notify after datastore removal: {err}");
+                warn!("failed to notify after datastore removal: {err}");
             }
 
             Ok(())

@@ -9,12 +9,12 @@ use hex::FromHex;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tracing::{info, warn};
 
 use proxmox_router::{
     http_bail, list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap,
 };
 use proxmox_schema::{api, param_bail};
-use proxmox_sys::{task_log, task_warn};
 
 use proxmox_acme::types::AccountData as AcmeAccountData;
 use proxmox_acme::Account;
@@ -240,10 +240,10 @@ fn register_account(
         Some(name.to_string()),
         auth_id.to_string(),
         true,
-        move |worker| async move {
+        move |_worker| async move {
             let mut client = AcmeClient::new(directory);
 
-            task_log!(worker, "Registering ACME account '{}'...", &name);
+            info!("Registering ACME account '{}'...", &name);
 
             let account = do_register_account(
                 &mut client,
@@ -255,11 +255,7 @@ fn register_account(
             )
             .await?;
 
-            task_log!(
-                worker,
-                "Registration successful, account URL: {}",
-                account.location
-            );
+            info!("Registration successful, account URL: {}", account.location);
 
             Ok(())
         },
@@ -354,7 +350,7 @@ pub fn deactivate_account(
         Some(name.to_string()),
         auth_id.to_string(),
         true,
-        move |worker| async move {
+        move |_worker| async move {
             match AcmeClient::load(&name)
                 .await?
                 .update_account(&json!({"status": "deactivated"}))
@@ -363,12 +359,7 @@ pub fn deactivate_account(
                 Ok(_account) => (),
                 Err(err) if !force => return Err(err),
                 Err(err) => {
-                    task_warn!(
-                        worker,
-                        "error deactivating account {}, proceedeing anyway - {}",
-                        name,
-                        err,
-                    );
+                    warn!("error deactivating account {name}, proceeding anyway - {err}");
                 }
             }
             crate::config::acme::mark_account_deactivated(&name)?;

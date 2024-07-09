@@ -25,6 +25,7 @@ use proxmox_sortable_macro::sortable;
 use proxmox_sys::fd::fd_change_cloexec;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_CONSOLE};
+use tracing::{info, warn};
 
 use crate::auth::{private_auth_keyring, public_auth_keyring};
 use crate::tools;
@@ -181,20 +182,18 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
             let stdout = child.stdout.take().expect("no child stdout handle");
             let stderr = child.stderr.take().expect("no child stderr handle");
 
-            let worker_stdout = worker.clone();
             let stdout_fut = async move {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Some(line) = reader.next_line().await? {
-                    worker_stdout.log_message(line);
+                    info!(line);
                 }
                 Ok::<(), Error>(())
             };
 
-            let worker_stderr = worker.clone();
             let stderr_fut = async move {
                 let mut reader = BufReader::new(stderr).lines();
                 while let Some(line) = reader.next_line().await? {
-                    worker_stderr.log_warning(line);
+                    warn!(line);
                 }
                 Ok::<(), Error>(())
             };
@@ -226,9 +225,9 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
                 }
 
                 if let Err(err) = child.kill().await {
-                    worker.log_warning(format!("error killing termproxy: {}", err));
+                    warn!("error killing termproxy: {err}");
                 } else if let Err(err) = child.wait().await {
-                    worker.log_warning(format!("error awaiting termproxy: {}", err));
+                    warn!("error awaiting termproxy: {err}");
                 }
             }
 

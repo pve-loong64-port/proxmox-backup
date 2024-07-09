@@ -6,7 +6,7 @@ use proxmox_router::{
 };
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::task_log;
+use tracing::info;
 
 use pbs_api_types::{
     BLOCKDEVICE_DISK_AND_PARTITION_NAME_SCHEMA, BLOCKDEVICE_NAME_SCHEMA, NODE_SCHEMA,
@@ -164,8 +164,8 @@ pub fn initialize_disk(
         Some(disk.clone()),
         auth_id,
         to_stdout,
-        move |worker| {
-            task_log!(worker, "initialize disk {}", disk);
+        move |_worker| {
+            info!("initialize disk {disk}");
 
             let disk_manager = DiskManage::new();
             let disk_info = disk_manager.disk_by_name(&disk)?;
@@ -209,13 +209,13 @@ pub fn wipe_disk(disk: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value,
         Some(disk.clone()),
         auth_id,
         to_stdout,
-        move |worker| {
-            task_log!(worker, "wipe disk {}", disk);
+        move |_worker| {
+            info!("wipe disk {disk}");
 
             let disk_manager = DiskManage::new();
             let disk_info = disk_manager.partition_by_name(&disk)?;
 
-            wipe_blockdev(&disk_info, worker)?;
+            wipe_blockdev(&disk_info)?;
 
             Ok(())
         },

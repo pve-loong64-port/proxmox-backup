@@ -2,11 +2,11 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, Error};
 use serde_json::json;
 use std::os::linux::fs::MetadataExt;
+use tracing::info;
 
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
-use proxmox_sys::task_log;
 
 use pbs_api_types::{
     DataStoreConfig, BLOCKDEVICE_NAME_SCHEMA, DATASTORE_SCHEMA, NODE_SCHEMA, PRIV_SYS_AUDIT,
@@ -179,8 +179,8 @@ pub fn create_datastore_disk(
         Some(name.clone()),
         auth_id,
         to_stdout,
-        move |worker| {
-            task_log!(worker, "create datastore '{}' on disk {}", name, disk);
+        move |_worker| {
+            info!("create datastore '{name}' on disk {disk}");
 
             let add_datastore = add_datastore.unwrap_or(false);
             let filesystem = filesystem.unwrap_or(FileSystemType::Ext4);
@@ -213,12 +213,7 @@ pub fn create_datastore_disk(
                     bail!("datastore '{}' already exists.", datastore.name);
                 }
 
-                crate::api2::config::datastore::do_create_datastore(
-                    lock,
-                    config,
-                    datastore,
-                    Some(&worker),
-                )?;
+                crate::api2::config::datastore::do_create_datastore(lock, config, datastore)?;
             }
 
             Ok(())

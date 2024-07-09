@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
 use serde_json::Value;
+use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::ReadExt;
@@ -13,7 +14,7 @@ use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::{api, ApiType};
 use proxmox_section_config::SectionConfigData;
 use proxmox_sys::fs::{replace_file, CreateOptions};
-use proxmox_sys::{task_log, task_warn, WorkerTaskContext};
+use proxmox_sys::WorkerTaskContext;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
@@ -403,12 +404,12 @@ pub fn restore(
 
             let restore_owner = owner.as_ref().unwrap_or(&auth_id);
 
-            task_log!(worker, "Mediaset '{media_set}'");
-            task_log!(worker, "Pool: {pool}");
+            info!("Mediaset '{media_set}'");
+            info!("Pool: {pool}");
 
             let res = if snapshots.is_some() || namespaces {
                 restore_list_worker(
-                    worker.clone(),
+                    worker,
                     snapshots.unwrap_or_default(),
                     inventory,
                     media_set_uuid,
@@ -422,7 +423,7 @@ pub fn restore(
                 )
             } else {
                 restore_full_worker(
-                    worker.clone(),
+                    worker,
                     inventory,
                     media_set_uuid,
                     drive_config,
@@ -434,10 +435,10 @@ pub fn restore(
                 )
             };
             if res.is_ok() {
-                task_log!(worker, "Restore mediaset '{media_set}' done");
+                info!("Restore mediaset '{media_set}' done");
             }
             if let Err(err) = set_tape_device_state(&drive, "") {
-                task_log!(worker, "could not unset drive state for {drive}: {err}");
+                info!("could not unset drive state for {drive}: {err}");
             }
 
             res
@@ -488,7 +489,7 @@ fn restore_full_worker(
     }
 
     if let Some(fingerprint) = encryption_key_fingerprint {
-        task_log!(worker, "Encryption key fingerprint: {fingerprint}");
+        info!("Encryption key fingerprint: {fingerprint}");
     }
 
     let used_datastores = store_map.used_datastores();
@@ -497,13 +498,9 @@ fn restore_full_worker(
         .map(|(t, _)| String::from(t.name()))
         .collect::<Vec<String>>()
         .join(", ");
-    task_log!(worker, "Datastore(s): {datastore_list}",);
-    task_log!(worker, "Drive: {drive_name}");
-    log_required_tapes(
-        &worker,
-        &inventory,
-        media_id_list.iter().map(|id| &id.label.uuid),
-    );
+    info!("Datastore(s): {datastore_list}",);
+    info!("Drive: {drive_name}");
+    log_required_tapes(&inventory, media_id_list.iter().map(|id| &id.label.uuid));
 
     let mut datastore_locks = Vec::new();
     for (target, _) in used_datastores.values() {
@@ -533,7 +530,6 @@ fn restore_full_worker(
 
 #[allow(clippy::too_many_arguments)]
 fn check_snapshot_restorable(
-    worker: &WorkerTask,
     store_map: &DataStoreMap,
     store: &str,
     snapshot: &str,
@@ -574,7 +570,7 @@ fn check_snapshot_restorable(
             auth_id,
             Some(restore_owner),
         ) {
-            task_warn!(worker, "cannot restore {store}:{snapshot} to {ns}: '{err}'");
+            warn!("cannot restore {store}:{snapshot} to {ns}: '{err}'");
             continue;
         }
 
@@ -582,8 +578,7 @@ fn check_snapshot_restorable(
         if let Ok(owner) = datastore.get_owner(&ns, dir.as_ref()) {
             if restore_owner != &owner {
                 // only the owner is allowed to create additional snapshots
-                task_warn!(
-                    worker,
+                warn!(
                     "restore  of '{snapshot}' to {ns} failed, owner check failed ({restore_owner} \
                     != {owner})",
                 );
@@ -594,10 +589,7 @@ fn check_snapshot_restorable(
         have_some_permissions = true;
 
         if datastore.snapshot_path(&ns, dir).exists() {
-            task_warn!(
-                worker,
-                "found snapshot {snapshot} on target datastore/namespace, skipping...",
-            );
+            warn!("found snapshot {snapshot} on target datastore/namespace, skipping...",);
             continue;
         }
         can_restore_some = true;
@@ -610,11 +602,7 @@ fn check_snapshot_restorable(
     Ok(can_restore_some)
 }
 
-fn log_required_tapes<'a>(
-    worker: &WorkerTask,
-    inventory: &Inventory,
-    list: impl Iterator<Item = &'a Uuid>,
-) {
+fn log_required_tapes<'a>(inventory: &Inventory, list: impl Iterator<Item = &'a Uuid>) {
     let mut tape_list = list
         .map(|uuid| {
             inventory
@@ -626,7 +614,7 @@ fn log_required_tapes<'a>(
         })
         .collect::<Vec<&str>>();
     tape_list.sort_unstable();
-    task_log!(worker, "Required media list: {}", tape_list.join(";"));
+    info!("Required media list: {}", tape_list.join(";"));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -658,14 +646,13 @@ fn restore_list_worker(
                 let (ns, dir) = match parse_ns_and_snapshot(snapshot) {
                     Ok((ns, dir)) if store_map.has_full_mapping(store, &ns) => (ns, dir),
                     Err(err) => {
-                        task_warn!(worker, "couldn't parse snapshot {snapshot} - {err}");
+                        warn!("couldn't parse snapshot {snapshot} - {err}");
                         continue;
                     }
                     _ => continue,
                 };
                 let snapshot = print_ns_and_snapshot(&ns, &dir);
                 match check_snapshot_restorable(
-                    &worker,
                     &store_map,
                     store,
                     &snapshot,
@@ -679,7 +666,7 @@ fn restore_list_worker(
                     Ok(true) => restorable.push((store.to_string(), snapshot.to_string(), ns, dir)),
                     Ok(false) => {}
                     Err(err) => {
-                        task_warn!(worker, "{err}");
+                        warn!("{err}");
                         skipped.push(format!("{store}:{snapshot}"));
                     }
                 }
@@ -697,7 +684,6 @@ fn restore_list_worker(
                     match parse_ns_and_snapshot(snapshot) {
                         Ok((ns, dir)) => {
                             match check_snapshot_restorable(
-                                &worker,
                                 &store_map,
                                 store,
                                 snapshot,
@@ -713,14 +699,14 @@ fn restore_list_worker(
                                 }
                                 Ok(false) => None,
                                 Err(err) => {
-                                    task_warn!(worker, "{err}");
+                                    warn!("{err}");
                                     skipped.push(format!("{store}:{snapshot}"));
                                     None
                                 }
                             }
                         }
                         Err(err) => {
-                            task_warn!(worker, "could not restore {store_snapshot}: {err}");
+                            warn!("could not restore {store_snapshot}: {err}");
                             skipped.push(store_snapshot);
                             None
                         }
@@ -738,10 +724,7 @@ fn restore_list_worker(
                     let media_id = inventory.lookup_media(media_uuid).unwrap();
                     (media_id, file_num)
                 } else {
-                    task_warn!(
-                        worker,
-                        "did not find snapshot '{store}:{snapshot}' in media set",
-                    );
+                    warn!("did not find snapshot '{store}:{snapshot}' in media set",);
                     skipped.push(format!("{store}:{snapshot}"));
                     continue;
                 };
@@ -754,26 +737,25 @@ fn restore_list_worker(
                 .or_default();
             file_list.push(file_num);
 
-            task_log!(
-                worker,
+            info!(
                 "found snapshot {snapshot} on {}: file {file_num}",
                 media_id.label.label_text,
             );
         }
 
         if snapshot_file_hash.is_empty() {
-            task_log!(worker, "nothing to restore, skipping remaining phases...");
+            info!("nothing to restore, skipping remaining phases...");
             if !skipped.is_empty() {
-                task_log!(worker, "skipped the following snapshots:");
+                info!("skipped the following snapshots:");
                 for snap in skipped {
-                    task_log!(worker, "  {snap}");
+                    info!("  {snap}");
                 }
             }
             return Ok(());
         }
 
-        task_log!(worker, "Phase 1: temporarily restore snapshots to temp dir");
-        log_required_tapes(&worker, &inventory, snapshot_file_hash.keys());
+        info!("Phase 1: temporarily restore snapshots to temp dir");
+        log_required_tapes(&inventory, snapshot_file_hash.keys());
         let mut datastore_chunk_map: HashMap<String, HashSet<[u8; 32]>> = HashMap::new();
         let mut tmp_paths = Vec::new();
         for (media_uuid, file_list) in snapshot_file_hash.iter_mut() {
@@ -824,10 +806,10 @@ fn restore_list_worker(
         drop(catalog);
 
         if !media_file_chunk_map.is_empty() {
-            task_log!(worker, "Phase 2: restore chunks to datastores");
-            log_required_tapes(&worker, &inventory, media_file_chunk_map.keys());
+            info!("Phase 2: restore chunks to datastores");
+            log_required_tapes(&inventory, media_file_chunk_map.keys());
         } else {
-            task_log!(worker, "All chunks are already present, skip phase 2...");
+            info!("All chunks are already present, skip phase 2...");
         }
 
         for (media_uuid, file_chunk_map) in media_file_chunk_map.iter_mut() {
@@ -842,10 +824,7 @@ fn restore_list_worker(
             restore_file_chunk_map(worker.clone(), &mut drive, &store_map, file_chunk_map)?;
         }
 
-        task_log!(
-            worker,
-            "Phase 3: copy snapshots from temp dir to datastores"
-        );
+        info!("Phase 3: copy snapshots from temp dir to datastores");
         let mut errors = false;
         for (source_datastore, snapshot, source_ns, backup_dir) in snapshots.into_iter() {
             if let Err(err) = proxmox_lang::try_block!({
@@ -902,20 +881,14 @@ fn restore_list_worker(
 
                         Ok(())
                     }) {
-                        task_warn!(
-                            worker,
-                            "could not restore {source_datastore}:{snapshot}: '{err}'"
-                        );
+                        warn!("could not restore {source_datastore}:{snapshot}: '{err}'");
                         skipped.push(format!("{source_datastore}:{snapshot}"));
                     }
                 }
-                task_log!(worker, "Restore snapshot '{}' done", snapshot);
+                info!("Restore snapshot '{snapshot}' done");
                 Ok::<_, Error>(())
             }) {
-                task_warn!(
-                    worker,
-                    "could not copy {source_datastore}:{snapshot}: {err}"
-                );
+                warn!("could not copy {source_datastore}:{snapshot}: {err}");
                 errors = true;
             }
         }
@@ -925,7 +898,7 @@ fn restore_list_worker(
                 std::fs::remove_dir_all(&tmp_path)
                     .map_err(|err| format_err!("remove_dir_all failed - {err}"))
             }) {
-                task_warn!(worker, "could not clean up temp dir {tmp_path:?}: {err}");
+                warn!("could not clean up temp dir {tmp_path:?}: {err}");
                 errors = true;
             };
         }
@@ -934,19 +907,16 @@ fn restore_list_worker(
             bail!("errors during copy occurred");
         }
         if !skipped.is_empty() {
-            task_log!(worker, "(partially) skipped the following snapshots:");
+            info!("(partially) skipped the following snapshots:");
             for snap in skipped {
-                task_log!(worker, "  {snap}");
+                info!("  {snap}");
             }
         }
         Ok(())
     });
 
     if res.is_err() {
-        task_warn!(
-            worker,
-            "Error during restore, partially restored snapshots will NOT be cleaned up"
-        );
+        warn!("Error during restore, partially restored snapshots will NOT be cleaned up");
     }
 
     for (datastore, _) in store_map.used_datastores().values() {
@@ -954,7 +924,7 @@ fn restore_list_worker(
         match std::fs::remove_dir_all(tmp_path) {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => task_warn!(worker, "error cleaning up: {}", err),
+            Err(err) => warn!("error cleaning up: {err}"),
         }
     }
 
@@ -1037,13 +1007,10 @@ fn restore_snapshots_to_tmpdir(
     for file_num in file_list {
         let current_file_number = drive.current_file_number()?;
         if current_file_number != *file_num {
-            task_log!(
-                worker,
-                "was at file {current_file_number}, moving to {file_num}"
-            );
+            info!("was at file {current_file_number}, moving to {file_num}");
             drive.move_to_file(*file_num)?;
             let current_file_number = drive.current_file_number()?;
-            task_log!(worker, "now at file {}", current_file_number);
+            info!("now at file {current_file_number}");
         }
         let mut reader = drive.read_next_file()?;
 
@@ -1065,10 +1032,7 @@ fn restore_snapshots_to_tmpdir(
                 let source_datastore = archive_header.store;
                 let snapshot = archive_header.snapshot;
 
-                task_log!(
-                    worker,
-                    "File {file_num}: snapshot archive {source_datastore}:{snapshot}",
-                );
+                info!("File {file_num}: snapshot archive {source_datastore}:{snapshot}",);
 
                 let mut decoder =
                     pxar::decoder::sync::Decoder::from_std(pxar::PxarVariant::Unified(reader))?;
@@ -1076,10 +1040,7 @@ fn restore_snapshots_to_tmpdir(
                 let target_datastore = match store_map.target_store(&source_datastore) {
                     Some(datastore) => datastore,
                     None => {
-                        task_warn!(
-                            worker,
-                            "could not find target datastore for {source_datastore}:{snapshot}",
-                        );
+                        warn!("could not find target datastore for {source_datastore}:{snapshot}",);
                         continue;
                     }
                 };
@@ -1131,10 +1092,10 @@ fn restore_file_chunk_map(
     for (nr, chunk_map) in file_chunk_map.iter_mut() {
         let current_file_number = drive.current_file_number()?;
         if current_file_number != *nr {
-            task_log!(worker, "was at file {current_file_number}, moving to {nr}");
+            info!("was at file {current_file_number}, moving to {nr}");
             drive.move_to_file(*nr)?;
             let current_file_number = drive.current_file_number()?;
-            task_log!(worker, "now at file {}", current_file_number);
+            info!("now at file {current_file_number}");
         }
         let mut reader = drive.read_next_file()?;
         let header: MediaContentHeader = unsafe { reader.read_le_value()? };
@@ -1151,10 +1112,7 @@ fn restore_file_chunk_map(
 
                 let source_datastore = archive_header.store;
 
-                task_log!(
-                    worker,
-                    "File {nr}: chunk archive for datastore '{source_datastore}'",
-                );
+                info!("File {nr}: chunk archive for datastore '{source_datastore}'",);
 
                 let datastore = store_map.target_store(&source_datastore).ok_or_else(|| {
                     format_err!("unexpected chunk archive for store: {source_datastore}")
@@ -1166,7 +1124,7 @@ fn restore_file_chunk_map(
                     datastore.clone(),
                     chunk_map,
                 )?;
-                task_log!(worker, "restored {count} chunks");
+                info!("restored {count} chunks");
             }
             _ => bail!("unexpected content magic {:?}", header.content_magic),
         }
@@ -1226,8 +1184,7 @@ fn restore_partial_chunk_archive<'a>(
 
     let elapsed = start_time.elapsed()?.as_secs_f64();
     let bytes = bytes.load(std::sync::atomic::Ordering::SeqCst) as f64;
-    task_log!(
-        worker,
+    info!(
         "restored {} ({:.2}/s)",
         HumanByte::new_decimal(bytes),
         HumanByte::new_decimal(bytes / elapsed),
@@ -1311,15 +1268,11 @@ pub fn restore_media(
         let current_file_number = drive.current_file_number()?;
         let reader = match drive.read_next_file() {
             Err(BlockReadError::EndOfFile) => {
-                task_log!(
-                    worker,
-                    "skip unexpected filemark at pos {}",
-                    current_file_number
-                );
+                info!("skip unexpected filemark at pos {current_file_number}");
                 continue;
             }
             Err(BlockReadError::EndOfStream) => {
-                task_log!(worker, "detected EOT after {} files", current_file_number);
+                info!("detected EOT after {current_file_number} files");
                 break;
             }
             Err(BlockReadError::Error(err)) => {
@@ -1383,13 +1336,7 @@ fn restore_archive<'a>(
             let datastore_name = archive_header.store;
             let snapshot = archive_header.snapshot;
 
-            task_log!(
-                worker,
-                "File {}: snapshot archive {}:{}",
-                current_file_number,
-                datastore_name,
-                snapshot
-            );
+            info!("File {current_file_number}: snapshot archive {datastore_name}:{snapshot}");
 
             let (backup_ns, backup_dir) = parse_ns_and_snapshot(&snapshot)?;
 
@@ -1423,16 +1370,16 @@ fn restore_archive<'a>(
                     path.push(rel_path);
 
                     if is_new {
-                        task_log!(worker, "restore snapshot {}", backup_dir);
+                        info!("restore snapshot {backup_dir}");
 
-                        match restore_snapshot_archive(worker.clone(), reader, &path) {
+                        match restore_snapshot_archive(worker, reader, &path) {
                             Err(err) => {
                                 std::fs::remove_dir_all(&path)?;
                                 bail!("restore snapshot {} failed - {}", backup_dir, err);
                             }
                             Ok(false) => {
                                 std::fs::remove_dir_all(&path)?;
-                                task_log!(worker, "skip incomplete snapshot {}", backup_dir);
+                                info!("skip incomplete snapshot {backup_dir}");
                             }
                             Ok(true) => {
                                 catalog.register_snapshot(
@@ -1448,7 +1395,7 @@ fn restore_archive<'a>(
                         return Ok(());
                     }
                 } else {
-                    task_log!(worker, "skipping...");
+                    info!("skipping...");
                 }
             }
 
@@ -1475,12 +1422,7 @@ fn restore_archive<'a>(
 
             let source_datastore = archive_header.store;
 
-            task_log!(
-                worker,
-                "File {}: chunk archive for datastore '{}'",
-                current_file_number,
-                source_datastore
-            );
+            info!("File {current_file_number}: chunk archive for datastore '{source_datastore}'");
             let datastore = target
                 .as_ref()
                 .and_then(|t| t.0.target_store(&source_datastore));
@@ -1497,15 +1439,9 @@ fn restore_archive<'a>(
                     .or_default();
 
                 let chunks = if let Some(datastore) = datastore {
-                    restore_chunk_archive(
-                        worker.clone(),
-                        reader,
-                        datastore,
-                        checked_chunks,
-                        verbose,
-                    )?
+                    restore_chunk_archive(worker, reader, datastore, checked_chunks, verbose)?
                 } else {
-                    scan_chunk_archive(worker.clone(), reader, verbose)?
+                    scan_chunk_archive(worker, reader, verbose)?
                 };
 
                 if let Some(chunks) = chunks {
@@ -1515,12 +1451,12 @@ fn restore_archive<'a>(
                         &source_datastore,
                         &chunks[..],
                     )?;
-                    task_log!(worker, "register {} chunks", chunks.len());
+                    info!("register {} chunks", chunks.len());
                     catalog.commit_if_large()?;
                 }
                 return Ok(());
             } else if target.is_some() {
-                task_log!(worker, "skipping...");
+                info!("skipping...");
             }
 
             reader.skip_data()?; // read all data
@@ -1531,10 +1467,8 @@ fn restore_archive<'a>(
             let archive_header: CatalogArchiveHeader = serde_json::from_slice(&header_data)
                 .map_err(|err| format_err!("unable to parse catalog archive header - {}", err))?;
 
-            task_log!(
-                worker,
-                "File {}: skip catalog '{}'",
-                current_file_number,
+            info!(
+                "File {current_file_number}: skip catalog '{}'",
                 archive_header.uuid
             );
 
@@ -1570,7 +1504,7 @@ fn scan_chunk_archive<'a>(
 
                 // check if this is an aborted stream without end marker
                 if let Ok(false) = reader.has_end_marker() {
-                    task_log!(worker, "missing stream end marker");
+                    info!("missing stream end marker");
                     return Ok(None);
                 }
 
@@ -1582,7 +1516,7 @@ fn scan_chunk_archive<'a>(
         worker.check_abort()?;
 
         if verbose {
-            task_log!(worker, "Found chunk: {}", hex::encode(digest));
+            info!("Found chunk: {}", hex::encode(digest));
         }
 
         chunks.push(digest);
@@ -1606,8 +1540,6 @@ fn restore_chunk_archive<'a>(
     let bytes = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let bytes2 = bytes.clone();
 
-    let worker2 = worker.clone();
-
     let writer_pool = ParallelHandler::new(
         "tape restore chunk writer",
         4,
@@ -1615,7 +1547,7 @@ fn restore_chunk_archive<'a>(
             let chunk_exists = datastore.cond_touch_chunk(&digest, false)?;
             if !chunk_exists {
                 if verbose {
-                    task_log!(worker2, "Insert chunk: {}", hex::encode(digest));
+                    info!("Insert chunk: {}", hex::encode(digest));
                 }
                 bytes2.fetch_add(chunk.raw_size(), std::sync::atomic::Ordering::SeqCst);
                 // println!("verify and write {}", hex::encode(&digest));
@@ -1626,7 +1558,7 @@ fn restore_chunk_archive<'a>(
 
                 datastore.insert_chunk(&chunk, &digest)?;
             } else if verbose {
-                task_log!(worker2, "Found existing chunk: {}", hex::encode(digest));
+                info!("Found existing chunk: {}", hex::encode(digest));
             }
             Ok(())
         },
@@ -1648,7 +1580,7 @@ fn restore_chunk_archive<'a>(
 
                 // check if this is an aborted stream without end marker
                 if let Ok(false) = reader.has_end_marker() {
-                    task_log!(worker, "missing stream end marker");
+                    info!("missing stream end marker");
                     return Ok(None);
                 }
 
@@ -1672,8 +1604,7 @@ fn restore_chunk_archive<'a>(
 
     let elapsed = start_time.elapsed()?.as_secs_f64();
     let bytes = bytes.load(std::sync::atomic::Ordering::SeqCst) as f64;
-    task_log!(
-        worker,
+    info!(
         "restored {} ({:.2}/s)",
         HumanByte::new_decimal(bytes),
         HumanByte::new_decimal(bytes / elapsed),
@@ -1818,7 +1749,6 @@ fn try_restore_snapshot_archive<R: pxar::decoder::SeqRead>(
 
 /// Try to restore media catalogs (form catalog_archives)
 pub fn fast_catalog_restore(
-    worker: &WorkerTask,
     drive: &mut Box<dyn TapeDriver>,
     media_set: &MediaSet,
     uuid: &Uuid, // current media Uuid
@@ -1839,14 +1769,11 @@ pub fn fast_catalog_restore(
             // limit reader scope
             let mut reader = match drive.read_next_file() {
                 Err(BlockReadError::EndOfFile) => {
-                    task_log!(
-                        worker,
-                        "skip unexpected filemark at pos {current_file_number}"
-                    );
+                    info!("skip unexpected filemark at pos {current_file_number}");
                     continue;
                 }
                 Err(BlockReadError::EndOfStream) => {
-                    task_log!(worker, "detected EOT after {current_file_number} files");
+                    info!("detected EOT after {current_file_number} files");
                     break;
                 }
                 Err(BlockReadError::Error(err)) => {
@@ -1863,7 +1790,7 @@ pub fn fast_catalog_restore(
             if header.content_magic == PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0
                 || header.content_magic == PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1
             {
-                task_log!(worker, "found catalog at pos {}", current_file_number);
+                info!("found catalog at pos {current_file_number}");
 
                 let header_data = reader.read_exact_allocated(header.size as usize)?;
 
@@ -1873,11 +1800,7 @@ pub fn fast_catalog_restore(
                     })?;
 
                 if &archive_header.media_set_uuid != media_set.uuid() {
-                    task_log!(
-                        worker,
-                        "skipping unrelated catalog at pos {}",
-                        current_file_number
-                    );
+                    info!("skipping unrelated catalog at pos {current_file_number}");
                     reader.skip_data()?; // read all data
                     continue;
                 }
@@ -1890,11 +1813,7 @@ pub fn fast_catalog_restore(
                 });
 
                 if !wanted {
-                    task_log!(
-                        worker,
-                        "skip catalog because media '{}' not inventarized",
-                        catalog_uuid
-                    );
+                    info!("skip catalog because media '{catalog_uuid}' not inventarized");
                     reader.skip_data()?; // read all data
                     continue;
                 }
@@ -1904,11 +1823,7 @@ pub fn fast_catalog_restore(
                 } else {
                     // only restore if catalog does not exist
                     if MediaCatalog::exists(TAPE_STATUS_DIR, catalog_uuid) {
-                        task_log!(
-                            worker,
-                            "catalog for media '{}' already exists",
-                            catalog_uuid
-                        );
+                        info!("catalog for media '{catalog_uuid}' already exists");
                         reader.skip_data()?; // read all data
                         continue;
                     }
@@ -1924,19 +1839,11 @@ pub fn fast_catalog_restore(
                 match MediaCatalog::parse_catalog_header(&mut file)? {
                     (true, Some(media_uuid), Some(media_set_uuid)) => {
                         if &media_uuid != catalog_uuid {
-                            task_log!(
-                                worker,
-                                "catalog uuid mismatch at pos {}",
-                                current_file_number
-                            );
+                            info!("catalog uuid mismatch at pos {current_file_number}");
                             continue;
                         }
                         if media_set_uuid != archive_header.media_set_uuid {
-                            task_log!(
-                                worker,
-                                "catalog media_set mismatch at pos {}",
-                                current_file_number
-                            );
+                            info!("catalog media_set mismatch at pos {current_file_number}");
                             continue;
                         }
 
@@ -1947,18 +1854,14 @@ pub fn fast_catalog_restore(
                         )?;
 
                         if catalog_uuid == uuid {
-                            task_log!(worker, "successfully restored catalog");
+                            info!("successfully restored catalog");
                             found_catalog = true
                         } else {
-                            task_log!(
-                                worker,
-                                "successfully restored related catalog {}",
-                                media_uuid
-                            );
+                            info!("successfully restored related catalog {media_uuid}");
                         }
                     }
                     _ => {
-                        task_warn!(worker, "got incomplete catalog header - skip file");
+                        warn!("got incomplete catalog header - skip file");
                         continue;
                     }
                 }
@@ -1972,7 +1875,7 @@ pub fn fast_catalog_restore(
         }
         moved_to_eom = true;
 
-        task_log!(worker, "searching for catalog at EOT (moving to EOT)");
+        info!("searching for catalog at EOT (moving to EOT)");
         drive.move_to_last_file()?;
 
         let new_file_number = drive.current_file_number()?;

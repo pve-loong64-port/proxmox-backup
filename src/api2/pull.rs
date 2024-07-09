@@ -1,10 +1,10 @@
 //! Sync datastore from remote server
 use anyhow::{bail, format_err, Error};
 use futures::{future::FutureExt, select};
+use tracing::info;
 
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
-use proxmox_sys::task_log;
 
 use pbs_api_types::{
     Authid, BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, DATASTORE_SCHEMA,
@@ -128,12 +128,12 @@ pub fn do_sync_job(
             let worker_future = async move {
                 let pull_params = PullParameters::try_from(&sync_job)?;
 
-                task_log!(worker, "Starting datastore sync job '{}'", job_id);
+                info!("Starting datastore sync job '{job_id}'");
                 if let Some(event_str) = schedule {
-                    task_log!(worker, "task triggered by schedule '{}'", event_str);
+                    info!("task triggered by schedule '{event_str}'");
                 }
-                task_log!(
-                    worker,
+
+                info!(
                     "sync datastore '{}' from '{}{}'",
                     sync_job.store,
                     sync_job
@@ -143,33 +143,29 @@ pub fn do_sync_job(
                     sync_job.remote_store,
                 );
 
-                let pull_stats = pull_store(&worker, pull_params).await?;
+                let pull_stats = pull_store(pull_params).await?;
 
                 if pull_stats.bytes != 0 {
                     let amount = HumanByte::from(pull_stats.bytes);
                     let rate = HumanByte::new_binary(
                         pull_stats.bytes as f64 / pull_stats.elapsed.as_secs_f64(),
                     );
-                    task_log!(
-                        worker,
+                    info!(
                         "Summary: sync job pulled {amount} in {} chunks (average rate: {rate}/s)",
                         pull_stats.chunk_count,
                     );
                 } else {
-                    task_log!(worker, "Summary: sync job found no new data to pull");
+                    info!("Summary: sync job found no new data to pull");
                 }
 
                 if let Some(removed) = pull_stats.removed {
-                    task_log!(
-                        worker,
+                    info!(
                         "Summary: removed vanished: snapshots: {}, groups: {}, namespaces: {}",
-                        removed.snapshots,
-                        removed.groups,
-                        removed.namespaces,
+                        removed.snapshots, removed.groups, removed.namespaces,
                     );
                 }
 
-                task_log!(worker, "sync job '{}' end", &job_id);
+                info!("sync job '{}' end", &job_id);
 
                 Ok(())
             };
@@ -315,21 +311,18 @@ async fn pull(
         auth_id.to_string(),
         true,
         move |worker| async move {
-            task_log!(
-                worker,
-                "pull datastore '{}' from '{}/{}'",
-                store,
+            info!(
+                "pull datastore '{store}' from '{}/{remote_store}'",
                 remote.as_deref().unwrap_or("-"),
-                remote_store,
             );
 
-            let pull_future = pull_store(&worker, pull_params);
+            let pull_future = pull_store(pull_params);
             (select! {
                 success = pull_future.fuse() => success,
                 abort = worker.abort_future().map(|_| Err(format_err!("pull aborted"))) => abort,
             })?;
 
-            task_log!(worker, "pull datastore '{}' end", store);
+            info!("pull datastore '{store}' end");
 
             Ok(())
         },

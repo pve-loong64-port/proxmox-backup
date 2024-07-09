@@ -5,6 +5,7 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Error};
 use pbs_tape::sg_tape::SgTape;
 use serde_json::Value;
+use tracing::{info, warn};
 
 use proxmox_router::{
     list_subdirs_api_method, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
@@ -12,7 +13,6 @@ use proxmox_router::{
 use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::{task_log, task_warn};
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
@@ -131,13 +131,8 @@ pub fn load_media(
         drive.clone(),
         "load-media",
         Some(job_id),
-        move |worker, config| {
-            task_log!(
-                worker,
-                "loading media '{}' into drive '{}'",
-                label_text,
-                drive
-            );
+        move |_worker, config| {
+            info!("loading media '{label_text}' into drive '{drive}'");
             let (mut changer, _) = required_media_changer(&config, &drive)?;
             changer.load_media(&label_text)?;
             Ok(())
@@ -250,8 +245,8 @@ pub fn unload(
         drive.clone(),
         "unload-media",
         Some(drive.clone()),
-        move |worker, config| {
-            task_log!(worker, "unloading media from drive '{}'", drive);
+        move |_worker, config| {
+            info!("unloading media from drive '{drive}'");
 
             let (mut changer, _) = required_media_changer(&config, &drive)?;
             changer.unload_media(target_slot)?;
@@ -299,9 +294,9 @@ pub fn format_media(
         drive.clone(),
         "format-media",
         Some(drive.clone()),
-        move |worker, config| {
+        move |_worker, config| {
             if let Some(ref label) = label_text {
-                task_log!(worker, "try to load media '{}'", label);
+                info!("try to load media '{label}'");
                 if let Some((mut changer, _)) = media_changer(&config, &drive)? {
                     changer.load_media(label)?;
                 }
@@ -315,11 +310,8 @@ pub fn format_media(
                 let mut handle = LtoTapeHandle::new(file)?;
                 if let Ok(status) = handle.get_drive_and_media_status() {
                     if status.density >= TapeDensity::LTO9 {
-                        task_log!(worker, "Slow formatting LTO9+ media.");
-                        task_log!(
-                            worker,
-                            "This can take a very long time due to media optimization."
-                        );
+                        info!("Slow formatting LTO9+ media.");
+                        info!("This can take a very long time due to media optimization.");
                     }
                 }
             }
@@ -330,15 +322,15 @@ pub fn format_media(
                         bail!("expected label '{}', found unrelated data", label);
                     }
                     /* assume drive contains no or unrelated data */
-                    task_log!(worker, "unable to read media label: {}", err);
-                    task_log!(worker, "format anyways");
+                    info!("unable to read media label: {err}");
+                    info!("format anyways");
                     handle.format_media(fast.unwrap_or(true))?;
                 }
                 Ok((None, _)) => {
                     if let Some(label) = label_text {
                         bail!("expected label '{}', found empty tape", label);
                     }
-                    task_log!(worker, "found empty media - format anyways");
+                    info!("found empty media - format anyways");
                     handle.format_media(fast.unwrap_or(true))?;
                 }
                 Ok((Some(media_id), _key_config)) => {
@@ -352,11 +344,9 @@ pub fn format_media(
                         }
                     }
 
-                    task_log!(
-                        worker,
+                    info!(
                         "found media '{}' with uuid '{}'",
-                        media_id.label.label_text,
-                        media_id.label.uuid,
+                        media_id.label.label_text, media_id.label.uuid,
                     );
 
                     let mut inventory = Inventory::new(TAPE_STATUS_DIR);
@@ -504,7 +494,7 @@ pub fn label_media(
         drive.clone(),
         "label-media",
         Some(drive.clone()),
-        move |worker, config| {
+        move |_worker, config| {
             let mut drive = open_drive(&config, &drive)?;
 
             drive.rewind()?;
@@ -526,7 +516,7 @@ pub fn label_media(
                 pool: pool.clone(),
             };
 
-            write_media_label(worker, &mut drive, label, pool)
+            write_media_label(&mut drive, label, pool)
         },
     )?;
 
@@ -534,7 +524,6 @@ pub fn label_media(
 }
 
 fn write_media_label(
-    worker: Arc<WorkerTask>,
     drive: &mut Box<dyn TapeDriver>,
     label: MediaLabel,
     pool: Option<String>,
@@ -549,18 +538,9 @@ fn write_media_label(
     }
     drive.label_tape(&label)?;
     if let Some(ref pool) = pool {
-        task_log!(
-            worker,
-            "Label media '{}' for pool '{}'",
-            label.label_text,
-            pool
-        );
+        info!("Label media '{}' for pool '{pool}'", label.label_text);
     } else {
-        task_log!(
-            worker,
-            "Label media '{}' (no pool assignment)",
-            label.label_text
-        );
+        info!("Label media '{}' (no pool assignment)", label.label_text);
     }
 
     let media_id = MediaId {
@@ -749,10 +729,10 @@ pub fn clean_drive(drive: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Val
         drive.clone(),
         "clean-drive",
         Some(drive.clone()),
-        move |worker, config| {
+        move |_worker, config| {
             let (mut changer, _changer_name) = required_media_changer(&config, &drive)?;
 
-            task_log!(worker, "Starting drive clean");
+            info!("Starting drive clean");
 
             changer.clean_drive()?;
 
@@ -763,7 +743,7 @@ pub fn clean_drive(drive: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Val
                 // test for critical tape alert flags
                 if let Ok(alert_flags) = handle.tape_alert_flags() {
                     if !alert_flags.is_empty() {
-                        task_log!(worker, "TapeAlertFlags: {:?}", alert_flags);
+                        info!("TapeAlertFlags: {alert_flags:?}");
                         if tape_alert_flags_critical(alert_flags) {
                             bail!("found critical tape alert flags: {:?}", alert_flags);
                         }
@@ -772,13 +752,13 @@ pub fn clean_drive(drive: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Val
 
                 // test wearout (max. 50 mounts)
                 if let Ok(volume_stats) = handle.volume_statistics() {
-                    task_log!(worker, "Volume mounts: {}", volume_stats.volume_mounts);
+                    info!("Volume mounts: {}", volume_stats.volume_mounts);
                     let wearout = volume_stats.volume_mounts * 2; // (*100.0/50.0);
-                    task_log!(worker, "Cleaning tape wearout: {}%", wearout);
+                    info!("Cleaning tape wearout: {wearout}%");
                 }
             }
 
-            task_log!(worker, "Drive cleaned successfully");
+            info!("Drive cleaned successfully");
 
             Ok(())
         },
@@ -910,12 +890,12 @@ pub fn update_inventory(
         drive.clone(),
         "inventory-update",
         Some(drive.clone()),
-        move |worker, config| {
+        move |_worker, config| {
             let (mut changer, changer_name) = required_media_changer(&config, &drive)?;
 
             let label_text_list = changer.online_media_label_texts()?;
             if label_text_list.is_empty() {
-                task_log!(worker, "changer device does not list any media labels");
+                info!("changer device does not list any media labels");
             }
 
             let mut inventory = Inventory::load(TAPE_STATUS_DIR)?;
@@ -924,7 +904,7 @@ pub fn update_inventory(
 
             for label_text in label_text_list.iter() {
                 if label_text.starts_with("CLN") {
-                    task_log!(worker, "skip cleaning unit '{}'", label_text);
+                    info!("skip cleaning unit '{label_text}'");
                     continue;
                 }
 
@@ -936,12 +916,12 @@ pub fn update_inventory(
                             if !catalog
                                 || MediaCatalog::exists(TAPE_STATUS_DIR, &media_id.label.uuid)
                             {
-                                task_log!(worker, "media '{}' already inventoried", label_text);
+                                info!("media '{label_text}' already inventoried");
                                 continue;
                             }
                         }
                         Err(err) => {
-                            task_warn!(worker, "error getting media by unique label: {err}");
+                            warn!("error getting media by unique label: {err}");
                             // we can't be sure which uuid it is
                             continue;
                         }
@@ -950,37 +930,28 @@ pub fn update_inventory(
                 }
 
                 if let Err(err) = changer.load_media(&label_text) {
-                    task_warn!(worker, "unable to load media '{}' - {}", label_text, err);
+                    warn!("unable to load media '{label_text}' - {err}");
                     continue;
                 }
 
                 let mut drive = open_drive(&config, &drive)?;
                 match drive.read_label() {
                     Err(err) => {
-                        task_warn!(
-                            worker,
-                            "unable to read label form media '{}' - {}",
-                            label_text,
-                            err
-                        );
+                        warn!("unable to read label form media '{label_text}' - {err}");
                     }
                     Ok((None, _)) => {
-                        task_log!(worker, "media '{}' is empty", label_text);
+                        info!("media '{label_text}' is empty");
                     }
                     Ok((Some(media_id), _key_config)) => {
                         if label_text != media_id.label.label_text {
-                            task_warn!(
-                                worker,
-                                "label text mismatch ({} != {})",
-                                label_text,
+                            warn!(
+                                "label text mismatch ({label_text} != {})",
                                 media_id.label.label_text
                             );
                             continue;
                         }
-                        task_log!(
-                            worker,
-                            "inventorize media '{}' with uuid '{}'",
-                            label_text,
+                        info!(
+                            "inventorize media '{label_text}' with uuid '{}'",
                             media_id.label.uuid
                         );
 
@@ -1002,15 +973,11 @@ pub fn update_inventory(
                             if catalog {
                                 let media_set = inventory.compute_media_set_members(&set.uuid)?;
                                 if let Err(err) = fast_catalog_restore(
-                                    &worker,
                                     &mut drive,
                                     &media_set,
                                     &media_id.label.uuid,
                                 ) {
-                                    task_warn!(
-                                        worker,
-                                        "could not restore catalog for {label_text}: {err}"
-                                    );
+                                    warn!("could not restore catalog for {label_text}: {err}");
                                 }
                             }
                         } else {
@@ -1066,14 +1033,13 @@ pub fn barcode_label_media(
         drive.clone(),
         "barcode-label-media",
         Some(drive.clone()),
-        move |worker, config| barcode_label_media_worker(worker, drive, &config, pool),
+        move |_worker, config| barcode_label_media_worker(drive, &config, pool),
     )?;
 
     Ok(upid_str.into())
 }
 
 fn barcode_label_media_worker(
-    worker: Arc<WorkerTask>,
     drive: String,
     drive_config: &SectionConfigData,
     pool: Option<String>,
@@ -1106,24 +1072,20 @@ fn barcode_label_media_worker(
         inventory.reload()?;
         match inventory.find_media_by_label_text(&label_text) {
             Ok(Some(_)) => {
-                task_log!(
-                    worker,
-                    "media '{}' already inventoried (already labeled)",
-                    label_text
-                );
+                info!("media '{label_text}' already inventoried (already labeled)");
                 continue;
             }
             Err(err) => {
-                task_warn!(worker, "error getting media by unique label: {err}",);
+                warn!("error getting media by unique label: {err}",);
                 continue;
             }
             Ok(None) => {} // ok to label
         }
 
-        task_log!(worker, "checking/loading media '{}'", label_text);
+        info!("checking/loading media '{label_text}'");
 
         if let Err(err) = changer.load_media(&label_text) {
-            task_warn!(worker, "unable to load media '{}' - {}", label_text, err);
+            warn!("unable to load media '{label_text}' - {err}");
             continue;
         }
 
@@ -1132,21 +1094,13 @@ fn barcode_label_media_worker(
 
         match drive.read_next_file() {
             Ok(_reader) => {
-                task_log!(
-                    worker,
-                    "media '{}' is not empty (format it first)",
-                    label_text
-                );
+                info!("media '{label_text}' is not empty (format it first)");
                 continue;
             }
             Err(BlockReadError::EndOfFile) => { /* EOF mark at BOT, assume tape is empty */ }
             Err(BlockReadError::EndOfStream) => { /* tape is empty */ }
             Err(_err) => {
-                task_warn!(
-                    worker,
-                    "media '{}' read error (maybe not empty - format it first)",
-                    label_text
-                );
+                warn!("media '{label_text}' read error (maybe not empty - format it first)");
                 continue;
             }
         }
@@ -1159,7 +1113,7 @@ fn barcode_label_media_worker(
             pool: pool.clone(),
         };
 
-        write_media_label(worker.clone(), &mut drive, label, pool.clone())?
+        write_media_label(&mut drive, label, pool.clone())?
     }
 
     Ok(())
@@ -1318,14 +1272,12 @@ pub fn catalog_media(
 
             let media_id = match drive.read_label()? {
                 (Some(media_id), key_config) => {
-                    task_log!(
-                        worker,
+                    info!(
                         "found media label: {}",
                         serde_json::to_string_pretty(&serde_json::to_value(&media_id)?)?
                     );
                     if key_config.is_some() {
-                        task_log!(
-                            worker,
+                        info!(
                             "encryption key config: {}",
                             serde_json::to_string_pretty(&serde_json::to_value(&key_config)?)?
                         );
@@ -1339,7 +1291,7 @@ pub fn catalog_media(
 
             let (_media_set_lock, media_set_uuid) = match media_id.media_set_label {
                 None => {
-                    task_log!(worker, "media is empty");
+                    info!("media is empty");
                     let _pool_lock = if let Some(pool) = media_id.pool() {
                         lock_media_pool(TAPE_STATUS_DIR, &pool)?
                     } else {
@@ -1352,7 +1304,7 @@ pub fn catalog_media(
                 Some(ref set) => {
                     if set.unassigned() {
                         // media is empty
-                        task_log!(worker, "media is empty");
+                        info!("media is empty");
                         let _lock = lock_unassigned_media_pool(TAPE_STATUS_DIR)?;
                         MediaCatalog::destroy(TAPE_STATUS_DIR, &media_id.label.uuid)?;
                         inventory.store(media_id.clone(), false)?;
@@ -1377,14 +1329,14 @@ pub fn catalog_media(
             if !scan {
                 let media_set = inventory.compute_media_set_members(media_set_uuid)?;
 
-                if fast_catalog_restore(&worker, &mut drive, &media_set, &media_id.label.uuid)? {
+                if fast_catalog_restore(&mut drive, &media_set, &media_id.label.uuid)? {
                     return Ok(());
                 }
 
-                task_log!(worker, "no catalog found");
+                info!("no catalog found");
             }
 
-            task_log!(worker, "scanning entire media to reconstruct catalog");
+            info!("scanning entire media to reconstruct catalog");
 
             drive.rewind()?;
             drive.read_label()?; // skip over labels - we already read them above
