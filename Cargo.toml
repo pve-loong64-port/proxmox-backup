@@ -65,6 +65,7 @@ proxmox-http = { version = "0.9.0", features = [ "client", "http-helpers", "webs
 proxmox-human-byte = "0.1"
 proxmox-io = "1.0.1" # tools and client use "tokio" feature
 proxmox-lang = "1.1"
+proxmox-log = "0.1"
 proxmox-ldap = "0.2.1"
 proxmox-metrics = "0.3.1"
 proxmox-notify = "0.4"
@@ -147,6 +148,8 @@ tokio = "1.6"
 tokio-openssl = "0.6.1"
 tokio-stream = "0.1.0"
 tokio-util = { version = "0.7", features = [ "io" ] }
+tracing = "0.1"
+tracing-subscriber = "0.3.16"
 tower-service = "0.3.0"
 udev = "0.4"
 url = "2.1"
@@ -194,6 +197,8 @@ tokio = { workspace = true, features = [ "fs", "io-util", "io-std", "macros", "n
 tokio-openssl.workspace = true
 tokio-stream.workspace = true
 tokio-util = { workspace = true, features = [ "codec" ] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 tower-service.workspace = true
 udev.workspace = true
 url.workspace = true
@@ -214,6 +219,7 @@ proxmox-http = { workspace = true, features = [ "client-trait", "proxmox-async",
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true
 proxmox-lang.workspace = true
+proxmox-log.workspace = true
 proxmox-ldap.workspace = true
 proxmox-metrics.workspace = true
 proxmox-notify = { workspace = true, features = [ "pbs-context" ] }
@@ -263,6 +269,7 @@ proxmox-rrd.workspace = true
 #proxmox-human-byte = { path = "../proxmox/proxmox-human-byte" }
 #proxmox-io = { path = "../proxmox/proxmox-io" }
 #proxmox-lang = { path = "../proxmox/proxmox-lang" }
+#proxmox-log = { path = "../proxmox/proxmox-log" }
 #proxmox-ldap = { path = "../proxmox/proxmox-ldap" }
 #proxmox-metrics = { path = "../proxmox/proxmox-metrics" }
 #proxmox-notify = { path = "../proxmox/proxmox-notify" }

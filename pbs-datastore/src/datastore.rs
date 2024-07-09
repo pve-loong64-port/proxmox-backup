@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{bail, format_err, Error};
 use lazy_static::lazy_static;
 use nix::unistd::{unlinkat, UnlinkatFlags};
+use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_schema::ApiType;
@@ -16,7 +17,6 @@ use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::fs::{lock_dir_noblock, DirLockGuard};
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_sys::WorkerTaskContext;
-use proxmox_sys::{task_log, task_warn};
 
 use pbs_api_types::{
     Authid, BackupNamespace, BackupType, ChunkOrder, DataStoreConfig, DatastoreFSyncLevel,
@@ -965,8 +965,7 @@ impl DataStore {
             let digest = index.index_digest(pos).unwrap();
             if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
                 let hex = hex::encode(digest);
-                task_warn!(
-                    worker,
+                warn!(
                     "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
                 );
 
@@ -1032,22 +1031,17 @@ impl DataStore {
 
             let percentage = (i + 1) * 100 / image_count;
             if percentage > last_percentage {
-                task_log!(
-                    worker,
-                    "marked {}% ({} of {} index files)",
-                    percentage,
+                info!(
+                    "marked {percentage}% ({} of {image_count} index files)",
                     i + 1,
-                    image_count,
                 );
                 last_percentage = percentage;
             }
         }
 
         if strange_paths_count > 0 {
-            task_log!(
-                worker,
-                "found (and marked) {} index files outside of expected directory scheme",
-                strange_paths_count,
+            info!(
+                "found (and marked) {strange_paths_count} index files outside of expected directory scheme"
             );
         }
 
@@ -1085,11 +1079,11 @@ impl DataStore {
                 ..Default::default()
             };
 
-            task_log!(worker, "Start GC phase1 (mark used chunks)");
+            info!("Start GC phase1 (mark used chunks)");
 
             self.mark_used_chunks(&mut gc_status, worker)?;
 
-            task_log!(worker, "Start GC phase2 (sweep unused chunks)");
+            info!("Start GC phase2 (sweep unused chunks)");
             self.inner.chunk_store.sweep_unused_chunks(
                 oldest_writer,
                 phase1_start_time,
@@ -1097,30 +1091,27 @@ impl DataStore {
                 worker,
             )?;
 
-            task_log!(
-                worker,
+            info!(
                 "Removed garbage: {}",
                 HumanByte::from(gc_status.removed_bytes),
             );
-            task_log!(worker, "Removed chunks: {}", gc_status.removed_chunks);
+            info!("Removed chunks: {}", gc_status.removed_chunks);
             if gc_status.pending_bytes > 0 {
-                task_log!(
-                    worker,
+                info!(
                     "Pending removals: {} (in {} chunks)",
                     HumanByte::from(gc_status.pending_bytes),
                     gc_status.pending_chunks,
                 );
             }
             if gc_status.removed_bad > 0 {
-                task_log!(worker, "Removed bad chunks: {}", gc_status.removed_bad);
+                info!("Removed bad chunks: {}", gc_status.removed_bad);
             }
 
             if gc_status.still_bad > 0 {
-                task_log!(worker, "Leftover bad chunks: {}", gc_status.still_bad);
+                info!("Leftover bad chunks: {}", gc_status.still_bad);
             }
 
-            task_log!(
-                worker,
+            info!(
                 "Original data usage: {}",
                 HumanByte::from(gc_status.index_data_bytes),
             );
@@ -1128,15 +1119,13 @@ impl DataStore {
             if gc_status.index_data_bytes > 0 {
                 let comp_per =
                     (gc_status.disk_bytes as f64 * 100.) / gc_status.index_data_bytes as f64;
-                task_log!(
-                    worker,
-                    "On-Disk usage: {} ({:.2}%)",
-                    HumanByte::from(gc_status.disk_bytes),
-                    comp_per,
+                info!(
+                    "On-Disk usage: {} ({comp_per:.2}%)",
+                    HumanByte::from(gc_status.disk_bytes)
                 );
             }
 
-            task_log!(worker, "On-Disk chunks: {}", gc_status.disk_chunks);
+            info!("On-Disk chunks: {}", gc_status.disk_chunks);
 
             let deduplication_factor = if gc_status.disk_bytes > 0 {
                 (gc_status.index_data_bytes as f64) / (gc_status.disk_bytes as f64)
@@ -1144,11 +1133,11 @@ impl DataStore {
                 1.0
             };
 
-            task_log!(worker, "Deduplication factor: {:.2}", deduplication_factor);
+            info!("Deduplication factor: {deduplication_factor:.2}");
 
             if gc_status.disk_chunks > 0 {
                 let avg_chunk = gc_status.disk_bytes / (gc_status.disk_chunks as u64);
-                task_log!(worker, "Average chunk size: {}", HumanByte::from(avg_chunk));
+                info!("Average chunk size: {}", HumanByte::from(avg_chunk));
             }
 
             if let Ok(serialized) = serde_json::to_string(&gc_status) {
@@ -1380,11 +1369,7 @@ impl DataStore {
     /// Destroy a datastore. This requires that there are no active operations on the datastore.
     ///
     /// This is a synchronous operation and should be run in a worker-thread.
-    pub fn destroy(
-        name: &str,
-        destroy_data: bool,
-        worker: &dyn WorkerTaskContext,
-    ) -> Result<(), Error> {
+    pub fn destroy(name: &str, destroy_data: bool) -> Result<(), Error> {
         let config_lock = pbs_config::datastore::lock_config()?;
 
         let (mut config, _digest) = pbs_config::datastore::config()?;
@@ -1412,13 +1397,13 @@ impl DataStore {
             let remove = |subdir, ok: &mut bool| {
                 if let Err(err) = std::fs::remove_dir_all(base.join(subdir)) {
                     if err.kind() != io::ErrorKind::NotFound {
-                        task_warn!(worker, "failed to remove {subdir:?} subdirectory: {err}");
+                        warn!("failed to remove {subdir:?} subdirectory: {err}");
                         *ok = false;
                     }
                 }
             };
 
-            task_log!(worker, "Deleting datastore data...");
+            info!("Deleting datastore data...");
             remove("ns", &mut ok); // ns first
             remove("ct", &mut ok);
             remove("vm", &mut ok);
@@ -1427,7 +1412,7 @@ impl DataStore {
             if ok {
                 if let Err(err) = std::fs::remove_file(base.join(".gc-status")) {
                     if err.kind() != io::ErrorKind::NotFound {
-                        task_warn!(worker, "failed to remove .gc-status file: {err}");
+                        warn!("failed to remove .gc-status file: {err}");
                         ok = false;
                     }
                 }
@@ -1441,7 +1426,7 @@ impl DataStore {
 
         // now the config
         if ok {
-            task_log!(worker, "Removing datastore from config...");
+            info!("Removing datastore from config...");
             let _lock = pbs_config::datastore::lock_config()?;
             let _ = config.sections.remove(name);
             pbs_config::datastore::save_config(&config)?;
@@ -1452,35 +1437,32 @@ impl DataStore {
             if ok {
                 if let Err(err) = std::fs::remove_file(base.join(".lock")) {
                     if err.kind() != io::ErrorKind::NotFound {
-                        task_warn!(worker, "failed to remove .lock file: {err}");
+                        warn!("failed to remove .lock file: {err}");
                         ok = false;
                     }
                 }
             }
 
             if ok {
-                task_log!(worker, "Finished deleting data.");
+                info!("Finished deleting data.");
 
                 match std::fs::remove_dir(base) {
-                    Ok(()) => task_log!(worker, "Removed empty datastore directory."),
+                    Ok(()) => info!("Removed empty datastore directory."),
                     Err(err) if err.kind() == io::ErrorKind::NotFound => {
                         // weird, but ok
                     }
                     Err(err) if err.is_errno(nix::errno::Errno::EBUSY) => {
-                        task_warn!(
-                            worker,
-                            "Cannot delete datastore directory (is it a mount point?)."
-                        )
+                        warn!("Cannot delete datastore directory (is it a mount point?).")
                     }
                     Err(err) if err.is_errno(nix::errno::Errno::ENOTEMPTY) => {
-                        task_warn!(worker, "Datastore directory not empty, not deleting.")
+                        warn!("Datastore directory not empty, not deleting.")
                     }
                     Err(err) => {
-                        task_warn!(worker, "Failed to remove datastore directory: {err}");
+                        warn!("Failed to remove datastore directory: {err}");
                     }
                 }
             } else {
-                task_log!(worker, "There were errors deleting data.");
+                info!("There were errors deleting data.");
             }
         }
 

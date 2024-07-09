@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Error;
-
-use proxmox_sys::{task_log, task_warn};
+use tracing::{info, warn};
 
 use pbs_api_types::{
     print_store_and_ns, Authid, KeepOptions, Operation, PruneJobOptions, MAX_NAMESPACE_DEPTH,
@@ -16,7 +15,6 @@ use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
 
 pub fn prune_datastore(
-    worker: Arc<WorkerTask>,
     auth_id: Authid,
     prune_options: PruneJobOptions,
     datastore: Arc<DataStore>,
@@ -31,19 +29,19 @@ pub fn prune_datastore(
     };
     let ns = prune_options.ns.clone().unwrap_or_default();
     let store_ns = print_store_and_ns(store, &ns);
-    task_log!(worker, "Starting datastore prune on {store_ns}, {depth}");
+    info!("Starting datastore prune on {store_ns}, {depth}");
 
     if dry_run {
-        task_log!(worker, "(dry test run)");
+        info!("(dry test run)");
     }
 
     let keep_all = !prune_options.keeps_something();
 
     if keep_all {
-        task_log!(worker, "No prune selection - keeping all files.");
+        info!("No prune selection - keeping all files.");
     } else {
         let rendered_options = cli_prune_options_string(&prune_options);
-        task_log!(worker, "retention options: {rendered_options}");
+        info!("retention options: {rendered_options}");
     }
 
     for group in ListAccessibleBackupGroups::new_with_privs(
@@ -61,8 +59,7 @@ pub fn prune_datastore(
         let mut prune_info = compute_prune_info(list, &prune_options.keep)?;
         prune_info.reverse(); // delete older snapshots first
 
-        task_log!(
-            worker,
+        info!(
             "Pruning group {ns}:\"{}/{}\"",
             group.backup_type(),
             group.backup_id()
@@ -70,11 +67,9 @@ pub fn prune_datastore(
 
         for (info, mark) in prune_info {
             let keep = keep_all || mark.keep();
-            task_log!(
-                worker,
-                "{}{} {}/{}/{}",
+            info!(
+                "{}{mark} {}/{}/{}",
                 if dry_run { "would " } else { "" },
-                mark,
                 group.backup_type(),
                 group.backup_id(),
                 info.backup_dir.backup_time_string()
@@ -82,7 +77,7 @@ pub fn prune_datastore(
             if !keep && !dry_run {
                 if let Err(err) = datastore.remove_backup_dir(ns, info.backup_dir.as_ref(), false) {
                     let path = info.backup_dir.relative_path();
-                    task_warn!(worker, "failed to remove dir {path:?}: {err}");
+                    warn!("failed to remove dir {path:?}: {err}");
                 }
             }
         }
@@ -150,13 +145,13 @@ pub fn do_prune_job(
         move |worker| {
             job.start(&worker.upid().to_string())?;
 
-            task_log!(worker, "prune job '{}'", job.jobname());
+            info!("prune job '{}'", job.jobname());
 
             if let Some(event_str) = schedule {
-                task_log!(worker, "task triggered by schedule '{event_str}'");
+                info!("task triggered by schedule '{event_str}'");
             }
 
-            let result = prune_datastore(worker.clone(), auth_id, prune_options, datastore, false);
+            let result = prune_datastore(auth_id, prune_options, datastore, false);
 
             let status = worker.create_state(&result);
 

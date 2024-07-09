@@ -7,18 +7,20 @@ use http::request::Parts;
 use http::Response;
 use hyper::header;
 use hyper::{Body, StatusCode};
+use tracing::{info, warn};
+use tracing_subscriber::filter::LevelFilter;
 use url::form_urlencoded;
 
 use openssl::ssl::SslAcceptor;
 use serde_json::{json, Value};
 
 use proxmox_lang::try_block;
+use proxmox_log::init_logger;
 use proxmox_metrics::MetricsData;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::{CreateOptions, FileSystemInformation};
 use proxmox_sys::linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat};
 use proxmox_sys::logrotate::LogRotate;
-use proxmox_sys::{task_log, task_warn};
 
 use pbs_datastore::DataStore;
 
@@ -181,21 +183,7 @@ async fn get_index_future(env: RestEnvironment, parts: Parts) -> Response<Body> 
 }
 
 async fn run() -> Result<(), Error> {
-    // Note: To debug early connection error use
-    // PROXMOX_DEBUG=1 ./target/release/proxmox-backup-proxy
-    let debug = std::env::var("PROXMOX_DEBUG").is_ok();
-
-    if let Err(err) = syslog::init(
-        syslog::Facility::LOG_DAEMON,
-        if debug {
-            log::LevelFilter::Debug
-        } else {
-            log::LevelFilter::Info
-        },
-        Some("proxmox-backup-proxy"),
-    ) {
-        bail!("unable to inititialize syslog - {err}");
-    }
+    init_logger("PBS_LOG", LevelFilter::INFO, "proxmox-backup-proxy")?;
 
     proxmox_backup::auth_helpers::setup_auth_context(false);
     proxmox_backup::server::notifications::init()?;
@@ -301,7 +289,7 @@ async fn run() -> Result<(), Error> {
     })?;
 
     let connections = proxmox_rest_server::connection::AcceptBuilder::new()
-        .debug(debug)
+        .debug(tracing::enabled!(tracing::Level::DEBUG))
         .rate_limiter_lookup(Arc::new(lookup_rate_limiter))
         .tcp_keepalive_time(PROXMOX_BACKUP_TCP_KEEPALIVE_TIME);
 
@@ -750,7 +738,7 @@ async fn schedule_task_log_rotate() {
         false,
         move |worker| {
             job.start(&worker.upid().to_string())?;
-            task_log!(worker, "starting task log rotation");
+            info!("starting task log rotation");
 
             let result = try_block!({
                 let max_size = 512 * 1024 - 1; // an entry has ~ 100b, so > 5000 entries/file
@@ -775,9 +763,9 @@ async fn schedule_task_log_rotate() {
                 )?;
 
                 if has_rotated {
-                    task_log!(worker, "task log archive was rotated");
+                    info!("task log archive was rotated");
                 } else {
-                    task_log!(worker, "task log archive was not rotated");
+                    info!("task log archive was not rotated");
                 }
 
                 let max_size = 32 * 1024 * 1024 - 1;
@@ -793,9 +781,9 @@ async fn schedule_task_log_rotate() {
                 if logrotate.rotate(max_size)? {
                     println!("rotated access log, telling daemons to re-open log file");
                     proxmox_async::runtime::block_on(command_reopen_access_logfiles())?;
-                    task_log!(worker, "API access log was rotated");
+                    info!("API access log was rotated");
                 } else {
-                    task_log!(worker, "API access log was not rotated");
+                    info!("API access log was not rotated");
                 }
 
                 let mut logrotate = LogRotate::new(
@@ -808,15 +796,15 @@ async fn schedule_task_log_rotate() {
                 if logrotate.rotate(max_size)? {
                     println!("rotated auth log, telling daemons to re-open log file");
                     proxmox_async::runtime::block_on(command_reopen_auth_logfiles())?;
-                    task_log!(worker, "API authentication log was rotated");
+                    info!("API authentication log was rotated");
                 } else {
-                    task_log!(worker, "API authentication log was not rotated");
+                    info!("API authentication log was not rotated");
                 }
 
                 if has_rotated {
-                    task_log!(worker, "cleaning up old task logs");
-                    if let Err(err) = cleanup_old_tasks(&worker, true) {
-                        task_warn!(worker, "could not completely cleanup old tasks: {err}");
+                    info!("cleaning up old task logs");
+                    if let Err(err) = cleanup_old_tasks(true) {
+                        warn!("could not completely cleanup old tasks: {err}");
                     }
                 }
 

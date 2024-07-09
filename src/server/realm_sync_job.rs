@@ -1,13 +1,14 @@
 use anyhow::{bail, format_err, Context, Error};
+use tracing::{info, warn};
+
 use pbs_config::{acl::AclTree, token_shadow, BackupLockGuard};
 use proxmox_lang::try_block;
 use proxmox_ldap::{Config, Connection, SearchParameters, SearchResult};
 use proxmox_rest_server::WorkerTask;
 use proxmox_schema::{ApiType, Schema};
 use proxmox_section_config::SectionConfigData;
-use proxmox_sys::{task_log, task_warn};
 
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
 use pbs_api_types::{
     AdRealmConfig, ApiToken, Authid, LdapRealmConfig, Realm, RealmType, RemoveVanished,
@@ -39,7 +40,7 @@ pub fn do_realm_sync_job(
         move |worker| {
             job.start(&worker.upid().to_string()).unwrap();
 
-            task_log!(worker, "starting realm sync for {}", realm.as_str());
+            info!("starting realm sync for {}", realm.as_str());
 
             let override_settings = GeneralSyncSettingsOverride {
                 remove_vanished,
@@ -49,12 +50,12 @@ pub fn do_realm_sync_job(
             async move {
                 match realm_type {
                     RealmType::Ldap => {
-                        LdapRealmSyncJob::new(worker, realm, &override_settings, dry_run)?
+                        LdapRealmSyncJob::new(realm, &override_settings, dry_run)?
                             .sync()
                             .await
                     }
                     RealmType::Ad => {
-                        AdRealmSyncJob::new(worker, realm, &override_settings, dry_run)?
+                        AdRealmSyncJob::new(realm, &override_settings, dry_run)?
                             .sync()
                             .await
                     }
@@ -73,7 +74,6 @@ struct AdRealmSyncJob(LdapRealmSyncJob);
 
 impl AdRealmSyncJob {
     fn new(
-        worker: Arc<WorkerTask>,
         realm: Realm,
         override_settings: &GeneralSyncSettingsOverride,
         dry_run: bool,
@@ -98,7 +98,6 @@ impl AdRealmSyncJob {
         let ldap_config = auth::AdAuthenticator::api_type_to_config(&config)?;
 
         Ok(Self(LdapRealmSyncJob {
-            worker,
             realm,
             general_sync_settings: sync_settings,
             ldap_sync_settings: sync_attributes,
@@ -114,7 +113,6 @@ impl AdRealmSyncJob {
 
 /// Implementation for syncing LDAP realms
 struct LdapRealmSyncJob {
-    worker: Arc<WorkerTask>,
     realm: Realm,
     general_sync_settings: GeneralSyncSettings,
     ldap_sync_settings: LdapSyncSettings,
@@ -125,7 +123,6 @@ struct LdapRealmSyncJob {
 impl LdapRealmSyncJob {
     /// Create new LdapRealmSyncJob
     fn new(
-        worker: Arc<WorkerTask>,
         realm: Realm,
         override_settings: &GeneralSyncSettingsOverride,
         dry_run: bool,
@@ -150,7 +147,6 @@ impl LdapRealmSyncJob {
         let ldap_config = auth::LdapAuthenticator::api_type_to_config(&config)?;
 
         Ok(Self {
-            worker,
             realm,
             general_sync_settings: sync_settings,
             ldap_sync_settings: sync_attributes,
@@ -162,10 +158,7 @@ impl LdapRealmSyncJob {
     /// Perform realm synchronization
     async fn sync(&self) -> Result<(), Error> {
         if self.dry_run {
-            task_log!(
-                self.worker,
-                "this is a DRY RUN - changes will not be persisted"
-            );
+            info!("this is a DRY RUN - changes will not be persisted");
         }
 
         let ldap = Connection::new(self.ldap_config.clone());
@@ -247,7 +240,7 @@ impl LdapRealmSyncJob {
                 anyhow::Ok(())
             });
             if let Err(e) = result {
-                task_log!(self.worker, "could not create/update user: {e}");
+                info!("could not create/update user: {e}");
             }
         }
 
@@ -266,18 +259,10 @@ impl LdapRealmSyncJob {
 
         if let Some(existing_user) = existing_user {
             if existing_user != new_or_updated_user {
-                task_log!(
-                    self.worker,
-                    "updating user {}",
-                    new_or_updated_user.userid.as_str()
-                );
+                info!("updating user {}", new_or_updated_user.userid.as_str());
             }
         } else {
-            task_log!(
-                self.worker,
-                "creating user {}",
-                new_or_updated_user.userid.as_str()
-            );
+            info!("creating user {}", new_or_updated_user.userid.as_str());
         }
 
         user_config.set_data(
@@ -299,10 +284,7 @@ impl LdapRealmSyncJob {
             let schema = schema.unwrap_string_schema();
 
             if let Err(e) = schema.check_constraints(value) {
-                task_warn!(
-                    self.worker,
-                    "{userid}: ignoring attribute `{attribute}`: {e}"
-                );
+                warn!("{userid}: ignoring attribute `{attribute}`: {e}");
 
                 None
             } else {
@@ -381,7 +363,7 @@ impl LdapRealmSyncJob {
         to_delete: &[Userid],
     ) -> Result<(), Error> {
         for userid in to_delete {
-            task_log!(self.worker, "deleting user {}", userid.as_str());
+            info!("deleting user {}", userid.as_str());
 
             // Delete the user
             user_config.sections.remove(userid.as_str());
@@ -408,7 +390,7 @@ impl LdapRealmSyncJob {
 
                     if !self.dry_run {
                         if let Err(e) = token_shadow::delete_secret(&tokenid) {
-                            task_warn!(self.worker, "could not delete token for user {userid}: {e}",)
+                            warn!("could not delete token for user {userid}: {e}",)
                         }
                     }
 

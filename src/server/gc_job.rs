@@ -1,7 +1,7 @@
 use anyhow::Error;
 use std::sync::Arc;
 
-use proxmox_sys::task_log;
+use tracing::info;
 
 use pbs_api_types::Authid;
 use pbs_datastore::DataStore;
@@ -28,9 +28,9 @@ pub fn do_garbage_collection_job(
         move |worker| {
             job.start(&worker.upid().to_string())?;
 
-            task_log!(worker, "starting garbage collection on store {store}");
+            info!("starting garbage collection on store {store}");
             if let Some(event_str) = schedule {
-                task_log!(worker, "task triggered by schedule '{event_str}'");
+                info!("task triggered by schedule '{event_str}'");
             }
 
             let result = datastore.garbage_collection(&*worker, worker.upid());

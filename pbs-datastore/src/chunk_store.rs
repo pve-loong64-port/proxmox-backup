@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, format_err, Error};
+use tracing::info;
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
 use proxmox_io::ReadExt;
@@ -10,7 +11,6 @@ use proxmox_sys::fs::{create_dir, create_path, file_type_from_file_stat, CreateO
 use proxmox_sys::process_locker::{
     ProcessLockExclusiveGuard, ProcessLockSharedGuard, ProcessLocker,
 };
-use proxmox_sys::task_log;
 use proxmox_sys::WorkerTaskContext;
 
 use crate::file_formats::{
@@ -92,7 +92,6 @@ impl ChunkStore {
         path: P,
         uid: nix::unistd::Uid,
         gid: nix::unistd::Gid,
-        worker: Option<&dyn WorkerTaskContext>,
         sync_level: DatastoreFSyncLevel,
     ) -> Result<Self, Error>
     where
@@ -143,9 +142,7 @@ impl ChunkStore {
             }
             let percentage = (i * 100) / (64 * 1024);
             if percentage != last_percentage {
-                if let Some(worker) = worker {
-                    task_log!(worker, "Chunkstore create: {}%", percentage)
-                }
+                info!("Chunkstore create: {percentage}%");
                 last_percentage = percentage;
             }
         }
@@ -375,7 +372,7 @@ impl ChunkStore {
         for (entry, percentage, bad) in self.get_chunk_iterator()? {
             if last_percentage != percentage {
                 last_percentage = percentage;
-                task_log!(worker, "processed {}% ({} chunks)", percentage, chunk_count,);
+                info!("processed {percentage}% ({chunk_count} chunks)");
             }
 
             worker.check_abort()?;
@@ -579,15 +576,8 @@ fn test_chunk_store1() {
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::current())
         .unwrap()
         .unwrap();
-    let chunk_store = ChunkStore::create(
-        "test",
-        &path,
-        user.uid,
-        user.gid,
-        None,
-        DatastoreFSyncLevel::None,
-    )
-    .unwrap();
+    let chunk_store =
+        ChunkStore::create("test", &path, user.uid, user.gid, DatastoreFSyncLevel::None).unwrap();
 
     let (chunk, digest) = crate::data_blob::DataChunkBuilder::new(&[0u8, 1u8])
         .build()
@@ -599,14 +589,8 @@ fn test_chunk_store1() {
     let (exists, _) = chunk_store.insert_chunk(&chunk, &digest).unwrap();
     assert!(exists);
 
-    let chunk_store = ChunkStore::create(
-        "test",
-        &path,
-        user.uid,
-        user.gid,
-        None,
-        DatastoreFSyncLevel::None,
-    );
+    let chunk_store =
+        ChunkStore::create("test", &path, user.uid, user.gid, DatastoreFSyncLevel::None);
     assert!(chunk_store.is_err());
 
     if let Err(_e) = std::fs::remove_dir_all(".testdir") { /* ignore */ }

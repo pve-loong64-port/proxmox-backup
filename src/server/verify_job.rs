@@ -1,9 +1,9 @@
 use anyhow::{format_err, Error};
+use tracing::{error, info};
 
 use pbs_api_types::{Authid, Operation, VerificationJobConfig};
 use pbs_datastore::DataStore;
 use proxmox_rest_server::WorkerTask;
-use proxmox_sys::task_log;
 
 use crate::{
     backup::{verify_all_backups, verify_filter},
@@ -34,9 +34,9 @@ pub fn do_verification_job(
         move |worker| {
             job.start(&worker.upid().to_string())?;
 
-            task_log!(worker, "Starting datastore verify job '{}'", job_id);
+            info!("Starting datastore verify job '{job_id}'");
             if let Some(event_str) = schedule {
-                task_log!(worker, "task triggered by schedule '{}'", event_str);
+                info!("task triggered by schedule '{event_str}'");
             }
 
             let ns = match verification_job.ns {
@@ -58,9 +58,9 @@ pub fn do_verification_job(
             let job_result = match result {
                 Ok(ref failed_dirs) if failed_dirs.is_empty() => Ok(()),
                 Ok(ref failed_dirs) => {
-                    task_log!(worker, "Failed to verify the following snapshots/groups:");
+                    error!("Failed to verify the following snapshots/groups:");
                     for dir in failed_dirs {
-                        task_log!(worker, "\t{}", dir);
+                        error!("\t{dir}");
                     }
 
                     Err(format_err!(

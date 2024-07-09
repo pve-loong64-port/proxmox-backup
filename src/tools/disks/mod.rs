@@ -16,14 +16,13 @@ use ::serde::{Deserialize, Serialize};
 
 use proxmox_lang::error::io_err_other;
 use proxmox_lang::{io_bail, io_format_err};
-use proxmox_rest_server::WorkerTask;
 use proxmox_schema::api;
 use proxmox_sys::linux::procfs::{mountinfo::Device, MountInfo};
-use proxmox_sys::task_log;
 
 use pbs_api_types::{BLOCKDEVICE_DISK_AND_PARTITION_NAME_REGEX, BLOCKDEVICE_NAME_REGEX};
 
 mod zfs;
+use tracing::info;
 pub use zfs::*;
 mod zpool_status;
 pub use zpool_status::*;
@@ -1116,7 +1115,7 @@ pub fn inititialize_gpt_disk(disk: &Disk, uuid: Option<&str>) -> Result<(), Erro
 
 /// Wipes all labels and the first 200 MiB of a disk/partition (or the whole if it is smaller).
 /// If called with a partition, also sets the partition type to 0x83 'Linux filesystem'.
-pub fn wipe_blockdev(disk: &Disk, worker: Arc<WorkerTask>) -> Result<(), Error> {
+pub fn wipe_blockdev(disk: &Disk) -> Result<(), Error> {
     let disk_path = match disk.device_path() {
         Some(path) => path,
         None => bail!("disk {:?} has no node in /dev", disk.syspath()),
@@ -1137,13 +1136,13 @@ pub fn wipe_blockdev(disk: &Disk, worker: Arc<WorkerTask>) -> Result<(), Error> 
 
     to_wipe.push(disk_path.to_path_buf());
 
-    task_log!(worker, "Wiping block device {}", disk_path.display());
+    info!("Wiping block device {}", disk_path.display());
 
     let mut wipefs_command = std::process::Command::new("wipefs");
     wipefs_command.arg("--all").args(&to_wipe);
 
     let wipefs_output = proxmox_sys::command::run_command(wipefs_command, None)?;
-    task_log!(worker, "wipefs output: {}", wipefs_output);
+    info!("wipefs output: {wipefs_output}");
 
     let size = disk.size().map(|size| size / 1024 / 1024)?;
     let count = size.min(200);
@@ -1163,21 +1162,17 @@ pub fn wipe_blockdev(disk: &Disk, worker: Arc<WorkerTask>) -> Result<(), Error> 
     dd_command.args(args);
 
     let dd_output = proxmox_sys::command::run_command(dd_command, None)?;
-    task_log!(worker, "dd output: {}", dd_output);
+    info!("dd output: {dd_output}");
 
     if is_partition {
         // set the partition type to 0x83 'Linux filesystem'
-        change_parttype(disk, "8300", worker)?;
+        change_parttype(disk, "8300")?;
     }
 
     Ok(())
 }
 
-pub fn change_parttype(
-    part_disk: &Disk,
-    part_type: &str,
-    worker: Arc<WorkerTask>,
-) -> Result<(), Error> {
+pub fn change_parttype(part_disk: &Disk, part_type: &str) -> Result<(), Error> {
     let part_path = match part_disk.device_path() {
         Some(path) => path,
         None => bail!("disk {:?} has no node in /dev", part_disk.syspath()),
@@ -1199,7 +1194,7 @@ pub fn change_parttype(
         };
         sgdisk_command.arg(part_disk_parent_path);
         let sgdisk_output = proxmox_sys::command::run_command(sgdisk_command, None)?;
-        task_log!(worker, "sgdisk output: {}", sgdisk_output);
+        info!("sgdisk output: {sgdisk_output}");
     }
     Ok(())
 }

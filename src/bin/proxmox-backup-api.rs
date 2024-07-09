@@ -5,12 +5,13 @@ use anyhow::{bail, Error};
 use futures::*;
 use http::Response;
 use hyper::{Body, StatusCode};
+use tracing_subscriber::filter::LevelFilter;
 
 use proxmox_lang::try_block;
+use proxmox_log::init_logger;
+use proxmox_rest_server::{daemon, ApiConfig, RestServer};
 use proxmox_router::RpcEnvironmentType;
 use proxmox_sys::fs::CreateOptions;
-
-use proxmox_rest_server::{daemon, ApiConfig, RestServer};
 
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::config;
@@ -40,13 +41,7 @@ fn get_index() -> Pin<Box<dyn Future<Output = Response<Body>> + Send>> {
 }
 
 async fn run() -> Result<(), Error> {
-    if let Err(err) = syslog::init(
-        syslog::Facility::LOG_DAEMON,
-        log::LevelFilter::Info,
-        Some("proxmox-backup-api"),
-    ) {
-        bail!("unable to inititialize syslog - {}", err);
-    }
+    init_logger("PBS_LOG", LevelFilter::INFO, "proxmox-backup-api")?;
 
     config::create_configdir()?;
 

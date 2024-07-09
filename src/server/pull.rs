@@ -10,10 +10,9 @@ use std::time::{Duration, SystemTime};
 use anyhow::{bail, format_err, Error};
 use http::StatusCode;
 use proxmox_human_byte::HumanByte;
-use proxmox_rest_server::WorkerTask;
 use proxmox_router::HttpError;
-use proxmox_sys::{task_log, task_warn};
 use serde_json::json;
+use tracing::{info, warn};
 
 use pbs_api_types::{
     print_store_and_ns, Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupFilter,
@@ -122,7 +121,6 @@ trait PullSource: Send + Sync {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
-        worker: &WorkerTask,
     ) -> Result<Vec<BackupNamespace>, Error>;
 
     /// Lists groups within a specific namespace from the source.
@@ -137,7 +135,6 @@ trait PullSource: Send + Sync {
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-        worker: &WorkerTask,
     ) -> Result<Vec<BackupDir>, Error>;
     fn get_ns(&self) -> BackupNamespace;
     fn get_store(&self) -> &str;
@@ -155,7 +152,6 @@ impl PullSource for RemoteSource {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
-        worker: &WorkerTask,
     ) -> Result<Vec<BackupNamespace>, Error> {
         if self.ns.is_root() && max_depth.map_or(false, |depth| depth == 0) {
             return Ok(vec![self.ns.clone()]);
@@ -178,8 +174,8 @@ impl PullSource for RemoteSource {
                 Some(HttpError { code, message }) => match code {
                     &StatusCode::NOT_FOUND => {
                         if self.ns.is_root() && max_depth.is_none() {
-                            task_warn!(worker, "Could not query remote for namespaces (404) -> temporarily switching to backwards-compat mode");
-                            task_warn!(worker, "Either make backwards-compat mode explicit (max-depth == 0) or upgrade remote system.");
+                            warn!("Could not query remote for namespaces (404) -> temporarily switching to backwards-compat mode");
+                            warn!("Either make backwards-compat mode explicit (max-depth == 0) or upgrade remote system.");
                             max_depth.replace(0);
                         } else {
                             bail!("Remote namespace set/recursive sync requested, but remote does not support namespaces.")
@@ -238,7 +234,6 @@ impl PullSource for RemoteSource {
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-        worker: &WorkerTask,
     ) -> Result<Vec<BackupDir>, Error> {
         let path = format!("api2/json/admin/datastore/{}/snapshots", self.repo.store());
 
@@ -261,11 +256,7 @@ impl PullSource for RemoteSource {
                 let snapshot = item.backup;
                 // in-progress backups can't be synced
                 if item.size.is_none() {
-                    task_log!(
-                        worker,
-                        "skipping snapshot {} - in-progress backup",
-                        snapshot
-                    );
+                    info!("skipping snapshot {snapshot} - in-progress backup");
                     return None;
                 }
 
@@ -301,7 +292,6 @@ impl PullSource for LocalSource {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
-        _worker: &WorkerTask,
     ) -> Result<Vec<BackupNamespace>, Error> {
         ListNamespacesRecursive::new_max_depth(
             self.store.clone(),
@@ -333,7 +323,6 @@ impl PullSource for LocalSource {
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-        _worker: &WorkerTask,
     ) -> Result<Vec<BackupDir>, Error> {
         Ok(self
             .store
@@ -381,19 +370,10 @@ trait PullReader: Send + Sync {
     /// Asynchronously loads a file from the source into a local file.
     /// `filename` is the name of the file to load from the source.
     /// `into` is the path of the local file to load the source file into.
-    async fn load_file_into(
-        &self,
-        filename: &str,
-        into: &Path,
-        worker: &WorkerTask,
-    ) -> Result<Option<DataBlob>, Error>;
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error>;
 
     /// Tries to download the client log from the source and save it into a local file.
-    async fn try_download_client_log(
-        &self,
-        to_path: &Path,
-        worker: &WorkerTask,
-    ) -> Result<(), Error>;
+    async fn try_download_client_log(&self, to_path: &Path) -> Result<(), Error>;
 
     fn skip_chunk_sync(&self, target_store_name: &str) -> bool;
 }
@@ -409,12 +389,7 @@ impl PullReader for RemoteReader {
         ))
     }
 
-    async fn load_file_into(
-        &self,
-        filename: &str,
-        into: &Path,
-        worker: &WorkerTask,
-    ) -> Result<Option<DataBlob>, Error> {
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error> {
         let mut tmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -426,8 +401,7 @@ impl PullReader for RemoteReader {
             match err.downcast_ref::<HttpError>() {
                 Some(HttpError { code, message }) => match *code {
                     StatusCode::NOT_FOUND => {
-                        task_log!(
-                            worker,
+                        info!(
                             "skipping snapshot {} - vanished since start of sync",
                             &self.dir,
                         );
@@ -446,11 +420,7 @@ impl PullReader for RemoteReader {
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_download_client_log(
-        &self,
-        to_path: &Path,
-        worker: &WorkerTask,
-    ) -> Result<(), Error> {
+    async fn try_download_client_log(&self, to_path: &Path) -> Result<(), Error> {
         let mut tmp_path = to_path.to_owned();
         tmp_path.set_extension("tmp");
 
@@ -469,7 +439,7 @@ impl PullReader for RemoteReader {
             if let Err(err) = std::fs::rename(&tmp_path, to_path) {
                 bail!("Atomic rename file {:?} failed - {}", to_path, err);
             }
-            task_log!(worker, "got backup log file {:?}", CLIENT_LOG_BLOB_NAME);
+            info!("got backup log file {CLIENT_LOG_BLOB_NAME:?}");
         }
 
         Ok(())
@@ -490,12 +460,7 @@ impl PullReader for LocalReader {
         ))
     }
 
-    async fn load_file_into(
-        &self,
-        filename: &str,
-        into: &Path,
-        _worker: &WorkerTask,
-    ) -> Result<Option<DataBlob>, Error> {
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error> {
         let mut tmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -509,11 +474,7 @@ impl PullReader for LocalReader {
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_download_client_log(
-        &self,
-        _to_path: &Path,
-        _worker: &WorkerTask,
-    ) -> Result<(), Error> {
+    async fn try_download_client_log(&self, _to_path: &Path) -> Result<(), Error> {
         Ok(())
     }
 
@@ -603,7 +564,6 @@ impl PullParameters {
 }
 
 async fn pull_index_chunks<I: IndexFile>(
-    worker: &WorkerTask,
     chunk_reader: Arc<dyn AsyncReadChunk>,
     target: Arc<DataStore>,
     index: I,
@@ -658,10 +618,10 @@ async fn pull_index_chunks<I: IndexFile>(
                     target.cond_touch_chunk(&info.digest, false)
                 })?;
                 if chunk_exists {
-                    //task_log!(worker, "chunk {} exists {}", pos, hex::encode(digest));
+                    //info!("chunk {} exists {}", pos, hex::encode(digest));
                     return Ok::<_, Error>(());
                 }
-                //task_log!(worker, "sync {} chunk {}", pos, hex::encode(digest));
+                //info!("sync {} chunk {}", pos, hex::encode(digest));
                 let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
                 let raw_size = chunk.raw_size() as usize;
 
@@ -689,8 +649,7 @@ async fn pull_index_chunks<I: IndexFile>(
     let bytes = bytes.load(Ordering::SeqCst);
     let chunk_count = chunk_count.load(Ordering::SeqCst);
 
-    task_log!(
-        worker,
+    info!(
         "downloaded {} ({}/s)",
         HumanByte::from(bytes),
         HumanByte::new_binary(bytes as f64 / elapsed.as_secs_f64()),
@@ -730,7 +689,6 @@ fn verify_archive(info: &FileInfo, csum: &[u8; 32], size: u64) -> Result<(), Err
 /// - if archive is an index, pull referenced chunks
 /// - Rename tmp file into real path
 async fn pull_single_archive<'a>(
-    worker: &'a WorkerTask,
     reader: Arc<dyn PullReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     archive_info: &'a FileInfo,
@@ -745,11 +703,9 @@ async fn pull_single_archive<'a>(
 
     let mut pull_stats = PullStats::default();
 
-    task_log!(worker, "sync archive {}", archive_name);
+    info!("sync archive {archive_name}");
 
-    reader
-        .load_file_into(archive_name, &tmp_path, worker)
-        .await?;
+    reader.load_file_into(archive_name, &tmp_path).await?;
 
     let mut tmpfile = std::fs::OpenOptions::new().read(true).open(&tmp_path)?;
 
@@ -762,10 +718,9 @@ async fn pull_single_archive<'a>(
             verify_archive(archive_info, &csum, size)?;
 
             if reader.skip_chunk_sync(snapshot.datastore().name()) {
-                task_log!(worker, "skipping chunk sync for same datastore");
+                info!("skipping chunk sync for same datastore");
             } else {
                 let stats = pull_index_chunks(
-                    worker,
                     reader.chunk_reader(archive_info.crypt_mode),
                     snapshot.datastore().clone(),
                     index,
@@ -783,10 +738,9 @@ async fn pull_single_archive<'a>(
             verify_archive(archive_info, &csum, size)?;
 
             if reader.skip_chunk_sync(snapshot.datastore().name()) {
-                task_log!(worker, "skipping chunk sync for same datastore");
+                info!("skipping chunk sync for same datastore");
             } else {
                 let stats = pull_index_chunks(
-                    worker,
                     reader.chunk_reader(archive_info.crypt_mode),
                     snapshot.datastore().clone(),
                     index,
@@ -818,7 +772,6 @@ async fn pull_single_archive<'a>(
 /// -- if not, pull it from the remote
 /// - Download log if not already existing
 async fn pull_snapshot<'a>(
-    worker: &'a WorkerTask,
     reader: Arc<dyn PullReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
@@ -834,7 +787,7 @@ async fn pull_snapshot<'a>(
     tmp_manifest_name.set_extension("tmp");
     let tmp_manifest_blob;
     if let Some(data) = reader
-        .load_file_into(MANIFEST_BLOB_NAME, &tmp_manifest_name, worker)
+        .load_file_into(MANIFEST_BLOB_NAME, &tmp_manifest_name)
         .await?
     {
         tmp_manifest_blob = data;
@@ -857,11 +810,9 @@ async fn pull_snapshot<'a>(
 
         if manifest_blob.raw_data() == tmp_manifest_blob.raw_data() {
             if !client_log_name.exists() {
-                reader
-                    .try_download_client_log(&client_log_name, worker)
-                    .await?;
+                reader.try_download_client_log(&client_log_name).await?;
             };
-            task_log!(worker, "no data changes");
+            info!("no data changes");
             let _ = std::fs::remove_file(&tmp_manifest_name);
             return Ok(pull_stats); // nothing changed
         }
@@ -881,7 +832,7 @@ async fn pull_snapshot<'a>(
                     match manifest.verify_file(&item.filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
-                            task_log!(worker, "detected changed file {:?} - {}", path, err);
+                            info!("detected changed file {path:?} - {err}");
                         }
                     }
                 }
@@ -891,7 +842,7 @@ async fn pull_snapshot<'a>(
                     match manifest.verify_file(&item.filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
-                            task_log!(worker, "detected changed file {:?} - {}", path, err);
+                            info!("detected changed file {path:?} - {err}");
                         }
                     }
                 }
@@ -901,21 +852,15 @@ async fn pull_snapshot<'a>(
                     match manifest.verify_file(&item.filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
-                            task_log!(worker, "detected changed file {:?} - {}", path, err);
+                            info!("detected changed file {path:?} - {err}");
                         }
                     }
                 }
             }
         }
 
-        let stats = pull_single_archive(
-            worker,
-            reader.clone(),
-            snapshot,
-            item,
-            downloaded_chunks.clone(),
-        )
-        .await?;
+        let stats =
+            pull_single_archive(reader.clone(), snapshot, item, downloaded_chunks.clone()).await?;
         pull_stats.add(stats);
     }
 
@@ -924,9 +869,7 @@ async fn pull_snapshot<'a>(
     }
 
     if !client_log_name.exists() {
-        reader
-            .try_download_client_log(&client_log_name, worker)
-            .await?;
+        reader.try_download_client_log(&client_log_name).await?;
     };
     snapshot
         .cleanup_unreferenced_files(&manifest)
@@ -940,7 +883,6 @@ async fn pull_snapshot<'a>(
 /// The `reader` is configured to read from the source backup directory, while the
 /// `snapshot` is pointing to the local datastore and target namespace.
 async fn pull_snapshot_from<'a>(
-    worker: &'a WorkerTask,
     reader: Arc<dyn PullReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
@@ -950,27 +892,27 @@ async fn pull_snapshot_from<'a>(
         .create_locked_backup_dir(snapshot.backup_ns(), snapshot.as_ref())?;
 
     let pull_stats = if is_new {
-        task_log!(worker, "sync snapshot {}", snapshot.dir());
+        info!("sync snapshot {}", snapshot.dir());
 
-        match pull_snapshot(worker, reader, snapshot, downloaded_chunks).await {
+        match pull_snapshot(reader, snapshot, downloaded_chunks).await {
             Err(err) => {
                 if let Err(cleanup_err) = snapshot.datastore().remove_backup_dir(
                     snapshot.backup_ns(),
                     snapshot.as_ref(),
                     true,
                 ) {
-                    task_log!(worker, "cleanup error - {}", cleanup_err);
+                    info!("cleanup error - {cleanup_err}");
                 }
                 return Err(err);
             }
             Ok(pull_stats) => {
-                task_log!(worker, "sync snapshot {} done", snapshot.dir());
+                info!("sync snapshot {} done", snapshot.dir());
                 pull_stats
             }
         }
     } else {
-        task_log!(worker, "re-sync snapshot {}", snapshot.dir());
-        pull_snapshot(worker, reader, snapshot, downloaded_chunks).await?
+        info!("re-sync snapshot {}", snapshot.dir());
+        pull_snapshot(reader, snapshot, downloaded_chunks).await?
     };
 
     Ok(pull_stats)
@@ -1073,7 +1015,6 @@ impl std::fmt::Display for SkipInfo {
 /// - remote snapshot access is checked by remote (twice: query and opening the backup reader)
 /// - local group owner is already checked by pull_store
 async fn pull_group(
-    worker: &WorkerTask,
     params: &PullParameters,
     source_namespace: &BackupNamespace,
     group: &BackupGroup,
@@ -1084,7 +1025,7 @@ async fn pull_group(
 
     let mut raw_list: Vec<BackupDir> = params
         .source
-        .list_backup_dirs(source_namespace, group, worker)
+        .list_backup_dirs(source_namespace, group)
         .await?;
     raw_list.sort_unstable_by(|a, b| a.time.cmp(&b.time));
 
@@ -1113,7 +1054,7 @@ async fn pull_group(
                 already_synced_skip_info.update(dir.time);
                 return false;
             } else if already_synced_skip_info.count > 0 {
-                task_log!(worker, "{}", already_synced_skip_info);
+                info!("{already_synced_skip_info}");
                 already_synced_skip_info.reset();
                 return true;
             }
@@ -1122,7 +1063,7 @@ async fn pull_group(
                 transfer_last_skip_info.update(dir.time);
                 return false;
             } else if transfer_last_skip_info.count > 0 {
-                task_log!(worker, "{}", transfer_last_skip_info);
+                info!("{transfer_last_skip_info}");
                 transfer_last_skip_info.reset();
             }
             true
@@ -1147,11 +1088,10 @@ async fn pull_group(
             .source
             .reader(source_namespace, &from_snapshot)
             .await?;
-        let result =
-            pull_snapshot_from(worker, reader, &to_snapshot, downloaded_chunks.clone()).await;
+        let result = pull_snapshot_from(reader, &to_snapshot, downloaded_chunks.clone()).await;
 
         progress.done_snapshots = pos as u64 + 1;
-        task_log!(worker, "percentage done: {}", progress);
+        info!("percentage done: {progress}");
 
         let stats = result?; // stop on error
         pull_stats.add(stats);
@@ -1169,14 +1109,13 @@ async fn pull_group(
                 continue;
             }
             if snapshot.is_protected() {
-                task_log!(
-                    worker,
+                info!(
                     "don't delete vanished snapshot {} (protected)",
                     snapshot.dir()
                 );
                 continue;
             }
-            task_log!(worker, "delete vanished snapshot {}", snapshot.dir());
+            info!("delete vanished snapshot {}", snapshot.dir());
             params
                 .target
                 .store
@@ -1235,7 +1174,6 @@ fn check_and_remove_ns(params: &PullParameters, local_ns: &BackupNamespace) -> R
 }
 
 fn check_and_remove_vanished_ns(
-    worker: &WorkerTask,
     params: &PullParameters,
     synced_ns: HashSet<BackupNamespace>,
 ) -> Result<(bool, RemovedVanishedStats), Error> {
@@ -1276,16 +1214,12 @@ fn check_and_remove_vanished_ns(
         }
         match check_and_remove_ns(params, &local_ns) {
             Ok(true) => {
-                task_log!(worker, "Removed namespace {local_ns}");
+                info!("Removed namespace {local_ns}");
                 removed_stats.namespaces += 1;
             }
-            Ok(false) => task_log!(
-                worker,
-                "Did not remove namespace {} - protected snapshots remain",
-                local_ns
-            ),
+            Ok(false) => info!("Did not remove namespace {local_ns} - protected snapshots remain"),
             Err(err) => {
-                task_log!(worker, "Failed to remove namespace {} - {}", local_ns, err);
+                info!("Failed to remove namespace {local_ns} - {err}");
                 errors = true;
             }
         }
@@ -1311,10 +1245,7 @@ fn check_and_remove_vanished_ns(
 /// - remote namespaces are filtered by remote
 /// - creation and removal of sub-NS checked here
 /// - access to sub-NS checked here
-pub(crate) async fn pull_store(
-    worker: &WorkerTask,
-    mut params: PullParameters,
-) -> Result<PullStats, Error> {
+pub(crate) async fn pull_store(mut params: PullParameters) -> Result<PullStats, Error> {
     // explicit create shared lock to prevent GC on newly created chunks
     let _shared_store_lock = params.target.store.try_shared_chunk_store_lock()?;
     let mut errors = false;
@@ -1323,10 +1254,7 @@ pub(crate) async fn pull_store(
     let mut namespaces = if params.source.get_ns().is_root() && old_max_depth == Some(0) {
         vec![params.source.get_ns()] // backwards compat - don't query remote namespaces!
     } else {
-        params
-            .source
-            .list_namespaces(&mut params.max_depth, worker)
-            .await?
+        params.source.list_namespaces(&mut params.max_depth).await?
     };
 
     let ns_layers_to_be_pulled = namespaces
@@ -1358,33 +1286,22 @@ pub(crate) async fn pull_store(
         let target_ns = namespace.map_prefix(&params.source.get_ns(), &params.target.ns)?;
         let target_store_ns_str = print_store_and_ns(params.target.store.name(), &target_ns);
 
-        task_log!(worker, "----");
-        task_log!(
-            worker,
-            "Syncing {} into {}",
-            source_store_ns_str,
-            target_store_ns_str
-        );
+        info!("----");
+        info!("Syncing {source_store_ns_str} into {target_store_ns_str}");
 
         synced_ns.insert(target_ns.clone());
 
         match check_and_create_ns(&params, &target_ns) {
-            Ok(true) => task_log!(worker, "Created namespace {}", target_ns),
+            Ok(true) => info!("Created namespace {target_ns}"),
             Ok(false) => {}
             Err(err) => {
-                task_log!(
-                    worker,
-                    "Cannot sync {} into {} - {}",
-                    source_store_ns_str,
-                    target_store_ns_str,
-                    err,
-                );
+                info!("Cannot sync {source_store_ns_str} into {target_store_ns_str} - {err}");
                 errors = true;
                 continue;
             }
         }
 
-        match pull_ns(worker, &namespace, &mut params).await {
+        match pull_ns(&namespace, &mut params).await {
             Ok((ns_progress, ns_pull_stats, ns_errors)) => {
                 errors |= ns_errors;
 
@@ -1393,29 +1310,23 @@ pub(crate) async fn pull_store(
                 if params.max_depth != Some(0) {
                     groups += ns_progress.done_groups;
                     snapshots += ns_progress.done_snapshots;
-                    task_log!(
-                        worker,
-                        "Finished syncing namespace {}, current progress: {} groups, {} snapshots",
-                        namespace,
-                        groups,
-                        snapshots,
+                    info!(
+                        "Finished syncing namespace {namespace}, current progress: {groups} groups, {snapshots} snapshots"
                     );
                 }
             }
             Err(err) => {
                 errors = true;
-                task_log!(
-                    worker,
-                    "Encountered errors while syncing namespace {} - {}",
+                info!(
+                    "Encountered errors while syncing namespace {} - {err}",
                     &namespace,
-                    err,
                 );
             }
         };
     }
 
     if params.remove_vanished {
-        let (has_errors, stats) = check_and_remove_vanished_ns(worker, &params, synced_ns)?;
+        let (has_errors, stats) = check_and_remove_vanished_ns(&params, synced_ns)?;
         errors |= has_errors;
         pull_stats.add(PullStats::from(stats));
     }
@@ -1440,7 +1351,6 @@ pub(crate) async fn pull_store(
 /// - remote namespaces are filtered by remote
 /// - owner check for vanished groups done here
 pub(crate) async fn pull_ns(
-    worker: &WorkerTask,
     namespace: &BackupNamespace,
     params: &mut PullParameters,
 ) -> Result<(StoreProgress, PullStats, bool), Error> {
@@ -1460,11 +1370,9 @@ pub(crate) async fn pull_ns(
         .into_iter()
         .filter(|group| group.apply_filters(&params.group_filter))
         .collect();
-    task_log!(
-        worker,
-        "found {} groups to sync (out of {} total)",
-        list.len(),
-        unfiltered_count
+    info!(
+        "found {} groups to sync (out of {unfiltered_count} total)",
+        list.len()
     );
 
     let mut errors = false;
@@ -1492,15 +1400,10 @@ pub(crate) async fn pull_ns(
             {
                 Ok(result) => result,
                 Err(err) => {
-                    task_log!(
-                        worker,
-                        "sync group {} failed - group lock failed: {}",
-                        &group,
-                        err
-                    );
+                    info!("sync group {} failed - group lock failed: {err}", &group);
                     errors = true;
                     // do not stop here, instead continue
-                    task_log!(worker, "create_locked_backup_group failed");
+                    info!("create_locked_backup_group failed");
                     continue;
                 }
             };
@@ -1508,19 +1411,16 @@ pub(crate) async fn pull_ns(
         // permission check
         if params.owner != owner {
             // only the owner is allowed to create additional snapshots
-            task_log!(
-                worker,
-                "sync group {} failed - owner check failed ({} != {})",
-                &group,
-                params.owner,
-                owner
+            info!(
+                "sync group {} failed - owner check failed ({} != {owner})",
+                &group, params.owner
             );
             errors = true; // do not stop here, instead continue
         } else {
-            match pull_group(worker, params, namespace, &group, &mut progress).await {
+            match pull_group(params, namespace, &group, &mut progress).await {
                 Ok(stats) => pull_stats.add(stats),
                 Err(err) => {
-                    task_log!(worker, "sync group {} failed - {}", &group, err,);
+                    info!("sync group {} failed - {err}", &group);
                     errors = true; // do not stop here, instead continue
                 }
             }
@@ -1542,7 +1442,7 @@ pub(crate) async fn pull_ns(
                 if !local_group.apply_filters(&params.group_filter) {
                     continue;
                 }
-                task_log!(worker, "delete vanished group '{local_group}'",);
+                info!("delete vanished group '{local_group}'");
                 let delete_stats_result = params
                     .target
                     .store
@@ -1551,10 +1451,7 @@ pub(crate) async fn pull_ns(
                 match delete_stats_result {
                     Ok(stats) => {
                         if !stats.all_removed() {
-                            task_log!(
-                                worker,
-                                "kept some protected snapshots of group '{local_group}'",
-                            );
+                            info!("kept some protected snapshots of group '{local_group}'");
                             pull_stats.add(PullStats::from(RemovedVanishedStats {
                                 snapshots: stats.removed_snapshots(),
                                 groups: 0,
@@ -1569,7 +1466,7 @@ pub(crate) async fn pull_ns(
                         }
                     }
                     Err(err) => {
-                        task_log!(worker, "{}", err);
+                        info!("{err}");
                         errors = true;
                     }
                 }
@@ -1577,7 +1474,7 @@ pub(crate) async fn pull_ns(
             Ok(())
         });
         if let Err(err) = result {
-            task_log!(worker, "error during cleanup: {}", err);
+            info!("error during cleanup: {err}");
             errors = true;
         };
     }

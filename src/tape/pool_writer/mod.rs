@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use anyhow::{bail, Error};
+use tracing::{info, warn};
 
-use proxmox_sys::{task_log, task_warn};
 use proxmox_uuid::Uuid;
 
 use pbs_datastore::{DataStore, SnapshotReader};
@@ -62,7 +62,6 @@ impl PoolWriter {
     pub fn new(
         mut pool: MediaPool,
         drive_name: &str,
-        worker: &WorkerTask,
         notification_mode: TapeNotificationMode,
         force_media_set: bool,
         ns_magic: bool,
@@ -71,11 +70,11 @@ impl PoolWriter {
 
         let new_media_set_reason = pool.start_write_session(current_time, force_media_set)?;
         if let Some(reason) = new_media_set_reason {
-            task_log!(worker, "starting new media set - reason: {}", reason,);
+            info!("starting new media set - reason: {reason}");
         }
 
         let media_set_uuid = pool.current_media_set().uuid();
-        task_log!(worker, "media set uuid: {}", media_set_uuid);
+        info!("media set uuid: {media_set_uuid}");
 
         let mut catalog_set = CatalogSet::new();
 
@@ -130,7 +129,7 @@ impl PoolWriter {
     }
 
     /// Eject media and drop PoolWriterState (close drive)
-    pub fn eject_media(&mut self, worker: &WorkerTask) -> Result<(), Error> {
+    pub fn eject_media(&mut self) -> Result<(), Error> {
         let mut status = match self.status.take() {
             Some(status) => status,
             None => return Ok(()), // no media loaded
@@ -139,13 +138,13 @@ impl PoolWriter {
         let (drive_config, _digest) = pbs_config::drive::config()?;
 
         if let Some((mut changer, _)) = media_changer(&drive_config, &self.drive_name)? {
-            task_log!(worker, "eject media");
+            info!("eject media");
             status.drive.eject_media()?; // rewind and eject early, so that unload_media is faster
             drop(status); // close drive
-            task_log!(worker, "unload media");
+            info!("unload media");
             changer.unload_media(None)?; //eject and unload
         } else {
-            task_log!(worker, "standalone drive - ejecting media");
+            info!("standalone drive - ejecting media");
             status.drive.eject_media()?;
         }
 
@@ -153,14 +152,14 @@ impl PoolWriter {
     }
 
     /// Export current media set and drop PoolWriterState (close drive)
-    pub fn export_media_set(&mut self, worker: &WorkerTask) -> Result<(), Error> {
+    pub fn export_media_set(&mut self) -> Result<(), Error> {
         let mut status = self.status.take();
 
         let (drive_config, _digest) = pbs_config::drive::config()?;
 
         if let Some((mut changer, _)) = media_changer(&drive_config, &self.drive_name)? {
             if let Some(ref mut status) = status {
-                task_log!(worker, "rewind media");
+                info!("rewind media");
                 // rewind first so that the unload command later does not run into a timeout
                 status.drive.rewind()?;
             }
@@ -170,25 +169,15 @@ impl PoolWriter {
                 let media = self.pool.lookup_media(media_uuid)?;
                 let label_text = media.label_text();
                 if let Some(slot) = changer.export_media(label_text)? {
-                    task_log!(
-                        worker,
-                        "exported media '{}' to import/export slot {}",
-                        label_text,
-                        slot
-                    );
+                    info!("exported media '{label_text}' to import/export slot {slot}");
                 } else {
-                    task_warn!(
-                        worker,
-                        "export failed - media '{}' is not online or in different drive",
-                        label_text
+                    warn!(
+                        "export failed - media '{label_text}' is not online or in different drive"
                     );
                 }
             }
         } else if let Some(mut status) = status {
-            task_log!(
-                worker,
-                "standalone drive - ejecting media instead of export"
-            );
+            info!("standalone drive - ejecting media instead of export");
             status.drive.eject_media()?;
         }
 
@@ -238,11 +227,7 @@ impl PoolWriter {
             return Ok(media_uuid);
         }
 
-        task_log!(
-            worker,
-            "allocated new writable media '{}'",
-            media.label_text()
-        );
+        info!("allocated new writable media '{}'", media.label_text());
 
         if let Some(PoolWriterState { mut drive, .. }) = self.status.take() {
             if let Some(uuid) = &last_media_uuid {
@@ -252,7 +237,7 @@ impl PoolWriter {
                         .set_media_bytes_used(uuid, Some(stats.total_used_native_capacity))?;
                 }
 
-                task_log!(worker, "eject current media");
+                info!("eject current media");
                 drive.eject_media()?;
             }
         }
@@ -270,7 +255,7 @@ impl PoolWriter {
         // test for critical tape alert flags
         if let Ok(alert_flags) = drive.tape_alert_flags() {
             if !alert_flags.is_empty() {
-                task_log!(worker, "TapeAlertFlags: {:?}", alert_flags);
+                info!("TapeAlertFlags: {alert_flags:?}");
                 if tape_alert_flags_critical(alert_flags) {
                     self.pool.set_media_status_damaged(&media_uuid)?;
                     bail!(
@@ -281,20 +266,15 @@ impl PoolWriter {
             }
         }
 
-        let (catalog, is_new_media) = update_media_set_label(
-            worker,
-            drive.as_mut(),
-            old_media_id.media_set_label,
-            media.id(),
-        )?;
+        let (catalog, is_new_media) =
+            update_media_set_label(drive.as_mut(), old_media_id.media_set_label, media.id())?;
 
         self.catalog_set.lock().unwrap().append_catalog(catalog)?;
 
         let media_set = media.media_set_label().unwrap();
 
         if is_new_media && media_set.seq_nr >= MEDIA_SET_SEQ_NR_WARN_LIMIT {
-            task_warn!(
-                worker,
+            warn!(
                 "large media-set detected ({}), consider using a different allocation policy",
                 media_set.seq_nr
             );
@@ -311,7 +291,7 @@ impl PoolWriter {
 
         if is_new_media {
             // add catalogs from previous media
-            self.append_media_set_catalogs(worker)?;
+            self.append_media_set_catalogs()?;
         }
 
         self.used_tapes.insert(media_uuid.clone());
@@ -331,12 +311,12 @@ impl PoolWriter {
     // Check it tape is loaded, then move to EOM (if not already there)
     //
     // Returns the tape position at EOM.
-    fn prepare_tape_write(status: &mut PoolWriterState, worker: &WorkerTask) -> Result<u64, Error> {
+    fn prepare_tape_write(status: &mut PoolWriterState) -> Result<u64, Error> {
         if !status.at_eom {
-            task_log!(worker, "moving to end of media");
+            info!("moving to end of media");
             status.drive.move_to_eom(true)?;
             status.at_eom = true;
-            task_log!(worker, "arrived at end of media");
+            info!("arrived at end of media");
         }
 
         let current_file_number = status.drive.current_file_number()?;
@@ -357,7 +337,7 @@ impl PoolWriter {
     /// on the media (return value 'Ok(false, _)'). In that case, the
     /// archive is marked incomplete. The caller should mark the media
     /// as full and try again using another media.
-    pub fn append_catalog_archive(&mut self, worker: &WorkerTask) -> Result<bool, Error> {
+    pub fn append_catalog_archive(&mut self) -> Result<bool, Error> {
         let catalog_magic = self.catalog_version();
 
         let status = match self.status {
@@ -365,7 +345,7 @@ impl PoolWriter {
             None => bail!("PoolWriter - no media loaded"),
         };
 
-        Self::prepare_tape_write(status, worker)?;
+        Self::prepare_tape_write(status)?;
 
         let catalog_set = self.catalog_set.lock().unwrap();
 
@@ -408,7 +388,7 @@ impl PoolWriter {
     }
 
     // Append catalogs for all previous media in set (without last)
-    fn append_media_set_catalogs(&mut self, worker: &WorkerTask) -> Result<(), Error> {
+    fn append_media_set_catalogs(&mut self) -> Result<(), Error> {
         let media_set = self.pool.current_media_set();
 
         let mut media_list = media_set.media_list();
@@ -424,7 +404,7 @@ impl PoolWriter {
             None => bail!("PoolWriter - no media loaded"),
         };
 
-        Self::prepare_tape_write(status, worker)?;
+        Self::prepare_tape_write(status)?;
 
         for (seq_nr, uuid) in media_list.iter().enumerate() {
             let uuid = match uuid {
@@ -436,7 +416,7 @@ impl PoolWriter {
 
             let mut file = Self::open_catalog_file(uuid)?;
 
-            task_log!(worker, "write catalog for previous media: {}", uuid);
+            info!("write catalog for previous media: {uuid}");
 
             if tape_write_catalog(
                 writer.as_mut(),
@@ -467,7 +447,6 @@ impl PoolWriter {
     /// media.
     pub fn append_snapshot_archive(
         &mut self,
-        worker: &WorkerTask,
         snapshot_reader: &SnapshotReader,
     ) -> Result<(bool, usize), Error> {
         let status = match self.status {
@@ -475,7 +454,7 @@ impl PoolWriter {
             None => bail!("PoolWriter - no media loaded"),
         };
 
-        let current_file_number = Self::prepare_tape_write(status, worker)?;
+        let current_file_number = Self::prepare_tape_write(status)?;
 
         let (done, bytes_written) = {
             let mut writer: Box<dyn TapeWrite> = status.drive.write_file()?;
@@ -521,7 +500,7 @@ impl PoolWriter {
             None => bail!("PoolWriter - no media loaded"),
         };
 
-        let current_file_number = Self::prepare_tape_write(status, worker)?;
+        let current_file_number = Self::prepare_tape_write(status)?;
 
         let writer = status.drive.write_file()?;
 
@@ -533,8 +512,7 @@ impl PoolWriter {
         status.bytes_written_after_sync += bytes_written;
 
         let elapsed = start_time.elapsed()?.as_secs_f64();
-        task_log!(
-            worker,
+        info!(
             "wrote {} chunks ({:.2} MB at {:.2} MB/s)",
             saved_chunks.len(),
             bytes_written as f64 / 1_000_000.0,
@@ -614,7 +592,7 @@ fn write_chunk_archive<'a>(
         }
 
         if writer.bytes_written() > max_size {
-            //task_log!(worker, "Chunk Archive max size reached, closing archive");
+            //info!("Chunk Archive max size reached, closing archive");
             break;
         }
     }
@@ -628,7 +606,6 @@ fn write_chunk_archive<'a>(
 // set label does not match the expected media set, overwrite the
 // media set label.
 fn update_media_set_label(
-    worker: &WorkerTask,
     drive: &mut dyn TapeDriver,
     old_set: Option<MediaSetLabel>,
     media_id: &MediaId,
@@ -657,7 +634,7 @@ fn update_media_set_label(
 
     let new_media = match old_set {
         None => {
-            task_log!(worker, "writing new media set label");
+            info!("writing new media set label");
             drive.write_media_set_label(new_set, key_config.as_ref())?;
             media_catalog = MediaCatalog::overwrite(TAPE_STATUS_DIR, media_id, false)?;
             true
@@ -681,8 +658,7 @@ fn update_media_set_label(
 
                 false
             } else {
-                task_log!(
-                    worker,
+                info!(
                     "writing new media set label (overwrite '{}/{}')",
                     media_set_label.uuid.to_string(),
                     media_set_label.seq_nr,

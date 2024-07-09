@@ -12,6 +12,7 @@ use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 use serde::Deserialize;
 use serde_json::Value;
+use tracing::info;
 
 use proxmox_sys::fs::{
     atomic_open_or_create_file, file_read_optional_string, lock_file, replace_file, CreateOptions,
@@ -19,7 +20,7 @@ use proxmox_sys::fs::{
 
 use proxmox_io::ReadExt;
 use proxmox_section_config::SectionConfigData;
-use proxmox_sys::{task_log, WorkerTaskContext};
+use proxmox_sys::WorkerTaskContext;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{Fingerprint, LtoTapeDrive, VirtualTapeDrive};
@@ -381,11 +382,9 @@ pub fn request_and_load_media(
 ) -> Result<(Box<dyn TapeDriver>, MediaId), Error> {
     let check_label = |handle: &mut dyn TapeDriver, uuid: &proxmox_uuid::Uuid| {
         if let Ok((Some(media_id), _)) = handle.read_label() {
-            task_log!(
-                worker,
+            info!(
                 "found media label {} ({})",
-                media_id.label.label_text,
-                media_id.label.uuid,
+                media_id.label.label_text, media_id.label.uuid,
             );
 
             if media_id.label.uuid == *uuid {
@@ -423,19 +422,15 @@ pub fn request_and_load_media(
                     let update_and_log_request_error =
                         |old: &mut TapeRequestError, new: TapeRequestError| -> Result<(), Error> {
                             if new != *old {
-                                task_log!(worker, "{}", new);
+                                info!("{new}");
                                 let (device_type, device) = if let Some(changer) = changer {
                                     ("changer", changer.as_str())
                                 } else {
                                     ("drive", drive)
                                 };
 
-                                task_log!(
-                                    worker,
-                                    "Please insert media '{}' into {} '{}'",
-                                    label_text,
-                                    device_type,
-                                    device
+                                info!(
+                                    "Please insert media '{label_text}' into {device_type} '{device}'"
                                 );
                                 send_load_media_notification(
                                     notification_mode,
@@ -460,19 +455,9 @@ pub fn request_and_load_media(
                                 std::thread::sleep(std::time::Duration::from_millis(100));
                             }
                         } else if drive_config.changer.is_none() {
-                            task_log!(
-                                worker,
-                                "Checking for media '{}' in drive '{}'",
-                                label_text,
-                                drive
-                            );
+                            info!("Checking for media '{label_text}' in drive '{drive}'");
                         } else {
-                            task_log!(
-                                worker,
-                                "trying to load media '{}' into drive '{}'",
-                                label_text,
-                                drive
-                            );
+                            info!("trying to load media '{label_text}' into drive '{drive}'");
                         }
 
                         if drive_config.changer.is_some() {
@@ -499,8 +484,7 @@ pub fn request_and_load_media(
 
                         let request_error = match handle.read_label() {
                             Ok((Some(media_id), _)) if media_id.label.uuid == label.uuid => {
-                                task_log!(
-                                    worker,
+                                info!(
                                     "found media label {} ({})",
                                     media_id.label.label_text,
                                     media_id.label.uuid.to_string(),

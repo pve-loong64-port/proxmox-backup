@@ -5,8 +5,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::{bail, format_err, Error};
+use tracing::{error, info};
 
-use proxmox_sys::{task_log, WorkerTaskContext};
+use proxmox_sys::WorkerTaskContext;
 
 use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, Authid, BackupNamespace, BackupType, CryptMode,
@@ -69,11 +70,7 @@ fn verify_blob(backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
     }
 }
 
-fn rename_corrupted_chunk(
-    datastore: Arc<DataStore>,
-    digest: &[u8; 32],
-    worker: &dyn WorkerTaskContext,
-) {
+fn rename_corrupted_chunk(datastore: Arc<DataStore>, digest: &[u8; 32]) {
     let (path, digest_str) = datastore.chunk_path(digest);
 
     let mut counter = 0;
@@ -89,17 +86,12 @@ fn rename_corrupted_chunk(
 
     match std::fs::rename(&path, &new_path) {
         Ok(_) => {
-            task_log!(worker, "corrupted chunk renamed to {:?}", &new_path);
+            info!("corrupted chunk renamed to {:?}", &new_path);
         }
         Err(err) => {
             match err.kind() {
                 std::io::ErrorKind::NotFound => { /* ignored */ }
-                _ => task_log!(
-                    worker,
-                    "could not rename corrupted chunk {:?} - {}",
-                    &path,
-                    err
-                ),
+                _ => info!("could not rename corrupted chunk {:?} - {err}", &path),
             }
         }
     };
@@ -117,7 +109,6 @@ fn verify_index_chunks(
     let mut read_bytes = 0;
     let mut decoded_bytes = 0;
 
-    let worker2 = Arc::clone(&verify_worker.worker);
     let datastore2 = Arc::clone(&verify_worker.datastore);
     let corrupt_chunks2 = Arc::clone(&verify_worker.corrupt_chunks);
     let verified_chunks2 = Arc::clone(&verify_worker.verified_chunks);
@@ -130,7 +121,7 @@ fn verify_index_chunks(
             let chunk_crypt_mode = match chunk.crypt_mode() {
                 Err(err) => {
                     corrupt_chunks2.lock().unwrap().insert(digest);
-                    task_log!(worker2, "can't verify chunk, unknown CryptMode - {}", err);
+                    info!("can't verify chunk, unknown CryptMode - {err}");
                     errors2.fetch_add(1, Ordering::SeqCst);
                     return Ok(());
                 }
@@ -138,20 +129,17 @@ fn verify_index_chunks(
             };
 
             if chunk_crypt_mode != crypt_mode {
-                task_log!(
-                    worker2,
-                    "chunk CryptMode {:?} does not match index CryptMode {:?}",
-                    chunk_crypt_mode,
-                    crypt_mode
+                info!(
+                    "chunk CryptMode {chunk_crypt_mode:?} does not match index CryptMode {crypt_mode:?}"
                 );
                 errors2.fetch_add(1, Ordering::SeqCst);
             }
 
             if let Err(err) = chunk.verify_unencrypted(size as usize, &digest) {
                 corrupt_chunks2.lock().unwrap().insert(digest);
-                task_log!(worker2, "{}", err);
+                info!("{err}");
                 errors2.fetch_add(1, Ordering::SeqCst);
-                rename_corrupted_chunk(datastore2.clone(), &digest, &worker2);
+                rename_corrupted_chunk(datastore2.clone(), &digest);
             } else {
                 verified_chunks2.lock().unwrap().insert(digest);
             }
@@ -175,11 +163,7 @@ fn verify_index_chunks(
             .contains(digest)
         {
             let digest_str = hex::encode(digest);
-            task_log!(
-                verify_worker.worker,
-                "chunk {} was marked as corrupt",
-                digest_str
-            );
+            info!("chunk {digest_str} was marked as corrupt");
             errors.fetch_add(1, Ordering::SeqCst);
             true
         } else {
@@ -218,17 +202,9 @@ fn verify_index_chunks(
                     .lock()
                     .unwrap()
                     .insert(info.digest);
-                task_log!(
-                    verify_worker.worker,
-                    "can't verify chunk, load failed - {}",
-                    err
-                );
+                error!("can't verify chunk, load failed - {err}");
                 errors.fetch_add(1, Ordering::SeqCst);
-                rename_corrupted_chunk(
-                    verify_worker.datastore.clone(),
-                    &info.digest,
-                    &verify_worker.worker,
-                );
+                rename_corrupted_chunk(verify_worker.datastore.clone(), &info.digest);
             }
             Ok(chunk) => {
                 let size = info.size();
@@ -251,15 +227,8 @@ fn verify_index_chunks(
 
     let error_count = errors.load(Ordering::SeqCst);
 
-    task_log!(
-        verify_worker.worker,
-        "  verified {:.2}/{:.2} MiB in {:.2} seconds, speed {:.2}/{:.2} MiB/s ({} errors)",
-        read_bytes_mib,
-        decoded_bytes_mib,
-        elapsed,
-        read_speed,
-        decode_speed,
-        error_count,
+    info!(
+        "  verified {read_bytes_mib:.2}/{decoded_bytes_mib:.2} MiB in {elapsed:.2} seconds, speed {read_speed:.2}/{decode_speed:.2} MiB/s ({error_count} errors)"
     );
 
     if errors.load(Ordering::SeqCst) > 0 {
@@ -329,8 +298,7 @@ pub fn verify_backup_dir(
     filter: Option<&dyn Fn(&BackupManifest) -> bool>,
 ) -> Result<bool, Error> {
     if !backup_dir.full_path().exists() {
-        task_log!(
-            verify_worker.worker,
+        info!(
             "SKIPPED: verify {}:{} - snapshot does not exist (anymore).",
             verify_worker.datastore.name(),
             backup_dir.dir(),
@@ -348,8 +316,7 @@ pub fn verify_backup_dir(
             verify_backup_dir_with_lock(verify_worker, backup_dir, upid, filter, snap_lock)
         }
         Err(err) => {
-            task_log!(
-                verify_worker.worker,
+            info!(
                 "SKIPPED: verify {}:{} - could not acquire snapshot lock: {}",
                 verify_worker.datastore.name(),
                 backup_dir.dir(),
@@ -371,8 +338,7 @@ pub fn verify_backup_dir_with_lock(
     let manifest = match backup_dir.load_manifest() {
         Ok((manifest, _)) => manifest,
         Err(err) => {
-            task_log!(
-                verify_worker.worker,
+            info!(
                 "verify {}:{} - manifest load error: {}",
                 verify_worker.datastore.name(),
                 backup_dir.dir(),
@@ -384,8 +350,7 @@ pub fn verify_backup_dir_with_lock(
 
     if let Some(filter) = filter {
         if !filter(&manifest) {
-            task_log!(
-                verify_worker.worker,
+            info!(
                 "SKIPPED: verify {}:{} (recently verified)",
                 verify_worker.datastore.name(),
                 backup_dir.dir(),
@@ -394,8 +359,7 @@ pub fn verify_backup_dir_with_lock(
         }
     }
 
-    task_log!(
-        verify_worker.worker,
+    info!(
         "verify {}:{}",
         verify_worker.datastore.name(),
         backup_dir.dir()
@@ -406,7 +370,7 @@ pub fn verify_backup_dir_with_lock(
     let mut verify_result = VerifyState::Ok;
     for info in manifest.files() {
         let result = proxmox_lang::try_block!({
-            task_log!(verify_worker.worker, "  check {}", info.filename);
+            info!("  check {}", info.filename);
             match archive_type(&info.filename)? {
                 ArchiveType::FixedIndex => verify_fixed_index(verify_worker, backup_dir, info),
                 ArchiveType::DynamicIndex => verify_dynamic_index(verify_worker, backup_dir, info),
@@ -418,8 +382,7 @@ pub fn verify_backup_dir_with_lock(
         verify_worker.worker.fail_on_shutdown()?;
 
         if let Err(err) = result {
-            task_log!(
-                verify_worker.worker,
+            info!(
                 "verify {}:{}/{} failed: {}",
                 verify_worker.datastore.name(),
                 backup_dir.dir(),
@@ -463,8 +426,7 @@ pub fn verify_backup_group(
     let mut list = match group.list_backups() {
         Ok(list) => list,
         Err(err) => {
-            task_log!(
-                verify_worker.worker,
+            info!(
                 "verify {}, group {} - unable to list backups: {}",
                 print_store_and_ns(verify_worker.datastore.name(), group.backup_ns()),
                 group.group(),
@@ -475,8 +437,7 @@ pub fn verify_backup_group(
     };
 
     let snapshot_count = list.len();
-    task_log!(
-        verify_worker.worker,
+    info!(
         "verify group {}:{} ({} snapshots)",
         verify_worker.datastore.name(),
         group.group(),
@@ -494,9 +455,8 @@ pub fn verify_backup_group(
             ));
         }
         progress.done_snapshots = pos as u64 + 1;
-        task_log!(verify_worker.worker, "percentage done: {}", progress);
+        info!("percentage done: {progress}");
     }
-
     Ok(errors)
 }
 
@@ -516,16 +476,11 @@ pub fn verify_all_backups(
     filter: Option<&dyn Fn(&BackupManifest) -> bool>,
 ) -> Result<Vec<String>, Error> {
     let mut errors = Vec::new();
-    let worker = Arc::clone(&verify_worker.worker);
 
-    task_log!(
-        worker,
-        "verify datastore {}",
-        verify_worker.datastore.name()
-    );
+    info!("verify datastore {}", verify_worker.datastore.name());
 
     let owner_filtered = if let Some(owner) = &owner {
-        task_log!(worker, "limiting to backups owned by {}", owner);
+        info!("limiting to backups owned by {owner}");
         true
     } else {
         false
@@ -553,7 +508,7 @@ pub fn verify_all_backups(
                 }
                 Err(err) => {
                     // we don't filter by owner, but we want to log the error
-                    task_log!(worker, "error on iterating groups in ns '{ns}' - {err}");
+                    info!("error on iterating groups in ns '{ns}' - {err}");
                     errors.push(err.to_string());
                     None
                 }
@@ -563,7 +518,7 @@ pub fn verify_all_backups(
             })
             .collect::<Vec<BackupGroup>>(),
         Err(err) => {
-            task_log!(worker, "unable to list backups: {}", err,);
+            info!("unable to list backups: {err}");
             return Ok(errors);
         }
     };
@@ -571,7 +526,7 @@ pub fn verify_all_backups(
     list.sort_unstable_by(|a, b| a.group().cmp(b.group()));
 
     let group_count = list.len();
-    task_log!(worker, "found {} groups", group_count);
+    info!("found {group_count} groups");
 
     let mut progress = StoreProgress::new(group_count as u64);
 

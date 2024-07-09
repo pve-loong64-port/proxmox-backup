@@ -7,24 +7,25 @@ extern crate tokio;
 
 use proxmox_lang::try_block;
 use proxmox_sys::fs::CreateOptions;
-use proxmox_sys::{task_log, WorkerTaskContext};
+use proxmox_sys::WorkerTaskContext;
 
 use pbs_api_types::{Authid, UPID};
 
 use proxmox_rest_server::{CommandSocket, WorkerTask};
+use tracing::info;
 
 fn garbage_collection(worker: &WorkerTask) -> Result<(), Error> {
-    task_log!(worker, "start garbage collection");
+    info!("start garbage collection");
 
     for i in 0..50 {
         worker.check_abort()?;
 
-        task_log!(worker, "progress {}", i);
+        info!("progress {i}");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
-    task_log!(worker, "end garbage collection");
+    info!("end garbage collection");
 
     Ok(())
 }
