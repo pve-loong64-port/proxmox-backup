@@ -1,5 +1,7 @@
 //! The Proxmox Backup Server API
 
+use std::future::Future;
+
 use proxmox_sortable_macro::sortable;
 
 pub mod access;
@@ -36,3 +38,21 @@ const SUBDIRS: SubdirMap = &sorted!([
 pub const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))
     .subdirs(SUBDIRS);
+
+#[derive(Clone)]
+struct ExecInheritLogContext;
+
+impl<Fut> hyper::rt::Executor<Fut> for ExecInheritLogContext
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send,
+{
+    fn execute(&self, fut: Fut) {
+        use proxmox_log::LogContext;
+
+        match LogContext::current() {
+            None => tokio::spawn(fut),
+            Some(context) => tokio::spawn(context.scope(fut)),
+        };
+    }
+}

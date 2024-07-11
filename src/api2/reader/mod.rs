@@ -9,12 +9,14 @@ use hyper::{Body, Request, Response, StatusCode};
 use serde::Deserialize;
 use serde_json::Value;
 
+use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
     Router, RpcEnvironment, SubdirMap,
 };
 use proxmox_schema::{BooleanSchema, ObjectSchema};
 use proxmox_sortable_macro::sortable;
+use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
     Authid, Operation, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
@@ -26,11 +28,10 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{archive_type, ArchiveType};
 use pbs_datastore::{DataStore, PROXMOX_BACKUP_READER_PROTOCOL_ID_V1};
 use pbs_tools::json::required_string_param;
-use proxmox_rest_server::{H2Service, WorkerTask};
-use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use crate::api2::backup::optional_ns_param;
 use crate::api2::helpers;
+use crate::api2::ExecInheritLogContext;
 
 mod environment;
 use environment::*;
@@ -183,7 +184,8 @@ fn upgrade_to_backup_reader_protocol(
                     let conn = hyper::upgrade::on(Request::from_parts(parts, req_body)).await?;
                     env2.debug("protocol upgrade done");
 
-                    let mut http = hyper::server::conn::Http::new();
+                    let mut http =
+                        hyper::server::conn::Http::new().with_executor(ExecInheritLogContext);
                     http.http2_only(true);
                     // increase window size: todo - find optiomal size
                     let window_size = 32 * 1024 * 1024; // max = (1 << 31) - 2

@@ -9,12 +9,14 @@ use hyper::{Body, Request, Response, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{http_err, list_subdirs_api_method};
 use proxmox_router::{
     ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
+use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
     Authid, BackupNamespace, BackupType, Operation, SnapshotVerifyState, VerifyState,
@@ -26,8 +28,8 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{archive_type, ArchiveType};
 use pbs_datastore::{DataStore, PROXMOX_BACKUP_PROTOCOL_ID_V1};
 use pbs_tools::json::{required_array_param, required_integer_param, required_string_param};
-use proxmox_rest_server::{H2Service, WorkerTask};
-use proxmox_sys::fs::lock_dir_noblock_shared;
+
+use crate::api2::ExecInheritLogContext;
 
 mod environment;
 use environment::*;
@@ -234,7 +236,8 @@ fn upgrade_to_backup_protocol(
                     .and_then(move |conn| {
                         env2.debug("protocol upgrade done");
 
-                        let mut http = hyper::server::conn::Http::new();
+                        let mut http = hyper::server::conn::Http::new()
+                            .with_executor(ExecInheritLogContext);
                         http.http2_only(true);
                         // increase window size: todo - find optiomal size
                         let window_size = 32 * 1024 * 1024; // max = (1 << 31) - 2
