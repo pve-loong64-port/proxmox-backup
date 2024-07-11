@@ -252,7 +252,7 @@ proxmox-rrd.workspace = true
 [patch.crates-io]
 
 #proxmox-apt = { path = "../proxmox/proxmox-apt" }
-#proxmox-apt-api = { path = "../proxmox/proxmox-apt-api-types" }
+#proxmox-apt-api-types = { path = "../proxmox/proxmox-apt-api-types" }
 #proxmox-async = { path = "../proxmox/proxmox-async" }
 #proxmox-auth-api = { path = "../proxmox/proxmox-auth-api" }
 #proxmox-borrow = { path = "../proxmox/proxmox-borrow" }
