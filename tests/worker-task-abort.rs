@@ -1,18 +1,12 @@
 use anyhow::{bail, Error};
-
-extern crate proxmox_backup;
-
-extern crate nix;
-extern crate tokio;
+use tracing::info;
 
 use proxmox_lang::try_block;
+use proxmox_rest_server::{CommandSocket, WorkerTask};
 use proxmox_sys::fs::CreateOptions;
-use proxmox_sys::WorkerTaskContext;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{Authid, UPID};
-
-use proxmox_rest_server::{CommandSocket, WorkerTask};
-use tracing::info;
 
 fn garbage_collection(worker: &WorkerTask) -> Result<(), Error> {
     info!("start garbage collection");

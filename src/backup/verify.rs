@@ -1,13 +1,14 @@
-use nix::dir::Dir;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::{bail, format_err, Error};
+use nix::dir::Dir;
 use tracing::{error, info};
 
-use proxmox_sys::WorkerTaskContext;
+use proxmox_sys::fs::lock_dir_noblock_shared;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, Authid, BackupNamespace, BackupType, CryptMode,
@@ -17,7 +18,6 @@ use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{archive_type, ArchiveType, BackupManifest, FileInfo};
 use pbs_datastore::{DataBlob, DataStore, StoreProgress};
-use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use crate::tools::parallel_handler::ParallelHandler;
 

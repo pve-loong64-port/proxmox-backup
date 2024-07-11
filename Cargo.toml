@@ -70,7 +70,7 @@ proxmox-ldap = "0.2.1"
 proxmox-metrics = "0.3.1"
 proxmox-notify = "0.4"
 proxmox-openid = "0.10.0"
-proxmox-rest-server = { version = "0.5.1", features = [ "templates" ] }
+proxmox-rest-server = { version = "0.6", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "2.0.0", default-features = false }
 proxmox-rrd = { version = "0.2" }
@@ -81,10 +81,11 @@ proxmox-serde = "0.1.1"
 proxmox-shared-memory = "0.3.0"
 proxmox-sortable-macro = "0.1.2"
 proxmox-subscription = { version = "0.4.2", features = [ "api-types" ] }
-proxmox-sys = "0.5.7"
+proxmox-sys = "0.6"
 proxmox-tfa = { version = "5", features = [ "api", "api-types" ] }
 proxmox-time = "2"
 proxmox-uuid = "1"
+proxmox-worker-task = "0.1"
 
 # other proxmox crates
 pathpatterns = "0.3"
@@ -236,6 +237,7 @@ proxmox-sys = { workspace = true, features = [ "timer" ] }
 proxmox-tfa.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true
+proxmox-worker-task.workspace = true
 
 # in their respective repo
 pathpatterns.workspace = true
@@ -287,6 +289,7 @@ proxmox-rrd.workspace = true
 #proxmox-tfa = { path = "../proxmox/proxmox-tfa" }
 #proxmox-time = { path = "../proxmox/proxmox-time" }
 #proxmox-uuid = { path = "../proxmox/proxmox-uuid" }
+#proxmox-worker-task = { path = "../proxmox/proxmox-worker-task" }
 
 #proxmox-acme = { path = "../proxmox/proxmox-acme" }
 #pathpatterns = {path = "../pathpatterns" }

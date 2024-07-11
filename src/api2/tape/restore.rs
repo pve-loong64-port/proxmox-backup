@@ -10,12 +10,13 @@ use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::ReadExt;
+use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::{api, ApiType};
 use proxmox_section_config::SectionConfigData;
 use proxmox_sys::fs::{replace_file, CreateOptions};
-use proxmox_sys::WorkerTaskContext;
 use proxmox_uuid::Uuid;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     parse_ns_and_snapshot, print_ns_and_snapshot, Authid, BackupDir, BackupNamespace, CryptMode,
@@ -34,7 +35,6 @@ use pbs_datastore::{DataBlob, DataStore};
 use pbs_tape::{
     BlockReadError, MediaContentHeader, TapeRead, PROXMOX_BACKUP_CONTENT_HEADER_MAGIC_1_0,
 };
-use proxmox_rest_server::WorkerTask;
 
 use crate::backup::check_ns_modification_privs;
 use crate::tape::TapeNotificationMode;

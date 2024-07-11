@@ -28,14 +28,15 @@ pathpatterns.workspace = true
 pxar.workspace = true
 
 proxmox-borrow.workspace = true
-proxmox-io.workspace = true
 proxmox-human-byte.workspace = true
+proxmox-io.workspace = true
 proxmox-lang.workspace=true
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-serde = { workspace = true, features = [ "serde_json" ] }
+proxmox-sys.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true
-proxmox-sys.workspace = true
+proxmox-worker-task.workspace = true
 
 pbs-api-types.workspace = true
 pbs-buildcfg.workspace = true

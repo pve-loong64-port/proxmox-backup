@@ -5,9 +5,10 @@ use serde_json::Value;
 use tracing::{info, warn};
 
 use proxmox_lang::try_block;
+use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::api;
-use proxmox_sys::WorkerTaskContext;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, Authid, MediaPoolConfig, Operation,
@@ -18,7 +19,6 @@ use pbs_api_types::{
 use pbs_config::CachedUserInfo;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::{DataStore, StoreProgress};
-use proxmox_rest_server::WorkerTask;
 
 use crate::tape::TapeNotificationMode;
 use crate::{

@@ -16,7 +16,7 @@ use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::fs::{lock_dir_noblock, DirLockGuard};
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
-use proxmox_sys::WorkerTaskContext;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     Authid, BackupNamespace, BackupType, ChunkOrder, DataStoreConfig, DatastoreFSyncLevel,
@@ -145,7 +145,7 @@ impl DataStore {
     ) -> Result<Arc<DataStore>, Error> {
         // Avoid TOCTOU between checking maintenance mode and updating active operation counter, as
         // we use it to decide whether it is okay to delete the datastore.
-        let config_lock = pbs_config::datastore::lock_config()?;
+        let _config_lock = pbs_config::datastore::lock_config()?;
 
         // we could use the ConfigVersionCache's generation for staleness detection, but  we load
         // the config anyway -> just use digest, additional benefit: manual changes get detected

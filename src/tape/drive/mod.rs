@@ -1,10 +1,5 @@
 //! Tape drivers
 
-mod virtual_tape;
-
-mod lto;
-pub use lto::*;
-
 use std::path::PathBuf;
 
 use anyhow::{bail, format_err, Error};
@@ -14,18 +9,16 @@ use serde::Deserialize;
 use serde_json::Value;
 use tracing::info;
 
+use proxmox_io::ReadExt;
+use proxmox_section_config::SectionConfigData;
 use proxmox_sys::fs::{
     atomic_open_or_create_file, file_read_optional_string, lock_file, replace_file, CreateOptions,
 };
-
-use proxmox_io::ReadExt;
-use proxmox_section_config::SectionConfigData;
-use proxmox_sys::WorkerTaskContext;
 use proxmox_uuid::Uuid;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{Fingerprint, LtoTapeDrive, VirtualTapeDrive};
 use pbs_key_config::KeyConfig;
-
 use pbs_tape::{sg_tape::TapeAlertFlags, BlockReadError, MediaContentHeader, TapeRead, TapeWrite};
 
 use crate::tape::TapeNotificationMode;
@@ -41,6 +34,11 @@ use crate::{
         MediaId,
     },
 };
+
+mod virtual_tape;
+
+mod lto;
+pub use lto::*;
 
 /// Tape driver interface
 pub trait TapeDriver {
@@ -430,8 +428,8 @@ pub fn request_and_load_media(
                                 };
 
                                 info!(
-                                    "Please insert media '{label_text}' into {device_type} '{device}'"
-                                );
+                                "Please insert media '{label_text}' into {device_type} '{device}'"
+                            );
                                 send_load_media_notification(
                                     notification_mode,
                                     changer.is_some(),
