@@ -7,8 +7,8 @@ use http::request::Parts;
 use http::Response;
 use hyper::header;
 use hyper::{Body, StatusCode};
+use tracing::level_filters::LevelFilter;
 use tracing::{info, warn};
-use tracing_subscriber::filter::LevelFilter;
 use url::form_urlencoded;
 
 use openssl::ssl::SslAcceptor;

@@ -5,7 +5,7 @@ use anyhow::{bail, Error};
 use futures::*;
 use http::Response;
 use hyper::{Body, StatusCode};
-use tracing_subscriber::filter::LevelFilter;
+use tracing::level_filters::LevelFilter;
 
 use proxmox_lang::try_block;
 use proxmox_log::init_logger;

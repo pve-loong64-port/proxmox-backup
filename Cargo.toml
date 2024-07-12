@@ -150,7 +150,6 @@ tokio-openssl = "0.6.1"
 tokio-stream = "0.1.0"
 tokio-util = { version = "0.7", features = [ "io" ] }
 tracing = "0.1"
-tracing-subscriber = "0.3.16"
 tower-service = "0.3.0"
 udev = "0.4"
 url = "2.1"
@@ -199,7 +198,6 @@ tokio-openssl.workspace = true
 tokio-stream.workspace = true
 tokio-util = { workspace = true, features = [ "codec" ] }
 tracing.workspace = true
-tracing-subscriber.workspace = true
 tower-service.workspace = true
 udev.workspace = true
 url.workspace = true
