@@ -1,4 +1,4 @@
-//! Sync datastore from remote server
+//! Sync datastore by pulling contents from remote server
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Seek, Write};
