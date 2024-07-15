@@ -132,8 +132,8 @@ Ext.define('PBS.window.SyncJobEdit', {
 			name: 'schedule',
 			emptyText: gettext('none (disabled)'),
 			cbind: {
-				deleteEmpty: '{!isCreate}',
-				value: '{scheduleValue}',
+			    deleteEmpty: '{!isCreate}',
+			    value: '{scheduleValue}',
 			},
 		    },
 		    {
