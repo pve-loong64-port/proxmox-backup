@@ -1311,8 +1311,14 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<PullStats, 
                 if params.max_depth != Some(0) {
                     groups += ns_progress.done_groups;
                     snapshots += ns_progress.done_snapshots;
+
+                    let ns = if namespace.is_root() {
+                        "root namespace".into()
+                    } else {
+                        format!("namespace {namespace}")
+                    };
                     info!(
-                        "Finished syncing namespace {namespace}, current progress: {groups} groups, {snapshots} snapshots"
+                        "Finished syncing {ns}, current progress: {groups} groups, {snapshots} snapshots"
                     );
                 }
             }
