@@ -30,7 +30,7 @@ pub struct ChunkInfo {
 /// ".didx").
 ///
 pub struct DataBlob {
-    raw_data: Vec<u8>, // tagged, compressed, encryped data
+    raw_data: Vec<u8>, // tagged, compressed, encrypted data
 }
 
 impl DataBlob {
@@ -212,7 +212,7 @@ impl DataBlob {
             let data_start = std::mem::size_of::<DataBlobHeader>();
             let mut reader = &self.raw_data[data_start..];
             let data = zstd::stream::decode_all(&mut reader)?;
-            // zstd::block::decompress is abou 10% slower
+            // zstd::block::decompress is about 10% slower
             // let data = zstd::block::decompress(&self.raw_data[data_start..], MAX_BLOB_SIZE)?;
             if let Some(digest) = digest {
                 Self::verify_digest(&data, None, digest)?;
@@ -472,7 +472,7 @@ impl DataBlob {
 /// Builder for chunk DataBlobs
 ///
 /// Main purpose is to centralize digest computation. Digest
-/// computation differ for encryped chunk, and this interface ensures that
+/// computation differ for encrypted chunk, and this interface ensures that
 /// we always compute the correct one.
 pub struct DataChunkBuilder<'a, 'b> {
     config: Option<&'b CryptConfig>,
