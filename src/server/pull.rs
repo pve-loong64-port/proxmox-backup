@@ -503,6 +503,7 @@ pub(crate) struct PullParameters {
 
 impl PullParameters {
     /// Creates a new instance of `PullParameters`.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         store: &str,
         ns: BackupNamespace,
