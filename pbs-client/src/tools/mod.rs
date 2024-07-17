@@ -5,9 +5,11 @@ use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::FromRawFd;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use anyhow::{bail, format_err, Context, Error};
 use serde_json::{json, Value};
@@ -735,4 +737,28 @@ pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
     }
 
     Ok(entries)
+}
+
+/// Creates a temporary file (with `O_TMPFILE`) in `XDG_CACHE_HOME`. If we
+/// cannot create the file there it will be created in `/tmp` instead.
+pub fn create_tmp_file() -> std::io::Result<std::fs::File> {
+    static TMP_PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
+    let tmp_path = TMP_PATH.get_or_init(|| {
+        xdg::BaseDirectories::new()
+            .map(|base| base.get_cache_home())
+            .unwrap_or_else(|_| std::path::PathBuf::from("/tmp"))
+    });
+
+    let mut open_opts_binding = std::fs::OpenOptions::new();
+    let builder = open_opts_binding
+        .write(true)
+        .read(true)
+        .custom_flags(libc::O_TMPFILE);
+    builder.open(tmp_path).or_else(|err| {
+        if tmp_path != std::path::Path::new("/tmp") {
+            builder.open("/tmp")
+        } else {
+            Err(err)
+        }
+    })
 }

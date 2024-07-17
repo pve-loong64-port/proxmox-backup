@@ -1,7 +1,6 @@
 use anyhow::{format_err, Error};
 use std::fs::File;
 use std::io::{Seek, SeekFrom, Write};
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 
 use futures::future::AbortHandle;
@@ -141,18 +140,14 @@ impl BackupReader {
 
     /// Download a .blob file
     ///
-    /// This creates a temporary file in /tmp (using O_TMPFILE). The data is verified using
-    /// the provided manifest.
+    /// This creates a temporary file (See [`crate::tools::create_tmp_file`] for
+    /// details). The data is verified using the provided manifest.
     pub async fn download_blob(
         &self,
         manifest: &BackupManifest,
         name: &str,
     ) -> Result<DataBlobReader<'_, File>, Error> {
-        let mut tmpfile = std::fs::OpenOptions::new()
-            .write(true)
-            .read(true)
-            .custom_flags(libc::O_TMPFILE)
-            .open("/tmp")?;
+        let mut tmpfile = crate::tools::create_tmp_file()?;
 
         self.download(name, &mut tmpfile).await?;
 
@@ -167,18 +162,14 @@ impl BackupReader {
 
     /// Download dynamic index file
     ///
-    /// This creates a temporary file in /tmp (using O_TMPFILE). The index is verified using
-    /// the provided manifest.
+    /// This creates a temporary file (See [`crate::tools::create_tmp_file`] for
+    /// details). The index is verified using the provided manifest.
     pub async fn download_dynamic_index(
         &self,
         manifest: &BackupManifest,
         name: &str,
     ) -> Result<DynamicIndexReader, Error> {
-        let mut tmpfile = std::fs::OpenOptions::new()
-            .write(true)
-            .read(true)
-            .custom_flags(libc::O_TMPFILE)
-            .open("/tmp")?;
+        let mut tmpfile = crate::tools::create_tmp_file()?;
 
         self.download(name, &mut tmpfile).await?;
 
@@ -194,18 +185,14 @@ impl BackupReader {
 
     /// Download fixed index file
     ///
-    /// This creates a temporary file in /tmp (using O_TMPFILE). The index is verified using
-    /// the provided manifest.
+    /// This creates a temporary file (See [`crate::tools::create_tmp_file`] for
+    /// details). The index is verified using the provided manifest.
     pub async fn download_fixed_index(
         &self,
         manifest: &BackupManifest,
         name: &str,
     ) -> Result<FixedIndexReader, Error> {
-        let mut tmpfile = std::fs::OpenOptions::new()
-            .write(true)
-            .read(true)
-            .custom_flags(libc::O_TMPFILE)
-            .open("/tmp")?;
+        let mut tmpfile = crate::tools::create_tmp_file()?;
 
         self.download(name, &mut tmpfile).await?;
 

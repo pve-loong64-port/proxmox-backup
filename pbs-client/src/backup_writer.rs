@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::future::Future;
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -531,11 +530,7 @@ impl BackupWriter {
         manifest: &BackupManifest,
         known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     ) -> Result<FixedIndexReader, Error> {
-        let mut tmpfile = std::fs::OpenOptions::new()
-            .write(true)
-            .read(true)
-            .custom_flags(libc::O_TMPFILE)
-            .open("/tmp")?;
+        let mut tmpfile = crate::tools::create_tmp_file()?;
 
         let param = json!({ "archive-name": archive_name });
         self.h2
@@ -570,11 +565,7 @@ impl BackupWriter {
         manifest: &BackupManifest,
         known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     ) -> Result<DynamicIndexReader, Error> {
-        let mut tmpfile = std::fs::OpenOptions::new()
-            .write(true)
-            .read(true)
-            .custom_flags(libc::O_TMPFILE)
-            .open("/tmp")?;
+        let mut tmpfile = crate::tools::create_tmp_file()?;
 
         let param = json!({ "archive-name": archive_name });
         self.h2

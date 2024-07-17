@@ -1,5 +1,4 @@
 use std::io::{Seek, SeekFrom};
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
@@ -106,11 +105,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
 
     let mut reader = BufferedDynamicReader::new(index, chunk_reader);
 
-    let mut catalogfile = std::fs::OpenOptions::new()
-        .write(true)
-        .read(true)
-        .custom_flags(libc::O_TMPFILE)
-        .open("/tmp")?;
+    let mut catalogfile = pbs_client::tools::create_tmp_file()?;
 
     std::io::copy(&mut reader, &mut catalogfile)
         .map_err(|err| format_err!("unable to download catalog - {}", err))?;
@@ -198,11 +193,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     )
     .await?;
 
-    let mut tmpfile = std::fs::OpenOptions::new()
-        .write(true)
-        .read(true)
-        .custom_flags(libc::O_TMPFILE)
-        .open("/tmp")?;
+    let mut tmpfile = pbs_client::tools::create_tmp_file()?;
 
     let (manifest, _) = client.download_manifest().await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
@@ -233,11 +224,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
         most_used,
     );
     let mut reader = BufferedDynamicReader::new(index, chunk_reader);
-    let mut catalogfile = std::fs::OpenOptions::new()
-        .write(true)
-        .read(true)
-        .custom_flags(libc::O_TMPFILE)
-        .open("/tmp")?;
+    let mut catalogfile = pbs_client::tools::create_tmp_file()?;
 
     std::io::copy(&mut reader, &mut catalogfile)
         .map_err(|err| format_err!("unable to download catalog - {}", err))?;
