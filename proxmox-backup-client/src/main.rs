@@ -286,8 +286,12 @@ async fn backup_image<P: AsRef<Path>>(
 
     let file = tokio::fs::File::open(path).await?;
 
-    let stream = tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new())
-        .map_err(Error::from);
+    let stream = tokio_util::codec::FramedRead::with_capacity(
+        file,
+        tokio_util::codec::BytesCodec::new(),
+        4 * 1024 * 1024,
+    )
+    .map_err(Error::from);
 
     let stream = FixedChunkStream::new(stream, chunk_size.unwrap_or(4 * 1024 * 1024));
 
