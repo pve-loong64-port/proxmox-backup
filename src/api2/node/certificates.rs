@@ -341,10 +341,8 @@ async fn order_certificate(
         info!("The validation for {domain} is pending");
         let domain_config: &AcmeDomain = get_domain_config(&domain)?;
         let plugin_id = domain_config.plugin.as_deref().unwrap_or("standalone");
-        let mut plugin_cfg =
-            crate::acme::get_acme_plugin(&plugins, plugin_id)?.ok_or_else(|| {
-                format_err!("plugin '{plugin_id}' for domain '{domain}' not found!")
-            })?;
+        let mut plugin_cfg = crate::acme::get_acme_plugin(&plugins, plugin_id)?
+            .ok_or_else(|| format_err!("plugin '{plugin_id}' for domain '{domain}' not found!"))?;
 
         info!("Setting up validation plugin");
         let validation_url = plugin_cfg
