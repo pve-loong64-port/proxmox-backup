@@ -331,9 +331,10 @@ fn test_crypt_speed(benchmark_result: &mut BenchmarkResult) -> Result<(), Error>
     let start_time = std::time::Instant::now();
 
     let mut bytes = 0;
+    let mut out = Vec::new();
     loop {
-        let mut out = Vec::new();
         DataBlob::encrypt_benchmark(&crypt_config, &random_data, &mut out)?;
+        out.clear();
         bytes += random_data.len();
         if start_time.elapsed().as_micros() > 1_000_000 {
             break;
