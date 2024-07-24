@@ -2,7 +2,7 @@ use anyhow::{bail, Error};
 use tracing::info;
 
 use proxmox_lang::try_block;
-use proxmox_rest_server::{CommandSocket, WorkerTask};
+use proxmox_rest_server::WorkerTask;
 use proxmox_sys::fs::CreateOptions;
 use proxmox_worker_task::WorkerTaskContext;
 
@@ -40,10 +40,8 @@ fn worker_task_abort() -> Result<(), Error> {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async move {
-        let mut commando_sock = CommandSocket::new(
-            proxmox_rest_server::our_ctrl_sock(),
-            nix::unistd::Gid::current(),
-        );
+        let mut commando_sock =
+            proxmox_daemon::command_socket::CommandSocket::new(nix::unistd::Gid::current());
 
         let init_result: Result<(), Error> = try_block!({
             proxmox_rest_server::register_task_control_commands(&mut commando_sock)?;
@@ -55,7 +53,7 @@ fn worker_task_abort() -> Result<(), Error> {
             return;
         }
 
-        if let Err(err) = commando_sock.spawn() {
+        if let Err(err) = commando_sock.spawn(proxmox_rest_server::last_worker_future()) {
             eprintln!("unable to spawn command socket - {}", err);
             return;
         }
@@ -70,7 +68,7 @@ fn worker_task_abort() -> Result<(), Error> {
                 println!("WORKER {}", worker);
 
                 let result = garbage_collection(&worker);
-                proxmox_rest_server::request_shutdown();
+                proxmox_daemon::request_shutdown();
 
                 if let Err(err) = result {
                     println!("got expected error: {}", err);

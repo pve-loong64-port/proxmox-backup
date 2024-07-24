@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 
 use anyhow::{bail, Error};
 use futures::*;
@@ -9,7 +9,7 @@ use tracing::level_filters::LevelFilter;
 
 use proxmox_lang::try_block;
 use proxmox_log::init_logger;
-use proxmox_rest_server::{daemon, ApiConfig, RestServer};
+use proxmox_rest_server::{ApiConfig, RestServer};
 use proxmox_router::RpcEnvironmentType;
 use proxmox_sys::fs::CreateOptions;
 
@@ -41,7 +41,7 @@ fn get_index() -> Pin<Box<dyn Future<Output = Response<Body>> + Send>> {
 }
 
 async fn run() -> Result<(), Error> {
-    init_logger("PBS_LOG", LevelFilter::INFO, "proxmox-backup-api")?;
+    init_logger("PBS_LOG", LevelFilter::INFO)?;
 
     config::create_configdir()?;
 
@@ -71,10 +71,7 @@ async fn run() -> Result<(), Error> {
     proxmox_backup::server::notifications::init()?;
 
     let backup_user = pbs_config::backup_user()?;
-    let mut command_sock = proxmox_rest_server::CommandSocket::new(
-        proxmox_rest_server::our_ctrl_sock(),
-        backup_user.gid,
-    );
+    let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
 
     let dir_opts = CreateOptions::new()
         .owner(backup_user.uid)
@@ -107,17 +104,17 @@ async fn run() -> Result<(), Error> {
     )?;
 
     // http server future:
-    let server = daemon::create_daemon(
+    let server = proxmox_daemon::server::create_daemon(
         ([127, 0, 0, 1], 82).into(),
         move |listener| {
             let incoming = hyper::server::conn::AddrIncoming::from_listener(listener)?;
 
             Ok(async {
-                daemon::systemd_notify(daemon::SystemdNotify::Ready)?;
+                proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
 
                 hyper::Server::builder(incoming)
                     .serve(rest_server)
-                    .with_graceful_shutdown(proxmox_rest_server::shutdown_future())
+                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
                     .map_err(Error::from)
                     .await
             })
@@ -129,9 +126,9 @@ async fn run() -> Result<(), Error> {
 
     let init_result: Result<(), Error> = try_block!({
         proxmox_rest_server::register_task_control_commands(&mut command_sock)?;
-        command_sock.spawn()?;
-        proxmox_rest_server::catch_shutdown_signal()?;
-        proxmox_rest_server::catch_reload_signal()?;
+        command_sock.spawn(proxmox_rest_server::last_worker_future())?;
+        proxmox_daemon::catch_shutdown_signal(proxmox_rest_server::last_worker_future())?;
+        proxmox_daemon::catch_reload_signal(proxmox_rest_server::last_worker_future())?;
         Ok(())
     });
 
@@ -154,7 +151,7 @@ async fn run() -> Result<(), Error> {
 
     server.await?;
     log::info!("server shutting down, waiting for active workers to complete");
-    proxmox_rest_server::last_worker_future().await?;
+    proxmox_rest_server::last_worker_future().await;
 
     log::info!("done - exit server");
 
@@ -162,8 +159,11 @@ async fn run() -> Result<(), Error> {
 }
 
 fn start_notification_worker() {
-    let abort_future = proxmox_rest_server::shutdown_future();
-    let future = Box::pin(proxmox_backup::server::notifications::notification_worker());
-    let task = futures::future::select(future, abort_future);
-    tokio::spawn(task);
+    let future = proxmox_backup::server::notifications::notification_worker();
+    let abort_future = proxmox_daemon::shutdown_future();
+    tokio::spawn(async move {
+        let future = pin!(future);
+        let abort_future = pin!(abort_future);
+        futures::future::select(future, abort_future).await;
+    });
 }

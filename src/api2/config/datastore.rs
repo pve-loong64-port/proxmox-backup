@@ -425,8 +425,8 @@ pub fn update_datastore(
             if let Ok(proxy_pid) =
                 proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN)
             {
-                let sock = proxmox_rest_server::ctrl_sock_from_pid(proxy_pid);
-                let _ = proxmox_rest_server::send_raw_command(
+                let sock = proxmox_daemon::command_socket::path_from_pid(proxy_pid);
+                let _ = proxmox_daemon::command_socket::send_raw(
                     sock,
                     &format!(
                         "{{\"command\":\"update-datastore-cache\",\"args\":\"{}\"}}\n",

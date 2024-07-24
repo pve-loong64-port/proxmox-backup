@@ -3,9 +3,7 @@ use std::str::FromStr;
 use anyhow::Error;
 use futures::*;
 
-extern crate proxmox_backup;
-
-use pbs_client::{ChunkStream, FixedChunkStream};
+use pbs_client::ChunkStream;
 use proxmox_human_byte::HumanByte;
 
 // Test Chunker with real data read from a file.

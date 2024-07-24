@@ -553,12 +553,9 @@ async fn run() -> Result<(), Error> {
             file_opts,
         )?;
 
-        let mut command_sock = proxmox_rest_server::CommandSocket::new(
-            proxmox_rest_server::our_ctrl_sock(),
-            backup_user.gid,
-        );
+        let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
         proxmox_rest_server::register_task_control_commands(&mut command_sock)?;
-        command_sock.spawn()?;
+        command_sock.spawn(proxmox_rest_server::last_worker_future())?;
     }
 
     let mut rpcenv = CliEnvironment::new();

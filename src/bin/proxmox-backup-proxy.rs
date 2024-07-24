@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::pin::pin;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, format_err, Context, Error};
@@ -48,8 +49,6 @@ use pbs_api_types::{
     Authid, DataStoreConfig, Operation, PruneJobConfig, SyncJobConfig, TapeBackupJobConfig,
     VerificationJobConfig,
 };
-
-use proxmox_rest_server::daemon;
 
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::server;
@@ -183,7 +182,7 @@ async fn get_index_future(env: RestEnvironment, parts: Parts) -> Response<Body> 
 }
 
 async fn run() -> Result<(), Error> {
-    init_logger("PBS_LOG", LevelFilter::INFO, "proxmox-backup-proxy")?;
+    init_logger("PBS_LOG", LevelFilter::INFO)?;
 
     proxmox_backup::auth_helpers::setup_auth_context(false);
     proxmox_backup::server::notifications::init()?;
@@ -215,10 +214,7 @@ async fn run() -> Result<(), Error> {
         ]);
 
     let backup_user = pbs_config::backup_user()?;
-    let mut command_sock = proxmox_rest_server::CommandSocket::new(
-        proxmox_rest_server::our_ctrl_sock(),
-        backup_user.gid,
-    );
+    let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
 
     let dir_opts = CreateOptions::new()
         .owner(backup_user.uid)
@@ -293,23 +289,23 @@ async fn run() -> Result<(), Error> {
         .rate_limiter_lookup(Arc::new(lookup_rate_limiter))
         .tcp_keepalive_time(PROXMOX_BACKUP_TCP_KEEPALIVE_TIME);
 
-    let server = daemon::create_daemon(
+    let server = proxmox_daemon::server::create_daemon(
         ([0, 0, 0, 0, 0, 0, 0, 0], 8007).into(),
         move |listener| {
             let (secure_connections, insecure_connections) =
                 connections.accept_tls_optional(listener, acceptor);
 
             Ok(async {
-                daemon::systemd_notify(daemon::SystemdNotify::Ready)?;
+                proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
 
                 let secure_server = hyper::Server::builder(secure_connections)
                     .serve(rest_server)
-                    .with_graceful_shutdown(proxmox_rest_server::shutdown_future())
+                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
                     .map_err(Error::from);
 
                 let insecure_server = hyper::Server::builder(insecure_connections)
                     .serve(redirector)
-                    .with_graceful_shutdown(proxmox_rest_server::shutdown_future())
+                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
                     .map_err(Error::from);
 
                 let (secure_res, insecure_res) =
@@ -338,9 +334,9 @@ async fn run() -> Result<(), Error> {
 
     let init_result: Result<(), Error> = try_block!({
         proxmox_rest_server::register_task_control_commands(&mut command_sock)?;
-        command_sock.spawn()?;
-        proxmox_rest_server::catch_shutdown_signal()?;
-        proxmox_rest_server::catch_reload_signal()?;
+        command_sock.spawn(proxmox_rest_server::last_worker_future())?;
+        proxmox_daemon::catch_shutdown_signal(proxmox_rest_server::last_worker_future())?;
+        proxmox_daemon::catch_reload_signal(proxmox_rest_server::last_worker_future())?;
         Ok(())
     });
 
@@ -365,7 +361,7 @@ async fn run() -> Result<(), Error> {
 
     server.await?;
     log::info!("server shutting down, waiting for active workers to complete");
-    proxmox_rest_server::last_worker_future().await?;
+    proxmox_rest_server::last_worker_future().await;
     log::info!("done - exit server");
 
     Ok(())
@@ -394,24 +390,27 @@ fn make_tls_acceptor() -> Result<SslAcceptor, Error> {
 }
 
 fn start_stat_generator() {
-    let abort_future = proxmox_rest_server::shutdown_future();
-    let future = Box::pin(run_stat_generator());
-    let task = futures::future::select(future, abort_future);
-    tokio::spawn(task.map(|_| ()));
+    tokio::spawn(async {
+        let abort_future = pin!(proxmox_daemon::shutdown_future());
+        let future = pin!(run_stat_generator());
+        futures::future::select(future, abort_future).await;
+    });
 }
 
 fn start_task_scheduler() {
-    let abort_future = proxmox_rest_server::shutdown_future();
-    let future = Box::pin(run_task_scheduler());
-    let task = futures::future::select(future, abort_future);
-    tokio::spawn(task.map(|_| ()));
+    tokio::spawn(async {
+        let abort_future = pin!(proxmox_daemon::shutdown_future());
+        let future = pin!(run_task_scheduler());
+        futures::future::select(future, abort_future).await;
+    });
 }
 
 fn start_traffic_control_updater() {
-    let abort_future = proxmox_rest_server::shutdown_future();
-    let future = Box::pin(run_traffic_control_updater());
-    let task = futures::future::select(future, abort_future);
-    tokio::spawn(task.map(|_| ()));
+    tokio::spawn(async {
+        let abort_future = pin!(proxmox_daemon::shutdown_future());
+        let future = pin!(run_traffic_control_updater());
+        futures::future::select(future, abort_future).await;
+    });
 }
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -827,14 +826,14 @@ async fn schedule_task_log_rotate() {
 async fn command_reopen_access_logfiles() -> Result<(), Error> {
     // only care about the most recent daemon instance for each, proxy & api, as other older ones
     // should not respond to new requests anyway, but only finish their current one and then exit.
-    let sock = proxmox_rest_server::our_ctrl_sock();
+    let sock = proxmox_daemon::command_socket::this_path();
     let f1 =
-        proxmox_rest_server::send_raw_command(sock, "{\"command\":\"api-access-log-reopen\"}\n");
+        proxmox_daemon::command_socket::send_raw(sock, "{\"command\":\"api-access-log-reopen\"}\n");
 
     let pid = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_API_PID_FN)?;
-    let sock = proxmox_rest_server::ctrl_sock_from_pid(pid);
+    let sock = proxmox_daemon::command_socket::path_from_pid(pid);
     let f2 =
-        proxmox_rest_server::send_raw_command(sock, "{\"command\":\"api-access-log-reopen\"}\n");
+        proxmox_daemon::command_socket::send_raw(sock, "{\"command\":\"api-access-log-reopen\"}\n");
 
     match futures::join!(f1, f2) {
         (Err(e1), Err(e2)) => Err(format_err!(
@@ -849,12 +848,14 @@ async fn command_reopen_access_logfiles() -> Result<(), Error> {
 async fn command_reopen_auth_logfiles() -> Result<(), Error> {
     // only care about the most recent daemon instance for each, proxy & api, as other older ones
     // should not respond to new requests anyway, but only finish their current one and then exit.
-    let sock = proxmox_rest_server::our_ctrl_sock();
-    let f1 = proxmox_rest_server::send_raw_command(sock, "{\"command\":\"api-auth-log-reopen\"}\n");
+    let sock = proxmox_daemon::command_socket::this_path();
+    let f1 =
+        proxmox_daemon::command_socket::send_raw(sock, "{\"command\":\"api-auth-log-reopen\"}\n");
 
     let pid = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_API_PID_FN)?;
-    let sock = proxmox_rest_server::ctrl_sock_from_pid(pid);
-    let f2 = proxmox_rest_server::send_raw_command(sock, "{\"command\":\"api-auth-log-reopen\"}\n");
+    let sock = proxmox_daemon::command_socket::path_from_pid(pid);
+    let f2 =
+        proxmox_daemon::command_socket::send_raw(sock, "{\"command\":\"api-auth-log-reopen\"}\n");
 
     match futures::join!(f1, f2) {
         (Err(e1), Err(e2)) => Err(format_err!(
