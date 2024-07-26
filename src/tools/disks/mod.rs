@@ -14,7 +14,6 @@ use once_cell::sync::OnceCell;
 
 use ::serde::{Deserialize, Serialize};
 
-use proxmox_lang::error::io_err_other;
 use proxmox_lang::{io_bail, io_format_err};
 use proxmox_schema::api;
 use proxmox_sys::linux::procfs::{mountinfo::Device, MountInfo};
@@ -300,7 +299,7 @@ impl Disk {
     /// Convenience wrapper for reading a `/sys` file which contains just a simple utf-8 string.
     pub fn read_sys_str<P: AsRef<Path>>(&self, path: P) -> io::Result<Option<String>> {
         Ok(match self.read_sys(path.as_ref())? {
-            Some(data) => Some(String::from_utf8(data).map_err(io_err_other)?),
+            Some(data) => Some(String::from_utf8(data).map_err(io::Error::other)?),
             None => None,
         })
     }
@@ -308,7 +307,7 @@ impl Disk {
     /// Convenience wrapper for unsigned integer `/sys` values up to 64 bit.
     pub fn read_sys_u64<P: AsRef<Path>>(&self, path: P) -> io::Result<Option<u64>> {
         Ok(match self.read_sys_str(path)? {
-            Some(data) => Some(data.trim().parse().map_err(io_err_other)?),
+            Some(data) => Some(data.trim().parse().map_err(io::Error::other)?),
             None => None,
         })
     }

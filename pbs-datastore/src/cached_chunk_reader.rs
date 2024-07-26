@@ -10,7 +10,6 @@ use anyhow::Error;
 use futures::ready;
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 
-use proxmox_lang::error::io_err_other;
 use proxmox_lang::io_format_err;
 
 use pbs_tools::async_lru_cache::{AsyncCacher, AsyncLruCache};
@@ -182,7 +181,7 @@ where
                 this.position += read as u64;
                 Ok(())
             }
-            Err(err) => Err(io_err_other(err)),
+            Err(err) => Err(std::io::Error::other(err)),
         };
 
         // future completed, drop
