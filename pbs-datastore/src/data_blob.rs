@@ -93,28 +93,42 @@ impl DataBlob {
             bail!("data blob too large ({} bytes).", data.len());
         }
 
-        let mut blob = if let Some(config) = config {
-            let compr_data;
-            let (_compress, data, magic) = if compress {
-                compr_data = zstd::bulk::compress(data, 1)?;
-                // Note: We only use compression if result is shorter
-                if compr_data.len() < data.len() {
-                    (true, &compr_data[..], ENCR_COMPR_BLOB_MAGIC_1_0)
-                } else {
-                    (false, data, ENCRYPTED_BLOB_MAGIC_1_0)
-                }
-            } else {
-                (false, data, ENCRYPTED_BLOB_MAGIC_1_0)
-            };
+        let header_len = if config.is_some() {
+            std::mem::size_of::<EncryptedDataBlobHeader>()
+        } else {
+            std::mem::size_of::<DataBlobHeader>()
+        };
 
-            let header_len = std::mem::size_of::<EncryptedDataBlobHeader>();
+        let mut compressed = false;
+        let mut data_compressed = vec![0u8; header_len + data.len()];
+        if compress {
+            match zstd_safe::compress(&mut data_compressed[header_len..], data, 1) {
+                Ok(size) if size <= data.len() => {
+                    data_compressed.truncate(header_len + size);
+                    compressed = true;
+                }
+                Err(err) if !zstd_error_is_target_too_small(err) => {
+                    log::warn!("zstd compression error: {err}");
+                }
+                _ => {}
+            }
+        }
+
+        let (magic, encryption_source) = match (compressed, config.is_some()) {
+            (true, true) => (ENCR_COMPR_BLOB_MAGIC_1_0, &data_compressed[header_len..]),
+            (true, false) => (COMPRESSED_BLOB_MAGIC_1_0, &data_compressed[header_len..]),
+            (false, true) => (ENCRYPTED_BLOB_MAGIC_1_0, data),
+            (false, false) => {
+                (&mut data_compressed[header_len..]).write_all(data)?;
+                (UNCOMPRESSED_BLOB_MAGIC_1_0, data)
+            }
+        };
+
+        let raw_data = if let Some(config) = config {
             let mut raw_data = Vec::with_capacity(data.len() + header_len);
 
             let dummy_head = EncryptedDataBlobHeader {
-                head: DataBlobHeader {
-                    magic: [0u8; 8],
-                    crc: [0; 4],
-                },
+                head: DataBlobHeader { magic, crc: [0; 4] },
                 iv: [0u8; 16],
                 tag: [0u8; 16],
             };
@@ -122,7 +136,7 @@ impl DataBlob {
                 raw_data.write_le_value(dummy_head)?;
             }
 
-            let (iv, tag) = Self::encrypt_to(config, data, &mut raw_data)?;
+            let (iv, tag) = Self::encrypt_to(config, encryption_source, &mut raw_data)?;
 
             let head = EncryptedDataBlobHeader {
                 head: DataBlobHeader { magic, crc: [0; 4] },
@@ -134,46 +148,17 @@ impl DataBlob {
                 (&mut raw_data[0..header_len]).write_le_value(head)?;
             }
 
-            DataBlob { raw_data }
+            raw_data
         } else {
-            let header_len = std::mem::size_of::<DataBlobHeader>();
-            let max_data_len = data.len() + header_len;
-            let mut raw_data = vec![0; max_data_len];
-            if compress {
-                let head = DataBlobHeader {
-                    magic: COMPRESSED_BLOB_MAGIC_1_0,
-                    crc: [0; 4],
-                };
-                unsafe {
-                    (&mut raw_data[0..header_len]).write_le_value(head)?;
-                }
-
-                match zstd_safe::compress(&mut raw_data[header_len..], data, 1) {
-                    Ok(size) if size <= data.len() => {
-                        raw_data.truncate(header_len + size);
-                        let mut blob = DataBlob { raw_data };
-                        blob.set_crc(blob.compute_crc());
-                        return Ok(blob);
-                    }
-                    Err(err) if !zstd_error_is_target_too_small(err) => {
-                        log::warn!("zstd compression error: {err}");
-                    }
-                    _ => {}
-                }
-            }
-
-            let head = DataBlobHeader {
-                magic: UNCOMPRESSED_BLOB_MAGIC_1_0,
-                crc: [0; 4],
-            };
+            let head = DataBlobHeader { magic, crc: [0; 4] };
             unsafe {
-                (&mut raw_data[0..header_len]).write_le_value(head)?;
+                (&mut data_compressed[0..header_len]).write_le_value(head)?;
             }
-            (&mut raw_data[header_len..]).write_all(data)?;
 
-            DataBlob { raw_data }
+            data_compressed
         };
 
+        let mut blob = DataBlob { raw_data };
         blob.set_crc(blob.compute_crc());
 
         Ok(blob)
