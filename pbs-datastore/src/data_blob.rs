@@ -563,11 +563,23 @@ impl<'a, 'b> DataChunkBuilder<'a, 'b> {
     }
 }
 
+/// Check if the error code returned by `zstd_safe::compress`, or anything else that does FFI calls
+/// into zstd code, was `70` 'Destination buffer is too small' by subtracting the error code from
+/// `0` (with underflow), see `ERR_getErrorCode` in
+/// https://github.com/facebook/zstd/blob/dev/lib/common/error_private.h
+///
+/// There is a test below to ensure we catch any change in the interface or internal value.
+fn zstd_error_is_target_too_small(err: usize) -> bool {
+    let (real_code, _) = 0usize.overflowing_sub(err);
+    // see ZSTD_ErrorCode in https://github.com/facebook/zstd/blob/dev/lib/zstd_errors.h
+    real_code == 70 // ZSTD_error_dstSize_tooSmall
+}
+
 #[cfg(test)]
 mod test {
     use pbs_tools::crypt_config::CryptConfig;
 
-    use super::DataChunkBuilder;
+    use super::{zstd_error_is_target_too_small, DataChunkBuilder};
 
     const TEST_DATA_LEN: usize = 50;
 
@@ -639,5 +651,21 @@ mod test {
             .decode(Some(&crypt_config), Some(&digest))
             .expect("cannot decode encrypted, compressed chunk");
         assert_eq!(data, data_decoded);
+    }
+
+    #[test]
+    /// test for the error code internal logic of zstd so we catch any interface/value changes on
+    /// (package) compile time
+    fn zstd_assert_dst_size_to_small_error_code_abi() {
+        let data = &build_test_data();
+        let mut target = Vec::new();
+        match zstd_safe::compress(&mut target, data, 1) {
+            Ok(_) => panic!("unexpected success with zero-sized buffer"),
+            Err(err) => {
+                if !zstd_error_is_target_too_small(err) {
+                    panic!("unexpected error code {err}, check test validity and zstd for changes!");
+                }
+            }
+        }
     }
 }

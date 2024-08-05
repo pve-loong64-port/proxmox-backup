@@ -23,6 +23,7 @@ tokio = { workspace = true, features = [] }
 tracing.workspace = true
 walkdir.workspace = true
 zstd.workspace = true
+zstd-safe.workspace = true
 
 pathpatterns.workspace = true
 pxar.workspace = true
