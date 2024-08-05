@@ -136,39 +136,40 @@ impl DataBlob {
 
             DataBlob { raw_data }
         } else {
-            let max_data_len = data.len() + std::mem::size_of::<DataBlobHeader>();
+            let header_len = std::mem::size_of::<DataBlobHeader>();
+            let max_data_len = data.len() + header_len;
+            let mut raw_data = vec![0; max_data_len];
             if compress {
-                let mut comp_data = Vec::with_capacity(max_data_len);
-
                 let head = DataBlobHeader {
                     magic: COMPRESSED_BLOB_MAGIC_1_0,
                     crc: [0; 4],
                 };
                 unsafe {
-                    comp_data.write_le_value(head)?;
+                    (&mut raw_data[0..header_len]).write_le_value(head)?;
                 }
 
-                zstd::stream::copy_encode(data, &mut comp_data, 1)?;
-
-                if comp_data.len() < max_data_len {
-                    let mut blob = DataBlob {
-                        raw_data: comp_data,
-                    };
-                    blob.set_crc(blob.compute_crc());
-                    return Ok(blob);
+                match zstd_safe::compress(&mut raw_data[header_len..], data, 1) {
+                    Ok(size) if size <= data.len() => {
+                        raw_data.truncate(header_len + size);
+                        let mut blob = DataBlob { raw_data };
+                        blob.set_crc(blob.compute_crc());
+                        return Ok(blob);
+                    }
+                    Err(err) if !zstd_error_is_target_too_small(err) => {
+                        log::warn!("zstd compression error: {err}");
+                    }
+                    _ => {}
                 }
             }
-
-            let mut raw_data = Vec::with_capacity(max_data_len);
 
             let head = DataBlobHeader {
                 magic: UNCOMPRESSED_BLOB_MAGIC_1_0,
                 crc: [0; 4],
             };
             unsafe {
-                raw_data.write_le_value(head)?;
+                (&mut raw_data[0..header_len]).write_le_value(head)?;
             }
-            raw_data.extend_from_slice(data);
+            (&mut raw_data[header_len..]).write_all(data)?;
 
             DataBlob { raw_data }
         };
