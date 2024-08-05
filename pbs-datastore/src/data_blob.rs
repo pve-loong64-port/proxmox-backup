@@ -562,3 +562,82 @@ impl<'a, 'b> DataChunkBuilder<'a, 'b> {
         chunk_builder.build()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use pbs_tools::crypt_config::CryptConfig;
+
+    use super::DataChunkBuilder;
+
+    const TEST_DATA_LEN: usize = 50;
+
+    fn build_test_data() -> Vec<u8> {
+        let mut data = Vec::with_capacity(TEST_DATA_LEN);
+        for i in 0..TEST_DATA_LEN / 10 {
+            for _ in 0..10 {
+                data.push(i as u8);
+            }
+        }
+        data
+    }
+
+    #[test]
+    fn unencrypted_uncompressed() {
+        let data = build_test_data();
+        let (chunk, digest) = DataChunkBuilder::new(&data)
+            .compress(false)
+            .build()
+            .expect("could not create unencrypted, uncompressed chunk");
+
+        let data_decoded = chunk
+            .decode(None, Some(&digest))
+            .expect("cannot decode unencrypted, uncompressed chunk");
+        assert_eq!(data, data_decoded);
+    }
+
+    #[test]
+    fn unencrypted_compressed() {
+        let data = build_test_data();
+        let (chunk, digest) = DataChunkBuilder::new(&data)
+            .compress(true)
+            .build()
+            .expect("could not create unencrypted, compressed chunk");
+
+        let data_decoded = chunk
+            .decode(None, Some(&digest))
+            .expect("cannot decode unencrypted, compressed chunk");
+        assert_eq!(data, data_decoded);
+    }
+
+    #[test]
+    fn encrypted_uncompressed() {
+        let data = build_test_data();
+        let crypt_config = CryptConfig::new([9; 32]).expect("could not create crypt config");
+        let (chunk, digest) = DataChunkBuilder::new(&data)
+            .compress(false)
+            .crypt_config(&crypt_config)
+            .build()
+            .expect("could not create encrypted, uncompressed chunk");
+
+        let data_decoded = chunk
+            .decode(Some(&crypt_config), Some(&digest))
+            .expect("cannot decode encrypted, uncompressed chunk");
+        assert_eq!(data, data_decoded);
+    }
+
+    #[test]
+    fn encrypted_compressed() {
+        let data = build_test_data();
+        let crypt_config = CryptConfig::new([9; 32]).expect("could not create crypt config");
+        let (chunk, digest) = DataChunkBuilder::new(&data)
+            .compress(true)
+            .crypt_config(&crypt_config)
+            .build()
+            .expect("could not create encrypted, compressed chunk");
+
+        let data_decoded = chunk
+            .decode(Some(&crypt_config), Some(&digest))
+            .expect("cannot decode encrypted, compressed chunk");
+        assert_eq!(data, data_decoded);
+    }
+}
