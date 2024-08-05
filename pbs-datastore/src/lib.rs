@@ -179,7 +179,6 @@ pub mod crypt_reader;
 pub mod crypt_writer;
 pub mod data_blob;
 pub mod data_blob_reader;
-pub mod data_blob_writer;
 pub mod file_formats;
 pub mod index;
 pub mod manifest;
@@ -201,7 +200,6 @@ pub use crypt_reader::CryptReader;
 pub use crypt_writer::CryptWriter;
 pub use data_blob::DataBlob;
 pub use data_blob_reader::DataBlobReader;
-pub use data_blob_writer::DataBlobWriter;
 pub use manifest::BackupManifest;
 pub use store_progress::StoreProgress;
 
