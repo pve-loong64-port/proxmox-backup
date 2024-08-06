@@ -9,7 +9,7 @@ use std::path::Path;
 use anyhow::{format_err, Error};
 use once_cell::sync::OnceCell;
 
-use proxmox_rrd::rrd::{AggregationFn, DataSourceType, Database};
+use proxmox_rrd::rrd::{AggregationFn, DataSourceType, Database, Archive};
 use proxmox_rrd::Cache;
 use proxmox_sys::fs::CreateOptions;
 
@@ -49,6 +49,7 @@ pub fn initialize_rrd_cache() -> Result<&'static Cache, Error> {
         Some(dir_options),
         apply_interval,
         load_callback,
+        create_callback,
     )?;
 
     RRD_CACHE
@@ -58,20 +59,35 @@ pub fn initialize_rrd_cache() -> Result<&'static Cache, Error> {
     Ok(RRD_CACHE.get().unwrap())
 }
 
-fn load_callback(path: &Path, _rel_path: &str, dst: DataSourceType) -> Database {
+fn load_callback(path: &Path, _rel_path: &str) -> Option<Database> {
     match Database::load(path, true) {
-        Ok(rrd) => rrd,
+        Ok(rrd) => Some(rrd),
         Err(err) => {
             if err.kind() != std::io::ErrorKind::NotFound {
-                log::warn!(
-                    "overwriting RRD file {:?}, because of load error: {}",
-                    path,
-                    err
-                );
+                log::warn!("overwriting RRD file {path:?}, because of load error: {err}",);
             }
-            Cache::create_proxmox_backup_default_rrd(dst)
+            None
         }
     }
+}
+
+fn create_callback(dst: DataSourceType) -> Database {
+    let rra_list = vec![
+        // 1 min * 1440 => 1 day
+        Archive::new(AggregationFn::Average, 60, 1440),
+        Archive::new(AggregationFn::Maximum, 60, 1440),
+        // 30 min * 1440 => 30 days ~ 1 month
+        Archive::new(AggregationFn::Average, 30 * 60, 1440),
+        Archive::new(AggregationFn::Maximum, 30 * 60, 1440),
+        // 6 h * 1440 => 360 days ~ 1 year
+        Archive::new(AggregationFn::Average, 6 * 3600, 1440),
+        Archive::new(AggregationFn::Maximum, 6 * 3600, 1440),
+        // 1 week * 570 => 10 years
+        Archive::new(AggregationFn::Average, 7 * 86400, 570),
+        Archive::new(AggregationFn::Maximum, 7 * 86400, 570),
+    ];
+
+    Database::new(dst, rra_list)
 }
 
 /// Extracts data for the specified time frame from from RRD cache
