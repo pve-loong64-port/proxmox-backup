@@ -257,7 +257,7 @@ pub fn delete_datastore_disk(name: String) -> Result<(), Error> {
     }
 
     // disable systemd mount-unit
-    let mut mount_unit_name = proxmox_sys::systemd::escape_unit(&path, true);
+    let mut mount_unit_name = proxmox_systemd::escape_unit(&path, true);
     mount_unit_name.push_str(".mount");
     crate::tools::systemd::disable_unit(&mount_unit_name)?;
 
@@ -293,7 +293,7 @@ fn create_datastore_mount_unit(
     fs_type: FileSystemType,
     what: &str,
 ) -> Result<String, Error> {
-    let mut mount_unit_name = proxmox_sys::systemd::escape_unit(mount_point, true);
+    let mut mount_unit_name = proxmox_systemd::escape_unit(mount_point, true);
     mount_unit_name.push_str(".mount");
 
     let mount_unit_path = format!("/etc/systemd/system/{}", mount_unit_name);

@@ -598,7 +598,7 @@ pub struct DeviceLockGuard {
 // Uses systemd escape_unit to compute a file name from `device_path`, the try
 // to lock `/var/lock/<name>`.
 fn open_device_lock(device_path: &str) -> Result<std::fs::File, Error> {
-    let lock_name = proxmox_sys::systemd::escape_unit(device_path, true);
+    let lock_name = proxmox_systemd::escape_unit(device_path, true);
 
     let mut path = std::path::PathBuf::from(crate::tape::DRIVE_LOCK_DIR);
     path.push(lock_name);
