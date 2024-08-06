@@ -74,7 +74,7 @@ proxmox-openid = "0.10.0"
 proxmox-rest-server = { version = "0.7", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "2.0.0", default-features = false }
-proxmox-rrd = { version = "0.2" }
+proxmox-rrd = { version = "0.2", features = [ "api-types" ]}
 # everything but pbs-config and pbs-client use "api-macro"
 proxmox-schema = "3"
 proxmox-section-config = "2"

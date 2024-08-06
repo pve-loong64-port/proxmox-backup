@@ -22,6 +22,7 @@ use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
     Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
 };
+use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::{
@@ -36,11 +37,11 @@ use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, Authid, BackupContent, BackupNamespace, BackupType,
     Counts, CryptMode, DataStoreConfig, DataStoreListItem, DataStoreStatus,
     GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions, Operation,
-    PruneJobOptions, RRDMode, RRDTimeFrame, SnapshotListItem, SnapshotVerifyState,
-    BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
-    BACKUP_TYPE_SCHEMA, DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH,
-    NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY,
-    PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
+    PruneJobOptions, SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA,
+    BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
+    DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
+    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
     VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};

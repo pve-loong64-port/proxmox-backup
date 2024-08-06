@@ -9,12 +9,12 @@ use std::path::Path;
 use anyhow::{format_err, Error};
 use once_cell::sync::OnceCell;
 
-use proxmox_rrd::rrd::{AggregationFn, DataSourceType, Database, Archive};
+use proxmox_rrd::rrd::{AggregationFn, Archive, DataSourceType, Database};
 use proxmox_rrd::Cache;
 use proxmox_sys::fs::CreateOptions;
 
-use pbs_api_types::{RRDMode, RRDTimeFrame};
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
+use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
 
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 

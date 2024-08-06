@@ -5,11 +5,11 @@ use serde_json::Value;
 
 use proxmox_router::list_subdirs_api_method;
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, SubdirMap};
+use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, DataStoreStatusListItem, Operation, RRDMode, RRDTimeFrame, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_BACKUP,
+    Authid, DataStoreStatusListItem, Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 
 use pbs_config::CachedUserInfo;

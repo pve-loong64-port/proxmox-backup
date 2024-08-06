@@ -3,9 +3,10 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 use proxmox_router::{Permission, Router};
+use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
 use proxmox_schema::api;
 
-use pbs_api_types::{RRDMode, RRDTimeFrame, NODE_SCHEMA, PRIV_SYS_AUDIT};
+use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT};
 
 use crate::rrd_cache::extract_rrd_data;
 
