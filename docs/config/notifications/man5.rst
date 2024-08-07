@@ -8,7 +8,7 @@ Description
 ===========
 
 The file /etc/proxmox-backup/notifications.cfg is a configuration file
-for Proxmox Backup Server. It contains the configration for the 
+for Proxmox Backup Server. It contains the configuration for the
 notification system configuration.
 
 File Format

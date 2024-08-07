@@ -663,7 +663,7 @@ address must be specified. Most options from :ref:`user_realms_ldap` apply to
 Active Directory as well, most importantly the bind credentials ``bind-dn``
 and ``password``. This is typically required by default for Microsoft Active
 Directory. The ``bind-dn`` can be specified either in AD-specific
-``user@company.net`` syntax or the commen LDAP-DN syntax.
+``user@company.net`` syntax or the common LDAP-DN syntax.
 
 The authentication domain name must only be specified if anonymous bind is
 requested. If bind credentials are given, the domain name is automatically
