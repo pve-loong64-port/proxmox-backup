@@ -24,6 +24,7 @@ proxmox-lang.workspace=true
 proxmox-router = { workspace = true, features = [ "cli" ] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-sys = { workspace = true, features = [ "logrotate" ] }
+proxmox-systemd.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true
 
