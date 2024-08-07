@@ -1,4 +1,4 @@
-// Tape Media Pool tests - test allow_ritable_media() function
+// Tape Media Pool tests - test allow_writable_media() function
 //
 // # cargo test --release tape::test::alloc_writable_media
 

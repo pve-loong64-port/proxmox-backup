@@ -9,7 +9,7 @@ update_initramfs() {
     CACHE_PATH_DBG="/var/cache/proxmox-backup/file-restore-initramfs-debug.img"
 
     # cleanup first, in case proxmox-file-restore was uninstalled since we do
-    # not want an unuseable image lying around
+    # not want an unusable image lying around
     rm -f "$CACHE_PATH"
 
     if [ ! -f "$INST_PATH/initramfs.img" ]; then

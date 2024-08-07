@@ -26,7 +26,7 @@ const FINGERPRINT_INPUT: [u8; 32] = [
 pub struct CryptConfig {
     // the Cipher
     cipher: Cipher,
-    // A secrect key use to provide the chunk digest name space.
+    // A secret key use to provide the chunk digest name space.
     id_key: [u8; 32],
     // Openssl hmac PKey of id_key
     id_pkey: openssl::pkey::PKey<openssl::pkey::Private>,

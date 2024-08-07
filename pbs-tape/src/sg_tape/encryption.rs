@@ -236,7 +236,7 @@ struct SspDataEncryptionAlgorithmDescriptor {
     algorithm_code: u32,
 }
 
-// Returns the algorythm_index for AES-GCM
+// Returns the algorithm_index for AES-GCM
 fn decode_spin_data_encryption_caps(data: &[u8]) -> Result<u8, Error> {
     proxmox_lang::try_block!({
         let mut reader = data;
