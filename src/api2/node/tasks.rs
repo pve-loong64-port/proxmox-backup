@@ -252,7 +252,7 @@ fn into_task_list_item(info: proxmox_rest_server::TaskListInfo) -> pbs_api_types
             exitstatus: {
                 type: String,
                 optional: true,
-                description: "'OK', 'Error: <msg>', or 'unkwown'.",
+                description: "'OK', 'Error: <msg>', or 'unknown'.",
             },
         },
     },
