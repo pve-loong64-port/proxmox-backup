@@ -16,6 +16,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use proxmox_router::{cli::*, ApiHandler, ApiMethod, RpcEnvironment};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
+use proxmox_systemd;
 
 use pbs_api_types::BackupNamespace;
 use pbs_client::tools::has_pxar_filename_extension;
@@ -156,7 +157,7 @@ fn complete_mapping_names<S: BuildHasher>(
 ) -> Vec<String> {
     match pbs_fuse_loop::find_all_mappings() {
         Ok(mappings) => mappings
-            .filter_map(|(name, _)| proxmox_sys::systemd::unescape_unit(&name).ok())
+            .filter_map(|(name, _)| proxmox_systemd::unescape_unit(&name).ok())
             .collect(),
         Err(_) => Vec::new(),
     }
@@ -326,7 +327,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
         let reader = CachedChunkReader::new(chunk_reader, index, 8).seekable();
 
         let name = &format!("{}:{}/{}", repo, path, archive_name);
-        let name_escaped = proxmox_sys::systemd::escape_unit(name, false);
+        let name_escaped = proxmox_systemd::escape_unit(name, false);
 
         let mut session =
             pbs_fuse_loop::FuseLoopSession::map_loop(size, reader, &name_escaped, options).await?;
@@ -388,7 +389,7 @@ fn unmap(
             pbs_fuse_loop::cleanup_unused_run_files(None);
             let mut any = false;
             for (backing, loopdev) in pbs_fuse_loop::find_all_mappings()? {
-                let name = proxmox_sys::systemd::unescape_unit(&backing)?;
+                let name = proxmox_systemd::unescape_unit(&backing)?;
                 log::info!(
                     "{}:\t{}",
                     loopdev.unwrap_or_else(|| "(unmapped)".to_string()),
@@ -411,7 +412,7 @@ fn unmap(
     if name.starts_with("/dev/loop") {
         pbs_fuse_loop::unmap_loopdev(name)?;
     } else {
-        let name = proxmox_sys::systemd::escape_unit(&name, false);
+        let name = proxmox_systemd::escape_unit(&name, false);
         pbs_fuse_loop::unmap_name(name)?;
     }
 

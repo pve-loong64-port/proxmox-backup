@@ -31,6 +31,7 @@ proxmox-router = { workspace = true, features = [ "cli" ] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-sortable-macro.workspace = true
 proxmox-sys.workspace = true
+proxmox-systemd.workspace = true
 proxmox-time.workspace = true
 
 pbs-api-types.workspace = true
