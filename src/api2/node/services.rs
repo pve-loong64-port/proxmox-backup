@@ -306,7 +306,7 @@ fn stop_service(
         permission: &Permission::Privilege(&["system", "services", "{service}"], PRIV_SYS_MODIFY, false),
     },
 )]
-/// Retart service.
+/// Restart service.
 fn restart_service(
     service: String,
     _param: Value,

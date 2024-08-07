@@ -150,7 +150,7 @@ pub struct MediaSetLabel {
     pub seq_nr: u64,
     /// Creation time stamp
     pub ctime: i64,
-    /// Encryption key finkerprint (if encryped)
+    /// Encryption key finkerprint (if encrypted)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encryption_key_fingerprint: Option<Fingerprint>,
 }

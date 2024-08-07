@@ -11,7 +11,7 @@ use pbs_datastore::DataStore;
 use proxmox_rest_server::formatter::*;
 use proxmox_rest_server::WorkerTask;
 
-/// `RpcEnvironmet` implementation for backup reader service
+/// `RpcEnvironment` implementation for backup reader service
 #[derive(Clone)]
 pub struct ReaderEnvironment {
     env_type: RpcEnvironmentType,

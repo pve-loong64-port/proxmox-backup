@@ -29,7 +29,7 @@ use crate::{
 #[derive(Copy, Clone, Serialize)]
 /// Speed test result
 struct Speed {
-    /// The meassured speed in Bytes/second
+    /// The measured speed in Bytes/second
     #[serde(skip_serializing_if = "Option::is_none")]
     speed: Option<f64>,
     /// Top result we want to compare with

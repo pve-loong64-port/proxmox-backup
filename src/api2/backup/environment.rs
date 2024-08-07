@@ -101,7 +101,7 @@ impl SharedBackupState {
     }
 }
 
-/// `RpcEnvironmet` implementation for backup service
+/// `RpcEnvironment` implementation for backup service
 #[derive(Clone)]
 pub struct BackupEnvironment {
     env_type: RpcEnvironmentType,

@@ -37,7 +37,7 @@ pub type Async<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
 /// An abstract implementation for retrieving data out of a block file backup
 pub trait BlockRestoreDriver {
-    /// List ArchiveEntrys for the given image file and path
+    /// List ArchiveEntries for the given image file and path
     fn data_list(
         &self,
         details: SnapRestoreDetails,

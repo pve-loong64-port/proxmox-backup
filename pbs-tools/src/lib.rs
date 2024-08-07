@@ -10,7 +10,7 @@ pub mod async_lru_cache;
 
 /// Set MMAP_THRESHOLD to a fixed value (128 KiB)
 ///
-/// This avoids the "dynamic" mmap-treshold logic from glibc's malloc, which seems misguided and
+/// This avoids the "dynamic" mmap-threshold logic from glibc's malloc, which seems misguided and
 /// effectively avoids using mmap for all allocations smaller than 32 MiB. Which, in combination
 /// with the allocation pattern from our/tokio's complex async machinery, resulted in very large
 /// RSS sizes due to defragmentation and long-living (smaller) allocation on top of the heap

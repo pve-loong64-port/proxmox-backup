@@ -62,7 +62,7 @@ pub struct PxarCreateOptions {
 
 pub type MetadataArchiveReader = Arc<dyn ReadAt + Send + Sync + 'static>;
 
-/// Statefull information of previous backups snapshots for partial backups
+/// Stateful information of previous backups snapshots for partial backups
 pub struct PxarPrevRef {
     /// Reference accessor for metadata comparison
     pub accessor: Accessor<MetadataArchiveReader>,
