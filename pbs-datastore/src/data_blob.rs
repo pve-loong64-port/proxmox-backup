@@ -649,7 +649,9 @@ mod test {
             Ok(_) => panic!("unexpected success with zero-sized buffer"),
             Err(err) => {
                 if !zstd_error_is_target_too_small(err) {
-                    panic!("unexpected error code {err}, check test validity and zstd for changes!");
+                    panic!(
+                        "unexpected error code {err}, check test validity and zstd for changes!"
+                    );
                 }
             }
         }
