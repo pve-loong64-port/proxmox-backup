@@ -53,8 +53,8 @@ Ext.define('PBS.config.PruneAndGC', {
 	}
     },
 
-    cbindData: function(initalConfig) {
+    cbindData: function(initialConfig) {
         let me = this;
-        me.datastore = initalConfig.datastore ? initalConfig.datastore : undefined;
+        me.datastore = initialConfig.datastore ? initialConfig.datastore : undefined;
     },
 });

@@ -9,7 +9,7 @@ Ext.define('PBS.DataStoreNotes', {
     scrollable: true,
     animCollapse: false,
 
-    cbindData: function(initalConfig) {
+    cbindData: function(initialConfig) {
 	let me = this;
 	me.url = `/api2/extjs/config/datastore/${me.datastore}`;
 	return { };

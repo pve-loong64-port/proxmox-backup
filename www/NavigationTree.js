@@ -272,8 +272,8 @@ Ext.define('PBS.view.main.NavigationTree', {
 		if (maintenance) {
 		    const [type, message] = PBS.Utils.parseMaintenanceMode(maintenance);
 		    qtip = `${type}${message ? ': ' + message : ''}`;
-		    let mainenanceTypeCls = type === 'delete' ? 'destroying' : 'maintenance';
-		    iconCls = `fa fa-database pmx-tree-icon-custom ${mainenanceTypeCls}`;
+		    let maintenanceTypeCls = type === 'delete' ? 'destroying' : 'maintenance';
+		    iconCls = `fa fa-database pmx-tree-icon-custom ${maintenanceTypeCls}`;
 		}
 
 		if (getChildTextAt(j).localeCompare(name) !== 0) {

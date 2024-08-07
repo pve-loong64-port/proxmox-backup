@@ -51,7 +51,7 @@ fn create_restore_log_dir() -> Result<String, Error> {
     Ok(logpath)
 }
 
-fn validate_img_existance(debug: bool) -> Result<(), Error> {
+fn validate_img_existence(debug: bool) -> Result<(), Error> {
     let kernel = PathBuf::from(pbs_buildcfg::PROXMOX_BACKUP_KERNEL_FN);
     let initramfs = PathBuf::from(if debug {
         pbs_buildcfg::PROXMOX_BACKUP_INITRAMFS_DBG_FN
@@ -213,7 +213,7 @@ pub async fn start_vm(
 
     let debug = debug_mode();
 
-    validate_img_existance(debug)?;
+    validate_img_existence(debug)?;
 
     let pid;
     let (mut pid_file, pid_path) =

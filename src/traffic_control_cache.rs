@@ -92,7 +92,7 @@ fn network_match_len(networks: &[IpInet], ip: &IpAddr) -> Option<u8> {
     match_len
 }
 
-fn cannonical_ip(ip: IpAddr) -> IpAddr {
+fn canonical_ip(ip: IpAddr) -> IpAddr {
     // TODO: use std::net::IpAddr::to_cananical once stable
     match ip {
         IpAddr::V4(addr) => IpAddr::V4(addr),
@@ -332,7 +332,7 @@ impl TrafficControlCache {
         peer: SocketAddr,
         now: i64,
     ) -> (&str, Option<SharedRateLimit>, Option<SharedRateLimit>) {
-        let peer_ip = cannonical_ip(peer.ip());
+        let peer_ip = canonical_ip(peer.ip());
 
         log::debug!("lookup_rate_limiter: {:?}", peer_ip);
 

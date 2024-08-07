@@ -3,7 +3,7 @@ Ext.define('PBS.DataStorePanel', {
     alias: 'widget.pbsDataStorePanel',
     mixins: ['Proxmox.Mixin.CBind'],
 
-    cbindData: function(initalConfig) {
+    cbindData: function(initialConfig) {
 	let me = this;
 	return {
 	    aclPath: `/datastore/${me.datastore}`,

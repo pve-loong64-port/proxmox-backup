@@ -9,7 +9,7 @@ use crate::sgutils2::SgRaw;
 
 #[repr(C, packed)]
 #[derive(Endian)]
-struct DesnityDescriptorBlock {
+struct DensityDescriptorBlock {
     primary_density_code: u8,
     secondary_density_code: u8,
     flags2: u8,
@@ -58,7 +58,7 @@ pub fn report_density<F: AsRawFd>(file: &mut F) -> Result<u8, Error> {
             if reader.is_empty() {
                 break;
             }
-            let block: DesnityDescriptorBlock = unsafe { reader.read_be_value()? };
+            let block: DensityDescriptorBlock = unsafe { reader.read_be_value()? };
             if block.primary_density_code > max_density {
                 max_density = block.primary_density_code;
             }

@@ -168,7 +168,7 @@ Ext.define('PBS.panel.NotificationRulesEditPanel', {
     onGetValues: function(values) {
 	let me = this;
 
-	let deleteArrayIfEmtpy = (field) => {
+	let deleteArrayIfEmpty = (field) => {
 	    if (Ext.isArray(values[field])) {
 		if (values[field].length === 0) {
 		    delete values[field];
@@ -178,9 +178,9 @@ Ext.define('PBS.panel.NotificationRulesEditPanel', {
 		}
 	    }
 	};
-	deleteArrayIfEmtpy('match-field');
-	deleteArrayIfEmtpy('match-severity');
-	deleteArrayIfEmtpy('match-calendar');
+	deleteArrayIfEmpty('match-field');
+	deleteArrayIfEmpty('match-severity');
+	deleteArrayIfEmpty('match-calendar');
 
 	return values;
     },

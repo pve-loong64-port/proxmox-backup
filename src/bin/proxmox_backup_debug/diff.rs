@@ -787,7 +787,7 @@ impl FileEntryPrinter {
         Ok(())
     }
 
-    fn write_column_seperator(&mut self) -> Result<(), Error> {
+    fn write_column_separator(&mut self) -> Result<(), Error> {
         write!(self.stream, " ")?;
         Ok(())
     }
@@ -800,25 +800,25 @@ impl FileEntryPrinter {
         operation: FileOperation,
     ) -> Result<(), Error> {
         self.write_operation(operation)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_entry_type(entry, changed.entry_type)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_uid(entry, changed.uid)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_gid(entry, changed.gid)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_mode(entry, changed.mode)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_filesize(entry, changed.size)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_mtime(entry, changed.mtime)?;
-        self.write_column_seperator()?;
+        self.write_column_separator()?;
 
         self.write_file_name(entry, changed.content)?;
         writeln!(self.stream)?;

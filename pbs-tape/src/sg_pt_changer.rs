@@ -52,7 +52,7 @@ struct AddressAssignmentPage {
     storage_element_count: u16,
     first_import_export_element_address: u16,
     import_export_element_count: u16,
-    first_tranfer_element_address: u16,
+    first_transfer_element_address: u16,
     transfer_element_count: u16,
     reserved22: u8,
     reserved23: u8,

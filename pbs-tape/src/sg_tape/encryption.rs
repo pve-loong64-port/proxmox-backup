@@ -76,7 +76,7 @@ struct SspSetDataEncryptionPage {
     control_byte_5: u8,
     encryption_mode: u8,
     decryption_mode: u8,
-    algorythm_index: u8,
+    algorithm_index: u8,
     key_format: u8,
     reserved: [u8; 8],
     key_len: u16,
@@ -86,7 +86,7 @@ struct SspSetDataEncryptionPage {
 #[allow(clippy::vec_init_then_push)]
 fn sg_spout_set_encryption<F: AsRawFd>(
     file: &mut F,
-    algorythm_index: u8,
+    algorithm_index: u8,
     key: Option<[u8; 32]>,
 ) -> Result<(), Error> {
     let mut sg_raw = SgRaw::new(file, 0)?;
@@ -106,7 +106,7 @@ fn sg_spout_set_encryption<F: AsRawFd>(
         control_byte_5: (chok << 2),
         encryption_mode: if key.is_some() { 2 } else { 0 },
         decryption_mode: if key.is_some() { 3 } else { 0 }, // mixed mode
-        algorythm_index,
+        algorithm_index,
         key_format: 0,
         reserved: [0u8; 8],
         key_len: if let Some(ref key) = key {
@@ -221,7 +221,7 @@ struct SspDataEncryptionCapabilityPage {
 #[derive(Endian)]
 #[repr(C, packed)]
 struct SspDataEncryptionAlgorithmDescriptor {
-    algorythm_index: u8,
+    algorithm_index: u8,
     reserved1: u8,
     descriptor_len: u16,
     control_byte_4: u8,
@@ -259,7 +259,7 @@ fn decode_spin_data_encryption_caps(data: &[u8]) -> Result<u8, Error> {
                 continue; // can't decrypt in hardware
             }
             if desc.algorithm_code == 0x00010014 && desc.key_size == 32 {
-                aes_gcm_index = Some(desc.algorythm_index);
+                aes_gcm_index = Some(desc.algorithm_index);
                 break;
             }
         }
@@ -280,7 +280,7 @@ struct SspDataEncryptionStatusPage {
     scope_byte: u8,
     encryption_mode: u8,
     decryption_mode: u8,
-    algorythm_index: u8,
+    algorithm_index: u8,
     key_instance_counter: u32,
     control_byte: u8,
     key_format: u8,
