@@ -556,6 +556,8 @@ impl<'a, 'b> DataChunkBuilder<'a, 'b> {
 ///
 /// There is a test below to ensure we catch any change in the interface or internal value.
 fn zstd_error_is_target_too_small(err: usize) -> bool {
+    // TODO: when zstd_sys >= 2.0.9 is available, we can use
+    // ZSTD_getErrorCode and the enum to use the public zstd API
     let (real_code, _) = 0usize.overflowing_sub(err);
     // see ZSTD_ErrorCode in https://github.com/facebook/zstd/blob/dev/lib/zstd_errors.h
     real_code == 70 // ZSTD_error_dstSize_tooSmall
