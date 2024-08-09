@@ -1,6 +1,7 @@
 use anyhow::Error;
 use serde_json::json;
 
+use proxmox_notify::context::pbs::PBS_CONTEXT;
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_subscription::SubscriptionStatus;
 use proxmox_sys::fs::CreateOptions;
@@ -100,6 +101,8 @@ async fn run(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
     let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
     proxmox_rest_server::register_task_control_commands(&mut command_sock)?;
     command_sock.spawn(proxmox_rest_server::last_worker_future())?;
+
+    proxmox_notify::context::set_context(&PBS_CONTEXT);
 
     do_update(rpcenv).await
 }
