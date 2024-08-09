@@ -15,7 +15,6 @@ use xdg::BaseDirectories;
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
 use proxmox_async::blocking::TokioWriterAdapter;
-use proxmox_human_byte::HumanByte;
 use proxmox_io::StdChannelWriter;
 use proxmox_router::{cli::*, ApiMethod, RpcEnvironment};
 use proxmox_schema::api;
@@ -25,10 +24,10 @@ use pxar::accessor::aio::Accessor;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
-    Authid, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType, CryptMode,
-    Fingerprint, GroupListItem, PruneJobOptions, PruneListItem, RateLimitConfig, SnapshotListItem,
-    StorageStatus, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
-    BACKUP_TYPE_SCHEMA, TRAFFIC_CONTROL_BURST_SCHEMA, TRAFFIC_CONTROL_RATE_SCHEMA,
+    Authid, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType, ClientRateLimitConfig,
+    CryptMode, Fingerprint, GroupListItem, PruneJobOptions, PruneListItem, RateLimitConfig,
+    SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
+    BACKUP_TYPE_SCHEMA,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
@@ -699,13 +698,9 @@ fn spawn_catalog_upload(
                schema: CHUNK_SIZE_SCHEMA,
                optional: true,
            },
-           rate: {
-               schema: TRAFFIC_CONTROL_RATE_SCHEMA,
-               optional: true,
-           },
-           burst: {
-               schema: TRAFFIC_CONTROL_BURST_SCHEMA,
-               optional: true,
+           limit: {
+               type: ClientRateLimitConfig,
+               flatten: true,
            },
            "change-detection-mode": {
                type: BackupDetectionMode,
@@ -749,6 +744,7 @@ async fn create_backup(
     change_detection_mode: Option<BackupDetectionMode>,
     dry_run: bool,
     skip_e2big_xattr: bool,
+    limit: ClientRateLimitConfig,
     _info: &ApiMethod,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
@@ -764,16 +760,7 @@ async fn create_backup(
         verify_chunk_size(size)?;
     }
 
-    let rate = match param["rate"].as_str() {
-        Some(s) => Some(s.parse::<HumanByte>()?),
-        None => None,
-    };
-    let burst = match param["burst"].as_str() {
-        Some(s) => Some(s.parse::<HumanByte>()?),
-        None => None,
-    };
-
-    let rate_limit = RateLimitConfig::with_same_inout(rate, burst);
+    let rate_limit = RateLimitConfig::from_client_config(limit);
 
     let crypto = crypto_parameters(&param)?;
 
@@ -1402,13 +1389,9 @@ We do not extract '.pxar' archives when writing to standard output.
 
 "###
             },
-            rate: {
-                schema: TRAFFIC_CONTROL_RATE_SCHEMA,
-                optional: true,
-            },
-            burst: {
-                schema: TRAFFIC_CONTROL_BURST_SCHEMA,
-                optional: true,
+            limit: {
+                type: ClientRateLimitConfig,
+                flatten: true,
             },
             "allow-existing-dirs": {
                 type: Boolean,
@@ -1499,22 +1482,14 @@ async fn restore(
     overwrite_files: bool,
     overwrite_symlinks: bool,
     overwrite_hardlinks: bool,
+    limit: ClientRateLimitConfig,
     ignore_extract_device_errors: bool,
 ) -> Result<Value, Error> {
     let repo = extract_repository_from_value(&param)?;
 
     let archive_name = json::required_string_param(&param, "archive-name")?;
 
-    let rate = match param["rate"].as_str() {
-        Some(s) => Some(s.parse::<HumanByte>()?),
-        None => None,
-    };
-    let burst = match param["burst"].as_str() {
-        Some(s) => Some(s.parse::<HumanByte>()?),
-        None => None,
-    };
-
-    let rate_limit = RateLimitConfig::with_same_inout(rate, burst);
+    let rate_limit = RateLimitConfig::from_client_config(limit);
 
     let client = connect_rate_limited(&repo, rate_limit)?;
     record_repository(&repo);
