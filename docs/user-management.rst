@@ -340,8 +340,8 @@ Some examples are:
   :align: left
 
   =========================== =========================================================
-  ``/datastore``              Access to *all* datastores on a Proxmox Backup server
-  ``/datastore/{store}``      Access to a specific datastore on a Proxmox Backup server
+  ``/datastore``              Access to *all* datastores on a Proxmox Backup Server
+  ``/datastore/{store}``      Access to a specific datastore on a Proxmox Backup Server
   ``/datastore/{store}/{ns}`` Access to a specific namespace on a specific datastore
   ``/remote``                 Access to all remote entries
   ``/system/network``         Access to configure the host network

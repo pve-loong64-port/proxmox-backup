@@ -4,7 +4,7 @@ Certificate Management
 ----------------------
 
 Access to the API and thus the web-based administration interface is always
-encrypted through ``https``. Each `Proxmox Backup`_ host creates by default its
+encrypted through ``https``. Each `Proxmox Backup`_ Server host creates by default its
 own (self-signed) certificate. This certificate is used for encrypted
 communication with the host’s ``proxmox-backup-proxy`` service, for any API
 call between a user or backup-client and the web-interface.
@@ -18,7 +18,7 @@ configuration, or by using certificates, signed by a trusted certificate authori
 Certificates for the API and SMTP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Proxmox Backup stores its certificate and key in:
+Proxmox Backup Server stores its certificate and key in:
 
 -  ``/etc/proxmox-backup/proxy.pem``
 
@@ -59,9 +59,9 @@ Note that any certificate key files must not be password protected.
 Trusted certificates via Let’s Encrypt (ACME)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Proxmox Backup includes an implementation of the **A**\ utomatic
+Proxmox Backup Server includes an implementation of the **A**\ utomatic
 **C**\ ertificate **M**\ anagement **E**\ nvironment (**ACME**)
-protocol, allowing Proxmox Backup admins to use an ACME provider
+protocol, allowing Proxmox Backup Server admins to use an ACME provider
 like Let’s Encrypt for easy setup of TLS certificates, which are
 accepted and trusted by modern operating systems and web browsers out of
 the box.
@@ -127,7 +127,7 @@ DNS record in the domain’s zone.
   :align: right
   :alt: Create ACME Account
 
-Proxmox Backup supports both of those challenge types out of the
+Proxmox Backup Server supports both of those challenge types out of the
 box, you can configure plugins either over the web interface under
 ``Certificates -> ACME Challenges``, or using the
 ``proxmox-backup-manager acme plugin add`` command.
@@ -178,7 +178,7 @@ with Let’s Encrypts ACME.
 -  There **must** be no other listener on port 80.
 
 -  The requested (sub)domain needs to resolve to a public IP of the
-   Proxmox Backup host.
+   Proxmox Backup Server host.
 
 .. _sysadmin_certs_acme_dns_challenge:
 
@@ -195,7 +195,7 @@ allows provisioning of ``TXT`` records via an API.
 Configuring ACME DNS APIs for validation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Proxmox Backup reuses the DNS plugins developed for the
+Proxmox Backup Server reuses the DNS plugins developed for the
 ``acme.sh``  [1]_ project. Please refer to its documentation for details
 on configuration of specific APIs.
 
@@ -229,7 +229,7 @@ domain/DNS server, in case your primary/real DNS does not support
 provisioning via an API. Manually set up a permanent ``CNAME`` record
 for ``_acme-challenge.domain1.example`` pointing to
 ``_acme-challenge.domain2.example``, and set the ``alias`` property in
-the Proxmox Backup node configuration file ``/etc/proxmox-backup/node.cfg``
+the Proxmox Backup Server node configuration file ``/etc/proxmox-backup/node.cfg``
 to ``domain2.example`` to allow the DNS server of ``domain2.example`` to
 validate all challenges for ``domain1.example``.
 
@@ -282,7 +282,7 @@ Manually Change Certificate over the Command Line
 If you want to get rid of certificate verification warnings, you have to
 generate a valid certificate for your server.
 
-Log in to your Proxmox Backup via ssh or use the console:
+Log in to your Proxmox Backup Server via ssh or use the console:
 
 ::
 

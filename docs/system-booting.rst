@@ -4,8 +4,8 @@
 Host Bootloader
 ---------------
 
-`Proxmox Backup`_ currently uses one of two bootloaders, depending on the disk setup
-selected in the installer.
+`Proxmox Backup`_ Server currently uses one of two bootloaders, depending on
+the disk setup selected in the installer.
 
 For EFI Systems installed with ZFS as the root filesystem ``systemd-boot`` is
 used, unless Secure Boot is enabled. All other deployments use the standard
@@ -18,8 +18,8 @@ on top of Debian).
 Partitioning Scheme Used by the Installer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Proxmox Backup installer creates 3 partitions on all disks selected for
-installation.
+The Proxmox Backup Server installer creates 3 partitions on all disks selected
+for installation.
 
 The created partitions are:
 
@@ -98,7 +98,7 @@ For example, to format an empty partition ``/dev/sda2`` as ESP, run the followin
   # proxmox-boot-tool format /dev/sda2
 
 To setup an existing, unmounted ESP located on ``/dev/sda2`` for inclusion in
-Proxmox Backup's kernel update synchronization mechanism, use the following:
+Proxmox Backup Server's kernel update synchronization mechanism, use the following:
 
 .. code-block:: console
 
@@ -198,7 +198,7 @@ Determine which Bootloader is Used
   :alt: Grub boot screen
 
 The simplest and most reliable way to determine which bootloader is used, is to
-watch the boot process of the Proxmox Backup node.
+watch the boot process of the Proxmox Backup Server node.
 
 
 You will either see the blue box of ``grub`` or the simple black on white
@@ -359,10 +359,11 @@ would run:
   # proxmox-boot-tool kernel pin 5.15.30-1-pve
 
 
-.. TIP:: The pinning functionality works for all Proxmox Backup systems, not only those using
-   ``proxmox-boot-tool`` to synchronize the contents of the ESPs, if your system
-   does not use ``proxmox-boot-tool`` for synchronizing, you can also skip the
-   ``proxmox-boot-tool refresh`` call in the end.
+.. TIP:: The pinning functionality works for all Proxmox Backup Server systems,
+   not only those using ``proxmox-boot-tool`` to synchronize the contents of
+   the ESPs, if your system does not use ``proxmox-boot-tool`` for
+   synchronizing, you can also skip the ``proxmox-boot-tool refresh`` call in
+   the end.
 
 You can also set a kernel version to be booted on the next system boot only.
 This is useful, for example, to test if an updated kernel has resolved an issue,
@@ -400,8 +401,8 @@ content and configuration on the ESPs by running the ``refresh`` subcommand.
 Secure Boot
 ~~~~~~~~~~~
 
-Since Proxmox Backup 3.1, Secure Boot is supported out of the box via signed
-packages and integration in ``proxmox-boot-tool``.
+Since Proxmox Backup Server 3.1, Secure Boot is supported out of the box via
+signed packages and integration in ``proxmox-boot-tool``.
 
 The following packages need to be installed for Secure Boot to be enabled:
 
@@ -411,8 +412,8 @@ The following packages need to be installed for Secure Boot to be enabled:
 * ``proxmox-kernel-6.X.Y-Z-pve-signed`` (Kernel image, signed by Proxmox)
 
 Only Grub as bootloader is supported out of the box, since there are no other
-pre-signed bootloader packages available. Any new installation of Proxmox Backup
-will automatically have all of the above packages included.
+pre-signed bootloader packages available. Any new installation of Proxmox
+Backup Server will automatically have all of the above packages included.
 
 More details about how Secure Boot works, and how to customize the setup, are
 available in `our wiki <https://pve.proxmox.com/wiki/Secure_Boot_Setup>`_.
@@ -426,10 +427,10 @@ Switching an Existing Installation to Secure Boot
 .. WARNING:: This can lead to an unbootable installation in some cases if not
    done correctly. Reinstalling the host will setup Secure Boot automatically if
    available, without any extra interactions. **Make sure you have a working and
-   well-tested backup of your Proxmox Backup host!**
+   well-tested backup of your Proxmox Backup Server host!**
 
 An existing UEFI installation can be switched over to Secure Boot if desired,
-without having to reinstall Proxmox Backup from scratch.
+without having to reinstall Proxmox Backup Server from scratch.
 
 First, ensure all your system is up-to-date. Next, install all the required
 pre-signed packages as listed above. Grub automatically creates the needed EFI
@@ -442,8 +443,8 @@ boot entry for booting via the default shim.
 
 If ``systemd-boot`` is used as a bootloader (see
 :ref:`Determine which Bootloader is used <systembooting-determine-bootloader>`),
-some additional setup is needed. This is only the case if Proxmox Backup was
-installed with ZFS-on-root.
+some additional setup is needed. This is only the case if Proxmox Backup Server
+was installed with ZFS-on-root.
 
 To check the latter, run:
 

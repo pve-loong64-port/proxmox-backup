@@ -195,7 +195,7 @@ With `systemd-boot`:
   # proxmox-boot-tool init <new ESP>
 
 .. NOTE:: `ESP` stands for EFI System Partition, which is setup as partition #2 on
-  bootable disks setup by the Proxmox Backup installer. For details, see
+  bootable disks setup by the Proxmox Backup Server installer. For details, see
   :ref:`Setting up a new partition for use as synced ESP <systembooting-proxmox-boot-setup>`.
 
 With `grub`:
@@ -224,7 +224,7 @@ preferred editor. The required setting for email notification is
 
   ZED_EMAIL_ADDR="root"
 
-Please note that Proxmox Backup forwards mails to `root` to the email address
+Please note that Proxmox Backup Server forwards mails to `root` to the email address
 configured for the root user.
 
 

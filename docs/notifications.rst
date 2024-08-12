@@ -259,7 +259,7 @@ Notification Events
 -------------------
 
 The following table contains a list of all notification events in Proxmox
-Backup server, their type, severity and additional metadata fields. ``type`` as
+Backup Server, their type, severity and additional metadata fields. ``type`` as
 well as any other metadata field may be used in ``match-field`` match rules.
 
 ================================ ==================== ========== ==============================================================
