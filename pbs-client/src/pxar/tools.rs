@@ -10,6 +10,7 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
 
+use pathpatterns::{MatchList, MatchType};
 use pxar::accessor::aio::{Accessor, Directory, FileEntry};
 use pxar::accessor::ReadAt;
 use pxar::format::StatxTimestamp;
@@ -454,6 +455,47 @@ pub async fn pxar_metadata_catalog_dump_dir<T: Clone + Send + Sync + ReadAt>(
     let entries = pxar_metadata_read_dir(parent_dir).await?;
     for entry in entries {
         pxar_metadata_catalog_dump_entry(entry, path_prefix).await?;
+    }
+    Ok(())
+}
+
+/// Call the callback on given entry if matched by the match patterns.
+fn pxar_metadata_catalog_find_entry<'future, T: Clone + Send + Sync + ReadAt + 'future>(
+    entry: FileEntry<T>,
+    match_list: &'future (impl MatchList<'future> + Sync),
+    callback: &'future (dyn Fn(&[u8]) -> Result<(), Error> + Send + Sync),
+) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'future>> {
+    Box::pin(async move {
+        let file_mode = entry.metadata().file_type() as u32;
+        let entry_path = entry_path_with_prefix(&entry, Some("/"))
+            .as_os_str()
+            .to_owned();
+
+        match match_list.matches(entry_path.as_bytes(), file_mode) {
+            Ok(Some(MatchType::Exclude)) => return Ok(()),
+            Ok(Some(MatchType::Include)) => callback(entry_path.as_bytes())?,
+            _ => (),
+        }
+
+        if let EntryKind::Directory = entry.kind() {
+            let dir_entry = entry.enter_directory().await?;
+            pxar_metadata_catalog_find(dir_entry, match_list, callback).await?;
+        }
+
+        Ok(())
+    })
+}
+
+/// Recursively iterate over pxar archive entries and call the callback on entries matching the
+/// match patterns.
+pub async fn pxar_metadata_catalog_find<'future, T: Clone + Send + Sync + ReadAt + 'future>(
+    parent_dir: Directory<T>,
+    match_list: &'future (impl pathpatterns::MatchList<'future> + Sync),
+    callback: &'future (dyn Fn(&[u8]) -> Result<(), Error> + Send + Sync),
+) -> Result<(), Error> {
+    let entries = pxar_metadata_read_dir(parent_dir).await?;
+    for entry in entries {
+        pxar_metadata_catalog_find_entry(entry, match_list, callback).await?;
     }
     Ok(())
 }
