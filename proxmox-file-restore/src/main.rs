@@ -22,6 +22,7 @@ use pxar::accessor::aio::Accessor;
 use pxar::decoder::aio::Decoder;
 
 use pbs_api_types::{file_restore::FileRestoreFormat, BackupDir, BackupNamespace, CryptMode};
+use pbs_client::pxar::tools::get_remote_pxar_reader;
 use pbs_client::pxar::{create_tar, create_zip, extract_sub_dir, extract_sub_dir_seq};
 use pbs_client::tools::{
     complete_group_or_snapshot, complete_repository, connect, extract_repository_from_value,
@@ -34,9 +35,9 @@ use pbs_client::tools::{
 };
 use pbs_client::{BackupReader, BackupRepository, RemoteChunkReader};
 use pbs_datastore::catalog::{ArchiveEntry, CatalogReader, DirEntryAttribute};
-use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
+use pbs_datastore::dynamic_index::BufferedDynamicReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::{BackupManifest, CATALOG_NAME};
+use pbs_datastore::CATALOG_NAME;
 use pbs_key_config::decrypt_key;
 use pbs_tools::crypt_config::CryptConfig;
 
@@ -356,31 +357,6 @@ async fn list(
     );
 
     Ok(())
-}
-
-async fn get_remote_pxar_reader(
-    archive_name: &str,
-    client: Arc<BackupReader>,
-    manifest: &BackupManifest,
-    crypt_config: Option<Arc<CryptConfig>>,
-) -> Result<(LocalDynamicReadAt<RemoteChunkReader>, u64), Error> {
-    let index = client
-        .download_dynamic_index(manifest, archive_name)
-        .await?;
-    let most_used = index.find_most_used_chunks(8);
-
-    let file_info = manifest.lookup_file_info(archive_name)?;
-    let chunk_reader = RemoteChunkReader::new(
-        client.clone(),
-        crypt_config,
-        file_info.chunk_crypt_mode(),
-        most_used,
-    );
-
-    let reader = BufferedDynamicReader::new(index, chunk_reader);
-    let archive_size = reader.archive_size();
-
-    Ok((LocalDynamicReadAt::new(reader), archive_size))
 }
 
 #[api(

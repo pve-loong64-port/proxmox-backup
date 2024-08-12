@@ -2,8 +2,8 @@
 
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
@@ -14,6 +14,13 @@ use pxar::format::{SignedDuration, StatxTimestamp};
 use pxar::{mode, Entry, EntryKind, Metadata};
 
 use pbs_datastore::catalog::{ArchiveEntry, DirEntryAttribute};
+
+use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
+use pbs_datastore::index::IndexFile;
+use pbs_datastore::BackupManifest;
+use pbs_tools::crypt_config::CryptConfig;
+
+use crate::{BackupReader, RemoteChunkReader};
 
 /// Get the file permissions as `nix::Mode`
 pub(crate) fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
@@ -374,4 +381,29 @@ pub fn handle_root_with_optional_format_version_prelude<R: pxar::decoder::SeqRea
         }
         _ => bail!("unexpected entry kind {:?}", first.kind()),
     }
+}
+
+pub async fn get_remote_pxar_reader(
+    archive_name: &str,
+    client: Arc<BackupReader>,
+    manifest: &BackupManifest,
+    crypt_config: Option<Arc<CryptConfig>>,
+) -> Result<(LocalDynamicReadAt<RemoteChunkReader>, u64), Error> {
+    let index = client
+        .download_dynamic_index(manifest, archive_name)
+        .await?;
+    let most_used = index.find_most_used_chunks(8);
+
+    let file_info = manifest.lookup_file_info(archive_name)?;
+    let chunk_reader = RemoteChunkReader::new(
+        client.clone(),
+        crypt_config,
+        file_info.chunk_crypt_mode(),
+        most_used,
+    );
+
+    let reader = BufferedDynamicReader::new(index, chunk_reader);
+    let archive_size = reader.archive_size();
+
+    Ok((LocalDynamicReadAt::new(reader), archive_size))
 }
