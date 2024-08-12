@@ -10,7 +10,7 @@ use nix::sys::stat::Mode;
 use pxar::{format::StatxTimestamp, mode, Entry, EntryKind, Metadata};
 
 /// Get the file permissions as `nix::Mode`
-pub fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
+pub(crate) fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
     let mode = meta.stat.get_permission_bits();
 
     u32::try_from(mode)
@@ -22,12 +22,14 @@ pub fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
 }
 
 /// Make sure path is relative and not '.' or '..'.
-pub fn assert_relative_path<S: AsRef<OsStr> + ?Sized>(path: &S) -> Result<(), Error> {
+pub(crate) fn assert_relative_path<S: AsRef<OsStr> + ?Sized>(path: &S) -> Result<(), Error> {
     assert_relative_path_do(Path::new(path))
 }
 
 /// Make sure path is a single component and not '.' or '..'.
-pub fn assert_single_path_component<S: AsRef<OsStr> + ?Sized>(path: &S) -> Result<(), Error> {
+pub(crate) fn assert_single_path_component<S: AsRef<OsStr> + ?Sized>(
+    path: &S,
+) -> Result<(), Error> {
     assert_single_path_component_do(Path::new(path))
 }
 

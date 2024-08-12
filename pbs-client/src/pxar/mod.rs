@@ -52,7 +52,7 @@ pub(crate) mod dir_stack;
 pub(crate) mod extract;
 pub(crate) mod look_ahead_cache;
 pub(crate) mod metadata;
-pub(crate) mod tools;
+pub mod tools;
 
 mod flags;
 pub use flags::Flags;
@@ -69,5 +69,3 @@ pub use extract::{
 /// memory, so we restrict the number of allowed entries to limit
 /// maximum memory usage.
 pub const ENCODER_MAX_ENTRIES: usize = 1024 * 1024;
-
-pub use tools::{format_multi_line_entry, format_single_line_entry};

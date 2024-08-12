@@ -705,7 +705,7 @@ impl Shell {
 
         let file = Self::walk_pxar_archive(&self.accessor, &mut stack).await?;
         std::io::stdout()
-            .write_all(crate::pxar::format_multi_line_entry(file.entry()).as_bytes())?;
+            .write_all(crate::pxar::tools::format_multi_line_entry(file.entry()).as_bytes())?;
         Ok(())
     }
 

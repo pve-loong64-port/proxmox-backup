@@ -12,9 +12,9 @@ use futures::select;
 use tokio::signal::unix::{signal, SignalKind};
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
+use pbs_client::pxar::tools::format_single_line_entry;
 use pbs_client::pxar::{
-    format_single_line_entry, Flags, OverwriteFlags, PxarExtractOptions, PxarWriters,
-    ENCODER_MAX_ENTRIES,
+    Flags, OverwriteFlags, PxarExtractOptions, PxarWriters, ENCODER_MAX_ENTRIES,
 };
 use pxar::EntryKind;
 
