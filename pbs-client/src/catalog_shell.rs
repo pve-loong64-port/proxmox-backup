@@ -21,7 +21,7 @@ use pxar::accessor::ReadAt;
 use pxar::{EntryKind, Metadata};
 
 use pbs_datastore::catalog::{self, DirEntryAttribute};
-use proxmox_async::runtime::block_in_place;
+use proxmox_async::runtime::{block_in_place, block_on};
 
 use crate::pxar::Flags;
 
@@ -312,8 +312,9 @@ pub struct Shell {
     /// Interactive prompt.
     prompt: String,
 
-    /// Catalog reader instance to navigate
-    catalog: CatalogReader,
+    /// Optional catalog reader instance to navigate, if not present the Accessor is used for
+    /// navigation
+    catalog: Option<CatalogReader>,
 
     /// List of selected paths for restore
     selected: HashMap<OsString, MatchEntry>,
@@ -347,7 +348,7 @@ impl PathStackEntry {
 impl Shell {
     /// Create a new shell for the given catalog and pxar archive.
     pub async fn new(
-        mut catalog: CatalogReader,
+        mut catalog: Option<CatalogReader>,
         archive_name: &str,
         archive: Accessor,
     ) -> Result<Self, Error> {
@@ -355,11 +356,31 @@ impl Shell {
         let mut rl = rustyline::Editor::<CliHelper>::new();
         rl.set_helper(Some(cli_helper));
 
-        let catalog_root = catalog.root()?;
-        let archive_root = catalog
-            .lookup(&catalog_root, archive_name.as_bytes())?
-            .ok_or_else(|| format_err!("archive not found in catalog"))?;
-        let position = vec![PathStackEntry::new(archive_root)];
+        let mut position = Vec::new();
+        if let Some(catalog) = catalog.as_mut() {
+            let catalog_root = catalog.root()?;
+            let archive_root = catalog
+                .lookup(&catalog_root, archive_name.as_bytes())?
+                .ok_or_else(|| format_err!("archive not found in catalog"))?;
+            position.push(PathStackEntry::new(archive_root));
+        } else {
+            let root = archive.open_root().await?;
+            let root_entry = root.lookup_self().await?;
+            if let EntryKind::Directory = root_entry.kind() {
+                let entry_attr = DirEntryAttribute::Directory {
+                    start: root_entry.entry_range_info().entry_range.start,
+                };
+                position.push(PathStackEntry {
+                    catalog: catalog::DirEntry {
+                        name: archive_name.into(),
+                        attr: entry_attr,
+                    },
+                    pxar: Some(root_entry),
+                });
+            } else {
+                bail!("unexpected root entry type");
+            }
+        }
 
         let mut this = Self {
             rl,
@@ -450,7 +471,7 @@ impl Shell {
 
     async fn resolve_symlink(
         stack: &mut Vec<PathStackEntry>,
-        catalog: &mut CatalogReader,
+        catalog: &mut Option<CatalogReader>,
         accessor: &Accessor,
         follow_symlinks: &mut Option<usize>,
     ) -> Result<(), Error> {
@@ -468,7 +489,7 @@ impl Shell {
             };
 
             let new_stack =
-                Self::lookup(stack, &mut *catalog, accessor, Some(path), follow_symlinks).await?;
+                Self::lookup(stack, catalog, accessor, Some(path), follow_symlinks).await?;
 
             *stack = new_stack;
 
@@ -484,7 +505,7 @@ impl Shell {
     /// out.
     async fn step(
         stack: &mut Vec<PathStackEntry>,
-        catalog: &mut CatalogReader,
+        catalog: &mut Option<CatalogReader>,
         accessor: &Accessor,
         component: std::path::Component<'_>,
         follow_symlinks: &mut Option<usize>,
@@ -503,9 +524,27 @@ impl Shell {
                 if stack.last().unwrap().catalog.is_symlink() {
                     Self::resolve_symlink(stack, catalog, accessor, follow_symlinks).await?;
                 }
-                match catalog.lookup(&stack.last().unwrap().catalog, entry.as_bytes())? {
-                    Some(dir) => stack.push(PathStackEntry::new(dir)),
-                    None => bail!("no such file or directory: {:?}", entry),
+                if let Some(catalog) = catalog {
+                    match catalog.lookup(&stack.last().unwrap().catalog, entry.as_bytes())? {
+                        Some(dir) => stack.push(PathStackEntry::new(dir)),
+                        None => bail!("no such file or directory: {entry:?}"),
+                    }
+                } else {
+                    let pxar_entry = parent_pxar_entry(&stack)?;
+                    let parent_dir = pxar_entry.enter_directory().await?;
+                    match parent_dir.lookup(entry).await? {
+                        Some(entry) => {
+                            let entry_attr = DirEntryAttribute::try_from(&entry)?;
+                            stack.push(PathStackEntry {
+                                catalog: catalog::DirEntry {
+                                    name: entry.entry().file_name().as_bytes().into(),
+                                    attr: entry_attr,
+                                },
+                                pxar: Some(entry),
+                            })
+                        }
+                        None => bail!("no such file or directory: {entry:?}"),
+                    }
                 }
             }
         }
@@ -515,7 +554,7 @@ impl Shell {
 
     fn step_nofollow(
         stack: &mut Vec<PathStackEntry>,
-        catalog: &mut CatalogReader,
+        catalog: &mut Option<CatalogReader>,
         component: std::path::Component<'_>,
     ) -> Result<(), Error> {
         use std::path::Component;
@@ -531,10 +570,26 @@ impl Shell {
             Component::Normal(entry) => {
                 if stack.last().unwrap().catalog.is_symlink() {
                     bail!("target is a symlink");
-                } else {
+                } else if let Some(catalog) = catalog.as_mut() {
                     match catalog.lookup(&stack.last().unwrap().catalog, entry.as_bytes())? {
                         Some(dir) => stack.push(PathStackEntry::new(dir)),
                         None => bail!("no such file or directory: {:?}", entry),
+                    }
+                } else {
+                    let pxar_entry = parent_pxar_entry(&stack)?;
+                    let parent_dir = block_on(pxar_entry.enter_directory())?;
+                    match block_on(parent_dir.lookup(entry))? {
+                        Some(entry) => {
+                            let entry_attr = DirEntryAttribute::try_from(&entry)?;
+                            stack.push(PathStackEntry {
+                                catalog: catalog::DirEntry {
+                                    name: entry.entry().file_name().as_bytes().into(),
+                                    attr: entry_attr,
+                                },
+                                pxar: Some(entry),
+                            })
+                        }
+                        None => bail!("no such file or directory: {entry:?}"),
                     }
                 }
             }
@@ -545,7 +600,7 @@ impl Shell {
     /// The pxar accessor is required to resolve symbolic links
     async fn walk_catalog(
         stack: &mut Vec<PathStackEntry>,
-        catalog: &mut CatalogReader,
+        catalog: &mut Option<CatalogReader>,
         accessor: &Accessor,
         path: &Path,
         follow_symlinks: &mut Option<usize>,
@@ -559,7 +614,7 @@ impl Shell {
     /// Non-async version cannot follow symlinks.
     fn walk_catalog_nofollow(
         stack: &mut Vec<PathStackEntry>,
-        catalog: &mut CatalogReader,
+        catalog: &mut Option<CatalogReader>,
         path: &Path,
     ) -> Result<(), Error> {
         for c in path.components() {
@@ -612,12 +667,34 @@ impl Shell {
                     tmp_stack = self.position.clone();
                 }
                 Self::walk_catalog_nofollow(&mut tmp_stack, &mut self.catalog, &path)?;
-                (&tmp_stack.last().unwrap().catalog, base, part)
+                (&tmp_stack.last().unwrap(), base, part)
             }
-            None => (&self.position.last().unwrap().catalog, "", input),
+            None => (&self.position.last().unwrap(), "", input),
         };
 
-        let entries = self.catalog.read_dir(parent)?;
+        let entries = if let Some(catalog) = self.catalog.as_mut() {
+            catalog.read_dir(&parent.catalog)?
+        } else {
+            let dir = if let Some(entry) = parent.pxar.as_ref() {
+                block_on(entry.enter_directory())?
+            } else {
+                bail!("missing pxar entry for parent");
+            };
+            let mut out = Vec::new();
+            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+            for entry in entries {
+                let mut name = base.to_string();
+                let file_name = entry.file_name().as_bytes();
+                if file_name.starts_with(part.as_bytes()) {
+                    name.push_str(std::str::from_utf8(file_name)?);
+                    if entry.is_dir() {
+                        name.push('/');
+                    }
+                    out.push(name);
+                }
+            }
+            return Ok(out);
+        };
 
         let mut out = Vec::new();
         for entry in entries {
@@ -637,7 +714,7 @@ impl Shell {
     // Break async recursion here: lookup -> walk_catalog -> step -> lookup
     fn lookup<'future, 's, 'c, 'a, 'p, 'y>(
         stack: &'s [PathStackEntry],
-        catalog: &'c mut CatalogReader,
+        catalog: &'c mut Option<CatalogReader>,
         accessor: &'a Accessor,
         path: Option<&'p Path>,
         follow_symlinks: &'y mut Option<usize>,
@@ -678,7 +755,23 @@ impl Shell {
 
         let last = stack.last().unwrap();
         if last.catalog.is_directory() {
-            let items = self.catalog.read_dir(&stack.last().unwrap().catalog)?;
+            let items = if let Some(catalog) = self.catalog.as_mut() {
+                catalog.read_dir(&stack.last().unwrap().catalog)?
+            } else {
+                let dir = if let Some(entry) = last.pxar.as_ref() {
+                    entry.enter_directory().await?
+                } else {
+                    bail!("missing pxar entry for parent");
+                };
+
+                let mut out = std::io::stdout();
+                let items = crate::pxar::tools::pxar_metadata_read_dir(dir).await?;
+                for item in items {
+                    out.write_all(&item.file_name().as_bytes())?;
+                    out.write_all(b"\n")?;
+                }
+                return Ok(());
+            };
             let mut out = std::io::stdout();
             // FIXME: columnize
             for item in items {
@@ -820,17 +913,36 @@ impl Shell {
     async fn list_matching_files(&mut self) -> Result<(), Error> {
         let matches = self.build_match_list();
 
-        self.catalog.find(
-            &self.position[0].catalog,
-            &mut Vec::new(),
-            &matches,
-            &mut |path: &[u8]| -> Result<(), Error> {
-                let mut out = std::io::stdout();
-                out.write_all(path)?;
-                out.write_all(b"\n")?;
-                Ok(())
-            },
-        )?;
+        if let Some(catalog) = self.catalog.as_mut() {
+            catalog.find(
+                &self.position[0].catalog,
+                &mut Vec::new(),
+                &matches,
+                &mut |path: &[u8]| -> Result<(), Error> {
+                    let mut out = std::io::stdout();
+                    out.write_all(path)?;
+                    out.write_all(b"\n")?;
+                    Ok(())
+                },
+            )?;
+        } else {
+            let parent_dir = if let Some(pxar_entry) = self.position[0].pxar.as_ref() {
+                pxar_entry.enter_directory().await?
+            } else {
+                bail!("missing pxar entry for archive root");
+            };
+            crate::pxar::tools::pxar_metadata_catalog_find(
+                parent_dir,
+                &matches,
+                &|path: &[u8]| -> Result<(), Error> {
+                    let mut out = std::io::stdout();
+                    out.write_all(path)?;
+                    out.write_all(b"\n")?;
+                    Ok(())
+                },
+            )
+            .await?;
+        }
 
         Ok(())
     }
@@ -841,18 +953,37 @@ impl Shell {
             MatchEntry::parse_pattern(pattern, PatternFlag::PATH_NAME, MatchType::Include)?;
 
         let mut found_some = false;
-        self.catalog.find(
-            &self.position[0].catalog,
-            &mut Vec::new(),
-            &[&pattern_entry],
-            &mut |path: &[u8]| -> Result<(), Error> {
-                found_some = true;
-                let mut out = std::io::stdout();
-                out.write_all(path)?;
-                out.write_all(b"\n")?;
-                Ok(())
-            },
-        )?;
+        if let Some(catalog) = self.catalog.as_mut() {
+            catalog.find(
+                &self.position[0].catalog,
+                &mut Vec::new(),
+                &[&pattern_entry],
+                &mut |path: &[u8]| -> Result<(), Error> {
+                    found_some = true;
+                    let mut out = std::io::stdout();
+                    out.write_all(path)?;
+                    out.write_all(b"\n")?;
+                    Ok(())
+                },
+            )?;
+        } else {
+            let parent_dir = if let Some(pxar_entry) = self.position[0].pxar.as_ref() {
+                pxar_entry.enter_directory().await?
+            } else {
+                bail!("missing pxar entry for archive root");
+            };
+            crate::pxar::tools::pxar_metadata_catalog_find(
+                parent_dir,
+                &[&pattern_entry],
+                &|path: &[u8]| -> Result<(), Error> {
+                    let mut out = std::io::stdout();
+                    out.write_all(path)?;
+                    out.write_all(b"\n")?;
+                    Ok(())
+                },
+            )
+            .await?;
+        }
 
         if found_some && select {
             self.selected.insert(pattern_os, pattern_entry);
@@ -945,6 +1076,18 @@ impl Shell {
     }
 }
 
+fn parent_pxar_entry(dir_stack: &[PathStackEntry]) -> Result<&FileEntry, Error> {
+    if let Some(parent) = dir_stack.last().as_ref() {
+        if let Some(entry) = parent.pxar.as_ref() {
+            Ok(entry)
+        } else {
+            bail!("missing pxar entry for parent");
+        }
+    } else {
+        bail!("missing parent entry on stack");
+    }
+}
+
 struct ExtractorState<'a> {
     path: Vec<u8>,
     path_len: usize,
@@ -960,22 +1103,38 @@ struct ExtractorState<'a> {
 
     extractor: crate::pxar::extract::Extractor,
 
-    catalog: &'a mut CatalogReader,
+    catalog: &'a mut Option<CatalogReader>,
     match_list: &'a [MatchEntry],
     accessor: &'a Accessor,
 }
 
 impl<'a> ExtractorState<'a> {
     pub fn new(
-        catalog: &'a mut CatalogReader,
+        catalog: &'a mut Option<CatalogReader>,
         dir_stack: Vec<PathStackEntry>,
         extractor: crate::pxar::extract::Extractor,
         match_list: &'a [MatchEntry],
         accessor: &'a Accessor,
     ) -> Result<Self, Error> {
-        let read_dir = catalog
-            .read_dir(&dir_stack.last().unwrap().catalog)?
-            .into_iter();
+        let read_dir = if let Some(catalog) = catalog.as_mut() {
+            catalog
+                .read_dir(&dir_stack.last().unwrap().catalog)?
+                .into_iter()
+        } else {
+            let pxar_entry = parent_pxar_entry(&dir_stack)?;
+            let dir = block_on(pxar_entry.enter_directory())?;
+            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+
+            let mut catalog_entries = Vec::with_capacity(entries.len());
+            for entry in entries {
+                let entry_attr = DirEntryAttribute::try_from(&entry).unwrap();
+                catalog_entries.push(catalog::DirEntry {
+                    name: entry.entry().file_name().as_bytes().into(),
+                    attr: entry_attr,
+                });
+            }
+            catalog_entries.into_iter()
+        };
         Ok(Self {
             path: Vec::new(),
             path_len: 0,
@@ -1053,11 +1212,29 @@ impl<'a> ExtractorState<'a> {
         entry: catalog::DirEntry,
         match_result: Option<MatchType>,
     ) -> Result<(), Error> {
+        let entry_iter = if let Some(catalog) = self.catalog.as_mut() {
+            catalog.read_dir(&entry)?.into_iter()
+        } else {
+            self.dir_stack.push(PathStackEntry::new(entry.clone()));
+            let dir = Shell::walk_pxar_archive(self.accessor, &mut self.dir_stack).await?;
+            self.dir_stack.pop();
+            let dir = dir.enter_directory().await?;
+            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+            entries
+                .into_iter()
+                .map(|entry| {
+                    let entry_attr = DirEntryAttribute::try_from(&entry).unwrap();
+                    catalog::DirEntry {
+                        name: entry.entry().file_name().as_bytes().into(),
+                        attr: entry_attr,
+                    }
+                })
+                .collect::<Vec<catalog::DirEntry>>()
+                .into_iter()
+        };
         // enter a new directory:
-        self.read_dir_stack.push(mem::replace(
-            &mut self.read_dir,
-            self.catalog.read_dir(&entry)?.into_iter(),
-        ));
+        self.read_dir_stack
+            .push(mem::replace(&mut self.read_dir, entry_iter));
         self.matches_stack.push(self.matches);
         self.dir_stack.push(PathStackEntry::new(entry));
         self.path_len_stack.push(self.path_len);

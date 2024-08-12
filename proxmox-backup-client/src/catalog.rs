@@ -230,10 +230,28 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     )
     .await?;
 
-    let mut tmpfile = pbs_client::tools::create_tmp_file()?;
-
     let (manifest, _) = client.download_manifest().await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
+
+    if let Err(_err) = manifest.lookup_file_info(CATALOG_NAME) {
+        // No catalog, fallback to pxar archive accessor if present
+        let accessor = helper::get_pxar_fuse_accessor(
+            &server_archive_name,
+            client.clone(),
+            &manifest,
+            crypt_config.clone(),
+        )
+        .await?;
+
+        let state = Shell::new(None, &server_archive_name, accessor).await?;
+        log::info!("Starting interactive shell");
+        state.shell().await?;
+        record_repository(&repo);
+
+        return Ok(());
+    }
+
+    let mut tmpfile = pbs_client::tools::create_tmp_file()?;
 
     let decoder = helper::get_pxar_fuse_accessor(
         &server_archive_name,
@@ -268,7 +286,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
 
     catalogfile.seek(SeekFrom::Start(0))?;
     let catalog_reader = CatalogReader::new(catalogfile);
-    let state = Shell::new(catalog_reader, &server_archive_name, decoder).await?;
+    let state = Shell::new(Some(catalog_reader), &server_archive_name, decoder).await?;
 
     log::info!("Starting interactive shell");
     state.shell().await?;
