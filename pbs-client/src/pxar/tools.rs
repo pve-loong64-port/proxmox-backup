@@ -299,30 +299,12 @@ pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
         while let Some(entry) = entries_iter.next().await {
             let entry = entry?.decode_entry().await?;
 
-            let entry_attr = match entry.kind() {
-                EntryKind::Version(_) | EntryKind::Prelude(_) | EntryKind::GoodbyeTable => continue,
-                EntryKind::Directory => DirEntryAttribute::Directory {
-                    start: entry.entry_range_info().entry_range.start,
-                },
-                EntryKind::File { size, .. } => {
-                    let mtime = match entry.metadata().mtime_as_duration() {
-                        SignedDuration::Positive(val) => i64::try_from(val.as_secs())?,
-                        SignedDuration::Negative(val) => -i64::try_from(val.as_secs())?,
-                    };
-                    DirEntryAttribute::File { size: *size, mtime }
-                }
-                EntryKind::Device(_) => match entry.metadata().file_type() {
-                    mode::IFBLK => DirEntryAttribute::BlockDevice,
-                    mode::IFCHR => DirEntryAttribute::CharDevice,
-                    _ => bail!("encountered unknown device type"),
-                },
-                EntryKind::Symlink(_) => DirEntryAttribute::Symlink,
-                EntryKind::Hardlink(_) => DirEntryAttribute::Hardlink,
-                EntryKind::Fifo => DirEntryAttribute::Fifo,
-                EntryKind::Socket => DirEntryAttribute::Socket,
+            let entry_attr = match DirEntryAttribute::try_from(&entry) {
+                Ok(attr) => attr,
+                Err(_) => continue,
             };
 
-            let entry_path = entry_path_with_prefix(&entry, path_prefix);
+            let entry_path = crate::pxar::tools::entry_path_with_prefix(&entry, path_prefix);
             entries.push(ArchiveEntry::new(
                 entry_path.as_os_str().as_bytes(),
                 Some(&entry_attr),

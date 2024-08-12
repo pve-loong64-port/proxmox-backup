@@ -7,6 +7,10 @@ use anyhow::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 
 use pathpatterns::{MatchList, MatchType};
+use pxar::accessor::aio::FileEntry;
+use pxar::accessor::ReadAt;
+use pxar::format::SignedDuration;
+use pxar::{mode, EntryKind};
 
 use proxmox_io::ReadExt;
 use proxmox_schema::api;
@@ -102,6 +106,42 @@ pub enum DirEntryAttribute {
     CharDevice,
     Fifo,
     Socket,
+}
+
+impl<T> TryFrom<&FileEntry<T>> for DirEntryAttribute
+where
+    T: Clone + ReadAt,
+{
+    type Error = Error;
+
+    fn try_from(entry: &FileEntry<T>) -> Result<Self, Self::Error> {
+        let attr = match entry.kind() {
+            EntryKind::Version(_) | EntryKind::Prelude(_) | EntryKind::GoodbyeTable => bail!(
+                "cannot convert pxar entry kind {:?} to catalog directory entry attribute",
+                entry.kind(),
+            ),
+            EntryKind::Directory => DirEntryAttribute::Directory {
+                start: entry.entry_range_info().entry_range.start,
+            },
+            EntryKind::File { size, .. } => {
+                let mtime = match entry.metadata().mtime_as_duration() {
+                    SignedDuration::Positive(val) => i64::try_from(val.as_secs())?,
+                    SignedDuration::Negative(val) => -i64::try_from(val.as_secs())?,
+                };
+                DirEntryAttribute::File { size: *size, mtime }
+            }
+            EntryKind::Device(_) => match entry.metadata().file_type() {
+                mode::IFBLK => DirEntryAttribute::BlockDevice,
+                mode::IFCHR => DirEntryAttribute::CharDevice,
+                _ => bail!("encountered unknown device type"),
+            },
+            EntryKind::Symlink(_) => DirEntryAttribute::Symlink,
+            EntryKind::Hardlink(_) => DirEntryAttribute::Hardlink,
+            EntryKind::Fifo => DirEntryAttribute::Fifo,
+            EntryKind::Socket => DirEntryAttribute::Socket,
+        };
+        Ok(attr)
+    }
 }
 
 impl DirEntry {
