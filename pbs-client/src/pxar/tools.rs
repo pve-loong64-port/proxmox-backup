@@ -8,7 +8,7 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
 
-use pxar::accessor::aio::Accessor;
+use pxar::accessor::aio::{Accessor, FileEntry};
 use pxar::accessor::ReadAt;
 use pxar::format::{SignedDuration, StatxTimestamp};
 use pxar::{mode, Entry, EntryKind, Metadata};
@@ -322,16 +322,7 @@ pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
                 EntryKind::Socket => DirEntryAttribute::Socket,
             };
 
-            let entry_path = if let Some(prefix) = path_prefix {
-                let mut entry_path = PathBuf::from(prefix);
-                match entry.path().strip_prefix("/") {
-                    Ok(path) => entry_path.push(path),
-                    Err(_) => entry_path.push(entry.path()),
-                }
-                entry_path
-            } else {
-                PathBuf::from(entry.path())
-            };
+            let entry_path = entry_path_with_prefix(&entry, path_prefix);
             entries.push(ArchiveEntry::new(
                 entry_path.as_os_str().as_bytes(),
                 Some(&entry_attr),
@@ -406,4 +397,21 @@ pub async fn get_remote_pxar_reader(
     let archive_size = reader.archive_size();
 
     Ok((LocalDynamicReadAt::new(reader), archive_size))
+}
+
+/// Generate entry path for given [`FileEntry`], prefixed by given `path_prefix` component(s).
+pub(crate) fn entry_path_with_prefix<T: Clone + ReadAt>(
+    entry: &FileEntry<T>,
+    path_prefix: Option<&str>,
+) -> PathBuf {
+    if let Some(prefix) = path_prefix {
+        let mut entry_path = PathBuf::from(prefix);
+        match entry.path().strip_prefix("/") {
+            Ok(path) => entry_path.push(path),
+            Err(_) => entry_path.push(entry.path()),
+        }
+        entry_path
+    } else {
+        PathBuf::from(entry.path())
+    }
 }
