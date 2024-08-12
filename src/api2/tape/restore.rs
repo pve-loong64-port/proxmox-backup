@@ -25,7 +25,7 @@ use pbs_api_types::{
     PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ, TAPE_RESTORE_NAMESPACE_SCHEMA,
     TAPE_RESTORE_SNAPSHOT_SCHEMA, UPID_SCHEMA,
 };
-use pbs_client::tools::handle_root_with_optional_format_version_prelude;
+use pbs_client::pxar::tools::handle_root_with_optional_format_version_prelude;
 use pbs_config::CachedUserInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;

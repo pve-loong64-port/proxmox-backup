@@ -339,3 +339,39 @@ pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
 
     Ok(entries)
 }
+
+/// Decode possible format version and prelude entries before getting the root directory
+/// entry.
+///
+/// Returns the root directory entry and, if present, the prelude entry
+pub fn handle_root_with_optional_format_version_prelude<R: pxar::decoder::SeqRead>(
+    decoder: &mut pxar::decoder::sync::Decoder<R>,
+) -> Result<(pxar::Entry, Option<pxar::Entry>), Error> {
+    let first = decoder
+        .next()
+        .ok_or_else(|| format_err!("missing root entry"))??;
+    match first.kind() {
+        pxar::EntryKind::Directory => {
+            let version = pxar::format::FormatVersion::Version1;
+            log::debug!("pxar format version '{version:?}'");
+            Ok((first, None))
+        }
+        pxar::EntryKind::Version(version) => {
+            log::debug!("pxar format version '{version:?}'");
+            let second = decoder
+                .next()
+                .ok_or_else(|| format_err!("missing root entry"))??;
+            match second.kind() {
+                pxar::EntryKind::Directory => Ok((second, None)),
+                pxar::EntryKind::Prelude(_prelude) => {
+                    let third = decoder
+                        .next()
+                        .ok_or_else(|| format_err!("missing root entry"))??;
+                    Ok((third, Some(second)))
+                }
+                _ => bail!("unexpected entry kind {:?}", second.kind()),
+            }
+        }
+        _ => bail!("unexpected entry kind {:?}", first.kind()),
+    }
+}

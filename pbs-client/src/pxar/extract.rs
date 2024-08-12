@@ -29,8 +29,8 @@ use proxmox_compression::zip::{ZipEncoder, ZipEntry};
 
 use crate::pxar::dir_stack::PxarDirStack;
 use crate::pxar::metadata;
+use crate::pxar::tools::handle_root_with_optional_format_version_prelude;
 use crate::pxar::Flags;
-use crate::tools::handle_root_with_optional_format_version_prelude;
 
 pub struct PxarExtractOptions<'a> {
     pub match_list: &'a [MatchEntry],
