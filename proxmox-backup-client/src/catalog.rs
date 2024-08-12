@@ -8,11 +8,13 @@ use proxmox_router::cli::*;
 use proxmox_schema::api;
 
 use pbs_api_types::BackupNamespace;
+use pbs_client::pxar::tools::get_remote_pxar_reader;
 use pbs_client::tools::has_pxar_filename_extension;
 use pbs_client::tools::key_source::get_encryption_key_password;
 use pbs_client::{BackupReader, RemoteChunkReader};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json::required_string_param;
+use pxar::accessor::aio::Accessor;
 
 use crate::helper;
 use crate::{
@@ -88,13 +90,48 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
     let (manifest, _) = client.download_manifest().await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
+    let file_info = match manifest.lookup_file_info(CATALOG_NAME) {
+        Ok(file_info) => file_info,
+        Err(err) => {
+            let mut metadata_archives = Vec::new();
+            // No catalog, fallback to metadata archives if present
+            for archive in manifest.files() {
+                if archive.filename.ends_with(".mpxar.didx") {
+                    metadata_archives.push(archive.filename.clone());
+                }
+            }
+            metadata_archives.sort_unstable_by(|a, b| a.cmp(b));
+
+            for archive in &metadata_archives {
+                let (reader, archive_size) = get_remote_pxar_reader(
+                    &archive,
+                    client.clone(),
+                    &manifest,
+                    crypt_config.clone(),
+                )
+                .await?;
+                // only care about the metadata, don't attach a payload reader
+                let reader = pxar::PxarVariant::Unified(reader);
+                let accessor = Accessor::new(reader, archive_size).await?;
+                let root_dir = accessor.open_root().await?;
+                let prefix = format!("./{archive}");
+                pbs_client::pxar::tools::pxar_metadata_catalog_dump_dir(root_dir, Some(&prefix))
+                    .await?;
+            }
+
+            if !metadata_archives.is_empty() {
+                return Ok(Value::Null);
+            }
+
+            bail!(err);
+        }
+    };
+
     let index = client
         .download_dynamic_index(&manifest, CATALOG_NAME)
         .await?;
 
     let most_used = index.find_most_used_chunks(8);
-
-    let file_info = manifest.lookup_file_info(CATALOG_NAME)?;
 
     let chunk_reader = RemoteChunkReader::new(
         client.clone(),
