@@ -1,19 +1,21 @@
 //! Some common methods used within the pxar code.
 
 use std::ffi::OsStr;
+use std::future::Future;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
 
-use pxar::accessor::aio::{Accessor, FileEntry};
+use pxar::accessor::aio::{Accessor, Directory, FileEntry};
 use pxar::accessor::ReadAt;
-use pxar::format::{SignedDuration, StatxTimestamp};
+use pxar::format::StatxTimestamp;
 use pxar::{mode, Entry, EntryKind, Metadata};
 
-use pbs_datastore::catalog::{ArchiveEntry, DirEntryAttribute};
+use pbs_datastore::catalog::{ArchiveEntry, CatalogEntryType, DirEntryAttribute};
 
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
 use pbs_datastore::index::IndexFile;
@@ -396,4 +398,62 @@ pub(crate) fn entry_path_with_prefix<T: Clone + ReadAt>(
     } else {
         PathBuf::from(entry.path())
     }
+}
+
+/// Read a sorted list of pxar archive entries from given parent entry via the pxar accessor.
+pub(crate) async fn pxar_metadata_read_dir<T: Clone + Send + Sync + ReadAt>(
+    parent_dir: Directory<T>,
+) -> Result<Vec<FileEntry<T>>, Error> {
+    let mut entries_iter = parent_dir.read_dir();
+    let mut entries = Vec::new();
+    while let Some(entry) = entries_iter.next().await {
+        let entry = entry?.decode_entry().await?;
+        entries.push(entry);
+    }
+    entries.sort_unstable_by(|a, b| a.path().cmp(b.path()));
+    Ok(entries)
+}
+
+/// Dump pxar archive entry by using the same format used to dump entries from a catalog.
+fn pxar_metadata_catalog_dump_entry<'future, T: Clone + Send + Sync + ReadAt + 'future>(
+    entry: FileEntry<T>,
+    path_prefix: Option<&'future str>,
+) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'future>> {
+    let entry_path = entry_path_with_prefix(&entry, path_prefix);
+
+    Box::pin(async move {
+        if let Ok(attr) = DirEntryAttribute::try_from(&entry) {
+            let etype = CatalogEntryType::from(&attr);
+            match attr {
+                DirEntryAttribute::File { size, mtime } => {
+                    let mut mtime_string = mtime.to_string();
+                    if let Ok(s) = proxmox_time::strftime_local("%FT%TZ", mtime) {
+                        mtime_string = s;
+                    }
+                    log::info!("{etype} {entry_path:?} {size} {mtime_string}");
+                }
+                DirEntryAttribute::Directory { .. } => {
+                    log::info!("{etype} {entry_path:?}");
+                    let dir = entry.enter_directory().await?;
+                    pxar_metadata_catalog_dump_dir(dir, path_prefix).await?;
+                }
+                _ => log::info!("{etype} {entry_path:?}"),
+            }
+        }
+
+        Ok(())
+    })
+}
+
+/// Recursively iterate over pxar archive entries and dump them using the same format used to dump
+/// entries from a catalog.
+pub async fn pxar_metadata_catalog_dump_dir<T: Clone + Send + Sync + ReadAt>(
+    parent_dir: Directory<T>,
+    path_prefix: Option<&str>,
+) -> Result<(), Error> {
+    let entries = pxar_metadata_read_dir(parent_dir).await?;
+    for entry in entries {
+        pxar_metadata_catalog_dump_entry(entry, path_prefix).await?;
+    }
+    Ok(())
 }
