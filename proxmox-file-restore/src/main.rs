@@ -187,8 +187,12 @@ async fn list_files(
                 let accessor = Accessor::new(reader, archive_size).await?;
                 let path = OsStr::from_bytes(&path);
 
-                pbs_client::tools::pxar_metadata_catalog_lookup(accessor, path, Some(&archive_name))
-                    .await
+                pbs_client::pxar::tools::pxar_metadata_catalog_lookup(
+                    accessor,
+                    path,
+                    Some(&archive_name),
+                )
+                .await
             }
         }
         ExtractPath::VM(file, path) => {

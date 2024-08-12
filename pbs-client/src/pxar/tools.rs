@@ -3,11 +3,17 @@
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
+use std::path::PathBuf;
 
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
 
-use pxar::{format::StatxTimestamp, mode, Entry, EntryKind, Metadata};
+use pxar::accessor::aio::Accessor;
+use pxar::accessor::ReadAt;
+use pxar::format::{SignedDuration, StatxTimestamp};
+use pxar::{mode, Entry, EntryKind, Metadata};
+
+use pbs_datastore::catalog::{ArchiveEntry, DirEntryAttribute};
 
 /// Get the file permissions as `nix::Mode`
 pub(crate) fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
@@ -256,4 +262,80 @@ pub fn format_multi_line_entry(entry: &Entry) -> String {
             format_mtime(&meta.stat.mtime),
         )
     }
+}
+
+/// Look up the directory entries of the given directory `path` in a pxar archive via it's given
+/// `accessor` and return the entries formatted as [`ArchiveEntry`]'s, compatible with reading
+/// entries from the catalog.
+///
+/// If the optional `path_prefix` is given, all returned entry paths will be prefixed with it.
+pub async fn pxar_metadata_catalog_lookup<T: Clone + ReadAt>(
+    accessor: Accessor<T>,
+    path: &OsStr,
+    path_prefix: Option<&str>,
+) -> Result<Vec<ArchiveEntry>, Error> {
+    let root = accessor.open_root().await?;
+    let dir_entry = root
+        .lookup(&path)
+        .await
+        .map_err(|err| format_err!("lookup failed - {err}"))?
+        .ok_or_else(|| format_err!("lookup failed - error opening '{path:?}'"))?;
+
+    let mut entries = Vec::new();
+    if let EntryKind::Directory = dir_entry.kind() {
+        let dir_entry = dir_entry
+            .enter_directory()
+            .await
+            .map_err(|err| format_err!("failed to enter directory - {err}"))?;
+
+        let mut entries_iter = dir_entry.read_dir();
+        while let Some(entry) = entries_iter.next().await {
+            let entry = entry?.decode_entry().await?;
+
+            let entry_attr = match entry.kind() {
+                EntryKind::Version(_) | EntryKind::Prelude(_) | EntryKind::GoodbyeTable => continue,
+                EntryKind::Directory => DirEntryAttribute::Directory {
+                    start: entry.entry_range_info().entry_range.start,
+                },
+                EntryKind::File { size, .. } => {
+                    let mtime = match entry.metadata().mtime_as_duration() {
+                        SignedDuration::Positive(val) => i64::try_from(val.as_secs())?,
+                        SignedDuration::Negative(val) => -i64::try_from(val.as_secs())?,
+                    };
+                    DirEntryAttribute::File { size: *size, mtime }
+                }
+                EntryKind::Device(_) => match entry.metadata().file_type() {
+                    mode::IFBLK => DirEntryAttribute::BlockDevice,
+                    mode::IFCHR => DirEntryAttribute::CharDevice,
+                    _ => bail!("encountered unknown device type"),
+                },
+                EntryKind::Symlink(_) => DirEntryAttribute::Symlink,
+                EntryKind::Hardlink(_) => DirEntryAttribute::Hardlink,
+                EntryKind::Fifo => DirEntryAttribute::Fifo,
+                EntryKind::Socket => DirEntryAttribute::Socket,
+            };
+
+            let entry_path = if let Some(prefix) = path_prefix {
+                let mut entry_path = PathBuf::from(prefix);
+                match entry.path().strip_prefix("/") {
+                    Ok(path) => entry_path.push(path),
+                    Err(_) => entry_path.push(entry.path()),
+                }
+                entry_path
+            } else {
+                PathBuf::from(entry.path())
+            };
+            entries.push(ArchiveEntry::new(
+                entry_path.as_os_str().as_bytes(),
+                Some(&entry_attr),
+            ));
+        }
+    } else {
+        bail!(format!(
+            "expected directory entry, got entry kind '{:?}'",
+            dir_entry.kind()
+        ));
+    }
+
+    Ok(entries)
 }

@@ -1737,7 +1737,7 @@ pub async fn catalog(
         let accessor = Accessor::new(reader, archive_size).await?;
 
         let file_path = decode_path(&filepath)?;
-        pbs_client::tools::pxar_metadata_catalog_lookup(
+        pbs_client::pxar::tools::pxar_metadata_catalog_lookup(
             accessor,
             OsStr::from_bytes(&file_path),
             None,
