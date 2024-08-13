@@ -13,6 +13,7 @@ authors = [
 edition = "2021"
 license = "AGPL-3"
 repository = "https://git.proxmox.com/?p=proxmox-backup.git"
+rust-version = "1.80"
 
 [package]
 name = "proxmox-backup"
