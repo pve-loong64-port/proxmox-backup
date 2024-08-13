@@ -7,6 +7,7 @@ use std::fs::{read_to_string, remove_file, File, OpenOptions};
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
@@ -22,9 +23,7 @@ use proxmox_time::epoch_i64;
 
 const RUN_DIR: &str = "/run/pbs-loopdev";
 
-lazy_static::lazy_static! {
-    static ref LOOPDEV_REGEX: Regex = Regex::new(r"^loop\d+$").unwrap();
-}
+static LOOPDEV_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^loop\d+$").unwrap());
 
 /// Represents an ongoing FUSE-session that has been mapped onto a loop device.
 /// Create with map_loop, then call 'main' and poll until startup_chan reports
