@@ -7,9 +7,9 @@
 //! [SectionConfig]: proxmox_section_config::SectionConfig
 
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use anyhow::Error;
-use lazy_static::lazy_static;
 
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
@@ -18,10 +18,8 @@ use pbs_api_types::{MediaPoolConfig, MEDIA_POOL_NAME_SCHEMA};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
-lazy_static! {
-    /// Static [`SectionConfig`] to access parser/writer functions.
-    pub static ref CONFIG: SectionConfig = init();
-}
+/// Static [`SectionConfig`] to access parser/writer functions.
+pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
     let mut config = SectionConfig::new(&MEDIA_POOL_NAME_SCHEMA);

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Error;
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
@@ -10,9 +10,7 @@ use pbs_api_types::{PruneJobConfig, JOB_ID_SCHEMA};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
-lazy_static! {
-    pub static ref CONFIG: SectionConfig = init();
-}
+pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
     const OBJ_SCHEMA: &AllOfSchema = PruneJobConfig::API_SCHEMA.unwrap_all_of_schema();

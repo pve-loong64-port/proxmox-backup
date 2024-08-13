@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use anyhow::Error;
-use lazy_static::lazy_static;
 
 use pbs_buildcfg::configdir;
 use proxmox_schema::{ApiType, ObjectSchema};
@@ -10,9 +10,7 @@ use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlug
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 use pbs_api_types::{AdRealmConfig, LdapRealmConfig, OpenIdRealmConfig, REALM_ID_SCHEMA};
 
-lazy_static! {
-    pub static ref CONFIG: SectionConfig = init();
-}
+pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
     const AD_SCHEMA: &ObjectSchema = AdRealmConfig::API_SCHEMA.unwrap_object_schema();

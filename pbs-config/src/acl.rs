@@ -2,11 +2,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 
 use anyhow::{bail, Error};
-
-use lazy_static::lazy_static;
 
 use proxmox_schema::{ApiStringFormat, ApiType, Schema, StringSchema};
 
@@ -14,25 +12,26 @@ use pbs_api_types::{Authid, Role, Userid, ROLE_NAME_NO_ACCESS};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
-lazy_static! {
-    /// Map of pre-defined [Roles](Role) to their associated [privileges](PRIVILEGES) combination
-    /// and description.
-    pub static ref ROLE_NAMES: HashMap<&'static str, (u64, &'static str)> = {
-        let mut map = HashMap::new();
+/// Map of pre-defined [Roles](Role) to their associated [privileges](PRIVILEGES) combination
+/// and description.
+pub static ROLE_NAMES: LazyLock<HashMap<&'static str, (u64, &'static str)>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
 
-        let list = match Role::API_SCHEMA {
-            Schema::String(StringSchema { format: Some(ApiStringFormat::Enum(list)), .. }) => list,
-            _ => unreachable!(),
-        };
-
-        for entry in list.iter() {
-            let privs: u64 = Role::from_str(entry.value).unwrap() as u64;
-            map.insert(entry.value, (privs, entry.description));
-        }
-
-        map
+    let list = match Role::API_SCHEMA {
+        Schema::String(StringSchema {
+            format: Some(ApiStringFormat::Enum(list)),
+            ..
+        }) => list,
+        _ => unreachable!(),
     };
-}
+
+    for entry in list.iter() {
+        let privs: u64 = Role::from_str(entry.value).unwrap() as u64;
+        map.insert(entry.value, (privs, entry.description));
+    }
+
+    map
+});
 
 pub fn split_acl_path(path: &str) -> Vec<&str> {
     let items = path.split('/');
@@ -722,13 +721,13 @@ pub fn cached_config() -> Result<Arc<AclTree>, Error> {
         last_mtime_nsec: i64,
     }
 
-    lazy_static! {
-        static ref CACHED_CONFIG: RwLock<ConfigCache> = RwLock::new(ConfigCache {
+    static CACHED_CONFIG: LazyLock<RwLock<ConfigCache>> = LazyLock::new(|| {
+        RwLock::new(ConfigCache {
             data: None,
             last_mtime: 0,
-            last_mtime_nsec: 0
-        });
-    }
+            last_mtime_nsec: 0,
+        })
+    });
 
     let stat = match nix::sys::stat::stat(ACL_CFG_FILENAME) {
         Ok(stat) => Some(stat),

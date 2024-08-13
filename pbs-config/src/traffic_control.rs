@@ -1,8 +1,8 @@
 //! Traffic Control Settings (Network rate limits)
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use anyhow::Error;
-use lazy_static::lazy_static;
 
 use proxmox_schema::{ApiType, Schema};
 
@@ -13,10 +13,8 @@ use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlug
 use crate::ConfigVersionCache;
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
-lazy_static! {
-    /// Static [`SectionConfig`] to access parser/writer functions.
-    pub static ref CONFIG: SectionConfig = init();
-}
+/// Static [`SectionConfig`] to access parser/writer functions.
+pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
     let mut config = SectionConfig::new(&TRAFFIC_CONTROL_ID_SCHEMA);

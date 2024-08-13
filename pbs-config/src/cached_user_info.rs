@@ -1,9 +1,8 @@
 //! Cached user info for fast ACL permission checks
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 
 use anyhow::{bail, Error};
-use lazy_static::lazy_static;
 
 use proxmox_router::UserInformation;
 use proxmox_section_config::SectionConfigData;
@@ -26,13 +25,13 @@ struct ConfigCache {
     last_user_cache_generation: usize,
 }
 
-lazy_static! {
-    static ref CACHED_CONFIG: RwLock<ConfigCache> = RwLock::new(ConfigCache {
+static CACHED_CONFIG: LazyLock<RwLock<ConfigCache>> = LazyLock::new(|| {
+    RwLock::new(ConfigCache {
         data: None,
         last_update: 0,
-        last_user_cache_generation: 0
-    });
-}
+        last_user_cache_generation: 0,
+    })
+});
 
 impl CachedUserInfo {
     /// Returns a cached instance (up to 5 seconds old).
