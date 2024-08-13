@@ -4,9 +4,9 @@ use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
+use std::sync::LazyLock;
 
 use anyhow::{bail, format_err, Error};
-use lazy_static::lazy_static;
 use log::{info, warn};
 
 use proxmox_schema::const_regex;
@@ -21,27 +21,25 @@ const_regex! {
     ZPOOL_IMPORT_DISK_REGEX = r"^\t {2,4}(vd[a-z]+(?:\d+)?)\s+ONLINE$";
 }
 
-lazy_static! {
-    static ref FS_OPT_MAP: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
+static FS_OPT_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
 
-        // otherwise ext complains about mounting read-only
-        m.insert("ext2", "noload");
-        m.insert("ext3", "noload");
-        m.insert("ext4", "noload");
+    // otherwise ext complains about mounting read-only
+    m.insert("ext2", "noload");
+    m.insert("ext3", "noload");
+    m.insert("ext4", "noload");
 
-        m.insert("xfs", "norecovery");
+    m.insert("xfs", "norecovery");
 
-        // ufs2 is used as default since FreeBSD 5.0 released in 2003, so let's assume that
-        // whatever the user is trying to restore is not using anything older...
-        m.insert("ufs", "ufstype=ufs2");
+    // ufs2 is used as default since FreeBSD 5.0 released in 2003, so let's assume that
+    // whatever the user is trying to restore is not using anything older...
+    m.insert("ufs", "ufstype=ufs2");
 
-        m.insert("ntfs", "utf8");
-        m.insert("ntfs3", "iocharset=utf8");
+    m.insert("ntfs", "utf8");
+    m.insert("ntfs3", "iocharset=utf8");
 
-        m
-    };
-}
+    m
+});
 
 pub enum ResolveResult {
     Path(PathBuf),

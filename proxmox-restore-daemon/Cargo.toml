@@ -4,6 +4,7 @@ version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 description = "Proxmox Restore Daemon"
+rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
@@ -12,7 +13,6 @@ env_logger.workspace = true
 futures.workspace = true
 http.workspace = true
 hyper.workspace = true
-lazy_static.workspace = true
 libc.workspace = true
 log.workspace = true
 nix.workspace = true

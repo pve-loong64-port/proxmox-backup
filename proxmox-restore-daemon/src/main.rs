@@ -6,10 +6,9 @@ use std::os::unix::{
     net,
 };
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{bail, format_err, Error};
-use lazy_static::lazy_static;
 use log::{error, info};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -29,12 +28,9 @@ pub const MAX_PENDING: usize = 32;
 /// Will be present in base initramfs
 pub const VM_DETECT_FILE: &str = "/restore-vm-marker";
 
-lazy_static! {
-    /// The current disks state. Use for accessing data on the attached snapshots.
-    pub static ref DISK_STATE: Arc<Mutex<DiskState>> = {
-        Arc::new(Mutex::new(DiskState::scan().unwrap()))
-    };
-}
+/// The current disks state. Use for accessing data on the attached snapshots.
+pub static DISK_STATE: LazyLock<Arc<Mutex<DiskState>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(DiskState::scan().unwrap())));
 
 fn init_disk_state() {
     info!("scanning all disks...");
