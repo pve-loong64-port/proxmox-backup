@@ -14,7 +14,6 @@ h2.workspace = true
 hex.workspace = true
 http.workspace = true
 hyper.workspace = true
-lazy_static.workspace = true
 libc.workspace = true
 log.workspace = true
 nix.workspace = true
