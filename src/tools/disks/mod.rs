@@ -6,7 +6,7 @@ use std::io;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use anyhow::{bail, format_err, Error};
 use libc::dev_t;
@@ -32,10 +32,8 @@ pub use lvm::*;
 mod smart;
 pub use smart::*;
 
-lazy_static::lazy_static! {
-    static ref ISCSI_PATH_REGEX: regex::Regex =
-        regex::Regex::new(r"host[^/]*/session[^/]*").unwrap();
-}
+static ISCSI_PATH_REGEX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"host[^/]*/session[^/]*").unwrap());
 
 /// Disk management context.
 ///

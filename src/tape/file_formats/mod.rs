@@ -2,6 +2,7 @@
 //! tapes
 
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use endian_trait::Endian;
 use serde::{Deserialize, Serialize};
@@ -56,22 +57,48 @@ pub const PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0: [u8; 8] =
 // openssl::sha::sha256(b"Proxmox Backup Catalog Archive v1.1")[0..8];
 pub const PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1: [u8; 8] = [179, 236, 113, 240, 173, 236, 2, 96];
 
-lazy_static::lazy_static! {
-    // Map content magic numbers to human readable names.
-    static ref PROXMOX_TAPE_CONTENT_NAME: HashMap<&'static [u8;8], &'static str> = {
+// Map content magic numbers to human readable names.
+static PROXMOX_TAPE_CONTENT_NAME: LazyLock<HashMap<&'static [u8; 8], &'static str>> =
+    LazyLock::new(|| {
         let mut map = HashMap::new();
-        map.insert(&PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0, "Proxmox Backup Tape Label v1.0");
-        map.insert(&PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0, "Proxmox Backup MediaSet Label v1.0");
-        map.insert(&PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_0, "Proxmox Backup Chunk Archive v1.0");
-        map.insert(&PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_1, "Proxmox Backup Chunk Archive v1.1");
-        map.insert(&PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_0, "Proxmox Backup Snapshot Archive v1.0");
-        map.insert(&PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1, "Proxmox Backup Snapshot Archive v1.1");
-        map.insert(&PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2, "Proxmox Backup Snapshot Archive v1.2");
-        map.insert(&PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0, "Proxmox Backup Catalog Archive v1.0");
-        map.insert(&PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1, "Proxmox Backup Catalog Archive v1.1");
+        map.insert(
+            &PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0,
+            "Proxmox Backup Tape Label v1.0",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0,
+            "Proxmox Backup MediaSet Label v1.0",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_0,
+            "Proxmox Backup Chunk Archive v1.0",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_1,
+            "Proxmox Backup Chunk Archive v1.1",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_0,
+            "Proxmox Backup Snapshot Archive v1.0",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1,
+            "Proxmox Backup Snapshot Archive v1.1",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
+            "Proxmox Backup Snapshot Archive v1.2",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0,
+            "Proxmox Backup Catalog Archive v1.0",
+        );
+        map.insert(
+            &PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1,
+            "Proxmox Backup Catalog Archive v1.1",
+        );
         map
-    };
-}
+    });
 
 /// Map content magic numbers to human readable names.
 pub fn proxmox_tape_magic_to_text(magic: &[u8; 8]) -> Option<String> {

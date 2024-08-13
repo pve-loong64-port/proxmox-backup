@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, Error};
-use lazy_static::lazy_static;
 
 use proxmox_schema::api;
 
@@ -224,7 +224,5 @@ static WEAROUT_FIELD_ORDER: &[&str] = &[
     "Perc_Rated_Life_Used",
 ];
 
-lazy_static! {
-    static ref WEAROUT_FIELD_NAMES: HashSet<&'static str> =
-        WEAROUT_FIELD_ORDER.iter().cloned().collect();
-}
+static WEAROUT_FIELD_NAMES: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| WEAROUT_FIELD_ORDER.iter().cloned().collect());

@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use anyhow::Error;
-use lazy_static::lazy_static;
 
 use super::types::*;
 
@@ -8,11 +9,9 @@ use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlug
 
 use proxmox_sys::{fs::replace_file, fs::CreateOptions};
 
-lazy_static! {
-    pub static ref SERVICE_CONFIG: SectionConfig = init_service();
-    pub static ref TIMER_CONFIG: SectionConfig = init_timer();
-    pub static ref MOUNT_CONFIG: SectionConfig = init_mount();
-}
+pub static SERVICE_CONFIG: LazyLock<SectionConfig> = LazyLock::new(init_service);
+pub static TIMER_CONFIG: LazyLock<SectionConfig> = LazyLock::new(init_timer);
+pub static MOUNT_CONFIG: LazyLock<SectionConfig> = LazyLock::new(init_mount);
 
 fn init_service() -> SectionConfig {
     let mut config = SectionConfig::with_systemd_syntax(&SYSTEMD_SECTION_NAME_SCHEMA);

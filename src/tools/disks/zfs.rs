@@ -1,23 +1,20 @@
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{bail, Error};
-use lazy_static::lazy_static;
 
 use proxmox_schema::const_regex;
 
 use super::*;
 
-lazy_static! {
-    static ref ZFS_UUIDS: HashSet<&'static str> = {
-        let mut set = HashSet::new();
-        set.insert("6a898cc3-1dd2-11b2-99a6-080020736631"); // apple
-        set.insert("516e7cba-6ecf-11d6-8ff8-00022d09712b"); // bsd
-        set
-    };
-}
+static ZFS_UUIDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    let mut set = HashSet::new();
+    set.insert("6a898cc3-1dd2-11b2-99a6-080020736631"); // apple
+    set.insert("516e7cba-6ecf-11d6-8ff8-00022d09712b"); // bsd
+    set
+});
 
 fn get_pool_from_dataset(dataset: &str) -> &str {
     if let Some(idx) = dataset.find('/') {
@@ -100,10 +97,8 @@ const_regex! {
     OBJSET_REGEX = r"^objset-0x[a-fA-F0-9]+$";
 }
 
-lazy_static::lazy_static! {
-    pub static ref ZFS_DATASET_OBJSET_MAP: Arc<Mutex<HashMap<String, (String, String)>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-}
+pub static ZFS_DATASET_OBJSET_MAP: LazyLock<Arc<Mutex<HashMap<String, (String, String)>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 // parses /proc/spl/kstat/zfs/POOL/objset-ID files
 // they have the following format:

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 use anyhow::Error;
@@ -21,11 +21,9 @@ use crate::tools::SharedRateLimiter;
 
 pub type SharedRateLimit = Arc<dyn ShareableRateLimit>;
 
-lazy_static::lazy_static! {
-    /// Shared traffic control cache singleton.
-    pub static ref TRAFFIC_CONTROL_CACHE: Arc<Mutex<TrafficControlCache>> =
-        Arc::new(Mutex::new(TrafficControlCache::new()));
-}
+/// Shared traffic control cache singleton.
+pub static TRAFFIC_CONTROL_CACHE: LazyLock<Arc<Mutex<TrafficControlCache>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(TrafficControlCache::new())));
 
 struct ParsedTcRule {
     config: TrafficControlRule,    // original rule config

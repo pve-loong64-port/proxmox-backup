@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use anyhow::Error;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -15,9 +16,7 @@ pub const PLUGIN_ID_SCHEMA: Schema = StringSchema::new("ACME Challenge Plugin ID
     .max_length(32)
     .schema();
 
-lazy_static! {
-    pub static ref CONFIG: SectionConfig = init();
-}
+pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 #[api(
     properties: {

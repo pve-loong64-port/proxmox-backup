@@ -1,19 +1,17 @@
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
+use std::sync::LazyLock;
 
 use anyhow::Error;
-use lazy_static::lazy_static;
 use serde_json::Value;
 
 use super::LsblkInfo;
 
-lazy_static! {
-    static ref LVM_UUIDS: HashSet<&'static str> = {
-        let mut set = HashSet::new();
-        set.insert("e6d6d379-f507-44c2-a23c-238f2a3df928");
-        set
-    };
-}
+static LVM_UUIDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    let mut set = HashSet::new();
+    set.insert("e6d6d379-f507-44c2-a23c-238f2a3df928");
+    set
+});
 
 /// Get set of devices used by LVM (pvs).
 ///

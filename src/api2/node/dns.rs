@@ -1,9 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use const_format::concatcp;
-use lazy_static::lazy_static;
 use openssl::sha;
 use regex::Regex;
 use serde_json::{json, Value};
@@ -46,11 +45,10 @@ pub fn read_etc_resolv_conf() -> Result<Value, Error> {
 
     let data = String::from_utf8(raw)?;
 
-    lazy_static! {
-        static ref DOMAIN_REGEX: Regex = Regex::new(r"^\s*(?:search|domain)\s+(\S+)\s*").unwrap();
-        static ref SERVER_REGEX: Regex =
-            Regex::new(concatcp!(r"^\s*nameserver\s+(", IPRE_STR, r")\s*")).unwrap();
-    }
+    static DOMAIN_REGEX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^\s*(?:search|domain)\s+(\S+)\s*").unwrap());
+    static SERVER_REGEX: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(concatcp!(r"^\s*nameserver\s+(", IPRE_STR, r")\s*")).unwrap());
 
     let mut options = String::new();
 
@@ -131,9 +129,7 @@ pub fn update_dns(
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
 ) -> Result<Value, Error> {
-    lazy_static! {
-        static ref MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-    }
+    static MUTEX: LazyLock<Arc<Mutex<()>>> = LazyLock::new(|| Arc::new(Mutex::new(())));
 
     let _guard = MUTEX.lock();
 

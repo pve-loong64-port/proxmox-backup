@@ -1,12 +1,11 @@
 use std::fs;
 use std::ops::ControlFlow;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::SystemTime;
 
 use anyhow::{bail, format_err, Error};
 use hex::FromHex;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -430,10 +429,8 @@ impl Serialize for ChallengeSchemaWrapper {
 }
 
 fn get_cached_challenge_schemas() -> Result<ChallengeSchemaWrapper, Error> {
-    lazy_static! {
-        static ref CACHE: Mutex<Option<(Arc<Vec<AcmeChallengeSchema>>, SystemTime)>> =
-            Mutex::new(None);
-    }
+    static CACHE: LazyLock<Mutex<Option<(Arc<Vec<AcmeChallengeSchema>>, SystemTime)>>> =
+        LazyLock::new(|| Mutex::new(None));
 
     // the actual loading code
     let mut last = CACHE.lock().unwrap();
