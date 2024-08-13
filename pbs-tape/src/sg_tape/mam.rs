@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
+use std::sync::LazyLock;
 
 use anyhow::{bail, format_err, Error};
 use endian_trait::Endian;
@@ -114,18 +115,15 @@ static MAM_ATTRIBUTES: &[MamType] = &[
     MamType::bin(0x10_01, 24, "Alternate Unique Cartridge Identify (Alt-UCI)"),
 ];
 
-lazy_static::lazy_static! {
+static MAM_ATTRIBUTE_NAMES: LazyLock<HashMap<u16, &'static MamType>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
 
-    static ref MAM_ATTRIBUTE_NAMES: HashMap<u16, &'static MamType> = {
-        let mut map = HashMap::new();
+    for entry in MAM_ATTRIBUTES {
+        map.insert(entry.id, entry);
+    }
 
-        for entry in MAM_ATTRIBUTES {
-            map.insert(entry.id, entry);
-        }
-
-        map
-    };
-}
+    map
+});
 
 fn read_tape_mam<F: AsRawFd>(file: &mut F) -> Result<Vec<u8>, Error> {
     let alloc_len: u32 = 32 * 1024;

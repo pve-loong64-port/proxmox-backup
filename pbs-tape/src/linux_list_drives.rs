@@ -3,6 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use anyhow::{bail, format_err, Error};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
@@ -12,10 +13,8 @@ use proxmox_sys::fs::scan_subdir;
 
 use pbs_api_types::{DeviceKind, OptionalDeviceIdentification, TapeDeviceInfo};
 
-lazy_static::lazy_static! {
-    static ref SCSI_GENERIC_NAME_REGEX: regex::Regex =
-        regex::Regex::new(r"^sg\d+$").unwrap();
-}
+static SCSI_GENERIC_NAME_REGEX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^sg\d+$").unwrap());
 
 /// List linux tape changer devices
 pub fn linux_tape_changer_list() -> Vec<TapeDeviceInfo> {
