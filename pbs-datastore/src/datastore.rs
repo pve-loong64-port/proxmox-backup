@@ -2,10 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{bail, format_err, Error};
-use lazy_static::lazy_static;
 use nix::unistd::{unlinkat, UnlinkatFlags};
 use tracing::{info, warn};
 
@@ -33,10 +32,8 @@ use crate::manifest::ArchiveType;
 use crate::task_tracking::{self, update_active_operations};
 use crate::DataBlob;
 
-lazy_static! {
-    static ref DATASTORE_MAP: Mutex<HashMap<String, Arc<DataStoreImpl>>> =
-        Mutex::new(HashMap::new());
-}
+static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 description = "low level pbs data storage access"
+rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
@@ -12,7 +13,6 @@ crc32fast.workspace = true
 endian_trait.workspace = true
 futures.workspace = true
 hex = { workspace = true, features = [ "serde" ] }
-lazy_static.workspace = true
 libc.workspace = true
 log.workspace = true
 nix.workspace = true
