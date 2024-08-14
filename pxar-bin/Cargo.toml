@@ -27,4 +27,3 @@ proxmox-sys.workspace = true
 
 pbs-client.workspace = true
 pbs-pxar-fuse.workspace = true
-pbs-tools.workspace = true
