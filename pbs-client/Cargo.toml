@@ -46,6 +46,5 @@ proxmox-time.workspace = true
 pxar.workspace = true
 
 pbs-api-types.workspace = true
-pbs-buildcfg.workspace = true
 pbs-datastore.workspace = true
 pbs-tools.workspace = true
