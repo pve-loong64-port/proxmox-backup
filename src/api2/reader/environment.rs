@@ -10,6 +10,7 @@ use pbs_datastore::backup_info::BackupDir;
 use pbs_datastore::DataStore;
 use proxmox_rest_server::formatter::*;
 use proxmox_rest_server::WorkerTask;
+use tracing::info;
 
 /// `RpcEnvironment` implementation for backup reader service
 #[derive(Clone)]
@@ -39,7 +40,7 @@ impl ReaderEnvironment {
             auth_id,
             worker,
             datastore,
-            debug: false,
+            debug: tracing::enabled!(tracing::Level::DEBUG),
             formatter: JSON_FORMATTER,
             backup_dir,
             allowed_chunks: Arc::new(RwLock::new(HashSet::new())),
@@ -47,12 +48,16 @@ impl ReaderEnvironment {
     }
 
     pub fn log<S: AsRef<str>>(&self, msg: S) {
-        self.worker.log_message(msg);
+        info!("{}", msg.as_ref());
     }
 
     pub fn debug<S: AsRef<str>>(&self, msg: S) {
         if self.debug {
-            self.worker.log_message(msg);
+            // This is kinda weird, we would like to use tracing::debug! here and automatically
+            // filter it, but self.debug is set from the client-side and the logs are printed on
+            // client and server side. This means that if the client sets the log level to debug,
+            // both server and client need to have 'debug' logs printed.
+            self.log(msg);
         }
     }
 

@@ -2,6 +2,7 @@ use anyhow::{bail, format_err, Error};
 use nix::dir::Dir;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tracing::info;
 
 use ::serde::Serialize;
 use serde_json::{json, Value};
@@ -141,7 +142,7 @@ impl BackupEnvironment {
             auth_id,
             worker,
             datastore,
-            debug: false,
+            debug: tracing::enabled!(tracing::Level::DEBUG),
             formatter: JSON_FORMATTER,
             backup_dir,
             last_backup: None,
@@ -687,12 +688,16 @@ impl BackupEnvironment {
     }
 
     pub fn log<S: AsRef<str>>(&self, msg: S) {
-        self.worker.log_message(msg);
+        info!("{}", msg.as_ref());
     }
 
     pub fn debug<S: AsRef<str>>(&self, msg: S) {
         if self.debug {
-            self.worker.log_message(msg);
+            // This is kinda weird, we would like to use tracing::debug! here and automatically
+            // filter it, but self.debug is set from the client-side and the logs are printed on
+            // client and server side. This means that if the client sets the log level to debug,
+            // both server and client need to have 'debug' logs printed.
+            self.log(msg);
         }
     }
 

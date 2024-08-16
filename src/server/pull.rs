@@ -278,8 +278,15 @@ impl PullSource for RemoteSource {
         ns: &BackupNamespace,
         dir: &BackupDir,
     ) -> Result<Arc<dyn PullReader>, Error> {
-        let backup_reader =
-            BackupReader::start(&self.client, None, self.repo.store(), ns, dir, true).await?;
+        let backup_reader = BackupReader::start(
+            &self.client,
+            None,
+            self.repo.store(),
+            ns,
+            dir,
+            tracing::enabled!(tracing::Level::DEBUG),
+        )
+        .await?;
         Ok(Arc::new(RemoteReader {
             backup_reader,
             dir: dir.clone(),
