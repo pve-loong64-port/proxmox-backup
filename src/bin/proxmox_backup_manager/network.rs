@@ -129,6 +129,24 @@ fn pending_network_changes(
     Ok(Value::Null)
 }
 
+#[api()]
+/// Reload network changes
+async fn reload_network_changes(
+    mut param: Value,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<Value, Error> {
+    param["node"] = "localhost".into();
+
+    let info = &api2::node::network::API_METHOD_RELOAD_NETWORK_CONFIG;
+    let result = match info.handler {
+        ApiHandler::Async(handler) => (handler)(param, info, rpcenv).await?,
+        _ => unreachable!(),
+    };
+    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+
+    Ok(Value::Null)
+}
+
 pub fn network_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_NETWORK_DEVICES))
@@ -168,8 +186,7 @@ pub fn network_commands() -> CommandLineInterface {
         )
         .insert(
             "reload",
-            CliCommand::new(&api2::node::network::API_METHOD_RELOAD_NETWORK_CONFIG)
-                .fixed_param("node", String::from("localhost")),
+            CliCommand::new(&API_METHOD_RELOAD_NETWORK_CHANGES),
         );
 
     cmd_def.into()
