@@ -746,9 +746,18 @@ fn decode_element_status_page(
                     let desc: TransportDescriptor = unsafe { reader.read_be_value()? };
 
                     let full = (desc.flags1 & 1) != 0;
-                    let volume_tag = subhead.parse_optional_volume_tag(&mut reader, full)?;
 
-                    subhead.skip_alternate_volume_tag(&mut reader)?;
+                    let volume_tag = match subhead.parse_optional_volume_tag(&mut reader, full) {
+                        Ok(tag) => tag,
+                        Err(err) => {
+                            log::warn!("could not read optional volume tag: {err}");
+                            None
+                        }
+                    };
+
+                    if let Err(err) = subhead.skip_alternate_volume_tag(&mut reader) {
+                        log::warn!("could not skip alternate volume tag: {err}");
+                    }
 
                     result.last_element_address = Some(desc.element_address);
 
