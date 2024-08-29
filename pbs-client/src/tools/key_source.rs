@@ -302,45 +302,43 @@ pub(crate) fn read_optional_default_master_pubkey() -> Result<Option<KeyWithSour
 }
 
 #[cfg(test)]
-static mut TEST_DEFAULT_ENCRYPTION_KEY: Result<Option<Vec<u8>>, Error> = Ok(None);
+static TEST_DEFAULT_ENCRYPTION_KEY: std::sync::Mutex<Result<Option<Vec<u8>>, Error>> =
+    std::sync::Mutex::new(Ok(None));
 
 #[cfg(test)]
 pub(crate) fn read_optional_default_encryption_key() -> Result<Option<KeyWithSource>, Error> {
     // not safe when multiple concurrent test cases end up here!
-    unsafe {
-        match &TEST_DEFAULT_ENCRYPTION_KEY {
-            Ok(Some(key)) => Ok(Some(KeyWithSource::from_default(key.clone()))),
-            Ok(None) => Ok(None),
-            Err(_) => bail!("test error"),
-        }
+    match &*TEST_DEFAULT_ENCRYPTION_KEY.lock().unwrap() {
+        Ok(Some(key)) => Ok(Some(KeyWithSource::from_default(key.clone()))),
+        Ok(None) => Ok(None),
+        Err(_) => bail!("test error"),
     }
 }
 
 #[cfg(test)]
 // not safe when multiple concurrent test cases end up here!
 pub(crate) unsafe fn set_test_encryption_key(value: Result<Option<Vec<u8>>, Error>) {
-    TEST_DEFAULT_ENCRYPTION_KEY = value;
+    *TEST_DEFAULT_ENCRYPTION_KEY.lock().unwrap() = value;
 }
 
 #[cfg(test)]
-static mut TEST_DEFAULT_MASTER_PUBKEY: Result<Option<Vec<u8>>, Error> = Ok(None);
+static TEST_DEFAULT_MASTER_PUBKEY: std::sync::Mutex<Result<Option<Vec<u8>>, Error>> =
+    std::sync::Mutex::new(Ok(None));
 
 #[cfg(test)]
 pub(crate) fn read_optional_default_master_pubkey() -> Result<Option<KeyWithSource>, Error> {
     // not safe when multiple concurrent test cases end up here!
-    unsafe {
-        match &TEST_DEFAULT_MASTER_PUBKEY {
-            Ok(Some(key)) => Ok(Some(KeyWithSource::from_default(key.clone()))),
-            Ok(None) => Ok(None),
-            Err(_) => bail!("test error"),
-        }
+    match &*TEST_DEFAULT_MASTER_PUBKEY.lock().unwrap() {
+        Ok(Some(key)) => Ok(Some(KeyWithSource::from_default(key.clone()))),
+        Ok(None) => Ok(None),
+        Err(_) => bail!("test error"),
     }
 }
 
 #[cfg(test)]
 // not safe when multiple concurrent test cases end up here!
 pub(crate) unsafe fn set_test_default_master_pubkey(value: Result<Option<Vec<u8>>, Error>) {
-    TEST_DEFAULT_MASTER_PUBKEY = value;
+    *TEST_DEFAULT_MASTER_PUBKEY.lock().unwrap() = value;
 }
 
 pub fn get_encryption_key_password() -> Result<Vec<u8>, Error> {
