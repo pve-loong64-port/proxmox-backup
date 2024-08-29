@@ -23,6 +23,7 @@ udev.workspace = true
 
 proxmox-io.workspace = true
 proxmox-lang.workspace=true
+proxmox-log.workspace=true
 proxmox-sys.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true

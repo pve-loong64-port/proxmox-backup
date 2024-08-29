@@ -16,6 +16,7 @@ use std::fs::File;
 use anyhow::{bail, Error};
 use serde_json::Value;
 
+use proxmox_log::init_cli_logger;
 use proxmox_router::cli::*;
 use proxmox_router::RpcEnvironment;
 use proxmox_schema::api;
@@ -387,7 +388,7 @@ fn scan(param: Value) -> Result<(), Error> {
 }
 
 fn main() -> Result<(), Error> {
-    init_cli_logger("PBS_LOG", "info");
+    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO)?;
 
     let uid = nix::unistd::Uid::current();
 

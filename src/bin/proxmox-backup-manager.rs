@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::str::FromStr;
 
 use anyhow::{format_err, Error};
+use proxmox_log::init_cli_logger;
 use serde_json::{json, Value};
 
 use proxmox_router::{cli::*, RpcEnvironment};
@@ -491,7 +492,7 @@ async fn get_versions(verbose: bool, param: Value) -> Result<Value, Error> {
 }
 
 async fn run() -> Result<(), Error> {
-    init_cli_logger("PBS_LOG", "info");
+    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO)?;
     proxmox_backup::server::notifications::init()?;
 
     let cmd_def = CliCommandMap::new()

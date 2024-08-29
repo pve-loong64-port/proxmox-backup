@@ -1,5 +1,6 @@
+use proxmox_log::init_cli_logger;
 use proxmox_router::{
-    cli::{init_cli_logger, run_cli_command, CliCommandMap, CliEnvironment},
+    cli::{run_cli_command, CliCommandMap, CliEnvironment},
     RpcEnvironment,
 };
 
@@ -7,7 +8,7 @@ mod proxmox_backup_debug;
 use proxmox_backup_debug::*;
 
 fn main() {
-    init_cli_logger("PBS_LOG", "info");
+    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO).expect("failed to initiate logger");
 
     let cmd_def = CliCommandMap::new()
         .insert("inspect", inspect::inspect_commands())

@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::ReadExt;
+use proxmox_log::init_cli_logger;
 use proxmox_router::cli::*;
 use proxmox_router::RpcEnvironment;
 use proxmox_schema::api;
@@ -997,7 +998,7 @@ async fn catalog_media(mut param: Value) -> Result<(), Error> {
 }
 
 fn main() {
-    init_cli_logger("PBS_LOG", "info");
+    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO).expect("failed to initiate logger");
 
     let cmd_def = CliCommandMap::new()
         .insert(
