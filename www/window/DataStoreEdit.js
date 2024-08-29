@@ -61,6 +61,7 @@ Ext.define('PBS.DataStoreEdit', {
 			allowBlank: false,
 			fieldLabel: gettext('Backing Path'),
 			emptyText: gettext('An absolute path'),
+			validator: val => val?.trim() !== '/',
 		    },
 		],
 		column2: [
@@ -91,6 +92,13 @@ Ext.define('PBS.DataStoreEdit', {
 			xtype: 'textfield',
 			name: 'comment',
 			fieldLabel: gettext('Comment'),
+		    },
+		],
+		advancedColumn1: [
+		    {
+			xtype: 'checkbox',
+			name: 'reuse-datastore',
+			fieldLabel: gettext('Reuse existing datastore'),
 		    },
 		],
 
