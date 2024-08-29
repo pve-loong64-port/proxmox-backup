@@ -214,7 +214,9 @@ pub fn create_datastore_disk(
                     bail!("datastore '{}' already exists.", datastore.name);
                 }
 
-                crate::api2::config::datastore::do_create_datastore(lock, config, datastore)?;
+                crate::api2::config::datastore::do_create_datastore(
+                    lock, config, datastore, false,
+                )?;
             }
 
             Ok(())

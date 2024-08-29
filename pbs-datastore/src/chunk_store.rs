@@ -156,6 +156,22 @@ impl ChunkStore {
         lockfile_path
     }
 
+    /// Check if the chunkstore path is absolute and that we can
+    /// access it. Returns the absolute '.chunks' path on success.
+    fn chunk_dir_accessible(base: &Path) -> Result<PathBuf, Error> {
+        if !base.is_absolute() {
+            bail!("expected absolute path - got {:?}", base);
+        }
+
+        let chunk_dir = Self::chunk_dir(base);
+
+        if let Err(err) = std::fs::metadata(&chunk_dir) {
+            bail!("unable to open chunk store at {chunk_dir:?} - {err}");
+        }
+
+        Ok(chunk_dir)
+    }
+
     /// Opens the chunk store with a new process locker.
     ///
     /// Note that this must be used with care, as it's dangerous to create two instances on the
@@ -168,15 +184,7 @@ impl ChunkStore {
     ) -> Result<Self, Error> {
         let base: PathBuf = base.into();
 
-        if !base.is_absolute() {
-            bail!("expected absolute path - got {:?}", base);
-        }
-
-        let chunk_dir = Self::chunk_dir(&base);
-
-        if let Err(err) = std::fs::metadata(&chunk_dir) {
-            bail!("unable to open chunk store '{name}' at {chunk_dir:?} - {err}");
-        }
+        let chunk_dir = ChunkStore::chunk_dir_accessible(&base)?;
 
         let lockfile_path = Self::lockfile_path(&base);
 
@@ -560,6 +568,53 @@ impl ChunkStore {
     pub fn try_exclusive_lock(&self) -> Result<ProcessLockExclusiveGuard, Error> {
         // unwrap: only `None` in unit tests
         ProcessLocker::try_exclusive_lock(self.locker.clone().unwrap())
+    }
+
+    /// Checks permissions and owner of passed path.
+    fn check_permissions<T: AsRef<Path>>(path: T, file_mode: u32) -> Result<(), Error> {
+        match nix::sys::stat::stat(path.as_ref()) {
+            Ok(stat) => {
+                if stat.st_uid != u32::from(pbs_config::backup_user()?.uid)
+                    || stat.st_gid != u32::from(pbs_config::backup_group()?.gid)
+                    || stat.st_mode != file_mode
+                {
+                    bail!(
+                            "unable to open existing chunk store path {:?} - permissions or owner not correct",
+                            path.as_ref(),
+                        );
+                }
+            }
+            Err(err) => {
+                bail!(
+                    "unable to open existing chunk store path {:?} - {err}",
+                    path.as_ref(),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify vital files in datastore. Checks the owner and permissions of: the chunkstore, it's
+    /// subdirectories and the lock file.
+    pub fn verify_chunkstore<T: AsRef<Path>>(path: T) -> Result<(), Error> {
+        // Check datastore root path perm/owner
+        ChunkStore::check_permissions(path.as_ref(), 0o700)?;
+
+        let chunk_dir = Self::chunk_dir(path.as_ref());
+        // Check datastore .chunks path perm/owner
+        ChunkStore::check_permissions(&chunk_dir, 0o700)?;
+
+        // Check all .chunks subdirectories
+        for i in 0..64 * 1024 {
+            let mut l1path = chunk_dir.clone();
+            l1path.push(format!("{:04x}", i));
+            ChunkStore::check_permissions(&l1path, 0o700)?;
+        }
+
+        // Check .lock file
+        let lockfile_path = Self::lockfile_path(path.as_ref());
+        ChunkStore::check_permissions(lockfile_path, 0o600)?;
+        Ok(())
     }
 }
 

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::Error;
+use anyhow::{bail, Error};
 use hex::FromHex;
 use serde_json::Value;
 use tracing::warn;
@@ -70,21 +70,39 @@ pub(crate) fn do_create_datastore(
     _lock: BackupLockGuard,
     mut config: SectionConfigData,
     datastore: DataStoreConfig,
+    reuse_datastore: bool,
 ) -> Result<(), Error> {
     let path: PathBuf = datastore.path.clone().into();
+
+    if path.parent().is_none() {
+        bail!("cannot create datastore in root path");
+    }
 
     let tuning: DatastoreTuning = serde_json::from_value(
         DatastoreTuning::API_SCHEMA
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
-    let backup_user = pbs_config::backup_user()?;
-    let _store = ChunkStore::create(
-        &datastore.name,
-        path,
-        backup_user.uid,
-        backup_user.gid,
-        tuning.sync_level.unwrap_or_default(),
-    )?;
+
+    if reuse_datastore {
+        ChunkStore::verify_chunkstore(&path)?;
+    } else {
+        if let Ok(dir) = std::fs::read_dir(&path) {
+            for file in dir {
+                let name = file?.file_name();
+                if !name.to_str().map_or(false, |name| name.starts_with('.')) {
+                    bail!("datastore path is not empty");
+                }
+            }
+        }
+        let backup_user = pbs_config::backup_user()?;
+        let _store = ChunkStore::create(
+            &datastore.name,
+            path,
+            backup_user.uid,
+            backup_user.gid,
+            tuning.sync_level.unwrap_or_default(),
+        )?;
+    }
 
     config.set_data(&datastore.name, "datastore", &datastore)?;
 
@@ -101,6 +119,12 @@ pub(crate) fn do_create_datastore(
                 type: DataStoreConfig,
                 flatten: true,
             },
+            "reuse-datastore": {
+                type: Boolean,
+                optional: true,
+                default: false,
+                description: "Re-use existing datastore directory."
+            }
         },
     },
     access: {
@@ -110,6 +134,7 @@ pub(crate) fn do_create_datastore(
 /// Create new datastore config.
 pub fn create_datastore(
     config: DataStoreConfig,
+    reuse_datastore: bool,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let lock = pbs_config::datastore::lock_config()?;
@@ -154,7 +179,7 @@ pub fn create_datastore(
         auth_id.to_string(),
         to_stdout,
         move |_worker| {
-            do_create_datastore(lock, section_config, config)?;
+            do_create_datastore(lock, section_config, config, reuse_datastore)?;
 
             if let Some(prune_job_config) = prune_job_config {
                 do_create_prune_job(prune_job_config)
