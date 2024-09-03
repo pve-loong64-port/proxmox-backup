@@ -813,6 +813,14 @@ impl Shell {
                     &mut None,
                 )
                 .await?;
+
+                if new_position.is_empty() {
+                    // Avoid moving below archive root into catalog root, thereby treating
+                    // the archive root as its own parent directory.
+                    self.position.truncate(1);
+                    return Ok(());
+                }
+
                 if !new_position.last().unwrap().catalog.is_directory() {
                     bail!("not a directory");
                 }
