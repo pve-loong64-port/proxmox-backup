@@ -19,7 +19,7 @@ use pbs_client::pxar::{
 use pxar::EntryKind;
 
 use proxmox_human_byte::HumanByte;
-use proxmox_log::init_cli_logger;
+use proxmox_log::{debug, enabled, error, info, init_cli_logger, Level};
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
@@ -40,7 +40,7 @@ fn extract_archive_from_reader<R: std::io::Read>(
         Path::new(target),
         feature_flags,
         |path| {
-            log::debug!("{:?}", path);
+            debug!("{path:?}");
         },
         options,
     )
@@ -222,7 +222,7 @@ fn extract_archive(
         // otherwise we want to log them but not act on them
         Some(Box::new(move |err| {
             was_ok.store(false, Ordering::Release);
-            log::error!("error: {}", err);
+            error!("error: {err:?}");
             Ok(())
         })
             as Box<dyn FnMut(Error) -> Result<(), Error> + Send>)
@@ -243,7 +243,7 @@ fn extract_archive(
         extract_archive_from_reader(&mut reader, target, feature_flags, options, None)
             .map_err(|err| format_err!("error extracting archive - {err:#}"))?;
     } else {
-        log::debug!("PXAR extract: {}", archive);
+        debug!("PXAR extract: {archive}");
         let file = std::fs::File::open(archive)?;
         let mut reader = std::io::BufReader::new(file);
         let mut payload_reader = if let Some(payload_input) = payload_input {
@@ -439,7 +439,7 @@ async fn create_archive(
         PxarWriters::new(writer, None),
         feature_flags,
         move |path| {
-            log::debug!("{:?}", path);
+            debug!("{path:?}");
             Ok(())
         },
         options,
@@ -495,7 +495,7 @@ async fn mount_archive(
     select! {
         res = session.fuse() => res?,
         _ = interrupt.recv().fuse() => {
-            log::debug!("interrupted");
+            debug!("interrupted");
         }
     }
 
@@ -531,14 +531,14 @@ fn dump_archive(archive: String, payload_input: Option<String>) -> Result<(), Er
     for entry in pxar::decoder::Decoder::open(input)? {
         let entry = entry?;
 
-        if log::log_enabled!(log::Level::Debug) {
+        if enabled!(Level::DEBUG) {
             match entry.kind() {
                 EntryKind::Version(version) => {
-                    log::debug!("pxar format version '{version:?}'");
+                    debug!("pxar format version '{version:?}'");
                     continue;
                 }
                 EntryKind::Prelude(prelude) => {
-                    log::debug!("prelude of size {}", HumanByte::from(prelude.data.len()));
+                    debug!("prelude of size {}", HumanByte::from(prelude.data.len()));
                     continue;
                 }
                 EntryKind::File {
@@ -549,7 +549,7 @@ fn dump_archive(archive: String, payload_input: Option<String>) -> Result<(), Er
                     if let Some(last) = last {
                         let skipped = offset - last;
                         if skipped > 0 {
-                            log::debug!("Encountered padding of {skipped} bytes");
+                            debug!("Encountered padding of {skipped} bytes");
                         }
                     }
                     last = Some(offset + size + std::mem::size_of::<pxar::format::Header>() as u64);
@@ -557,11 +557,11 @@ fn dump_archive(archive: String, payload_input: Option<String>) -> Result<(), Er
                 _ => (),
             }
 
-            log::debug!("{}", format_single_line_entry(&entry));
+            debug!("{}", format_single_line_entry(&entry));
         } else {
             match entry.kind() {
                 EntryKind::Version(_) | EntryKind::Prelude(_) => continue,
-                _ => log::info!("{:?}", entry.path()),
+                _ => info!("{:?}", entry.path()),
             }
         }
     }
