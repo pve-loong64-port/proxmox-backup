@@ -226,13 +226,17 @@ async fn call_api_code(
         nix::unistd::setuid(backup_user.uid)?;
     }
     match method.handler {
-        ApiHandler::StreamingSync(handler) => {
+        ApiHandler::SerializingSync(handler) => {
             let res = (handler)(params, method, rpcenv)?.to_value()?;
             Ok(res)
         }
-        ApiHandler::StreamingAsync(handler) => {
+        ApiHandler::SerializingAsync(handler) => {
             let res = (handler)(params, method, rpcenv).await?.to_value()?;
             Ok(res)
+        }
+        ApiHandler::StreamSync(handler) => (handler)(params, method, rpcenv)?.try_collect(),
+        ApiHandler::StreamAsync(handler) => {
+            (handler)(params, method, rpcenv).await?.try_collect().await
         }
         ApiHandler::AsyncHttp(_handler) => {
             bail!("not implemented");
