@@ -19,7 +19,7 @@ use pbs_client::pxar::{
 use pxar::EntryKind;
 
 use proxmox_human_byte::HumanByte;
-use proxmox_log::{debug, enabled, error, info, init_cli_logger, Level};
+use proxmox_log::{debug, enabled, error, init_cli_logger, Level};
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
@@ -557,11 +557,11 @@ fn dump_archive(archive: String, payload_input: Option<String>) -> Result<(), Er
                 _ => (),
             }
 
-            debug!("{}", format_single_line_entry(&entry));
+            println!("{}", format_single_line_entry(&entry));
         } else {
             match entry.kind() {
                 EntryKind::Version(_) | EntryKind::Prelude(_) => continue,
-                _ => info!("{:?}", entry.path()),
+                _ => println!("{:?}", entry.path()),
             }
         }
     }

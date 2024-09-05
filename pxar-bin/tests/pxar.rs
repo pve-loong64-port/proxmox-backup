@@ -215,5 +215,5 @@ fn pxar_list_with_payload_input() {
 \"/folder_9/file_9\"
 ";
 
-    assert_eq!(expected.as_bytes(), output.stderr);
+    assert_eq!(expected.as_bytes(), output.stdout);
 }
