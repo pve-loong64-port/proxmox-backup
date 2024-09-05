@@ -118,7 +118,7 @@ fn get_dir_entry(path: &Path) -> Result<DirEntryAttribute, Error> {
 }
 
 #[api(
-    streaming: true,
+    serializing: true,
     input: {
         properties: {
             "path": {

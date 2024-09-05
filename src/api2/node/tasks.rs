@@ -445,7 +445,7 @@ fn stop_task(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Err
 }
 
 #[api(
-    streaming: true,
+    serializing: true,
     input: {
         properties: {
             node: {

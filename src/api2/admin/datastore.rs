@@ -415,7 +415,7 @@ pub async fn delete_snapshot(
 }
 
 #[api(
-    streaming: true,
+    serializing: true,
     input: {
         properties: {
             store: { schema: DATASTORE_SCHEMA },
