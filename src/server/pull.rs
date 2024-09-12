@@ -28,7 +28,8 @@ use pbs_datastore::{check_backup_owner, DataStore, StoreProgress};
 use pbs_tools::sha::sha256;
 
 use super::sync::{
-    LocalSource, RemoteSource, RemovedVanishedStats, SyncSource, SyncSourceReader, SyncStats,
+    LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo, SkipReason, SyncSource,
+    SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::tools::parallel_handler::ParallelHandler;
@@ -472,85 +473,6 @@ async fn pull_snapshot_from<'a>(
     };
 
     Ok(sync_stats)
-}
-
-#[derive(PartialEq, Eq)]
-enum SkipReason {
-    AlreadySynced,
-    TransferLast,
-}
-
-impl std::fmt::Display for SkipReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                SkipReason::AlreadySynced => "older than the newest local snapshot",
-                SkipReason::TransferLast => "due to transfer-last",
-            }
-        )
-    }
-}
-
-struct SkipInfo {
-    oldest: i64,
-    newest: i64,
-    count: u64,
-    skip_reason: SkipReason,
-}
-
-impl SkipInfo {
-    fn new(skip_reason: SkipReason) -> Self {
-        SkipInfo {
-            oldest: i64::MAX,
-            newest: i64::MIN,
-            count: 0,
-            skip_reason,
-        }
-    }
-
-    fn reset(&mut self) {
-        self.count = 0;
-        self.oldest = i64::MAX;
-        self.newest = i64::MIN;
-    }
-
-    fn update(&mut self, backup_time: i64) {
-        self.count += 1;
-
-        if backup_time < self.oldest {
-            self.oldest = backup_time;
-        }
-
-        if backup_time > self.newest {
-            self.newest = backup_time;
-        }
-    }
-
-    fn affected(&self) -> Result<String, Error> {
-        match self.count {
-            0 => Ok(String::new()),
-            1 => Ok(proxmox_time::epoch_to_rfc3339_utc(self.oldest)?),
-            _ => Ok(format!(
-                "{} .. {}",
-                proxmox_time::epoch_to_rfc3339_utc(self.oldest)?,
-                proxmox_time::epoch_to_rfc3339_utc(self.newest)?,
-            )),
-        }
-    }
-}
-
-impl std::fmt::Display for SkipInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "skipped: {} snapshot(s) ({}) - {}",
-            self.count,
-            self.affected().map_err(|_| std::fmt::Error)?,
-            self.skip_reason,
-        )
-    }
 }
 
 /// Pulls a group according to `params`.

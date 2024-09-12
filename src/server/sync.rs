@@ -467,3 +467,82 @@ impl SyncSource for LocalSource {
         }))
     }
 }
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum SkipReason {
+    AlreadySynced,
+    TransferLast,
+}
+
+impl std::fmt::Display for SkipReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                SkipReason::AlreadySynced => "older than the newest local snapshot",
+                SkipReason::TransferLast => "due to transfer-last",
+            }
+        )
+    }
+}
+
+pub(crate) struct SkipInfo {
+    oldest: i64,
+    newest: i64,
+    pub(crate) count: u64,
+    skip_reason: SkipReason,
+}
+
+impl SkipInfo {
+    pub(crate) fn new(skip_reason: SkipReason) -> Self {
+        SkipInfo {
+            oldest: i64::MAX,
+            newest: i64::MIN,
+            count: 0,
+            skip_reason,
+        }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.count = 0;
+        self.oldest = i64::MAX;
+        self.newest = i64::MIN;
+    }
+
+    pub(crate) fn update(&mut self, backup_time: i64) {
+        self.count += 1;
+
+        if backup_time < self.oldest {
+            self.oldest = backup_time;
+        }
+
+        if backup_time > self.newest {
+            self.newest = backup_time;
+        }
+    }
+
+    fn affected(&self) -> Result<String, Error> {
+        match self.count {
+            0 => Ok(String::new()),
+            1 => Ok(proxmox_time::epoch_to_rfc3339_utc(self.oldest)?),
+            _ => Ok(format!(
+                "{} .. {}",
+                proxmox_time::epoch_to_rfc3339_utc(self.oldest)?,
+                proxmox_time::epoch_to_rfc3339_utc(self.newest)?,
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for SkipInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "skipped: {} snapshot(s) ({}) - {}",
+            self.count,
+            self.affected().map_err(|_| std::fmt::Error)?,
+            self.skip_reason,
+        )
+    }
+}
