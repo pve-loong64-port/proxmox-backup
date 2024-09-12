@@ -547,3 +547,24 @@ impl std::fmt::Display for SkipInfo {
         )
     }
 }
+
+/// Check if a sync from source to target of given namespaces exceeds the global namespace depth limit
+pub(crate) fn check_namespace_depth_limit(
+    source_namespace: &BackupNamespace,
+    target_namespace: &BackupNamespace,
+    namespaces: &[BackupNamespace],
+) -> Result<(), Error> {
+    let target_ns_depth = target_namespace.depth();
+    let sync_ns_depth = namespaces
+        .iter()
+        .map(BackupNamespace::depth)
+        .max()
+        .map_or(0, |v| v - source_namespace.depth());
+
+    if sync_ns_depth + target_ns_depth > MAX_NAMESPACE_DEPTH {
+        bail!(
+            "Syncing would exceed max allowed namespace depth. ({sync_ns_depth}+{target_ns_depth} > {MAX_NAMESPACE_DEPTH})",
+        );
+    }
+    Ok(())
+}

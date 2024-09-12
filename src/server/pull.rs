@@ -28,8 +28,8 @@ use pbs_datastore::{check_backup_owner, DataStore, StoreProgress};
 use pbs_tools::sha::sha256;
 
 use super::sync::{
-    LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo, SkipReason, SyncSource,
-    SyncSourceReader, SyncStats,
+    check_namespace_depth_limit, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
+    SkipReason, SyncSource, SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::tools::parallel_handler::ParallelHandler;
@@ -735,21 +735,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
         params.source.list_namespaces(&mut params.max_depth).await?
     };
 
-    let ns_layers_to_be_pulled = namespaces
-        .iter()
-        .map(BackupNamespace::depth)
-        .max()
-        .map_or(0, |v| v - params.source.get_ns().depth());
-    let target_depth = params.target.ns.depth();
-
-    if ns_layers_to_be_pulled + target_depth > MAX_NAMESPACE_DEPTH {
-        bail!(
-            "Syncing would exceed max allowed namespace depth. ({}+{} > {})",
-            ns_layers_to_be_pulled,
-            target_depth,
-            MAX_NAMESPACE_DEPTH
-        );
-    }
+    check_namespace_depth_limit(&params.source.get_ns(), &params.target.ns, &namespaces)?;
 
     errors |= old_max_depth != params.max_depth; // fail job if we switched to backwards-compat mode
     namespaces.sort_unstable_by_key(|a| a.name_len());
