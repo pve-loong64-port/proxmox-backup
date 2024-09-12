@@ -480,7 +480,8 @@ impl std::fmt::Display for SkipReason {
             f,
             "{}",
             match self {
-                SkipReason::AlreadySynced => "older than the newest local snapshot",
+                SkipReason::AlreadySynced =>
+                    "older than the newest snapshot present on sync target",
                 SkipReason::TransferLast => "due to transfer-last",
             }
         )
