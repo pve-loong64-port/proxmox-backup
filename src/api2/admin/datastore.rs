@@ -271,7 +271,7 @@ pub fn list_groups(
     },
     access: {
         permission: &Permission::Anybody,
-        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any\
+        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any \
             or DATASTORE_PRUNE and being the owner of the group",
     },
 )]
@@ -378,7 +378,7 @@ pub async fn list_snapshot_files(
     },
     access: {
         permission: &Permission::Anybody,
-        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any\
+        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any \
             or DATASTORE_PRUNE and being the owner of the group",
     },
 )]
@@ -958,7 +958,7 @@ pub fn verify(
     returns: pbs_api_types::ADMIN_DATASTORE_PRUNE_RETURN_TYPE,
     access: {
         permission: &Permission::Anybody,
-        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any\
+        description: "Requires on /datastore/{store}[/{namespace}] either DATASTORE_MODIFY for any \
             or DATASTORE_PRUNE and being the owner of the group",
     },
 )]
