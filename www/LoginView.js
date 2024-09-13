@@ -20,6 +20,19 @@ Ext.define('PBS.LoginView', {
     controller: {
 	xclass: 'Ext.app.ViewController',
 
+	init: async function() {
+	    if (Proxmox.consentText !== "") {
+		Ext.create('Proxmox.window.ConsentModal', {
+		    autoShow: true,
+		    consent: Proxmox.Markdown.parse(
+			Ext.htmlEncode(
+			    Proxmox.Utils.base64ToUtf8(Proxmox.consentText)
+			),
+		    ),
+		});
+	    }
+	},
+
 	submitForm: async function() {
 	    var me = this;
 	    var loginForm = me.lookupReference('loginForm');

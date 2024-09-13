@@ -54,5 +54,11 @@ Ext.define('PBS.NodeOptionView', {
 	    deleteEmpty: true,
 	    renderer: Proxmox.Utils.render_language,
 	},
+	{
+	    xtype: 'textareafield',
+	    name: 'consent-text',
+	    text: gettext('Consent Text'),
+	    deleteEmpty: true,
+	},
     ],
 });
