@@ -40,6 +40,14 @@ Proxmox Backup Server supports various languages and authentication back ends
 .. note:: For convenience, you can save the username on the client side, by
   selecting the "Save User name" checkbox at the bottom of the window.
 
+Consent Banner
+^^^^^^^^^^^^^^
+
+A custom consent banner that has to be accepted before login can be configured
+in **Configuration -> Other -> General -> Consent Text**. If there is no
+content, the consent banner will not be displayed. The text will be stored as a
+base64 string in the ``/etc/proxmox-backup/node.cfg`` config file.
+
 
 GUI Overview
 ------------
