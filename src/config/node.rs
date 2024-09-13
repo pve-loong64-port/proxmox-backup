@@ -225,6 +225,10 @@ pub struct NodeConfig {
     /// Maximum days to keep Task logs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_log_max_days: Option<usize>,
+
+    /// Consent banner text
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consent_text: Option<String>,
 }
 
 impl NodeConfig {

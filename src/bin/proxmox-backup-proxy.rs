@@ -45,6 +45,7 @@ use pbs_api_types::{
 };
 
 use proxmox_backup::auth_helpers::*;
+use proxmox_backup::config;
 use proxmox_backup::server::{self, metric_collection};
 use proxmox_backup::tools::PROXMOX_BACKUP_TCP_KEEPALIVE_TIME;
 
@@ -79,7 +80,7 @@ fn get_language(headers: &http::HeaderMap) -> String {
 
     match cookie_from_header(headers, "PBSLangCookie") {
         Some(cookie_lang) if exists(&cookie_lang) => cookie_lang,
-        _ => match proxmox_backup::config::node::config().map(|(cfg, _)| cfg.default_lang) {
+        _ => match config::node::config().map(|(cfg, _)| cfg.default_lang) {
             Ok(Some(default_lang)) if exists(&default_lang) => default_lang,
             _ => String::from(""),
         },
@@ -144,6 +145,10 @@ async fn get_index_future(env: RestEnvironment, parts: Parts) -> Response<Body> 
 
     let theme = get_theme(&parts.headers);
 
+    let consent = config::node::config()
+        .ok()
+        .and_then(|config| config.0.consent_text)
+        .unwrap_or("".to_string());
     let data = json!({
         "NodeName": nodename,
         "UserName": user,
@@ -152,6 +157,7 @@ async fn get_index_future(env: RestEnvironment, parts: Parts) -> Response<Body> 
         "theme": theme,
         "auto": theme == "auto",
         "debug": debug,
+        "consentText": consent,
     });
 
     let (ct, index) = match api.render_template(template_file, &data) {
@@ -360,7 +366,7 @@ fn make_tls_acceptor() -> Result<SslAcceptor, Error> {
     let key_path = configdir!("/proxy.key");
     let cert_path = configdir!("/proxy.pem");
 
-    let (config, _) = proxmox_backup::config::node::config()?;
+    let (config, _) = config::node::config()?;
     let ciphers_tls_1_3 = config.ciphers_tls_1_3;
     let ciphers_tls_1_2 = config.ciphers_tls_1_2;
 

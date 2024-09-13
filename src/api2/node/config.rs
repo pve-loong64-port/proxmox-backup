@@ -67,6 +67,8 @@ pub enum DeletableProperty {
     Description,
     /// Delete the task-log-max-days property
     TaskLogMaxDays,
+    /// Delete the consent-text property
+    ConsentText,
 }
 
 #[api(
@@ -155,6 +157,9 @@ pub fn update_node_config(
                 DeletableProperty::TaskLogMaxDays => {
                     config.task_log_max_days = None;
                 }
+                DeletableProperty::ConsentText => {
+                    config.consent_text = None;
+                }
             }
         }
     }
@@ -197,6 +202,9 @@ pub fn update_node_config(
     }
     if update.task_log_max_days.is_some() {
         config.task_log_max_days = update.task_log_max_days;
+    }
+    if update.consent_text.is_some() {
+        config.consent_text = update.consent_text;
     }
 
     crate::config::node::save_config(&config)?;
