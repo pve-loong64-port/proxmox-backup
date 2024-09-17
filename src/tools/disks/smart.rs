@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
+use std::{collections::{HashMap, HashSet}, path::Path};
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Error};
+use anyhow::Error;
 
 use proxmox_schema::api;
 
@@ -76,7 +76,7 @@ pub struct SmartData {
 }
 
 /// Read smartctl data for a disk (/dev/XXX).
-pub fn get_smart_data(disk: &super::Disk, health_only: bool) -> Result<SmartData, Error> {
+pub fn get_smart_data(disk_path: &Path, health_only: bool) -> Result<SmartData, Error> {
     const SMARTCTL_BIN_PATH: &str = "smartctl";
 
     let mut command = std::process::Command::new(SMARTCTL_BIN_PATH);
@@ -85,10 +85,6 @@ pub fn get_smart_data(disk: &super::Disk, health_only: bool) -> Result<SmartData
         command.args(["-A", "-j"]);
     }
 
-    let disk_path = match disk.device_path() {
-        Some(path) => path,
-        None => bail!("disk {:?} has no node in /dev", disk.syspath()),
-    };
     command.arg(disk_path);
 
     let output = proxmox_sys::command::run_command(

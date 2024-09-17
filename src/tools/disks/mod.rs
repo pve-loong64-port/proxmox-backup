@@ -865,8 +865,8 @@ fn get_partitions_info(
     lvm_devices: &HashSet<u64>,
     zfs_devices: &HashSet<u64>,
     file_system_devices: &HashSet<u64>,
+    lsblk_infos: &[LsblkInfo],
 ) -> Vec<PartitionInfo> {
-    let lsblk_infos = get_lsblk_info().ok();
     partitions
         .values()
         .map(|disk| {
@@ -889,8 +889,8 @@ fn get_partitions_info(
 
             let mounted = disk.is_mounted().unwrap_or(false);
             let mut filesystem = None;
-            if let (Some(devpath), Some(infos)) = (devpath.as_ref(), lsblk_infos.as_ref()) {
-                for info in infos.iter().filter(|i| i.path.eq(devpath)) {
+            if let Some(devpath) = devpath.as_ref() {
+                for info in lsblk_infos.iter().filter(|i| i.path.eq(devpath)) {
                     used = match info.partition_type.as_deref() {
                         Some("21686148-6449-6e6f-744e-656564454649") => PartitionUsageType::BIOS,
                         Some("c12a7328-f81f-11d2-ba4b-00a0c93ec93b") => PartitionUsageType::EFI,
@@ -944,6 +944,7 @@ fn get_disks(
     // fixme: ceph journals/volumes
 
     let mut result = HashMap::new();
+    let mut device_paths = Vec::new();
 
     for item in proxmox_sys::fs::scan_subdir(libc::AT_FDCWD, "/sys/block", &BLOCKDEVICE_NAME_REGEX)?
     {
@@ -1011,6 +1012,8 @@ fn get_disks(
             .map(|p| p.to_owned())
             .map(|p| p.to_string_lossy().to_string());
 
+        device_paths.push((name.clone(), devpath.clone()));
+
         let wwn = disk.wwn().map(|s| s.to_string_lossy().into_owned());
 
         let partitions: Option<Vec<PartitionInfo>> = if include_partitions {
@@ -1020,6 +1023,7 @@ fn get_disks(
                     &lvm_devices,
                     &zfs_devices,
                     &file_system_devices,
+                    &lsblk_info,
                 ))
             })
         } else {

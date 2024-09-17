@@ -115,7 +115,11 @@ pub fn smart_status(disk: String, healthonly: Option<bool>) -> Result<SmartData,
 
     let manager = DiskManage::new();
     let disk = manager.disk_by_name(&disk)?;
-    get_smart_data(&disk, healthonly)
+    if let Some(path) = disk.device_path() {
+        get_smart_data(path, healthonly)
+    } else {
+        bail!("disk {:?} has no node in /dev", disk.syspath());
+    }
 }
 
 #[api(

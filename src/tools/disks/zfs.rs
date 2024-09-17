@@ -70,7 +70,7 @@ pub fn zfs_pool_stats(pool: &OsStr) -> Result<Option<BlockDevStat>, Error> {
 ///
 /// The set is indexed by using the unix raw device number (dev_t is u64)
 pub fn zfs_devices(lsblk_info: &[LsblkInfo], pool: Option<String>) -> Result<HashSet<u64>, Error> {
-    let list = zpool_list(pool, true)?;
+    let list = zpool_list(pool.as_ref(), true)?;
 
     let mut device_set = HashSet::new();
     for entry in list {
@@ -79,12 +79,13 @@ pub fn zfs_devices(lsblk_info: &[LsblkInfo], pool: Option<String>) -> Result<Has
             device_set.insert(meta.rdev());
         }
     }
-
-    for info in lsblk_info.iter() {
-        if let Some(partition_type) = &info.partition_type {
-            if ZFS_UUIDS.contains(partition_type.as_str()) {
-                let meta = std::fs::metadata(&info.path)?;
-                device_set.insert(meta.rdev());
+    if pool.is_none() {
+        for info in lsblk_info.iter() {
+            if let Some(partition_type) = &info.partition_type {
+                if ZFS_UUIDS.contains(partition_type.as_str()) {
+                    let meta = std::fs::metadata(&info.path)?;
+                    device_set.insert(meta.rdev());
+                }
             }
         }
     }
