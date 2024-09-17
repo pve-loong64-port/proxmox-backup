@@ -15,13 +15,15 @@ use once_cell::sync::OnceCell;
 use ::serde::{Deserialize, Serialize};
 
 use proxmox_lang::{io_bail, io_format_err};
+use proxmox_log::info;
 use proxmox_schema::api;
 use proxmox_sys::linux::procfs::{mountinfo::Device, MountInfo};
 
 use pbs_api_types::{BLOCKDEVICE_DISK_AND_PARTITION_NAME_REGEX, BLOCKDEVICE_NAME_REGEX};
 
+use crate::tools::parallel_handler::ParallelHandler;
+
 mod zfs;
-use tracing::info;
 pub use zfs::*;
 mod zpool_status;
 pub use zpool_status::*;
@@ -1049,16 +1051,6 @@ fn get_disks(
             usage = DiskUsageType::DeviceMapper;
         }
 
-        let mut status = SmartStatus::Unknown;
-        let mut wearout = None;
-
-        if !no_smart {
-            if let Ok(smart) = get_smart_data(&disk, false) {
-                status = smart.status;
-                wearout = smart.wearout;
-            }
-        }
-
         let info = DiskUsageInfo {
             name: name.clone(),
             vendor,
@@ -1069,8 +1061,8 @@ fn get_disks(
             size,
             wwn,
             disk_type,
-            status,
-            wearout,
+            status: SmartStatus::Unknown,
+            wearout: None,
             used: usage,
             gpt: disk.has_gpt(),
             rpm: disk.ata_rotation_rate_rpm(),
@@ -1079,6 +1071,30 @@ fn get_disks(
         result.insert(name, info);
     }
 
+    if !no_smart {
+        let (tx, rx) = crossbeam_channel::bounded(result.len());
+
+        let parallel_handler =
+            ParallelHandler::new("smartctl data", 4, move |device: (String, String)| {
+                let smart_data = get_smart_data(Path::new(&device.1), false)?;
+                tx.send((device.0, smart_data))?;
+                Ok(())
+            });
+
+        for (name, path) in device_paths.into_iter() {
+            if let Some(p) = path {
+                parallel_handler.send((name, p))?;
+            }
+        }
+
+        parallel_handler.complete()?;
+        while let Ok(msg) = rx.recv() {
+            if let Some(value) = result.get_mut(&msg.0) {
+                value.wearout = msg.1.wearout;
+                value.status = msg.1.status;
+            }
+        }
+    }
     Ok(result)
 }
 
