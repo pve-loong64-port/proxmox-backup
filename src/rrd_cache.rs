@@ -14,7 +14,7 @@ use proxmox_rrd::Cache;
 use proxmox_sys::fs::CreateOptions;
 
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
-use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
 
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 

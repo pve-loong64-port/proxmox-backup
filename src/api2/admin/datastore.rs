@@ -22,7 +22,7 @@ use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
     Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
 };
-use proxmox_rrd::api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::{

@@ -75,7 +75,8 @@ proxmox-openid = "0.10.0"
 proxmox-rest-server = { version = "0.8", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "3.0.0", default-features = false }
-proxmox-rrd = { version = "0.3", features = [ "api-types" ]}
+proxmox-rrd = "0.4"
+proxmox-rrd-api-types = "1"
 # everything but pbs-config and pbs-client use "api-macro"
 proxmox-schema = "3"
 proxmox-section-config = "2"
@@ -248,6 +249,7 @@ pbs-key-config.workspace = true
 pbs-tape.workspace = true
 pbs-tools.workspace = true
 proxmox-rrd.workspace = true
+proxmox-rrd-api-types.workspace = true
 
 # Local path overrides
 # NOTE: You must run `cargo update` after changing this for it to take effect!
@@ -274,6 +276,7 @@ proxmox-rrd.workspace = true
 #proxmox-rest-server = { path = "../proxmox/proxmox-rest-server" }
 #proxmox-router = { path = "../proxmox/proxmox-router" }
 #proxmox-rrd = { path = "../proxmox/proxmox-rrd" }
+#proxmox-rrd-api-types = { path = "../proxmox/proxmox-rrd-api-types" }
 #proxmox-schema = { path = "../proxmox/proxmox-schema" }
 #proxmox-section-config = { path = "../proxmox/proxmox-section-config" }
 #proxmox-serde = { path = "../proxmox/proxmox-serde" }
