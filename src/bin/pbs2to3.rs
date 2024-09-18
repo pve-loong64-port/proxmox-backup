@@ -123,18 +123,27 @@ impl Checker {
         Ok(())
     }
 
+    fn is_kernel_version_compatible(&self, running_version: &str) -> bool {
+        let re = if self.upgraded {
+            r"^6\.(?:2\.(?:[2-9]\d+|1[6-8]|1\d\d+)|5)[^~]*$"
+        } else {
+            r"^(?:5\.(?:13|15)|6\.2)"
+        };
+        let re = Regex::new(re).expect("failed to compile kernel compat regex");
+
+        re.is_match(running_version)
+    }
+
     fn check_kernel_compat(
         &mut self,
         pkg_versions: &[pbs_api_types::APTUpdateInfo],
     ) -> Result<(), Error> {
         self.output.log_info("Check running kernel version..")?;
-        let (krunning, kinstalled) = if self.upgraded {
-            (
-                Regex::new(r"^6\.(?:2\.(?:[2-9]\d+|1[6-8]|1\d\d+)|5)[^~]*$")?,
-                "proxmox-kernel-6.2",
-            )
+
+        let kinstalled = if self.upgraded {
+            "proxmox-kernel-6.2"
         } else {
-            (Regex::new(r"^(?:5\.(?:13|15)|6\.2)")?, "pve-kernel-5.15")
+            "pve-kernel-5.15"
         };
 
         let output = std::process::Command::new("uname").arg("-r").output();
@@ -144,7 +153,7 @@ impl Checker {
                 .log_fail("unable to determine running kernel version.")?,
             Ok(ret) => {
                 let running_version = std::str::from_utf8(&ret.stdout[..ret.stdout.len() - 1])?;
-                if krunning.is_match(running_version) {
+                if self.is_kernel_version_compatible(running_version) {
                     if self.upgraded {
                         self.output.log_pass(format!(
                             "running new kernel '{running_version}' after upgrade."
@@ -618,5 +627,44 @@ impl ConsoleOutput {
         }
         self.reset()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_is_kernel_version_compatible(
+        expected_versions: &[&str],
+        unexpected_versions: &[&str],
+        upgraded: bool,
+    ) {
+        let checker = Checker {
+            output: ConsoleOutput::new(),
+            upgraded,
+        };
+
+        for version in expected_versions {
+            assert!(checker.is_kernel_version_compatible(version));
+        }
+        for version in unexpected_versions {
+            assert!(!checker.is_kernel_version_compatible(version));
+        }
+    }
+
+    #[test]
+    fn test_is_pve_kernel_version_compatible() {
+        let expected_versions = &["5.13.19-6-pve", "5.15.158-2-pve", "6.2.16-5-pve"];
+        let unexpected_versions = &["6.1.10-1-pve", "5.19.17-2-pve"];
+
+        test_is_kernel_version_compatible(expected_versions, unexpected_versions, false);
+    }
+
+    #[test]
+    fn test_is_proxmox_kernel_version_compatible() {
+        let expected_versions = &["6.2.16-20-pve", "6.5.13-6-pve"];
+        let unexpected_versions = &["5.13.19-6-pve", "6.1.15-1-pve"];
+
+        test_is_kernel_version_compatible(expected_versions, unexpected_versions, true);
     }
 }
