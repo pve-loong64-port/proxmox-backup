@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::Path;
 
 use anyhow::{format_err, Error};
+use const_format::concatcp;
 use regex::Regex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -124,8 +125,11 @@ impl Checker {
     }
 
     fn is_kernel_version_compatible(&self, running_version: &str) -> bool {
+        const MINIMUM_RE: &str = r"6\.(?:2\.(?:[2-9]\d+|1[6-8]|1\d\d+)|5)[^~]*";
+        const ARBITRARY_RE: &str = r"(?:[6-9]|\d{2,})\.(?:[2-9]|\d{2,})[^~]*-pve";
+
         let re = if self.upgraded {
-            r"^6\.(?:2\.(?:[2-9]\d+|1[6-8]|1\d\d+)|5)[^~]*$"
+            concatcp!(r"^(?:", MINIMUM_RE, r"|", ARBITRARY_RE, r")$")
         } else {
             r"^(?:5\.(?:13|15)|6\.2)"
         };
@@ -662,7 +666,7 @@ mod tests {
 
     #[test]
     fn test_is_proxmox_kernel_version_compatible() {
-        let expected_versions = &["6.2.16-20-pve", "6.5.13-6-pve"];
+        let expected_versions = &["6.2.16-20-pve", "6.5.13-6-pve", "6.8.12-1-pve"];
         let unexpected_versions = &["5.13.19-6-pve", "6.1.15-1-pve"];
 
         test_is_kernel_version_compatible(expected_versions, unexpected_versions, true);
