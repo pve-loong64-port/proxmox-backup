@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use proxmox_router::list_subdirs_api_method;
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, SubdirMap};
-use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::api;
 
 use pbs_api_types::{
@@ -82,7 +82,7 @@ pub async fn datastore_status(
         let rrd_dir = format!("datastore/{}", store);
 
         let get_rrd =
-            |what: &str| extract_rrd_data(&rrd_dir, what, RRDTimeFrame::Month, RRDMode::Average);
+            |what: &str| extract_rrd_data(&rrd_dir, what, RrdTimeframe::Month, RrdMode::Average);
 
         let total_res = get_rrd("total")?;
         let used_res = get_rrd("used")?;

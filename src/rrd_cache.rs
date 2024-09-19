@@ -14,7 +14,7 @@ use proxmox_rrd::Cache;
 use proxmox_sys::fs::CreateOptions;
 
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
-use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 
@@ -94,23 +94,23 @@ fn create_callback(dst: DataSourceType) -> Database {
 pub fn extract_rrd_data(
     basedir: &str,
     name: &str,
-    timeframe: RRDTimeFrame,
-    mode: RRDMode,
+    timeframe: RrdTimeframe,
+    mode: RrdMode,
 ) -> Result<Option<proxmox_rrd::Entry>, Error> {
     let end = proxmox_time::epoch_f64() as u64;
 
     let (start, resolution) = match timeframe {
-        RRDTimeFrame::Hour => (end - 3600, 60),
-        RRDTimeFrame::Day => (end - 3600 * 24, 60),
-        RRDTimeFrame::Week => (end - 3600 * 24 * 7, 30 * 60),
-        RRDTimeFrame::Month => (end - 3600 * 24 * 30, 30 * 60),
-        RRDTimeFrame::Year => (end - 3600 * 24 * 365, 6 * 60 * 60),
-        RRDTimeFrame::Decade => (end - 10 * 3600 * 24 * 366, 7 * 86400),
+        RrdTimeframe::Hour => (end - 3600, 60),
+        RrdTimeframe::Day => (end - 3600 * 24, 60),
+        RrdTimeframe::Week => (end - 3600 * 24 * 7, 30 * 60),
+        RrdTimeframe::Month => (end - 3600 * 24 * 30, 30 * 60),
+        RrdTimeframe::Year => (end - 3600 * 24 * 365, 6 * 60 * 60),
+        RrdTimeframe::Decade => (end - 10 * 3600 * 24 * 366, 7 * 86400),
     };
 
     let cf = match mode {
-        RRDMode::Max => AggregationFn::Maximum,
-        RRDMode::Average => AggregationFn::Average,
+        RrdMode::Max => AggregationFn::Maximum,
+        RrdMode::Average => AggregationFn::Average,
     };
 
     let rrd_cache = get_rrd_cache()?;

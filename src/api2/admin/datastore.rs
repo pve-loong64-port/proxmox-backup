@@ -22,7 +22,7 @@ use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
     Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
 };
-use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::{
@@ -1925,10 +1925,10 @@ pub fn pxar_file_download(
                 schema: DATASTORE_SCHEMA,
             },
             timeframe: {
-                type: RRDTimeFrame,
+                type: RrdTimeframe,
             },
             cf: {
-                type: RRDMode,
+                type: RrdMode,
             },
         },
     },
@@ -1940,8 +1940,8 @@ pub fn pxar_file_download(
 /// Read datastore stats
 pub fn get_rrd_stats(
     store: String,
-    timeframe: RRDTimeFrame,
-    cf: RRDMode,
+    timeframe: RrdTimeframe,
+    cf: RrdMode,
     _param: Value,
 ) -> Result<Value, Error> {
     let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;

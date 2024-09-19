@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 use proxmox_router::{Permission, Router};
-use proxmox_rrd_api_types::{RRDMode, RRDTimeFrame};
+use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::api;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT};
@@ -13,8 +13,8 @@ use crate::rrd_cache::extract_rrd_data;
 pub fn create_value_from_rrd(
     basedir: &str,
     list: &[&str],
-    timeframe: RRDTimeFrame,
-    mode: RRDMode,
+    timeframe: RrdTimeframe,
+    mode: RrdMode,
 ) -> Result<Value, Error> {
     let mut result: Vec<Value> = Vec::new();
 
@@ -65,10 +65,10 @@ pub fn create_value_from_rrd(
                 schema: NODE_SCHEMA,
             },
             timeframe: {
-                type: RRDTimeFrame,
+                type: RrdTimeframe,
             },
             cf: {
-                type: RRDMode,
+                type: RrdMode,
             },
         },
     },
@@ -77,7 +77,7 @@ pub fn create_value_from_rrd(
     },
 )]
 /// Read node stats
-fn get_node_stats(timeframe: RRDTimeFrame, cf: RRDMode, _param: Value) -> Result<Value, Error> {
+fn get_node_stats(timeframe: RrdTimeframe, cf: RrdMode, _param: Value) -> Result<Value, Error> {
     create_value_from_rrd(
         "host",
         &[
