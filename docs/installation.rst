@@ -52,10 +52,10 @@ It includes the following:
 
 Install `Proxmox Backup`_ Server Unattended
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It is possible to install {pve} automatically in an unattended manner. This
-enables you to fully automate the setup process on bare-metal. Once the
-installation is complete and the host has booted up, automation tools like
-Ansible can be used to further configure the installation.
+It is possible to install `Proxmox Backup`_ Server automatically in an
+unattended manner. This enables you to fully automate the setup process on
+bare-metal. Once the installation is complete and the host has booted up,
+automation tools like Ansible can be used to further configure the installation.
 
 The necessary options for the installer must be provided in an answer file.
 This file allows the use of filter rules to determine which disks and network
