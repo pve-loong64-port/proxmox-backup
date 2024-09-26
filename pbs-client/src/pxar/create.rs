@@ -716,15 +716,6 @@ impl Archiver {
             None => return Ok(()),
         };
 
-        let match_path = PathBuf::from("/").join(self.path.clone());
-        if self
-            .patterns
-            .matches(match_path.as_os_str().as_bytes(), stat.st_mode)?
-            == Some(MatchType::Exclude)
-        {
-            return Ok(());
-        }
-
         let metadata = get_metadata(
             fd.as_raw_fd(),
             stat,
