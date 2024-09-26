@@ -635,7 +635,10 @@ impl Archiver {
                 });
 
             match match_result {
-                Ok(Some(MatchType::Exclude)) => continue,
+                Ok(Some(MatchType::Exclude)) => {
+                    log::debug!("matched by exclude pattern '{full_path:?}'");
+                    continue;
+                }
                 Ok(_) => (),
                 Err(err) if err.not_found() => continue,
                 Err(err) => {
