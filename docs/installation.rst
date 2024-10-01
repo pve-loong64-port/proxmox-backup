@@ -7,6 +7,8 @@ Debian_ from the provided package repository.
 
 .. include:: system-requirements.rst
 
+.. include:: installation-media.rst
+
 .. include:: package-repositories.rst
 
 Server Installation
