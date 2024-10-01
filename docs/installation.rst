@@ -30,27 +30,10 @@ The provided ISO will get you started in just a few minutes, and is the
 recommended method for new and existing users.
 
 Alternatively, Proxmox Backup Server can be installed on top of an
-existing Debian system.
+existing Debian system. This option is only recommended for advanced users
+because detailed knowledge about Proxmox Backup Server is required.
 
-Install `Proxmox Backup`_ Server using the Installer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Download the ISO from |DOWNLOADS|.
-It includes the following:
-
-* The Proxmox Backup Server installer, which partitions the local
-  disk(s) with ext4, xfs or ZFS, and installs the operating system
-
-* Complete operating system (Debian Linux, 64-bit)
-
-* Proxmox Linux kernel with ZFS support
-
-* Complete tool-set to administer backups and all necessary resources
-
-* Web based management interface
-
-.. note:: During the installation process, the complete server
-   is used by default and all existing data is removed.
+.. include:: using-the-installer.rst
 
 Install `Proxmox Backup`_ Server Unattended
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

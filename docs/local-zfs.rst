@@ -264,6 +264,7 @@ systems with more than 256 GiB of total memory, where simply setting
 
   # update-initramfs -u
 
+.. _zfs_swap:
 
 Swap on ZFS
 ^^^^^^^^^^^

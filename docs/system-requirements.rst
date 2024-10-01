@@ -6,6 +6,8 @@ production. To further decrease the impact of a failed host, you can set up
 periodic, efficient, incremental :ref:`datastore synchronization <syncjobs>`
 from other Proxmox Backup Server instances.
 
+.. _minimum_system_requirements:
+
 Minimum Server Requirements, for Evaluation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
