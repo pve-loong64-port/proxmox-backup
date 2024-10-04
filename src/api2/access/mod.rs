@@ -13,7 +13,7 @@ use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, User, Userid, ACL_PATH_SCHEMA, PASSWORD_FORMAT, PASSWORD_SCHEMA, PRIVILEGES,
+    Authid, User, Userid, ACL_PATH_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIVILEGES,
     PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT,
 };
 use pbs_config::acl::AclTreeNode;
@@ -75,7 +75,7 @@ async fn user_update_auth<S: AsRef<str>>(
                 type: Userid,
             },
             password: {
-                schema: PASSWORD_SCHEMA,
+                schema: PBS_PASSWORD_SCHEMA,
             },
             "confirmation-password": {
                 type: String,
