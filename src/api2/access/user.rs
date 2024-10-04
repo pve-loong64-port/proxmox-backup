@@ -12,8 +12,8 @@ use proxmox_tfa::api::TfaConfig;
 
 use pbs_api_types::{
     ApiToken, Authid, Tokenname, User, UserUpdater, UserWithTokens, Userid, ENABLE_USER_SCHEMA,
-    EXPIRE_USER_SCHEMA, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT,
-    PROXMOX_CONFIG_DIGEST_SCHEMA, SINGLE_LINE_COMMENT_SCHEMA,
+    EXPIRE_USER_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY,
+    PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, SINGLE_LINE_COMMENT_SCHEMA,
 };
 use pbs_config::token_shadow;
 
@@ -224,7 +224,11 @@ pub enum DeletableProperty {
                 flatten: true,
             },
             password: {
-                schema: PBS_PASSWORD_SCHEMA,
+                type: String,
+                description: "This parameter is ignored, please use 'PUT /access/password' to change a user's password",
+                min_length: 1,
+                max_length: 1024,
+                format: &PASSWORD_FORMAT,
                 optional: true,
             },
             delete: {
@@ -248,7 +252,7 @@ pub enum DeletableProperty {
         ]),
     },
 )]
-/// Update user configuration.
+/// Update user configuration. To change a user's password use the 'PUT /access/password' endpoint.
 #[allow(clippy::too_many_arguments)]
 pub async fn update_user(
     userid: Userid,
@@ -256,11 +260,10 @@ pub async fn update_user(
     password: Option<String>,
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
-    rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
-    if password.is_some() {
-        super::user_update_auth(rpcenv, &userid, password.as_deref(), false).await?;
-    }
+    // ignore password here, updating passwords should happen through 'PUT /access/password'
+    // TODO: Remove with PBS 4
+    let _ = password;
 
     let _lock = pbs_config::user::lock_config()?;
 
@@ -299,19 +302,6 @@ pub async fn update_user(
 
     if let Some(expire) = update.expire {
         data.expire = if expire > 0 { Some(expire) } else { None };
-    }
-
-    if let Some(password) = password {
-        let user_info = CachedUserInfo::new()?;
-        let current_auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
-        let self_service = current_auth_id.user() == &userid;
-        let target_realm = userid.realm();
-        if !self_service && target_realm == "pam" && !user_info.is_superuser(&current_auth_id) {
-            bail!("only superuser can edit pam credentials!");
-        }
-        let authenticator = crate::auth::lookup_authenticator(userid.realm())?;
-        let client_ip = rpcenv.get_client_ip().map(|sa| sa.ip());
-        authenticator.store_password(userid.name(), &password, client_ip.as_ref())?;
     }
 
     if let Some(firstname) = update.firstname {
