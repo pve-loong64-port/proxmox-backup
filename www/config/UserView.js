@@ -61,6 +61,7 @@ Ext.define('PBS.config.UserView', {
 	    Ext.create('Proxmox.window.PasswordEdit', {
 		userid: selection[0].data.userid,
 		confirmCurrentPassword: Proxmox.UserName !== 'root@pam',
+		minLength: 8,
 	    }).show();
 	},
 

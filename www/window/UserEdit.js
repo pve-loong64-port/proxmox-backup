@@ -91,7 +91,7 @@ Ext.define('PBS.window.UserEdit', {
 		xtype: 'textfield',
 		inputType: 'password',
 		fieldLabel: gettext('Password'),
-		minLength: 5,
+		minLength: 8,
 		allowBlank: false,
 		name: 'password',
 		listeners: {
