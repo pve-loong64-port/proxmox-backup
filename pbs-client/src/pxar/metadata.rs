@@ -72,7 +72,13 @@ pub fn apply_at(
         Mode::empty(),
     )?;
 
-    apply(flags, metadata, fd.as_raw_fd(), path_info, on_error)
+    apply(
+        flags,
+        metadata,
+        fd.as_raw_fd(),
+        &path_info.join(file_name.to_string_lossy().to_string()),
+        on_error,
+    )
 }
 
 pub fn apply_initial_flags(

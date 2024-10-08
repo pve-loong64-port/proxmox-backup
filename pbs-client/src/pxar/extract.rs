@@ -724,7 +724,10 @@ impl Extractor {
             self.feature_flags,
             metadata,
             file.as_raw_fd(),
-            self.dir_stack.path(),
+            &self
+                .dir_stack
+                .path()
+                .join(file_name.to_string_lossy().to_string()),
             &mut self.on_error,
         )
     }
@@ -783,7 +786,10 @@ impl Extractor {
             self.feature_flags,
             metadata,
             file.as_raw_fd(),
-            self.dir_stack.path(),
+            &self
+                .dir_stack
+                .path()
+                .join(file_name.to_string_lossy().to_string()),
             &mut self.on_error,
         )
     }
