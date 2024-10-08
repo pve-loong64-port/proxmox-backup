@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
-use anyhow::{anyhow, bail, Context, Error};
+use anyhow::{anyhow, Context, Error};
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
@@ -300,7 +300,7 @@ fn apply_acls(
     }
 
     if !acl.is_valid() {
-        bail!("Error while restoring ACL - ACL invalid");
+        log::warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
     }
 
     acl.set_file(c_proc_path, acl::ACL_TYPE_ACCESS)?;
@@ -329,7 +329,7 @@ fn apply_acls(
         }
 
         if !acl.is_valid() {
-            bail!("Error while restoring ACL - ACL invalid");
+            log::warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
         }
 
         acl.set_file(c_proc_path, acl::ACL_TYPE_DEFAULT)?;
