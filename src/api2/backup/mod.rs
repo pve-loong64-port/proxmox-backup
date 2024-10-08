@@ -1,6 +1,6 @@
 //! Backup protocol (HTTP2 upgrade)
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hex::FromHex;
 use hyper::header::{HeaderValue, CONNECTION, UPGRADE};
@@ -784,6 +784,26 @@ fn finish_backup(
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     let env: &BackupEnvironment = rpcenv.as_ref();
+
+    if let Err(err) = env.stat_prev_known_chunks() {
+        env.debug(format!("stat registered chunks failed - {err:?}"));
+
+        if let Some(last) = env.last_backup.as_ref() {
+            // No need to acquire snapshot lock, already locked when starting the backup
+            let verify_state = SnapshotVerifyState {
+                state: VerifyState::Failed,
+                upid: env.worker.upid().clone(), // backup writer UPID
+            };
+            let verify_state = serde_json::to_value(verify_state)?;
+            last.backup_dir
+                .update_manifest(|manifest| {
+                    manifest.unprotected["verify_state"] = verify_state;
+                })
+                .with_context(|| "manifest update failed")?;
+        }
+
+        bail!("stat known chunks failed - {err:?}");
+    }
 
     env.finish_backup()?;
     env.log("successfully finished backup");
