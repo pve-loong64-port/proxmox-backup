@@ -30,7 +30,7 @@ please refer to the standard Debian documentation.
 
 .. include:: certificate-management.rst
 
-.. include:: external_metric_server.rst
+.. include:: external-metric-server.rst
 
 .. include:: services.rst
 

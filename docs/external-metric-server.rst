@@ -1,5 +1,3 @@
-.. _external_metric_server:
-
 External Metric Server
 ----------------------
 
@@ -44,14 +42,14 @@ necessary.
 
 Here is an example configuration for InfluxDB (on your InfluxDB server):
 
-----
-[[udp]]
-   enabled = true
-   bind-address = "0.0.0.0:8089"
-   database = "proxmox"
-   batch-size = 1000
-   batch-timeout = "1s"
-----
+.. code-block:: console
+
+   [[udp]]
+      enabled = true
+      bind-address = "0.0.0.0:8089"
+      database = "proxmox"
+      batch-size = 1000
+      batch-timeout = "1s"
 
 With this configuration, the InfluxDB server listens on all IP addresses on
 port 8089, and writes the data in the *proxmox* database.
