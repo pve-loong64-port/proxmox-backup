@@ -67,6 +67,14 @@ Options
 
 .. include:: config/media-pool/config.rst
 
+``node.cfg``
+~~~~~~~~~~~~~~~~~~
+
+Options
+^^^^^^^
+
+.. include:: config/node/format.rst
+
 .. _notifications.cfg:
 
 ``notifications.cfg``

@@ -108,6 +108,7 @@ man_pages = [
     ('config/datastore/man5', 'datastore.cfg', 'Datastore Configuration', [author], 5),
     ('config/domains/man5', 'domains.cfg', 'Realm Configuration', [author], 5),
     ('config/media-pool/man5', 'media-pool.cfg', 'Media Pool Configuration', [author], 5),
+    ('config/node/man5', 'node.cfg', 'Node Configuration', [author], 5),
     ('config/remote/man5', 'remote.cfg', 'Remote Server Configuration', [author], 5),
     ('config/sync/man5', 'sync.cfg', 'Synchronization Job Configuration', [author], 5),
     ('config/tape-job/man5', 'tape-job.cfg', 'Tape Job Configuration', [author], 5),

@@ -40,6 +40,7 @@ MAN5_PAGES :=				\
 	datastore.cfg.5			\
 	domains.cfg.5			\
 	media-pool.cfg.5		\
+	node.cfg.5			\
 	notifications-priv.cfg.5	\
 	notifications.cfg.5		\
 	remote.cfg.5			\
