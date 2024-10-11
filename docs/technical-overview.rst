@@ -56,8 +56,9 @@ The chunks of a datastore are found in
 
  <datastore-root>/.chunks/
 
-This chunk directory is further subdivided by the first four bytes of the
-chunk's checksum, so a chunk with the checksum
+This chunk directory is further subdivided into directories grouping chunks by
+their checksums 2 byte prefix (given as 4 hexadecimal digits), so a chunk with
+the checksum
 
  a342e8151cbf439ce65f3df696b54c67a114982cc0aa751f2852c2f7acc19a8b
 
