@@ -37,6 +37,25 @@ pub fn get_metrics(
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let user_info = CachedUserInfo::new()?;
 
+    let has_any_datastore_audit_privs =
+        user_info.any_privs_below(&auth_id, &["datastore"], PRIV_DATASTORE_AUDIT)?;
+
+    let has_host_audit_privs =
+        (CachedUserInfo::lookup_privs(&user_info, &auth_id, &["system", "status"])
+            & PRIV_SYS_AUDIT)
+            != 0;
+
+    if !has_any_datastore_audit_privs && !has_host_audit_privs {
+        // The `pull_metrics::get_*` calls are expensive, so
+        // check early if the current user has sufficient privileges to read *any*
+        // metric data.
+        // For datastores, we do not yet know for which individual datastores
+        // we have metrics in the cache, so we just check if we have
+        // audit permissions for *any* datastore and filter after
+        // reading the data.
+        return Ok(Metrics { data: Vec::new() });
+    }
+
     let metrics = if history {
         pull_metrics::get_all_metrics(start_time)?
     } else {
@@ -46,11 +65,10 @@ pub fn get_metrics(
     let filter_by_privs = |point: &MetricDataPoint| {
         let id = point.id.as_str();
         if id == "host" {
-            let user_privs =
-                CachedUserInfo::lookup_privs(&user_info, &auth_id, &["system", "status"]);
-            return (user_privs & PRIV_SYS_AUDIT) != 0;
+            return has_host_audit_privs;
         } else if let Some(datastore_id) = id.strip_prefix("datastore/") {
             if !datastore_id.contains('/') {
+                // Now, check whether we have permissions for the individual datastore
                 let user_privs = CachedUserInfo::lookup_privs(
                     &user_info,
                     &auth_id,
