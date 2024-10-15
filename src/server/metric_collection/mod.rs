@@ -21,12 +21,20 @@ use crate::{
     tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage},
 };
 
+/// Initialize the metric collection subsystem.
+///
+/// Any datapoints in the RRD journal will be committed.
 pub fn init() -> Result<(), Error> {
     let rrd_cache = initialize_rrd_cache()?;
     rrd_cache.apply_journal()?;
     Ok(())
 }
 
+/// Spawns a tokio task for regular metric collection.
+///
+/// Every 10 seconds, host and disk stats will be collected and
+///   - stored in the RRD
+///   - sent to any configured metric servers
 pub fn start_collection_task() {
     tokio::spawn(async {
         let abort_future = pin!(proxmox_daemon::shutdown_future());
