@@ -72,15 +72,26 @@ async fn run_stat_generator() {
                 rrd::sync_journal();
             }
         });
+        let pull_metric_future = tokio::task::spawn_blocking({
+            let stats = Arc::clone(&stats);
+            move || {
+                pull_metrics::update_metrics(&stats.0, &stats.1, &stats.2)?;
+                Ok::<(), Error>(())
+            }
+        });
 
         let metrics_future = metric_server::send_data_to_metric_servers(stats);
 
-        let (rrd_res, metrics_res) = join!(rrd_future, metrics_future);
+        let (rrd_res, metrics_res, pull_metrics_res) =
+            join!(rrd_future, metrics_future, pull_metric_future);
         if let Err(err) = rrd_res {
             log::error!("rrd update panicked: {err}");
         }
         if let Err(err) = metrics_res {
             log::error!("error during metrics sending: {err}");
+        }
+        if let Err(err) = pull_metrics_res {
+            log::error!("error caching pull-style metrics: {err}");
         }
 
         tokio::time::sleep_until(tokio::time::Instant::from_std(delay_target)).await;
