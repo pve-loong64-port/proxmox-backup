@@ -34,37 +34,33 @@ pub fn get_metrics(
     history: bool,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Metrics, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let user_info = CachedUserInfo::new()?;
+
     let metrics = if history {
         pull_metrics::get_all_metrics(start_time)?
     } else {
         pull_metrics::get_most_recent_metrics()?
     };
 
-    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
-    let user_info = CachedUserInfo::new()?;
-
     let filter_by_privs = |point: &MetricDataPoint| {
-        let elements: Vec<&str> = point.id.as_str().split('/').collect();
-
-        match elements.as_slice() {
-            ["host"] => {
-                let user_privs =
-                    CachedUserInfo::lookup_privs(&user_info, &auth_id, &["system", "status"]);
-                (user_privs & PRIV_SYS_AUDIT) != 0
-            }
-            ["datastore", datastore_id] => {
+        let id = point.id.as_str();
+        if id == "host" {
+            let user_privs =
+                CachedUserInfo::lookup_privs(&user_info, &auth_id, &["system", "status"]);
+            return (user_privs & PRIV_SYS_AUDIT) != 0;
+        } else if let Some(datastore_id) = id.strip_prefix("datastore/") {
+            if !datastore_id.contains('/') {
                 let user_privs = CachedUserInfo::lookup_privs(
                     &user_info,
                     &auth_id,
                     &["datastore", datastore_id],
                 );
-                (user_privs & PRIV_DATASTORE_AUDIT) != 0
-            }
-            _ => {
-                log::error!("invalid metric object id: {}", point.id);
-                false
+                return (user_privs & PRIV_DATASTORE_AUDIT) != 0;
             }
         }
+        log::error!("invalid metric object id: {id:?}");
+        false
     };
 
     Ok(Metrics {
