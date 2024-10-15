@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::Error;
 use pbs_api_types::{DataStoreConfig, Operation};
-use serde_json::{json, Value};
 use tokio::join;
 
 use proxmox_sys::{
@@ -93,26 +92,6 @@ struct DiskStat {
     name: String,
     usage: Option<FileSystemInformation>,
     dev: Option<BlockDevStat>,
-}
-
-impl DiskStat {
-    fn to_value(&self) -> Value {
-        let mut value = json!({});
-        if let Some(usage) = &self.usage {
-            value["total"] = Value::from(usage.total);
-            value["used"] = Value::from(usage.used);
-            value["avail"] = Value::from(usage.available);
-        }
-
-        if let Some(dev) = &self.dev {
-            value["read_ios"] = Value::from(dev.read_ios);
-            value["read_bytes"] = Value::from(dev.read_sectors * 512);
-            value["write_ios"] = Value::from(dev.write_ios);
-            value["write_bytes"] = Value::from(dev.write_sectors * 512);
-            value["io_ticks"] = Value::from(dev.io_ticks / 1000);
-        }
-        value
-    }
 }
 
 fn collect_host_stats_sync() -> HostStats {
