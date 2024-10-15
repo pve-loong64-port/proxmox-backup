@@ -23,7 +23,7 @@ const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 static RRD_CACHE: OnceCell<Cache> = OnceCell::new();
 
 /// Get the RRD cache instance
-fn get_rrd_cache() -> Result<&'static Cache, Error> {
+fn get_cache() -> Result<&'static Cache, Error> {
     RRD_CACHE
         .get()
         .ok_or_else(|| format_err!("RRD cache not initialized!"))
@@ -32,7 +32,7 @@ fn get_rrd_cache() -> Result<&'static Cache, Error> {
 /// Initialize the RRD cache instance
 ///
 /// Note: Only a single process must do this (proxmox-backup-proxy)
-pub(super) fn initialize_rrd_cache() -> Result<&'static Cache, Error> {
+pub(super) fn init() -> Result<&'static Cache, Error> {
     let backup_user = pbs_config::backup_user()?;
 
     let file_options = CreateOptions::new()
@@ -115,22 +115,22 @@ pub fn extract_rrd_data(
         RrdMode::Average => AggregationFn::Average,
     };
 
-    let rrd_cache = get_rrd_cache()?;
+    let rrd_cache = get_cache()?;
 
     rrd_cache.extract_cached_data(basedir, name, cf, resolution, Some(start), Some(end))
 }
 
 /// Sync/Flush the RRD journal
-pub(super) fn rrd_sync_journal() {
-    if let Ok(rrd_cache) = get_rrd_cache() {
+pub(super) fn sync_journal() {
+    if let Ok(rrd_cache) = get_cache() {
         if let Err(err) = rrd_cache.sync_journal() {
             log::error!("rrd_sync_journal failed - {}", err);
         }
     }
 }
 /// Update RRD Gauge values
-fn rrd_update_gauge(name: &str, value: f64) {
-    if let Ok(rrd_cache) = get_rrd_cache() {
+fn update_gauge(name: &str, value: f64) {
+    if let Ok(rrd_cache) = get_cache() {
         let now = proxmox_time::epoch_f64();
         if let Err(err) = rrd_cache.update_value(name, now, value, DataSourceType::Gauge) {
             log::error!("rrd::update_value '{}' failed - {}", name, err);
@@ -139,8 +139,8 @@ fn rrd_update_gauge(name: &str, value: f64) {
 }
 
 /// Update RRD Derive values
-fn rrd_update_derive(name: &str, value: f64) {
-    if let Ok(rrd_cache) = get_rrd_cache() {
+fn update_derive(name: &str, value: f64) {
+    if let Ok(rrd_cache) = get_cache() {
         let now = proxmox_time::epoch_f64();
         if let Err(err) = rrd_cache.update_value(name, now, value, DataSourceType::Derive) {
             log::error!("rrd::update_value '{}' failed - {}", name, err);
@@ -148,21 +148,17 @@ fn rrd_update_derive(name: &str, value: f64) {
     }
 }
 
-pub(super) fn rrd_update_host_stats_sync(
-    host: &HostStats,
-    hostdisk: &DiskStat,
-    datastores: &[DiskStat],
-) {
+pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: &[DiskStat]) {
     if let Some(stat) = &host.proc {
-        rrd_update_gauge("host/cpu", stat.cpu);
-        rrd_update_gauge("host/iowait", stat.iowait_percent);
+        update_gauge("host/cpu", stat.cpu);
+        update_gauge("host/iowait", stat.iowait_percent);
     }
 
     if let Some(meminfo) = &host.meminfo {
-        rrd_update_gauge("host/memtotal", meminfo.memtotal as f64);
-        rrd_update_gauge("host/memused", meminfo.memused as f64);
-        rrd_update_gauge("host/swaptotal", meminfo.swaptotal as f64);
-        rrd_update_gauge("host/swapused", meminfo.swapused as f64);
+        update_gauge("host/memtotal", meminfo.memtotal as f64);
+        update_gauge("host/memused", meminfo.memused as f64);
+        update_gauge("host/swaptotal", meminfo.swaptotal as f64);
+        update_gauge("host/swapused", meminfo.swapused as f64);
     }
 
     if let Some(netdev) = &host.net {
@@ -176,44 +172,44 @@ pub(super) fn rrd_update_host_stats_sync(
             netin += item.receive;
             netout += item.send;
         }
-        rrd_update_derive("host/netin", netin as f64);
-        rrd_update_derive("host/netout", netout as f64);
+        update_derive("host/netin", netin as f64);
+        update_derive("host/netout", netout as f64);
     }
 
     if let Some(loadavg) = &host.load {
-        rrd_update_gauge("host/loadavg", loadavg.0);
+        update_gauge("host/loadavg", loadavg.0);
     }
 
-    rrd_update_disk_stat(hostdisk, "host");
+    update_disk_metrics(hostdisk, "host");
 
     for stat in datastores {
         let rrd_prefix = format!("datastore/{}", stat.name);
-        rrd_update_disk_stat(stat, &rrd_prefix);
+        update_disk_metrics(stat, &rrd_prefix);
     }
 }
 
-fn rrd_update_disk_stat(disk: &DiskStat, rrd_prefix: &str) {
+fn update_disk_metrics(disk: &DiskStat, rrd_prefix: &str) {
     if let Some(status) = &disk.usage {
         let rrd_key = format!("{}/total", rrd_prefix);
-        rrd_update_gauge(&rrd_key, status.total as f64);
+        update_gauge(&rrd_key, status.total as f64);
         let rrd_key = format!("{}/used", rrd_prefix);
-        rrd_update_gauge(&rrd_key, status.used as f64);
+        update_gauge(&rrd_key, status.used as f64);
         let rrd_key = format!("{}/available", rrd_prefix);
-        rrd_update_gauge(&rrd_key, status.available as f64);
+        update_gauge(&rrd_key, status.available as f64);
     }
 
     if let Some(stat) = &disk.dev {
         let rrd_key = format!("{}/read_ios", rrd_prefix);
-        rrd_update_derive(&rrd_key, stat.read_ios as f64);
+        update_derive(&rrd_key, stat.read_ios as f64);
         let rrd_key = format!("{}/read_bytes", rrd_prefix);
-        rrd_update_derive(&rrd_key, (stat.read_sectors * 512) as f64);
+        update_derive(&rrd_key, (stat.read_sectors * 512) as f64);
 
         let rrd_key = format!("{}/write_ios", rrd_prefix);
-        rrd_update_derive(&rrd_key, stat.write_ios as f64);
+        update_derive(&rrd_key, stat.write_ios as f64);
         let rrd_key = format!("{}/write_bytes", rrd_prefix);
-        rrd_update_derive(&rrd_key, (stat.write_sectors * 512) as f64);
+        update_derive(&rrd_key, (stat.write_sectors * 512) as f64);
 
         let rrd_key = format!("{}/io_ticks", rrd_prefix);
-        rrd_update_derive(&rrd_key, (stat.io_ticks as f64) / 1000.0);
+        update_derive(&rrd_key, (stat.io_ticks as f64) / 1000.0);
     }
 }

@@ -17,8 +17,6 @@ use proxmox_sys::{
 
 use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
 
-use rrd::{initialize_rrd_cache, rrd_sync_journal};
-
 mod metric_server;
 pub mod rrd;
 
@@ -26,7 +24,7 @@ pub mod rrd;
 ///
 /// Any datapoints in the RRD journal will be committed.
 pub fn init() -> Result<(), Error> {
-    let rrd_cache = initialize_rrd_cache()?;
+    let rrd_cache = rrd::init()?;
     rrd_cache.apply_journal()?;
     Ok(())
 }
@@ -65,8 +63,8 @@ async fn run_stat_generator() {
         let rrd_future = tokio::task::spawn_blocking({
             let stats = Arc::clone(&stats);
             move || {
-                rrd::rrd_update_host_stats_sync(&stats.0, &stats.1, &stats.2);
-                rrd_sync_journal();
+                rrd::update_metrics(&stats.0, &stats.1, &stats.2);
+                rrd::sync_journal();
             }
         });
 
