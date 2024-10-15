@@ -16,6 +16,8 @@ use proxmox_sys::fs::CreateOptions;
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 
+use super::{DiskStat, HostStats};
+
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 
 static RRD_CACHE: OnceCell<Cache> = OnceCell::new();
@@ -143,5 +145,75 @@ pub fn rrd_update_derive(name: &str, value: f64) {
         if let Err(err) = rrd_cache.update_value(name, now, value, DataSourceType::Derive) {
             log::error!("rrd::update_value '{}' failed - {}", name, err);
         }
+    }
+}
+
+pub(super) fn rrd_update_host_stats_sync(
+    host: &HostStats,
+    hostdisk: &DiskStat,
+    datastores: &[DiskStat],
+) {
+    if let Some(stat) = &host.proc {
+        rrd_update_gauge("host/cpu", stat.cpu);
+        rrd_update_gauge("host/iowait", stat.iowait_percent);
+    }
+
+    if let Some(meminfo) = &host.meminfo {
+        rrd_update_gauge("host/memtotal", meminfo.memtotal as f64);
+        rrd_update_gauge("host/memused", meminfo.memused as f64);
+        rrd_update_gauge("host/swaptotal", meminfo.swaptotal as f64);
+        rrd_update_gauge("host/swapused", meminfo.swapused as f64);
+    }
+
+    if let Some(netdev) = &host.net {
+        use pbs_config::network::is_physical_nic;
+        let mut netin = 0;
+        let mut netout = 0;
+        for item in netdev {
+            if !is_physical_nic(&item.device) {
+                continue;
+            }
+            netin += item.receive;
+            netout += item.send;
+        }
+        rrd_update_derive("host/netin", netin as f64);
+        rrd_update_derive("host/netout", netout as f64);
+    }
+
+    if let Some(loadavg) = &host.load {
+        rrd_update_gauge("host/loadavg", loadavg.0);
+    }
+
+    rrd_update_disk_stat(hostdisk, "host");
+
+    for stat in datastores {
+        let rrd_prefix = format!("datastore/{}", stat.name);
+        rrd_update_disk_stat(stat, &rrd_prefix);
+    }
+}
+
+fn rrd_update_disk_stat(disk: &DiskStat, rrd_prefix: &str) {
+    if let Some(status) = &disk.usage {
+        let rrd_key = format!("{}/total", rrd_prefix);
+        rrd_update_gauge(&rrd_key, status.total as f64);
+        let rrd_key = format!("{}/used", rrd_prefix);
+        rrd_update_gauge(&rrd_key, status.used as f64);
+        let rrd_key = format!("{}/available", rrd_prefix);
+        rrd_update_gauge(&rrd_key, status.available as f64);
+    }
+
+    if let Some(stat) = &disk.dev {
+        let rrd_key = format!("{}/read_ios", rrd_prefix);
+        rrd_update_derive(&rrd_key, stat.read_ios as f64);
+        let rrd_key = format!("{}/read_bytes", rrd_prefix);
+        rrd_update_derive(&rrd_key, (stat.read_sectors * 512) as f64);
+
+        let rrd_key = format!("{}/write_ios", rrd_prefix);
+        rrd_update_derive(&rrd_key, stat.write_ios as f64);
+        let rrd_key = format!("{}/write_bytes", rrd_prefix);
+        rrd_update_derive(&rrd_key, (stat.write_sectors * 512) as f64);
+
+        let rrd_key = format!("{}/io_ticks", rrd_prefix);
+        rrd_update_derive(&rrd_key, (stat.io_ticks as f64) / 1000.0);
     }
 }
