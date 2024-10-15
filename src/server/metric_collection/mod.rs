@@ -179,7 +179,7 @@ fn collect_disk_stats_sync() -> (DiskStat, Vec<DiskStat>) {
                 {
                     continue;
                 }
-                let path = std::path::Path::new(&config.path);
+                let path = Path::new(&config.path);
                 datastores.push(gather_disk_stats(disk_manager.clone(), path, &config.name));
             }
         }
