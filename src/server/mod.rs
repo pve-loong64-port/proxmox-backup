@@ -33,6 +33,8 @@ pub use report::*;
 
 pub mod auth;
 
+pub mod metric_collection;
+
 pub(crate) mod pull;
 pub(crate) mod sync;
 
