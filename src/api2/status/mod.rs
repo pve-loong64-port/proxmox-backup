@@ -7,6 +7,7 @@ use proxmox_router::list_subdirs_api_method;
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::api;
+use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
     Authid, DataStoreStatusListItem, Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
@@ -19,6 +20,8 @@ use crate::server::metric_collection::rrd::extract_rrd_data;
 use crate::tools::statistics::linear_regression;
 
 use crate::backup::can_access_any_namespace;
+
+pub mod metrics;
 
 #[api(
     returns: {
@@ -137,10 +140,14 @@ pub async fn datastore_status(
     Ok(list)
 }
 
-const SUBDIRS: SubdirMap = &[(
-    "datastore-usage",
-    &Router::new().get(&API_METHOD_DATASTORE_STATUS),
-)];
+#[sortable]
+const SUBDIRS: SubdirMap = &sorted!([
+    (
+        "datastore-usage",
+        &Router::new().get(&API_METHOD_DATASTORE_STATUS),
+    ),
+    ("metrics", &metrics::ROUTER),
+]);
 
 pub const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))

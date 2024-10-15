@@ -39,6 +39,51 @@ pub(super) fn init() -> Result<(), Error> {
     Ok(())
 }
 
+/// Return most recent metrics
+///
+/// If the metric collection loop has no produced any metrics yet, an empty
+/// `Vec` is returned. Returns an error if the cache could not be accessed.
+pub fn get_most_recent_metrics() -> Result<Vec<MetricDataPoint>, Error> {
+    let cached_datapoints: Option<MetricDataPoints> = get_cache()?.get()?;
+    let mut points = cached_datapoints.map(|r| r.datapoints).unwrap_or_default();
+
+    points.sort_unstable_by_key(|p| p.timestamp);
+
+    Ok(points)
+}
+
+/// Return all cached metrics with a `timestamp > start_time`
+///
+/// If the metric collection loop has no produced any metrics yet, an empty
+/// `Vec` is returned. Returns an error if the cache could not be accessed.
+pub fn get_all_metrics(start_time: i64) -> Result<Vec<MetricDataPoint>, Error> {
+    let now = proxmox_time::epoch_i64();
+
+    let delta = now - start_time;
+
+    if delta < 0 {
+        // start-time in the future, no metrics for you
+        return Ok(Vec::new());
+    }
+
+    let generations = delta / (METRIC_COLLECTION_INTERVAL.as_secs() as i64);
+    let generations = generations.clamp(0, STORED_METRIC_GENERATIONS as i64);
+
+    let cached_datapoints: Vec<MetricDataPoints> = get_cache()?.get_last(generations as u32)?;
+
+    let mut points = Vec::new();
+
+    for gen in cached_datapoints {
+        if gen.timestamp > start_time {
+            points.extend(gen.datapoints);
+        }
+    }
+
+    points.sort_unstable_by_key(|p| p.timestamp);
+
+    Ok(points)
+}
+
 /// Convert `DiskStat` `HostStat` into a universal metric data point and cache
 /// them for a later retrieval.
 pub(super) fn update_metrics(

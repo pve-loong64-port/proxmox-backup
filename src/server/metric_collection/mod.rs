@@ -17,8 +17,8 @@ use proxmox_sys::{
 use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
 
 mod metric_server;
-mod pull_metrics;
-pub mod rrd;
+pub(crate) mod pull_metrics;
+pub(crate) mod rrd;
 
 const METRIC_COLLECTION_INTERVAL: Duration = Duration::from_secs(10);
 
