@@ -6,9 +6,9 @@ use std::{
 };
 
 use anyhow::Error;
-use pbs_api_types::{DataStoreConfig, Operation};
 use tokio::join;
 
+use pbs_api_types::{DataStoreConfig, Operation};
 use proxmox_sys::{
     fs::FileSystemInformation,
     linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat},
@@ -17,7 +17,10 @@ use proxmox_sys::{
 use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
 
 mod metric_server;
+mod pull_metrics;
 pub mod rrd;
+
+const METRIC_COLLECTION_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Initialize the metric collection subsystem.
 ///
@@ -25,6 +28,9 @@ pub mod rrd;
 pub fn init() -> Result<(), Error> {
     let rrd_cache = rrd::init()?;
     rrd_cache.apply_journal()?;
+
+    pull_metrics::init()?;
+
     Ok(())
 }
 
@@ -43,7 +49,7 @@ pub fn start_collection_task() {
 
 async fn run_stat_generator() {
     loop {
-        let delay_target = Instant::now() + Duration::from_secs(10);
+        let delay_target = Instant::now() + METRIC_COLLECTION_INTERVAL;
 
         let stats_future = tokio::task::spawn_blocking(|| {
             let hoststats = collect_host_stats_sync();
