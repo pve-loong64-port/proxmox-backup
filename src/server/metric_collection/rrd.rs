@@ -23,7 +23,7 @@ const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 static RRD_CACHE: OnceCell<Cache> = OnceCell::new();
 
 /// Get the RRD cache instance
-pub fn get_rrd_cache() -> Result<&'static Cache, Error> {
+fn get_rrd_cache() -> Result<&'static Cache, Error> {
     RRD_CACHE
         .get()
         .ok_or_else(|| format_err!("RRD cache not initialized!"))
@@ -32,7 +32,7 @@ pub fn get_rrd_cache() -> Result<&'static Cache, Error> {
 /// Initialize the RRD cache instance
 ///
 /// Note: Only a single process must do this (proxmox-backup-proxy)
-pub fn initialize_rrd_cache() -> Result<&'static Cache, Error> {
+pub(super) fn initialize_rrd_cache() -> Result<&'static Cache, Error> {
     let backup_user = pbs_config::backup_user()?;
 
     let file_options = CreateOptions::new()
@@ -121,7 +121,7 @@ pub fn extract_rrd_data(
 }
 
 /// Sync/Flush the RRD journal
-pub fn rrd_sync_journal() {
+pub(super) fn rrd_sync_journal() {
     if let Ok(rrd_cache) = get_rrd_cache() {
         if let Err(err) = rrd_cache.sync_journal() {
             log::error!("rrd_sync_journal failed - {}", err);
@@ -129,7 +129,7 @@ pub fn rrd_sync_journal() {
     }
 }
 /// Update RRD Gauge values
-pub fn rrd_update_gauge(name: &str, value: f64) {
+fn rrd_update_gauge(name: &str, value: f64) {
     if let Ok(rrd_cache) = get_rrd_cache() {
         let now = proxmox_time::epoch_f64();
         if let Err(err) = rrd_cache.update_value(name, now, value, DataSourceType::Gauge) {
@@ -139,7 +139,7 @@ pub fn rrd_update_gauge(name: &str, value: f64) {
 }
 
 /// Update RRD Derive values
-pub fn rrd_update_derive(name: &str, value: f64) {
+fn rrd_update_derive(name: &str, value: f64) {
     if let Ok(rrd_cache) = get_rrd_cache() {
         let now = proxmox_time::epoch_f64();
         if let Err(err) = rrd_cache.update_value(name, now, value, DataSourceType::Derive) {
