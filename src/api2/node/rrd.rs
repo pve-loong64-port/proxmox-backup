@@ -8,7 +8,7 @@ use proxmox_schema::api;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT};
 
-use crate::rrd_cache::extract_rrd_data;
+use crate::server::metric_collection::rrd::extract_rrd_data;
 
 pub fn create_value_from_rrd(
     basedir: &str,

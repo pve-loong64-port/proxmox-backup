@@ -15,7 +15,7 @@ use pbs_api_types::{
 use pbs_config::CachedUserInfo;
 use pbs_datastore::DataStore;
 
-use crate::rrd_cache::extract_rrd_data;
+use crate::server::metric_collection::rrd::extract_rrd_data;
 use crate::tools::statistics::linear_regression;
 
 use crate::backup::can_access_any_namespace;

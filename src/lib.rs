@@ -31,8 +31,6 @@ pub mod acme;
 
 pub mod client_helpers;
 
-pub mod rrd_cache;
-
 pub mod traffic_control_cache;
 
 /// Get the server's certificate info (from `proxy.pem`).

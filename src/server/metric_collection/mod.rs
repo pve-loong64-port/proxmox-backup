@@ -16,10 +16,11 @@ use proxmox_sys::{
     linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat},
 };
 
-use crate::{
-    rrd_cache::{initialize_rrd_cache, rrd_sync_journal, rrd_update_derive, rrd_update_gauge},
-    tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage},
-};
+use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
+
+use rrd::{initialize_rrd_cache, rrd_sync_journal, rrd_update_derive, rrd_update_gauge};
+
+pub mod rrd;
 
 /// Initialize the metric collection subsystem.
 ///
