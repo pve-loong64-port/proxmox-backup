@@ -691,16 +691,11 @@ impl BackupWriter {
                 loop {
                     tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
 
-                    let size = stream_len3.load(Ordering::SeqCst);
-                    let size_uploaded = uploaded_len.load(Ordering::SeqCst);
-                    let elapsed = start_time.elapsed();
+                    let size = HumanByte::from(stream_len3.load(Ordering::SeqCst));
+                    let size_uploaded = HumanByte::from(uploaded_len.load(Ordering::SeqCst));
+                    let elapsed = TimeSpan::from(start_time.elapsed());
 
-                    log::info!(
-                        " processed {} in {}, uploaded {}",
-                        HumanByte::from(size),
-                        TimeSpan::from(elapsed),
-                        HumanByte::from(size_uploaded),
-                    );
+                    log::info!("processed {size} in {elapsed}, uploaded {size_uploaded}");
                 }
             }))
         } else {
