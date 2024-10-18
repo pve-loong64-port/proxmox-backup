@@ -1,59 +1,59 @@
 include ../defines.mk
 
 GENERATED_SYNOPSIS := 						\
-	proxmox-tape/synopsis.rst				\
-	proxmox-backup-client/synopsis.rst			\
-	proxmox-backup-client/catalog-shell-synopsis.rst 	\
-	proxmox-backup-manager/synopsis.rst			\
-	proxmox-backup-debug/synopsis.rst			\
-	proxmox-file-restore/synopsis.rst			\
-	pxar/synopsis.rst					\
-	pmtx/synopsis.rst					\
-	pmt/synopsis.rst					\
-	config/media-pool/config.rst				\
-	config/notifications/config.rst				\
-	config/notifications-priv/config.rst				\
-	config/tape/config.rst					\
-	config/tape-job/config.rst				\
-	config/user/config.rst					\
-	config/remote/config.rst				\
-	config/sync/config.rst					\
-	config/verification/config.rst				\
 	config/acl/roles.rst					\
 	config/datastore/config.rst				\
-	config/domains/config.rst
+	config/domains/config.rst				\
+	config/media-pool/config.rst				\
+	config/notifications-priv/config.rst			\
+	config/notifications/config.rst				\
+	config/remote/config.rst				\
+	config/sync/config.rst					\
+	config/tape-job/config.rst				\
+	config/tape/config.rst					\
+	config/user/config.rst					\
+	config/verification/config.rst				\
+	pmt/synopsis.rst					\
+	pmtx/synopsis.rst					\
+	proxmox-backup-client/catalog-shell-synopsis.rst 	\
+	proxmox-backup-client/synopsis.rst			\
+	proxmox-backup-debug/synopsis.rst			\
+	proxmox-backup-manager/synopsis.rst			\
+	proxmox-file-restore/synopsis.rst			\
+	proxmox-tape/synopsis.rst				\
+	pxar/synopsis.rst					\
 
 MAN1_PAGES := 				\
-	pxar.1				\
-	pmtx.1				\
-	pmt.1				\
-	proxmox-tape.1			\
-	proxmox-backup-proxy.1		\
-	proxmox-backup-client.1		\
-	proxmox-backup-manager.1	\
-	proxmox-file-restore.1		\
-	proxmox-backup-debug.1		\
 	pbs2to3.1			\
+	pmt.1				\
+	pmtx.1				\
+	proxmox-backup-client.1		\
+	proxmox-backup-debug.1		\
+	proxmox-backup-manager.1	\
+	proxmox-backup-proxy.1		\
+	proxmox-file-restore.1		\
+	proxmox-tape.1			\
+	pxar.1				\
 
 MAN5_PAGES :=				\
-	media-pool.cfg.5		\
-	tape.cfg.5			\
-	tape-job.cfg.5			\
 	acl.cfg.5			\
-	user.cfg.5			\
-	remote.cfg.5			\
-	sync.cfg.5			\
-	verification.cfg.5		\
 	datastore.cfg.5			\
 	domains.cfg.5			\
-	notifications.cfg.5		\
+	media-pool.cfg.5		\
 	notifications-priv.cfg.5	\
+	notifications.cfg.5		\
+	remote.cfg.5			\
+	sync.cfg.5			\
+	tape-job.cfg.5			\
+	tape.cfg.5			\
+	user.cfg.5			\
+	verification.cfg.5		\
 
 PRUNE_SIMULATOR_FILES := 					\
 	prune-simulator/index.html				\
-	prune-simulator/documentation.html			\
 	prune-simulator/clear-trigger.png			\
-	prune-simulator/prune-simulator.js
+	prune-simulator/documentation.html			\
+	prune-simulator/prune-simulator.js			\
 
 PRUNE_SIMULATOR_JS_SOURCE :=						\
 	/usr/share/javascript/proxmox-widget-toolkit-dev/Toolkit.js	\
