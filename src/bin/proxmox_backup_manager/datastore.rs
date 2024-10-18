@@ -1,14 +1,16 @@
-use anyhow::Error;
-use serde_json::Value;
-
+use pbs_api_types::{
+    DataStoreConfig, DataStoreConfigUpdater, DATASTORE_SCHEMA, PROXMOX_CONFIG_DIGEST_SCHEMA,
+};
+use pbs_client::view_task_result;
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_schema::api;
 
-use pbs_api_types::{DataStoreConfig, DATASTORE_SCHEMA, PROXMOX_CONFIG_DIGEST_SCHEMA};
-use pbs_client::view_task_result;
-
 use proxmox_backup::api2;
+use proxmox_backup::api2::config::datastore::DeletableProperty;
 use proxmox_backup::client_helpers::connect_to_localhost;
+
+use anyhow::Error;
+use serde_json::Value;
 
 #[api(
     input: {
@@ -139,6 +141,53 @@ async fn delete_datastore(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> 
     Ok(())
 }
 
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            name: {
+                schema: DATASTORE_SCHEMA,
+            },
+            update: {
+                type: DataStoreConfigUpdater,
+                flatten: true,
+            },
+            delete: {
+                description: "List of properties to delete.",
+                type: Array,
+                optional: true,
+                items: {
+                    type: DeletableProperty,
+                }
+            },
+            digest: {
+                optional: true,
+                schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        },
+    },
+)]
+/// Update datastore configuration.
+async fn update_datastore(name: String, mut param: Value) -> Result<(), Error> {
+    let output_format = extract_output_format(&mut param);
+    let client = connect_to_localhost()?;
+
+    let result = client
+        .put(
+            format!("api2/json/config/datastore/{name}").as_str(),
+            Some(param),
+        )
+        .await?;
+
+    view_task_result(&client, result, &output_format).await?;
+
+    Ok(())
+}
+
 pub fn datastore_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_DATASTORES))
@@ -154,7 +203,7 @@ pub fn datastore_commands() -> CommandLineInterface {
         )
         .insert(
             "update",
-            CliCommand::new(&api2::config::datastore::API_METHOD_UPDATE_DATASTORE)
+            CliCommand::new(&API_METHOD_UPDATE_DATASTORE)
                 .arg_param(&["name"])
                 .completion_cb("name", pbs_config::datastore::complete_datastore_name)
                 .completion_cb(
