@@ -1,3 +1,88 @@
+rust-proxmox-backup (3.2.8-1) bookworm; urgency=medium
+
+  * switch various log statements in worker tasks to the newer, more flexible
+    proxmox log crate. With this change, errors from task logs are now also
+    logged to the system log, increasing their visibility.
+
+  * datastore api: list snapshots: avoid calculating protected attribute
+    twice per snapshot, this reduces the amounts of file metadata requests.
+
+  * avoid re-calculating the backup snapshot path's date time component when
+    getting the full path, reducing calls to the relatively slow strftime
+    function from libc.
+
+  * fix #3699: client: prefer the XDG cache directory for temporary files with
+    a fallback to using /tmp, as before.
+
+  * sync job: improve log message for when syncing the root namespace.
+
+  * client: increase read buffer from 8 KiB to 4 MiB for raw image based
+    backups. This reduces the time spent polling between the reader, chunker
+    and uploader async tasks and thus can improve backup speed significantly,
+    especially on setups with fast network and storage.
+
+  * client benchmark: avoid unnecessary allocation in the AES benchmark,
+    causing artificial overhead. The benchmark AES results should now be more
+    in line with the hardware capability and what the PBS client could already
+    do.  On our test system we saw an increase by an factor of 2.3 on this
+    specific benchmark.
+
+  * docs: add external metrics server page
+
+  * tfa: webauthn: serialize OriginUrl following RFC6454
+
+  * factor out apt and apt-repository handling into a new library crate for
+    re-use in other projects. There should be no functional change.
+
+  * fix various typos all over the place found using the rust based `typos`
+    tool.
+
+  * datastore: data blob compression: increase compression throughput by
+    switching away from a higher level zstd method to a lower level one, which
+    allows us to control the target buffer size directly and thus avoid some
+    allocation and syscall overhead. We saw the compression bandwidth increase
+    by a factor of 1.19 in our tests where both the source data and the target
+    datastore where located in memory backed tmpfs.
+
+  * daily-update: ensure notification system context is initialized.
+
+  * backup reader: derive if debug messages should be printed from the global
+    log level. This avoids printing some debug messages by default, e.g., the
+    "protocol upgrade done" message from sync jobs.
+
+  * ui: user view: disable 'Unlock TFA' button by default to improve UX if no
+    user is selected.
+
+  * manager cli: ensure the worker tasks finishes when triggering a reload of
+    the system network.
+
+  * fix #5622: backup client: properly handle rate and burst parameters.
+    Previously, passing any non-integer value, like `1mb`, was ignored.
+
+  * tape: read element status: ignore responses where the library specifies
+    that it will return a volume tag but then does not includes that field in
+    the actual response. As both the primary and the alternative volume tag
+    are not required by PBS, this specific error can simply be downgraded to a
+    warning.
+
+  * pxar: dump archive: print entries to stdout instead of stderr
+
+  * sync jobs: various clean-ups and refactoring that should not result in any
+    semantic change.
+
+  * metric collection: put metrics in a cache with a 30 minutes lifetime.
+
+  * api: add /status/metrics API to allow pull-based metric server to gather
+    data directly.
+
+  * partial fix #5560: client: periodically show backup progress
+
+  * docs: add proxmox-backup.node.cfg man page
+
+  * docs: sync: explicitly mention `removed-vanish` flag
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 18 Oct 2024 19:05:41 +0200
+
 rust-proxmox-backup (3.2.7-1) bookworm; urgency=medium
 
   * docs: drop blanket statement recommending against remote storage
