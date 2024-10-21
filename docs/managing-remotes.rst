@@ -69,6 +69,9 @@ sync-job`` command. The configuration information for sync jobs is stored at
 in the GUI, or use the ``create`` subcommand. After creating a sync job, you can
 either start it manually from the GUI or provide it with a schedule (see
 :ref:`calendar-event-scheduling`) to run regularly.
+Backup snapshots, groups and namespaces which are no longer available on the
+**Remote** datastore can be removed from the local datastore as well by setting
+the ``remove-vanished`` option for the sync job.
 
 .. code-block:: console
 
