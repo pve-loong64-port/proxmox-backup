@@ -35,12 +35,15 @@ MAN1_PAGES := 				\
 	proxmox-tape.1			\
 	pxar.1				\
 
+# FIXME: prefix all man pages that are not directly relating to an existing executable with
+# `proxmox-backup.`, like the newer added proxmox-backup.node.cfg but add backwards compatible
+# symlinks, e.g. with a "5pbs" man page "suffix section".
 MAN5_PAGES :=				\
 	acl.cfg.5			\
 	datastore.cfg.5			\
 	domains.cfg.5			\
 	media-pool.cfg.5		\
-	node.cfg.5			\
+	proxmox-backup.node.cfg.5	\
 	notifications-priv.cfg.5	\
 	notifications.cfg.5		\
 	remote.cfg.5			\
