@@ -200,6 +200,7 @@ pub fn read_user(userid: Userid, rpcenv: &mut dyn RpcEnvironment) -> Result<User
 #[api()]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+/// The set of properties that can be deleted from a user configuration.
 pub enum DeletableProperty {
     /// Delete the comment property.
     Comment,

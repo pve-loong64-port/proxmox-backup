@@ -641,6 +641,7 @@ fn get_file_system_devices(lsblk_info: &[LsblkInfo]) -> Result<HashSet<u64>, Err
 #[api()]
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
+/// What a block device partition is used for.
 pub enum PartitionUsageType {
     /// Partition is not used (as far we can tell)
     Unused,
@@ -661,6 +662,7 @@ pub enum PartitionUsageType {
 #[api()]
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
+/// What a block device (disk) is used for.
 pub enum DiskUsageType {
     /// Disk is not used (as far we can tell)
     Unused,
@@ -1220,6 +1222,7 @@ pub fn create_single_linux_partition(disk: &Disk) -> Result<Disk, Error> {
 #[api()]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
+/// A file system type supported by our tooling.
 pub enum FileSystemType {
     /// Linux Ext4
     Ext4,
@@ -1233,7 +1236,7 @@ impl std::fmt::Display for FileSystemType {
             FileSystemType::Ext4 => "ext4",
             FileSystemType::Xfs => "xfs",
         };
-        write!(f, "{}", text)
+        write!(f, "{text}")
     }
 }
 
