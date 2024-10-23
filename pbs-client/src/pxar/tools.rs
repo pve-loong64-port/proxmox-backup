@@ -1,16 +1,14 @@
 //! Some common methods used within the pxar code.
 
 use std::ffi::OsStr;
-use std::future::Future;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context, Error};
 use nix::sys::stat::Mode;
 
-use pathpatterns::{MatchList, MatchType};
+use pathpatterns::MatchType;
 use pxar::accessor::aio::{Accessor, Directory, FileEntry};
 use pxar::accessor::ReadAt;
 use pxar::format::StatxTimestamp;
@@ -415,37 +413,6 @@ pub(crate) async fn pxar_metadata_read_dir<T: Clone + Send + Sync + ReadAt>(
     Ok(entries)
 }
 
-/// Dump pxar archive entry by using the same format used to dump entries from a catalog.
-fn pxar_metadata_catalog_dump_entry<'future, T: Clone + Send + Sync + ReadAt + 'future>(
-    entry: FileEntry<T>,
-    path_prefix: Option<&'future str>,
-) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'future>> {
-    let entry_path = entry_path_with_prefix(&entry, path_prefix);
-
-    Box::pin(async move {
-        if let Ok(attr) = DirEntryAttribute::try_from(&entry) {
-            let etype = CatalogEntryType::from(&attr);
-            match attr {
-                DirEntryAttribute::File { size, mtime } => {
-                    let mut mtime_string = mtime.to_string();
-                    if let Ok(s) = proxmox_time::strftime_local("%FT%TZ", mtime) {
-                        mtime_string = s;
-                    }
-                    log::info!("{etype} {entry_path:?} {size} {mtime_string}");
-                }
-                DirEntryAttribute::Directory { .. } => {
-                    log::info!("{etype} {entry_path:?}");
-                    let dir = entry.enter_directory().await?;
-                    pxar_metadata_catalog_dump_dir(dir, path_prefix).await?;
-                }
-                _ => log::info!("{etype} {entry_path:?}"),
-            }
-        }
-
-        Ok(())
-    })
-}
-
 /// Recursively iterate over pxar archive entries and dump them using the same format used to dump
 /// entries from a catalog.
 pub async fn pxar_metadata_catalog_dump_dir<T: Clone + Send + Sync + ReadAt>(
@@ -454,36 +421,33 @@ pub async fn pxar_metadata_catalog_dump_dir<T: Clone + Send + Sync + ReadAt>(
 ) -> Result<(), Error> {
     let entries = pxar_metadata_read_dir(parent_dir).await?;
     for entry in entries {
-        pxar_metadata_catalog_dump_entry(entry, path_prefix).await?;
+        let entry_path = entry_path_with_prefix(&entry, path_prefix);
+
+        Box::pin(async move {
+            if let Ok(attr) = DirEntryAttribute::try_from(&entry) {
+                let etype = CatalogEntryType::from(&attr);
+                match attr {
+                    DirEntryAttribute::File { size, mtime } => {
+                        let mut mtime_string = mtime.to_string();
+                        if let Ok(s) = proxmox_time::strftime_local("%FT%TZ", mtime) {
+                            mtime_string = s;
+                        }
+                        log::info!("{etype} {entry_path:?} {size} {mtime_string}");
+                    }
+                    DirEntryAttribute::Directory { .. } => {
+                        log::info!("{etype} {entry_path:?}");
+                        let dir = entry.enter_directory().await?;
+                        pxar_metadata_catalog_dump_dir(dir, path_prefix).await?;
+                    }
+                    _ => log::info!("{etype} {entry_path:?}"),
+                }
+            }
+
+            Ok::<(), Error>(())
+        })
+        .await?;
     }
     Ok(())
-}
-
-/// Call the callback on given entry if matched by the match patterns.
-fn pxar_metadata_catalog_find_entry<'future, T: Clone + Send + Sync + ReadAt + 'future>(
-    entry: FileEntry<T>,
-    match_list: &'future (impl MatchList<'future> + Sync),
-    callback: &'future (dyn Fn(&[u8]) -> Result<(), Error> + Send + Sync),
-) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'future>> {
-    Box::pin(async move {
-        let file_mode = entry.metadata().file_type() as u32;
-        let entry_path = entry_path_with_prefix(&entry, Some("/"))
-            .as_os_str()
-            .to_owned();
-
-        match match_list.matches(entry_path.as_bytes(), file_mode) {
-            Ok(Some(MatchType::Exclude)) => return Ok(()),
-            Ok(Some(MatchType::Include)) => callback(entry_path.as_bytes())?,
-            _ => (),
-        }
-
-        if let EntryKind::Directory = entry.kind() {
-            let dir_entry = entry.enter_directory().await?;
-            pxar_metadata_catalog_find(dir_entry, match_list, callback).await?;
-        }
-
-        Ok(())
-    })
 }
 
 /// Recursively iterate over pxar archive entries and call the callback on entries matching the
@@ -495,7 +459,26 @@ pub async fn pxar_metadata_catalog_find<'future, T: Clone + Send + Sync + ReadAt
 ) -> Result<(), Error> {
     let entries = pxar_metadata_read_dir(parent_dir).await?;
     for entry in entries {
-        pxar_metadata_catalog_find_entry(entry, match_list, callback).await?;
+        Box::pin(async move {
+            let file_mode = entry.metadata().file_type() as u32;
+            let entry_path = entry_path_with_prefix(&entry, Some("/"))
+                .as_os_str()
+                .to_owned();
+
+            match match_list.matches(entry_path.as_bytes(), file_mode) {
+                Ok(Some(MatchType::Exclude)) => return Ok::<(), Error>(()),
+                Ok(Some(MatchType::Include)) => callback(entry_path.as_bytes())?,
+                _ => (),
+            }
+
+            if let EntryKind::Directory = entry.kind() {
+                let dir_entry = entry.enter_directory().await?;
+                pxar_metadata_catalog_find(dir_entry, match_list, callback).await?;
+            }
+
+            Ok(())
+        })
+        .await?;
     }
     Ok(())
 }
