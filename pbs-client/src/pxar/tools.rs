@@ -187,30 +187,23 @@ pub fn format_multi_line_entry(entry: &Entry) -> String {
 
     let meta = entry.metadata();
 
-    let (size, link, type_name, payload_offset) = match entry.kind() {
-        EntryKind::Version(version) => (format!("{version:?}"), String::new(), "version", None),
+    let (size, link, type_name) = match entry.kind() {
+        EntryKind::Version(version) => (format!("{version:?}"), String::new(), "version"),
         EntryKind::Prelude(prelude) => (
             "0".to_string(),
             format!("raw data: {:?} bytes", prelude.data.len()),
             "prelude",
-            None,
         ),
-        EntryKind::File {
-            size,
-            payload_offset,
-            ..
-        } => (format!("{}", *size), String::new(), "file", *payload_offset),
+        EntryKind::File { size, .. } => (format!("{}", *size), String::new(), "file"),
         EntryKind::Symlink(link) => (
             "0".to_string(),
             format!(" -> {:?}", link.as_os_str()),
             "symlink",
-            None,
         ),
         EntryKind::Hardlink(link) => (
             "0".to_string(),
             format!(" -> {:?}", link.as_os_str()),
             "symlink",
-            None,
         ),
         EntryKind::Device(dev) => (
             format!("{},{}", dev.major, dev.minor),
@@ -222,12 +215,11 @@ pub fn format_multi_line_entry(entry: &Entry) -> String {
             } else {
                 "device"
             },
-            None,
         ),
-        EntryKind::Socket => ("0".to_string(), String::new(), "socket", None),
-        EntryKind::Fifo => ("0".to_string(), String::new(), "fifo", None),
-        EntryKind::Directory => ("0".to_string(), String::new(), "directory", None),
-        EntryKind::GoodbyeTable => ("0".to_string(), String::new(), "bad entry", None),
+        EntryKind::Socket => ("0".to_string(), String::new(), "socket"),
+        EntryKind::Fifo => ("0".to_string(), String::new(), "fifo"),
+        EntryKind::Directory => ("0".to_string(), String::new(), "directory"),
+        EntryKind::GoodbyeTable => ("0".to_string(), String::new(), "bad entry"),
     };
 
     let file_name = match std::str::from_utf8(entry.path().as_os_str().as_bytes()) {
@@ -235,41 +227,21 @@ pub fn format_multi_line_entry(entry: &Entry) -> String {
         Err(_) => std::borrow::Cow::Owned(format!("{:?}", entry.path())),
     };
 
-    if let Some(offset) = payload_offset {
-        format!(
-            "  File: {}{}\n  \
-               Size: {:<13} Type: {}\n\
-             Access: ({:o}/{})  Uid: {:<5} Gid: {:<5}\n\
-             Modify: {}\n
-             PayloadOffset: {}\n",
-            file_name,
-            link,
-            size,
-            type_name,
-            meta.file_mode(),
-            mode_string,
-            meta.stat.uid,
-            meta.stat.gid,
-            format_mtime(&meta.stat.mtime),
-            offset,
-        )
-    } else {
-        format!(
-            "  File: {}{}\n  \
-               Size: {:<13} Type: {}\n\
-             Access: ({:o}/{})  Uid: {:<5} Gid: {:<5}\n\
-             Modify: {}\n",
-            file_name,
-            link,
-            size,
-            type_name,
-            meta.file_mode(),
-            mode_string,
-            meta.stat.uid,
-            meta.stat.gid,
-            format_mtime(&meta.stat.mtime),
-        )
-    }
+    format!(
+        "  File: {}{}\n  \
+           Size: {:<13} Type: {}\n\
+         Access: ({:o}/{})  Uid: {:<5} Gid: {:<5}\n\
+         Modify: {}\n",
+        file_name,
+        link,
+        size,
+        type_name,
+        meta.file_mode(),
+        mode_string,
+        meta.stat.uid,
+        meta.stat.gid,
+        format_mtime(&meta.stat.mtime),
+    )
 }
 
 /// Look up the directory entries of the given directory `path` in a pxar archive via it's given
