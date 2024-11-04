@@ -533,22 +533,25 @@ async fn pull_group(
             if last_sync_time > dir.time {
                 already_synced_skip_info.update(dir.time);
                 return false;
-            } else if already_synced_skip_info.count > 0 {
-                info!("{already_synced_skip_info}");
-                already_synced_skip_info.reset();
             }
 
             if pos < cutoff && last_sync_time != dir.time {
                 transfer_last_skip_info.update(dir.time);
                 return false;
-            } else if transfer_last_skip_info.count > 0 {
-                info!("{transfer_last_skip_info}");
-                transfer_last_skip_info.reset();
             }
             true
         })
         .map(|(_, dir)| dir)
         .collect();
+
+    if already_synced_skip_info.count > 0 {
+        info!("{already_synced_skip_info}");
+        already_synced_skip_info.reset();
+    }
+    if transfer_last_skip_info.count > 0 {
+        info!("{transfer_last_skip_info}");
+        transfer_last_skip_info.reset();
+    }
 
     // start with 65536 chunks (up to 256 GiB)
     let downloaded_chunks = Arc::new(Mutex::new(HashSet::with_capacity(1024 * 64)));
