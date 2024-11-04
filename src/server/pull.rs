@@ -528,6 +528,8 @@ async fn pull_group(
         .enumerate()
         .filter(|&(pos, ref dir)| {
             source_snapshots.insert(dir.time);
+            // Note: Last sync times final snapshot might not have been completely
+            // done yet on the source side, keep it include for a resync.
             if last_sync_time > dir.time {
                 already_synced_skip_info.update(dir.time);
                 return false;
