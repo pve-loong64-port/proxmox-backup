@@ -534,7 +534,6 @@ async fn pull_group(
             } else if already_synced_skip_info.count > 0 {
                 info!("{already_synced_skip_info}");
                 already_synced_skip_info.reset();
-                return true;
             }
 
             if pos < cutoff && last_sync_time != dir.time {
