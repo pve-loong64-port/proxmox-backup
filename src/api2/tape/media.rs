@@ -9,7 +9,8 @@ use proxmox_uuid::Uuid;
 use pbs_api_types::{
     Authid, MediaContentEntry, MediaContentListFilter, MediaListEntry, MediaPoolConfig,
     MediaSetListEntry, MediaStatus, CHANGER_NAME_SCHEMA, MEDIA_LABEL_SCHEMA,
-    MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA, PRIV_TAPE_AUDIT, VAULT_NAME_SCHEMA,
+    MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY,
+    VAULT_NAME_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
 
@@ -304,6 +305,9 @@ pub async fn list_media(
                 optional: true,
             },
         },
+    },
+    access: {
+        permission: &Permission::Privilege(&["tape"], PRIV_TAPE_MODIFY, false),
     },
 )]
 /// Change Tape location to vault (if given), or offline.
