@@ -482,6 +482,11 @@ Ext.define('PBS.Utils', {
 		    ipanel: 'pmxGotifyEditPanel',
 		    iconCls: 'fa-bell-o',
 	    },
+	    webhook: {
+		name: 'Webhook',
+		    ipanel: 'pmxWebhookEditPanel',
+		    iconCls: 'fa-bell-o',
+	    },
 	};
     },
 
