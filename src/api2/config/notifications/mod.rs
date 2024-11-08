@@ -22,6 +22,7 @@ pub mod matchers;
 pub mod sendmail;
 pub mod smtp;
 pub mod targets;
+pub mod webhook;
 
 #[sortable]
 const SUBDIRS: SubdirMap = &sorted!([
@@ -41,6 +42,7 @@ const ENDPOINT_SUBDIRS: SubdirMap = &sorted!([
     ("gotify", &gotify::ROUTER),
     ("sendmail", &sendmail::ROUTER),
     ("smtp", &smtp::ROUTER),
+    ("webhook", &webhook::ROUTER),
 ]);
 
 const ENDPOINT_ROUTER: Router = Router::new()
