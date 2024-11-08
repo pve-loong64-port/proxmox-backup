@@ -85,6 +85,106 @@ integrate with different platforms and services.
 
 See :ref:`notifications.cfg` for all configuration options.
 
+.. _notification_targets_webhook:
+Webhook
+^^^^^^^
+Webhook notification targets perform HTTP requests to a configurable URL.
+
+The following configuration options are available:
+
+* ``url``: The URL to which to perform the HTTP requests.
+  Supports templating to inject message contents, metadata and secrets.
+* ``method``: HTTP Method to use (POST/PUT/GET)
+* ``header``: Array of HTTP headers that should be set for the request.
+  Supports templating to inject message contents, metadata and secrets.
+* ``body``: HTTP body that should be sent.
+  Supports templating to inject message contents, metadata and secrets.
+* ``secret``: Array of secret key-value pairs. These will be stored in
+  a protected configuration file only readable by root. Secrets can be
+  accessed in body/header/URL templates via the ``secrets`` namespace.
+* ``comment``: Comment for this target.
+
+For configuration options that support templating, the
+`Handlebars <https://handlebarsjs.com>`_ syntax can be used to
+access the following properties:
+
+* ``{{ title }}``: The rendered notification title
+* ``{{ message }}``: The rendered notification body
+* ``{{ severity }}``: The severity of the notification (``info``, ``notice``,
+  ``warning``, ``error``, ``unknown``)
+* ``{{ timestamp }}``: The notification's timestamp as a UNIX epoch (in seconds).
+* ``{{ fields.<name> }}``: Sub-namespace for any metadata fields of the
+  notification. For instance, ``fields.type`` contains the notification
+  type - for all available fields refer to :ref:`notification_events`.
+* ``{{ secrets.<name> }}``: Sub-namespace for secrets. For instance, a secret
+  named ``token`` is accessible via ``secrets.token``.
+
+For convenience, the following helpers are available:
+
+* ``{{ url-encode <value/property> }}``: URL-encode a property/literal.
+* ``{{ escape <value/property> }}``: Escape any control characters that cannot
+  be safely represented as a JSON string.
+* ``{{ json <value/property> }}``: Render a value as JSON. This can be useful
+  to pass a whole sub-namespace (e.g. ``fields``) as a part of a JSON payload
+  (e.g. ``{{ json fields }}``).
+
+Example - ntfy.sh
+"""""""""""""""""
+
+* Method: ``POST``
+* URL: ``https://ntfy.sh/{{ secrets.channel }}``
+* Headers:
+
+  * ``Markdown``: ``Yes``
+* Body::
+
+    ```
+    {{ message }}
+    ```
+
+* Secrets:
+
+  * ``channel``: ``<your ntfy.sh channel>``
+
+Example - Discord
+"""""""""""""""""
+
+* Method: ``POST``
+* URL: ``https://discord.com/api/webhooks/{{ secrets.token }}``
+* Headers:
+
+  * ``Content-Type``: ``application/json``
+
+* Body::
+
+    {
+      "content": "``` {{ escape message }}```"
+    }
+
+* Secrets:
+
+  * ``token``: ``<token>``
+
+Example - Slack
+"""""""""""""""
+
+* Method: ``POST``
+* URL: ``https://hooks.slack.com/services/{{ secrets.token }}``
+* Headers:
+
+  * ``Content-Type``: ``application/json``
+
+* Body::
+
+    {
+      "text": "``` {{escape message}}```",
+      "type": "mrkdwn"
+    }
+
+* Secrets:
+
+  * ``token``: ``<token>``
+
 .. _notification_matchers:
 
 Notification Matchers
