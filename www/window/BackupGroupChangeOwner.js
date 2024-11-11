@@ -41,7 +41,6 @@ Ext.define('PBS.BackupGroupChangeOwner', {
 			name: 'new-owner',
 			value: me.owner,
 			fieldLabel: gettext('New Owner'),
-			minLength: 8,
 			allowBlank: false,
 		    },
 		],
