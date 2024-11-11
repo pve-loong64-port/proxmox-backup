@@ -80,11 +80,8 @@ pub fn check_acl_path(path: &str) -> Result<(), Error> {
             }
         }
         "datastore" => {
-            // /datastore/{store}
-            if components_len <= 2 {
-                return Ok(());
-            }
-            if components_len > 2 && components_len <= 2 + pbs_api_types::MAX_NAMESPACE_DEPTH {
+            // /datastore/{store}/{namespace}
+            if components_len <= 2 + pbs_api_types::MAX_NAMESPACE_DEPTH {
                 return Ok(());
             }
         }
