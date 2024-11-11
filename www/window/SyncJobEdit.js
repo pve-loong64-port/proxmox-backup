@@ -238,7 +238,13 @@ Ext.define('PBS.window.SyncJobEdit', {
 				let remoteNamespaceField = me.up('pbsSyncJobEdit').down('field[name=remote-ns]');
 				remoteNamespaceField.setRemote(remote);
 				remoteNamespaceField.setRemoteStore(value);
-				me.up('tabpanel').down('pbsGroupFilter').setRemoteDatastore(remote, value);
+
+				if (!me.syncDirectionPush) {
+				    me.up('tabpanel').down('pbsGroupFilter').setRemoteDatastore(remote, value);
+				} else {
+				    let localStore = me.up('pbsSyncJobEdit').down('field[name=store]').getValue();
+				    me.up('tabpanel').down('pbsGroupFilter').setLocalDatastore(localStore);
+				}
 			    },
 			},
 		    },
