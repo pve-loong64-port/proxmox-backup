@@ -8,7 +8,7 @@ use proxmox_schema::api;
 
 use pbs_api_types::ApiVersionInfo;
 
-const FEATURES: &'static [&'static str] = &[];
+const FEATURES: &[&str] = &["prune-delete-stats"];
 
 #[api(
     returns: {
