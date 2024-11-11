@@ -9,7 +9,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 
     isAdd: true,
 
-    subject: gettext('Sync Job'),
+    subject: gettext('Sync Job - Pull Direction'),
 
     bodyPadding: 0,
 
@@ -29,6 +29,30 @@ Ext.define('PBS.window.SyncJobEdit', {
 	me.scheduleValue = id ? null : 'hourly';
 	me.authid = id ? null : Proxmox.UserName;
 	me.editDatastore = me.datastore === undefined && me.isCreate;
+
+	if (me.syncDirection === 'push') {
+	    me.subject = gettext('Sync Job - Push Direction');
+	    me.syncDirectionPush = true;
+	    me.syncRemoteLabel = gettext('Target Remote');
+	    me.syncRemoteDatastore = gettext('Target Datastore');
+	    me.syncRemoteNamespace = gettext('Target Namespace');
+	    me.syncLocalOwner = gettext('Local User');
+	    // Sync direction request parameter is only required for creating new jobs,
+	    // for edit and delete it is derived from the job config given by it's id.
+	    if (me.isCreate) {
+		me.extraRequestParams = {
+		    "sync-direction": 'push',
+		};
+	    }
+	} else {
+	    me.subject = gettext('Sync Job - Pull Direction');
+	    me.syncDirectionPush = false;
+	    me.syncRemoteLabel = gettext('Source Remote');
+	    me.syncRemoteDatastore = gettext('Source Datastore');
+	    me.syncRemoteNamespace = gettext('Source Namespace');
+	    me.syncLocalOwner = gettext('Local Owner');
+	}
+
 	return { };
     },
 
@@ -118,10 +142,10 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Local Owner'),
 			xtype: 'pbsAuthidSelector',
 			name: 'owner',
 			cbind: {
+			    fieldLabel: '{syncLocalOwner}',
 			    value: '{authid}',
 			    deleteEmpty: '{!isCreate}',
 			},
@@ -151,6 +175,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			xtype: 'radiogroup',
 			fieldLabel: gettext('Location'),
 			defaultType: 'radiofield',
+			cbind: {
+			    disabled: '{syncDirectionPush}',
+			},
 			items: [
 			    {
 				boxLabel: 'Local',
@@ -201,7 +228,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Source Remote'),
+			cbind: {
+			    fieldLabel: '{syncRemoteLabel}',
+			},
 			xtype: 'pbsRemoteSelector',
 			allowBlank: false,
 			name: 'remote',
@@ -222,13 +251,13 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Source Datastore'),
 			xtype: 'pbsRemoteStoreSelector',
 			allowBlank: false,
 			autoSelect: false,
 			name: 'remote-store',
 			cbind: {
 			    datastore: '{datastore}',
+			    fieldLabel: '{syncRemoteDatastore}',
 			},
 			listeners: {
 			    change: function(field, value) {
@@ -249,7 +278,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Source Namespace'),
+			cbind: {
+			    fieldLabel: '{syncRemoteNamespace}',
+			},
 			xtype: 'pbsRemoteNamespaceSelector',
 			allowBlank: true,
 			autoSelect: false,
