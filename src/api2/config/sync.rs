@@ -14,6 +14,7 @@ use pbs_api_types::{
 use pbs_config::sync;
 
 use pbs_config::CachedUserInfo;
+use pbs_datastore::check_backup_owner;
 
 pub fn check_sync_job_read_access(
     user_info: &CachedUserInfo,
@@ -31,6 +32,14 @@ pub fn check_sync_job_read_access(
     } else {
         let source_ds_privs = user_info.lookup_privs(auth_id, &["datastore", &job.remote_store]);
         source_ds_privs & PRIV_DATASTORE_AUDIT != 0
+    }
+}
+
+fn is_correct_owner(auth_id: &Authid, job: &SyncJobConfig) -> bool {
+    match job.owner {
+        Some(ref owner) => check_backup_owner(owner, auth_id).is_ok(),
+        // default sync owner
+        None => auth_id == Authid::root_auth_id(),
     }
 }
 
@@ -54,17 +63,8 @@ pub fn check_sync_job_modify_access(
         }
     }
 
-    let correct_owner = match job.owner {
-        Some(ref owner) => {
-            owner == auth_id
-                || (owner.is_token() && !auth_id.is_token() && owner.user() == auth_id.user())
-        }
-        // default sync owner
-        None => auth_id == Authid::root_auth_id(),
-    };
-
     // same permission as changing ownership after syncing
-    if !correct_owner && ns_anchor_privs & PRIV_DATASTORE_MODIFY == 0 {
+    if !is_correct_owner(auth_id, job) && ns_anchor_privs & PRIV_DATASTORE_MODIFY == 0 {
         return false;
     }
 
