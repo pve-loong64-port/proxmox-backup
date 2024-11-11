@@ -78,7 +78,6 @@ JSSRC=							\
 	window/NamespaceEdit.js				\
 	window/MaintenanceOptions.js			\
 	window/NotesEdit.js				\
-	window/NotificationMatcherOverride.js		\
 	window/RemoteEdit.js				\
 	window/TrafficControlEdit.js			\
 	window/NotifyOptions.js				\
