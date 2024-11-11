@@ -86,8 +86,8 @@ pub fn check_acl_path(path: &str) -> Result<(), Error> {
             }
         }
         "remote" => {
-            // /remote/{remote}/{store}
-            if components_len <= 3 {
+            // /remote/{remote}/{store}/{namespace}
+            if components_len <= 3 + pbs_api_types::MAX_NAMESPACE_DEPTH {
                 return Ok(());
             }
         }
