@@ -34,10 +34,10 @@ use pxar::accessor::aio::Accessor;
 use pxar::EntryKind;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, Authid, BackupContent, BackupNamespace, BackupType,
-    Counts, CryptMode, DataStoreConfig, DataStoreListItem, DataStoreStatus,
-    GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions, Operation,
-    PruneJobOptions, SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA,
+    print_ns_and_snapshot, print_store_and_ns, Authid, BackupContent, BackupGroupDeleteStats,
+    BackupNamespace, BackupType, Counts, CryptMode, DataStoreConfig, DataStoreListItem,
+    DataStoreStatus, GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions,
+    Operation, PruneJobOptions, SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA,
     BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
     DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
     PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
@@ -267,7 +267,16 @@ pub fn list_groups(
                 type: pbs_api_types::BackupGroup,
                 flatten: true,
             },
+            "error-on-protected": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "Return error when group cannot be deleted because of protected snapshots",
+            }
         },
+    },
+    returns: {
+        type: BackupGroupDeleteStats,
     },
     access: {
         permission: &Permission::Anybody,
@@ -279,9 +288,10 @@ pub fn list_groups(
 pub async fn delete_group(
     store: String,
     ns: Option<BackupNamespace>,
+    error_on_protected: bool,
     group: pbs_api_types::BackupGroup,
     rpcenv: &mut dyn RpcEnvironment,
-) -> Result<Value, Error> {
+) -> Result<BackupGroupDeleteStats, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     tokio::task::spawn_blocking(move || {
@@ -299,10 +309,13 @@ pub async fn delete_group(
 
         let delete_stats = datastore.remove_backup_group(&ns, &group)?;
         if !delete_stats.all_removed() {
-            bail!("group only partially deleted due to protected snapshots");
+            if error_on_protected {
+                bail!("group only partially deleted due to protected snapshots");
+            } else {
+                warn!("group only partially deleted due to protected snapshots");
+            }
         }
-
-        Ok(Value::Null)
+        Ok(delete_stats)
     })
     .await?
 }

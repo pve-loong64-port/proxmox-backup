@@ -1,13 +1,12 @@
 use anyhow::{bail, Error};
-use serde_json::Value;
 
 use pbs_config::CachedUserInfo;
 use proxmox_router::{http_bail, ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::*;
 
 use pbs_api_types::{
-    Authid, BackupNamespace, NamespaceListItem, Operation, DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA,
-    PROXMOX_SAFE_ID_FORMAT,
+    Authid, BackupGroupDeleteStats, BackupNamespace, NamespaceListItem, Operation,
+    DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA, PROXMOX_SAFE_ID_FORMAT,
 };
 
 use pbs_datastore::DataStore;
@@ -138,6 +137,12 @@ pub fn list_namespaces(
                 optional: true,
                 default: false,
             },
+            "error-on-protected": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "Return error when namespace cannot be deleted because of protected snapshots",
+            }
         },
     },
     access: {
@@ -149,24 +154,32 @@ pub fn delete_namespace(
     store: String,
     ns: BackupNamespace,
     delete_groups: bool,
+    error_on_protected: bool,
     _info: &ApiMethod,
     rpcenv: &mut dyn RpcEnvironment,
-) -> Result<Value, Error> {
+) -> Result<BackupGroupDeleteStats, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     check_ns_modification_privs(&store, &ns, &auth_id)?;
 
     let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
 
-    if !datastore.remove_namespace_recursive(&ns, delete_groups)? {
-        if delete_groups {
-            bail!("group only partially deleted due to protected snapshots");
+    let (removed_all, stats) = datastore.remove_namespace_recursive(&ns, delete_groups)?;
+    if !removed_all {
+        let err_msg = if delete_groups {
+            "group only partially deleted due to protected snapshots"
         } else {
-            bail!("only partially deleted due to existing groups but `delete-groups` not true ");
+            "only partially deleted due to existing groups but `delete-groups` not true"
+        };
+
+        if error_on_protected {
+            bail!(err_msg);
+        } else {
+            log::warn!("{err_msg}");
         }
     }
 
-    Ok(Value::Null)
+    Ok(stats)
 }
 
 pub const ROUTER: Router = Router::new()

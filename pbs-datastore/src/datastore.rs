@@ -492,16 +492,22 @@ impl DataStore {
     ///
     /// Does *not* descends into child-namespaces and doesn't remoes the namespace itself either.
     ///
-    /// Returns true if all the groups were removed, and false if some were protected.
-    pub fn remove_namespace_groups(self: &Arc<Self>, ns: &BackupNamespace) -> Result<bool, Error> {
+    /// Returns a tuple with the first item being true if all the groups were removed, and false if some were protected.
+    /// The second item returns the remove statistics.
+    pub fn remove_namespace_groups(
+        self: &Arc<Self>,
+        ns: &BackupNamespace,
+    ) -> Result<(bool, BackupGroupDeleteStats), Error> {
         // FIXME: locking? The single groups/snapshots are already protected, so may not be
         // necessary (depends on what we all allow to do with namespaces)
         log::info!("removing all groups in namespace {}:/{ns}", self.name());
 
         let mut removed_all_groups = true;
+        let mut stats = BackupGroupDeleteStats::default();
 
         for group in self.iter_backup_groups(ns.to_owned())? {
             let delete_stats = group?.destroy()?;
+            stats.add(&delete_stats);
             removed_all_groups = removed_all_groups && delete_stats.all_removed();
         }
 
@@ -518,7 +524,7 @@ impl DataStore {
             }
         }
 
-        Ok(removed_all_groups)
+        Ok((removed_all_groups, stats))
     }
 
     /// Remove a complete backup namespace optionally including all it's, and child namespaces',
@@ -530,13 +536,15 @@ impl DataStore {
         self: &Arc<Self>,
         ns: &BackupNamespace,
         delete_groups: bool,
-    ) -> Result<bool, Error> {
+    ) -> Result<(bool, BackupGroupDeleteStats), Error> {
         let store = self.name();
         let mut removed_all_requested = true;
+        let mut stats = BackupGroupDeleteStats::default();
         if delete_groups {
             log::info!("removing whole namespace recursively below {store}:/{ns}",);
             for ns in self.recursive_iter_backup_ns(ns.to_owned())? {
-                let removed_ns_groups = self.remove_namespace_groups(&ns?)?;
+                let (removed_ns_groups, delete_stats) = self.remove_namespace_groups(&ns?)?;
+                stats.add(&delete_stats);
                 removed_all_requested = removed_all_requested && removed_ns_groups;
             }
         } else {
@@ -577,7 +585,7 @@ impl DataStore {
             }
         }
 
-        Ok(removed_all_requested)
+        Ok((removed_all_requested, stats))
     }
 
     /// Remove a complete backup group including all snapshots.

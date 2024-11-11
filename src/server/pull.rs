@@ -650,10 +650,12 @@ fn check_and_remove_ns(params: &PullParameters, local_ns: &BackupNamespace) -> R
     check_ns_modification_privs(params.target.store.name(), local_ns, &params.owner)
         .map_err(|err| format_err!("Removing {local_ns} not allowed - {err}"))?;
 
-    params
+    let (removed_all, _delete_stats) = params
         .target
         .store
-        .remove_namespace_recursive(local_ns, true)
+        .remove_namespace_recursive(local_ns, true)?;
+
+    Ok(removed_all)
 }
 
 fn check_and_remove_vanished_ns(
