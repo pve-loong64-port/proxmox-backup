@@ -227,3 +227,43 @@ the web interface or using the ``proxmox-backup-manager`` command-line tool:
 .. code-block:: console
 
     # proxmox-backup-manager sync-job update ID --rate-in 20MiB
+
+Sync Direction Push
+^^^^^^^^^^^^^^^^^^^
+
+Sync jobs can be configured for pull or push direction. Sync jobs in push
+direction are not identical in behaviour because of the limited access to the
+target datastore via the remote servers API. Most notably, pushed content will
+always be owned by the user configured in the remote configuration, being
+independent from the local user as configured in the sync job. Latter is used
+exclusively for permission check and scope checks on the pushing side.
+
+.. note:: It is strongly advised to create a dedicated remote configuration for
+   each individual sync job in push direction, using a dedicated user on the
+   remote. Otherwise, sync jobs pushing to the same target might remove each
+   others snapshots and/or groups, if the remove vanished flag is set or skip
+   snapshots if the backup time is not incremental.
+   This is because the backup groups on the target are owned by the user
+   given in the remote configuration.
+
+The following permissions are required for a sync job in push direction:
+
+#. ``Remote.Audit`` on ``/remote/{remote}`` and ``Remote.DatastoreBackup`` on
+   ``/remote/{remote}/{remote-store}/{remote-ns}`` path or subnamespace.
+#. At least ``Datastore.Read`` on the local source datastore namespace
+   (``/datastore/{store}/{ns}``) or ``Datastore.Backup`` if owner of the sync
+   job.
+#. ``Remote.DatastorePrune`` on ``/remote/{remote}/{remote-store}/{remote-ns}``
+   path to remove vanished snapshots and groups. Make sure to use a dedicated
+   remote for each sync job in push direction as noted above.
+#. ``Remote.DatastoreModify`` on ``/remote/{remote}/{remote-store}/{remote-ns}``
+   path to remove vanished namespaces. A remote user with limited access should
+   be used on the remote backup server instance. Consider the implications as
+   noted below.
+
+.. note:: ``Remote.DatastoreModify`` will allow to remove whole namespaces on the
+   remote target datastore, independent of ownership. Make sure the user as
+   configured in remote.cfg has limited permissions on the remote side.
+
+.. note:: Sync jobs in push direction require namespace support on the remote
+   Proxmox Backup Server instance (minimum version 2.2).
