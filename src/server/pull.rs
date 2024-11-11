@@ -829,22 +829,16 @@ pub(crate) async fn pull_ns(
     namespace: &BackupNamespace,
     params: &mut PullParameters,
 ) -> Result<(StoreProgress, SyncStats, bool), Error> {
-    let mut list: Vec<BackupGroup> = params.source.list_groups(namespace, &params.owner).await?;
-
-    list.sort_unstable_by(|a, b| {
-        let type_order = a.ty.cmp(&b.ty);
-        if type_order == std::cmp::Ordering::Equal {
-            a.id.cmp(&b.id)
-        } else {
-            type_order
-        }
-    });
+    let list: Vec<BackupGroup> = params.source.list_groups(namespace, &params.owner).await?;
 
     let unfiltered_count = list.len();
-    let list: Vec<BackupGroup> = list
+    let mut list: Vec<BackupGroup> = list
         .into_iter()
         .filter(|group| group.apply_filters(&params.group_filter))
         .collect();
+
+    list.sort_unstable();
+
     info!(
         "found {} groups to sync (out of {unfiltered_count} total)",
         list.len()
