@@ -36,6 +36,7 @@ pub mod auth;
 pub mod metric_collection;
 
 pub(crate) mod pull;
+pub(crate) mod push;
 pub(crate) mod sync;
 
 pub(crate) async fn reload_proxy_certificate() -> Result<(), Error> {
