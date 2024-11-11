@@ -7,6 +7,7 @@ use std::time::Instant;
 use anyhow::{bail, format_err, Error};
 use futures::future::{self, AbortHandle, Either, FutureExt, TryFutureExt};
 use futures::stream::{Stream, StreamExt, TryStreamExt};
+use openssl::sha::Sha256;
 use serde_json::{json, Value};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, oneshot};
@@ -648,42 +649,14 @@ impl BackupWriter {
         archive: &str,
     ) -> impl Future<Output = Result<UploadStats, Error>> {
         let mut counters = UploadCounters::new();
-        let uploaded_len = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counters_readonly = counters.clone();
 
-        let append_chunk_path = format!("{}_index", prefix);
-        let upload_chunk_path = format!("{}_chunk", prefix);
         let is_fixed_chunk_size = prefix == "fixed";
-
-        let (upload_queue, upload_result) =
-            Self::append_chunk_queue(h2.clone(), wid, append_chunk_path, uploaded_len.clone());
-
-        let start_time = std::time::Instant::now();
 
         let index_csum = Arc::new(Mutex::new(Some(openssl::sha::Sha256::new())));
         let index_csum_2 = index_csum.clone();
 
-        let progress_handle = if archive.ends_with(".img")
-            || archive.ends_with(".pxar")
-            || archive.ends_with(".ppxar")
-        {
-            let counters = counters.clone();
-            Some(tokio::spawn(async move {
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-
-                    let size = HumanByte::from(counters.total_stream_len());
-                    let size_uploaded = HumanByte::from(uploaded_len.load(Ordering::SeqCst));
-                    let elapsed = TimeSpan::from(start_time.elapsed());
-
-                    log::info!("processed {size} in {elapsed}, uploaded {size_uploaded}");
-                }
-            }))
-        } else {
-            None
-        };
-
-        stream
+        let stream = stream
             .inject_reused_chunks(injections, counters.clone())
             .and_then(move |chunk_info| match chunk_info {
                 InjectedChunksInfo::Known(chunks) => {
@@ -749,7 +722,58 @@ impl BackupWriter {
                     future::ok(res)
                 }
             })
-            .merge_known_chunks()
+            .merge_known_chunks();
+
+        Self::upload_merged_chunk_stream(
+            h2,
+            wid,
+            archive,
+            prefix,
+            stream,
+            index_csum_2,
+            counters_readonly,
+        )
+    }
+
+    fn upload_merged_chunk_stream(
+        h2: H2Client,
+        wid: u64,
+        archive: &str,
+        prefix: &str,
+        stream: impl Stream<Item = Result<MergedChunkInfo, Error>>,
+        index_csum: Arc<Mutex<Option<Sha256>>>,
+        counters: UploadCounters,
+    ) -> impl Future<Output = Result<UploadStats, Error>> {
+        let append_chunk_path = format!("{prefix}_index");
+        let upload_chunk_path = format!("{prefix}_chunk");
+
+        let start_time = std::time::Instant::now();
+        let uploaded_len = Arc::new(AtomicUsize::new(0));
+
+        let (upload_queue, upload_result) =
+            Self::append_chunk_queue(h2.clone(), wid, append_chunk_path, uploaded_len.clone());
+
+        let progress_handle = if archive.ends_with(".img")
+            || archive.ends_with(".pxar")
+            || archive.ends_with(".ppxar")
+        {
+            let counters = counters.clone();
+            Some(tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+
+                    let size = HumanByte::from(counters.total_stream_len());
+                    let size_uploaded = HumanByte::from(uploaded_len.load(Ordering::SeqCst));
+                    let elapsed = TimeSpan::from(start_time.elapsed());
+
+                    log::info!("processed {size} in {elapsed}, uploaded {size_uploaded}");
+                }
+            }))
+        } else {
+            None
+        };
+
+        stream
             .try_for_each(move |merged_chunk_info| {
                 let upload_queue = upload_queue.clone();
 
@@ -813,14 +837,14 @@ impl BackupWriter {
             })
             .then(move |result| async move { upload_result.await?.and(result) }.boxed())
             .and_then(move |_| {
-                let mut guard = index_csum_2.lock().unwrap();
+                let mut guard = index_csum.lock().unwrap();
                 let csum = guard.take().unwrap().finish();
 
                 if let Some(handle) = progress_handle {
                     handle.abort();
                 }
 
-                futures::future::ok(counters_readonly.to_upload_stats(csum, start_time.elapsed()))
+                futures::future::ok(counters.to_upload_stats(csum, start_time.elapsed()))
             })
     }
 
