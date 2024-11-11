@@ -589,7 +589,14 @@ async fn schedule_datastore_sync_jobs() {
         Ok((config, _digest)) => config,
     };
 
-    for (job_id, (_, job_config)) in config.sections {
+    for (job_id, (job_type, job_config)) in config.sections {
+        let sync_direction = match SyncDirection::from_config_type_str(&job_type) {
+            Ok(direction) => direction,
+            Err(err) => {
+                eprintln!("unexpected config type in sync job config - {err}");
+                continue;
+            }
+        };
         let job_config: SyncJobConfig = match serde_json::from_value(job_config) {
             Ok(c) => c,
             Err(err) => {
@@ -616,7 +623,7 @@ async fn schedule_datastore_sync_jobs() {
                 job_config,
                 &auth_id,
                 Some(event_str),
-                SyncDirection::Pull,
+                sync_direction,
                 false,
             ) {
                 eprintln!("unable to start datastore sync job {job_id} - {err}");

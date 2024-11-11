@@ -1,6 +1,7 @@
 //! Datastore Synchronization Job Management
 
 use anyhow::{bail, format_err, Error};
+use serde::Deserialize;
 use serde_json::Value;
 
 use proxmox_router::{
@@ -29,6 +30,10 @@ use crate::{
                 schema: DATASTORE_SCHEMA,
                 optional: true,
             },
+            "sync-direction": {
+                type: SyncDirection,
+                optional: true,
+            },
         },
     },
     returns: {
@@ -44,6 +49,7 @@ use crate::{
 /// List all sync jobs
 pub fn list_sync_jobs(
     store: Option<String>,
+    sync_direction: Option<SyncDirection>,
     _param: Value,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<SyncJobStatus>, Error> {
@@ -52,8 +58,9 @@ pub fn list_sync_jobs(
 
     let (config, digest) = sync::config()?;
 
+    let sync_direction = sync_direction.unwrap_or_default();
     let job_config_iter = config
-        .convert_to_typed_array("sync")?
+        .convert_to_typed_array(sync_direction.as_config_type_str())?
         .into_iter()
         .filter(|job: &SyncJobConfig| {
             if let Some(store) = &store {
@@ -62,7 +69,9 @@ pub fn list_sync_jobs(
                 true
             }
         })
-        .filter(|job: &SyncJobConfig| check_sync_job_read_access(&user_info, &auth_id, job));
+        .filter(|job: &SyncJobConfig| {
+            check_sync_job_read_access(&user_info, &auth_id, job, sync_direction)
+        });
 
     let mut list = Vec::new();
 
@@ -106,24 +115,23 @@ pub fn run_sync_job(
     let user_info = CachedUserInfo::new()?;
 
     let (config, _digest) = sync::config()?;
-    let sync_job: SyncJobConfig = config.lookup("sync", &id)?;
+    let (config_type, config_section) = config
+        .sections
+        .get(&id)
+        .ok_or_else(|| format_err!("No sync job with id '{id}' found in config"))?;
 
-    if !check_sync_job_modify_access(&user_info, &auth_id, &sync_job) {
-        bail!("permission check failed");
+    let sync_direction = SyncDirection::from_config_type_str(config_type)?;
+    let sync_job = SyncJobConfig::deserialize(config_section)?;
+
+    if !check_sync_job_modify_access(&user_info, &auth_id, &sync_job, sync_direction) {
+        bail!("permission check failed, '{auth_id}' is missing access");
     }
 
     let job = Job::new("syncjob", &id)?;
 
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
-    let upid_str = do_sync_job(
-        job,
-        sync_job,
-        &auth_id,
-        None,
-        SyncDirection::Pull,
-        to_stdout,
-    )?;
+    let upid_str = do_sync_job(job, sync_job, &auth_id, None, sync_direction, to_stdout)?;
 
     Ok(upid_str)
 }
