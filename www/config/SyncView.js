@@ -16,10 +16,6 @@ Ext.define('pbs-sync-jobs-status', {
 	'comment',
     ],
     idProperty: 'id',
-    proxy: {
-	type: 'proxmox',
-	url: '/api2/json/admin/sync',
-    },
 });
 
 Ext.define('PBS.config.SyncJobView', {
@@ -153,6 +149,10 @@ Ext.define('PBS.config.SyncJobView', {
 	    storeid: 'pbs-sync-jobs-status',
 	    model: 'pbs-sync-jobs-status',
 	    interval: 5000,
+	    proxy: {
+		type: 'proxmox',
+		url: '/api2/json/admin/sync',
+	    },
 	},
     },
 
