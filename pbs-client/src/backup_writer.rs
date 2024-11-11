@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use anyhow::{bail, format_err, Error};
 use futures::future::{self, AbortHandle, Either, FutureExt, TryFutureExt};
@@ -23,6 +24,7 @@ use pbs_tools::crypt_config::CryptConfig;
 use proxmox_human_byte::HumanByte;
 use proxmox_time::TimeSpan;
 
+use super::backup_stats::{BackupStats, UploadCounters, UploadStats};
 use super::inject_reused_chunks::{InjectChunks, InjectReusedChunks, InjectedChunksInfo};
 use super::merge_known_chunks::{MergeKnownChunks, MergedChunkInfo};
 
@@ -40,11 +42,6 @@ impl Drop for BackupWriter {
     }
 }
 
-pub struct BackupStats {
-    pub size: u64,
-    pub csum: [u8; 32],
-}
-
 /// Options for uploading blobs/streams to the server
 #[derive(Default, Clone)]
 pub struct UploadOptions {
@@ -52,18 +49,6 @@ pub struct UploadOptions {
     pub compress: bool,
     pub encrypt: bool,
     pub fixed_size: Option<u64>,
-}
-
-struct UploadStats {
-    chunk_count: usize,
-    chunk_reused: usize,
-    chunk_injected: usize,
-    size: usize,
-    size_reused: usize,
-    size_injected: usize,
-    size_compressed: usize,
-    duration: std::time::Duration,
-    csum: [u8; 32],
 }
 
 struct ChunkUploadResponse {
@@ -194,6 +179,7 @@ impl BackupWriter {
         mut reader: R,
         file_name: &str,
     ) -> Result<BackupStats, Error> {
+        let start_time = Instant::now();
         let mut raw_data = Vec::new();
         // fixme: avoid loading into memory
         reader.read_to_end(&mut raw_data)?;
@@ -211,7 +197,12 @@ impl BackupWriter {
                 raw_data,
             )
             .await?;
-        Ok(BackupStats { size, csum })
+        Ok(BackupStats {
+            size,
+            csum,
+            duration: start_time.elapsed(),
+            chunk_count: 0,
+        })
     }
 
     pub async fn upload_blob_from_data(
@@ -220,6 +211,7 @@ impl BackupWriter {
         file_name: &str,
         options: UploadOptions,
     ) -> Result<BackupStats, Error> {
+        let start_time = Instant::now();
         let blob = match (options.encrypt, &self.crypt_config) {
             (false, _) => DataBlob::encode(&data, None, options.compress)?,
             (true, None) => bail!("requested encryption without a crypt config"),
@@ -243,7 +235,12 @@ impl BackupWriter {
                 raw_data,
             )
             .await?;
-        Ok(BackupStats { size, csum })
+        Ok(BackupStats {
+            size,
+            csum,
+            duration: start_time.elapsed(),
+            chunk_count: 0,
+        })
     }
 
     pub async fn upload_blob_from_file<P: AsRef<std::path::Path>>(
@@ -421,10 +418,7 @@ impl BackupWriter {
             "csum": hex::encode(upload_stats.csum),
         });
         let _value = self.h2.post(&close_path, Some(param)).await?;
-        Ok(BackupStats {
-            size: upload_stats.size as u64,
-            csum: upload_stats.csum,
-        })
+        Ok(upload_stats.to_backup_stats())
     }
 
     fn response_queue() -> (
@@ -653,23 +647,9 @@ impl BackupWriter {
         injections: Option<std::sync::mpsc::Receiver<InjectChunks>>,
         archive: &str,
     ) -> impl Future<Output = Result<UploadStats, Error>> {
-        let total_chunks = Arc::new(AtomicUsize::new(0));
-        let total_chunks2 = total_chunks.clone();
-        let known_chunk_count = Arc::new(AtomicUsize::new(0));
-        let known_chunk_count2 = known_chunk_count.clone();
-        let injected_chunk_count = Arc::new(AtomicUsize::new(0));
-        let injected_chunk_count2 = injected_chunk_count.clone();
-
-        let stream_len = Arc::new(AtomicUsize::new(0));
-        let stream_len2 = stream_len.clone();
-        let stream_len3 = stream_len.clone();
-        let compressed_stream_len = Arc::new(AtomicU64::new(0));
-        let compressed_stream_len2 = compressed_stream_len.clone();
-        let reused_len = Arc::new(AtomicUsize::new(0));
-        let reused_len2 = reused_len.clone();
-        let injected_len = Arc::new(AtomicUsize::new(0));
-        let injected_len2 = injected_len.clone();
-        let uploaded_len = Arc::new(AtomicUsize::new(0));
+        let mut counters = UploadCounters::new();
+        let uploaded_len = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counters_readonly = counters.clone();
 
         let append_chunk_path = format!("{}_index", prefix);
         let upload_chunk_path = format!("{}_chunk", prefix);
@@ -687,11 +667,12 @@ impl BackupWriter {
             || archive.ends_with(".pxar")
             || archive.ends_with(".ppxar")
         {
+            let counters = counters.clone();
             Some(tokio::spawn(async move {
                 loop {
                     tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
 
-                    let size = HumanByte::from(stream_len3.load(Ordering::SeqCst));
+                    let size = HumanByte::from(counters.total_stream_len());
                     let size_uploaded = HumanByte::from(uploaded_len.load(Ordering::SeqCst));
                     let elapsed = TimeSpan::from(start_time.elapsed());
 
@@ -703,22 +684,15 @@ impl BackupWriter {
         };
 
         stream
-            .inject_reused_chunks(injections, stream_len.clone())
+            .inject_reused_chunks(injections, counters.clone())
             .and_then(move |chunk_info| match chunk_info {
                 InjectedChunksInfo::Known(chunks) => {
                     // account for injected chunks
-                    let count = chunks.len();
-                    total_chunks.fetch_add(count, Ordering::SeqCst);
-                    injected_chunk_count.fetch_add(count, Ordering::SeqCst);
-
                     let mut known = Vec::new();
                     let mut guard = index_csum.lock().unwrap();
                     let csum = guard.as_mut().unwrap();
                     for chunk in chunks {
-                        let offset =
-                            stream_len.fetch_add(chunk.size() as usize, Ordering::SeqCst) as u64;
-                        reused_len.fetch_add(chunk.size() as usize, Ordering::SeqCst);
-                        injected_len.fetch_add(chunk.size() as usize, Ordering::SeqCst);
+                        let offset = counters.add_injected_chunk(&chunk) as u64;
                         let digest = chunk.digest();
                         known.push((offset, digest));
                         let end_offset = offset + chunk.size();
@@ -731,9 +705,6 @@ impl BackupWriter {
                     // account for not injected chunks (new and known)
                     let chunk_len = data.len();
 
-                    total_chunks.fetch_add(1, Ordering::SeqCst);
-                    let offset = stream_len.fetch_add(chunk_len, Ordering::SeqCst) as u64;
-
                     let mut chunk_builder = DataChunkBuilder::new(data.as_ref()).compress(compress);
 
                     if let Some(ref crypt_config) = crypt_config {
@@ -741,7 +712,29 @@ impl BackupWriter {
                     }
 
                     let mut known_chunks = known_chunks.lock().unwrap();
-                    let digest = chunk_builder.digest();
+                    let digest = *chunk_builder.digest();
+                    let (offset, res) = if known_chunks.contains(&digest) {
+                        let offset = counters.add_known_chunk(chunk_len) as u64;
+                        (offset, MergedChunkInfo::Known(vec![(offset, digest)]))
+                    } else {
+                        match chunk_builder.build() {
+                            Ok((chunk, digest)) => {
+                                let offset =
+                                    counters.add_new_chunk(chunk_len, chunk.raw_size()) as u64;
+                                known_chunks.insert(digest);
+                                (
+                                    offset,
+                                    MergedChunkInfo::New(ChunkInfo {
+                                        chunk,
+                                        digest,
+                                        chunk_len: chunk_len as u64,
+                                        offset,
+                                    }),
+                                )
+                            }
+                            Err(err) => return future::err(err),
+                        }
+                    };
 
                     let mut guard = index_csum.lock().unwrap();
                     let csum = guard.as_mut().unwrap();
@@ -751,26 +744,9 @@ impl BackupWriter {
                     if !is_fixed_chunk_size {
                         csum.update(&chunk_end.to_le_bytes());
                     }
-                    csum.update(digest);
+                    csum.update(&digest);
 
-                    let chunk_is_known = known_chunks.contains(digest);
-                    if chunk_is_known {
-                        known_chunk_count.fetch_add(1, Ordering::SeqCst);
-                        reused_len.fetch_add(chunk_len, Ordering::SeqCst);
-                        future::ok(MergedChunkInfo::Known(vec![(offset, *digest)]))
-                    } else {
-                        let compressed_stream_len2 = compressed_stream_len.clone();
-                        known_chunks.insert(*digest);
-                        future::ready(chunk_builder.build().map(move |(chunk, digest)| {
-                            compressed_stream_len2.fetch_add(chunk.raw_size(), Ordering::SeqCst);
-                            MergedChunkInfo::New(ChunkInfo {
-                                chunk,
-                                digest,
-                                chunk_len: chunk_len as u64,
-                                offset,
-                            })
-                        }))
-                    }
+                    future::ok(res)
                 }
             })
             .merge_known_chunks()
@@ -837,15 +813,6 @@ impl BackupWriter {
             })
             .then(move |result| async move { upload_result.await?.and(result) }.boxed())
             .and_then(move |_| {
-                let duration = start_time.elapsed();
-                let chunk_count = total_chunks2.load(Ordering::SeqCst);
-                let chunk_reused = known_chunk_count2.load(Ordering::SeqCst);
-                let chunk_injected = injected_chunk_count2.load(Ordering::SeqCst);
-                let size = stream_len2.load(Ordering::SeqCst);
-                let size_reused = reused_len2.load(Ordering::SeqCst);
-                let size_injected = injected_len2.load(Ordering::SeqCst);
-                let size_compressed = compressed_stream_len2.load(Ordering::SeqCst) as usize;
-
                 let mut guard = index_csum_2.lock().unwrap();
                 let csum = guard.take().unwrap().finish();
 
@@ -853,17 +820,7 @@ impl BackupWriter {
                     handle.abort();
                 }
 
-                futures::future::ok(UploadStats {
-                    chunk_count,
-                    chunk_reused,
-                    chunk_injected,
-                    size,
-                    size_reused,
-                    size_injected,
-                    size_compressed,
-                    duration,
-                    csum,
-                })
+                futures::future::ok(counters_readonly.to_upload_stats(csum, start_time.elapsed()))
             })
     }
 

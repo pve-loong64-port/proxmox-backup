@@ -1,13 +1,13 @@
 use std::cmp;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::mpsc;
 use std::task::{Context, Poll};
 
 use anyhow::{anyhow, Error};
 use futures::{ready, Stream};
 use pin_project_lite::pin_project;
 
+use crate::backup_stats::UploadCounters;
 use crate::pxar::create::ReusableDynamicEntry;
 
 pin_project! {
@@ -16,7 +16,7 @@ pin_project! {
         input: S,
         next_injection: Option<InjectChunks>,
         injections: Option<mpsc::Receiver<InjectChunks>>,
-        stream_len: Arc<AtomicUsize>,
+        counters: UploadCounters,
     }
 }
 
@@ -42,7 +42,7 @@ pub trait InjectReusedChunks: Sized {
     fn inject_reused_chunks(
         self,
         injections: Option<mpsc::Receiver<InjectChunks>>,
-        stream_len: Arc<AtomicUsize>,
+        counters: UploadCounters,
     ) -> InjectReusedChunksQueue<Self>;
 }
 
@@ -53,13 +53,13 @@ where
     fn inject_reused_chunks(
         self,
         injections: Option<mpsc::Receiver<InjectChunks>>,
-        stream_len: Arc<AtomicUsize>,
+        counters: UploadCounters,
     ) -> InjectReusedChunksQueue<Self> {
         InjectReusedChunksQueue {
             input: self,
             next_injection: None,
             injections,
-            stream_len,
+            counters,
         }
     }
 }
@@ -85,7 +85,7 @@ where
 
             if let Some(inject) = this.next_injection.take() {
                 // got reusable dynamic entries to inject
-                let offset = this.stream_len.load(Ordering::SeqCst) as u64;
+                let offset = this.counters.total_stream_len() as u64;
 
                 match inject.boundary.cmp(&offset) {
                     // inject now
