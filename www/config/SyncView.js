@@ -25,11 +25,21 @@ Ext.define('pbs-sync-jobs-status', {
 Ext.define('PBS.config.SyncJobView', {
     extend: 'Ext.grid.GridPanel',
     alias: 'widget.pbsSyncJobView',
+    mixins: ['Proxmox.Mixin.CBind'],
 
     stateful: true,
     stateId: 'grid-sync-jobs-v1',
 
-    title: gettext('Sync Jobs'),
+    title: gettext('Sync Jobs - Pull Direction'),
+    ownerHeader: gettext('Owner'),
+
+    cbindData: function(initialConfig) {
+	let me = this;
+	if (me.syncDirection === 'push') {
+	    me.title = gettext('Sync Jobs - Push Direction');
+	    me.ownerHeader = gettext('Local User');
+	}
+    },
 
     controller: {
 	xclass: 'Ext.app.ViewController',
@@ -39,6 +49,7 @@ Ext.define('PBS.config.SyncJobView', {
 	    let view = me.getView();
             Ext.create('PBS.window.SyncJobEdit', {
 		datastore: view.datastore,
+		syncDirection: view.syncDirection,
 		listeners: {
 		    destroy: function() {
 			me.reload();
@@ -56,6 +67,7 @@ Ext.define('PBS.config.SyncJobView', {
             Ext.create('PBS.window.SyncJobEdit', {
 		datastore: view.datastore,
                 id: selection[0].data.id,
+		syncDirection: view.syncDirection,
 		listeners: {
 		    destroy: function() {
 			me.reload();
@@ -116,6 +128,9 @@ Ext.define('PBS.config.SyncJobView', {
 	    let params = {};
 	    if (view.datastore !== undefined) {
 		params.store = view.datastore;
+	    }
+	    if (view.syncDirection !== undefined) {
+		params["sync-direction"] = view.syncDirection;
 	    }
 	    view.getStore().rstore.getProxy().setExtraParams(params);
 	    Proxmox.Utils.monStoreErrors(view, view.getStore().rstore);
@@ -230,7 +245,9 @@ Ext.define('PBS.config.SyncJobView', {
 	    sortable: true,
 	},
 	{
-	    header: gettext('Owner'),
+	    cbind: {
+		header: '{ownerHeader}',
+	    },
 	    dataIndex: 'owner',
 	    renderer: 'render_optional_owner',
 	    flex: 2,
