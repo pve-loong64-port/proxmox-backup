@@ -12,7 +12,7 @@ use proxmox_sys::fs::CreateOptions;
 
 use pbs_api_types::percent_encoding::percent_encode_component;
 use pbs_api_types::{
-    BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, DATASTORE_SCHEMA,
+    BackupNamespace, GroupFilter, RateLimitConfig, SyncDirection, SyncJobConfig, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA,
     REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, TRANSFER_LAST_SCHEMA, UPID_SCHEMA,
     VERIFICATION_OUTDATED_AFTER_SCHEMA,
@@ -294,6 +294,72 @@ fn task_mgmt_cli() -> CommandLineInterface {
     cmd_def.into()
 }
 
+/// Sync datastore by pulling from or pushing to another repository
+#[allow(clippy::too_many_arguments)]
+async fn sync_datastore(
+    remote: String,
+    remote_store: String,
+    remote_ns: Option<BackupNamespace>,
+    store: String,
+    ns: Option<BackupNamespace>,
+    remove_vanished: Option<bool>,
+    max_depth: Option<usize>,
+    group_filter: Option<Vec<GroupFilter>>,
+    limit: RateLimitConfig,
+    transfer_last: Option<usize>,
+    param: Value,
+    sync_direction: SyncDirection,
+) -> Result<Value, Error> {
+    let output_format = get_output_format(&param);
+
+    let client = connect_to_localhost()?;
+    let mut args = json!({
+        "store": store,
+        "remote": remote,
+        "remote-store": remote_store,
+    });
+
+    if remote_ns.is_some() {
+        args["remote-ns"] = json!(remote_ns);
+    }
+
+    if ns.is_some() {
+        args["ns"] = json!(ns);
+    }
+
+    if max_depth.is_some() {
+        args["max-depth"] = json!(max_depth);
+    }
+
+    if group_filter.is_some() {
+        args["group-filter"] = json!(group_filter);
+    }
+
+    if let Some(remove_vanished) = remove_vanished {
+        args["remove-vanished"] = Value::from(remove_vanished);
+    }
+
+    if transfer_last.is_some() {
+        args["transfer-last"] = json!(transfer_last)
+    }
+
+    let mut limit_json = json!(limit);
+    let limit_map = limit_json
+        .as_object_mut()
+        .ok_or_else(|| format_err!("limit is not an Object"))?;
+
+    args.as_object_mut().unwrap().append(limit_map);
+
+    let result = match sync_direction {
+        SyncDirection::Pull => client.post("api2/json/pull", Some(args)).await?,
+        SyncDirection::Push => client.post("api2/json/push", Some(args)).await?,
+    };
+
+    view_task_result(&client, result, &output_format).await?;
+
+    Ok(Value::Null)
+}
+
 // fixme: avoid API redefinition
 #[api(
    input: {
@@ -342,7 +408,7 @@ fn task_mgmt_cli() -> CommandLineInterface {
         }
    }
 )]
-/// Sync datastore from another repository
+/// Sync datastore by pulling from another repository
 #[allow(clippy::too_many_arguments)]
 async fn pull_datastore(
     remote: String,
@@ -357,52 +423,100 @@ async fn pull_datastore(
     transfer_last: Option<usize>,
     param: Value,
 ) -> Result<Value, Error> {
-    let output_format = get_output_format(&param);
+    sync_datastore(
+        remote,
+        remote_store,
+        remote_ns,
+        store,
+        ns,
+        remove_vanished,
+        max_depth,
+        group_filter,
+        limit,
+        transfer_last,
+        param,
+        SyncDirection::Pull,
+    )
+    .await
+}
 
-    let client = connect_to_localhost()?;
-
-    let mut args = json!({
-        "store": store,
-        "remote": remote,
-        "remote-store": remote_store,
-    });
-
-    if remote_ns.is_some() {
-        args["remote-ns"] = json!(remote_ns);
-    }
-
-    if ns.is_some() {
-        args["ns"] = json!(ns);
-    }
-
-    if max_depth.is_some() {
-        args["max-depth"] = json!(max_depth);
-    }
-
-    if group_filter.is_some() {
-        args["group-filter"] = json!(group_filter);
-    }
-
-    if let Some(remove_vanished) = remove_vanished {
-        args["remove-vanished"] = Value::from(remove_vanished);
-    }
-
-    if transfer_last.is_some() {
-        args["transfer-last"] = json!(transfer_last)
-    }
-
-    let mut limit_json = json!(limit);
-    let limit_map = limit_json
-        .as_object_mut()
-        .ok_or_else(|| format_err!("limit is not an Object"))?;
-
-    args.as_object_mut().unwrap().append(limit_map);
-
-    let result = client.post("api2/json/pull", Some(args)).await?;
-
-    view_task_result(&client, result, &output_format).await?;
-
-    Ok(Value::Null)
+#[api(
+   input: {
+        properties: {
+            "store": {
+                schema: DATASTORE_SCHEMA,
+            },
+            "ns": {
+                type: BackupNamespace,
+                optional: true,
+            },
+            remote: {
+                schema: REMOTE_ID_SCHEMA,
+            },
+            "remote-store": {
+                schema: DATASTORE_SCHEMA,
+            },
+            "remote-ns": {
+                type: BackupNamespace,
+                optional: true,
+            },
+            "remove-vanished": {
+                schema: REMOVE_VANISHED_BACKUPS_SCHEMA,
+                optional: true,
+            },
+            "max-depth": {
+                schema: NS_MAX_DEPTH_SCHEMA,
+                optional: true,
+            },
+            "group-filter": {
+                schema: GROUP_FILTER_LIST_SCHEMA,
+                optional: true,
+            },
+            limit: {
+                type: RateLimitConfig,
+                flatten: true,
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+            "transfer-last": {
+                schema: TRANSFER_LAST_SCHEMA,
+                optional: true,
+            },
+        }
+   }
+)]
+/// Sync datastore by pushing to another repository
+#[allow(clippy::too_many_arguments)]
+async fn push_datastore(
+    remote: String,
+    remote_store: String,
+    remote_ns: Option<BackupNamespace>,
+    store: String,
+    ns: Option<BackupNamespace>,
+    remove_vanished: Option<bool>,
+    max_depth: Option<usize>,
+    group_filter: Option<Vec<GroupFilter>>,
+    limit: RateLimitConfig,
+    transfer_last: Option<usize>,
+    param: Value,
+) -> Result<Value, Error> {
+    sync_datastore(
+        remote,
+        remote_store,
+        remote_ns,
+        store,
+        ns,
+        remove_vanished,
+        max_depth,
+        group_filter,
+        limit,
+        transfer_last,
+        param,
+        SyncDirection::Push,
+    )
+    .await
 }
 
 #[api(
@@ -527,6 +641,14 @@ async fn run() -> Result<(), Error> {
                 .completion_cb("remote-store", complete_remote_datastore_name)
                 .completion_cb("group-filter", complete_remote_datastore_group_filter)
                 .completion_cb("remote-ns", complete_remote_datastore_namespace),
+        )
+        .insert(
+            "push",
+            CliCommand::new(&API_METHOD_PUSH_DATASTORE)
+                .arg_param(&["store", "remote", "remote-store"])
+                .completion_cb("store", pbs_config::datastore::complete_datastore_name)
+                .completion_cb("remote", pbs_config::remote::complete_remote_name)
+                .completion_cb("remote-store", complete_remote_datastore_name),
         )
         .insert(
             "verify",
