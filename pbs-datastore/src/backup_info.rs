@@ -221,6 +221,7 @@ impl BackupGroup {
             std::fs::remove_dir_all(&path).map_err(|err| {
                 format_err!("removing group directory {:?} failed - {}", path, err)
             })?;
+            delete_stats.increment_removed_groups();
         }
 
         Ok(delete_stats)
