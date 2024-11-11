@@ -9,6 +9,7 @@ pub mod tools;
 
 mod inject_reused_chunks;
 mod merge_known_chunks;
+pub use merge_known_chunks::MergedChunkInfo;
 pub mod pipe_to_stream;
 
 mod http_client;

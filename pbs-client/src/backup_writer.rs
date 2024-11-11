@@ -266,6 +266,99 @@ impl BackupWriter {
             .await
     }
 
+    /// Upload chunks and index
+    pub async fn upload_index_chunk_info(
+        &self,
+        archive_name: &str,
+        stream: impl Stream<Item = Result<MergedChunkInfo, Error>>,
+        options: UploadOptions,
+    ) -> Result<BackupStats, Error> {
+        let mut param = json!({ "archive-name": archive_name });
+        let prefix = if let Some(size) = options.fixed_size {
+            param["size"] = size.into();
+            "fixed"
+        } else {
+            "dynamic"
+        };
+
+        if options.encrypt && self.crypt_config.is_none() {
+            bail!("requested encryption without a crypt config");
+        }
+
+        let wid = self
+            .h2
+            .post(&format!("{prefix}_index"), Some(param))
+            .await?
+            .as_u64()
+            .unwrap();
+
+        let mut counters = UploadCounters::new();
+        let counters_readonly = counters.clone();
+
+        let is_fixed_chunk_size = prefix == "fixed";
+
+        let index_csum = Arc::new(Mutex::new(Some(Sha256::new())));
+        let index_csum_2 = index_csum.clone();
+
+        let stream = stream
+            .and_then(move |mut merged_chunk_info| {
+                match merged_chunk_info {
+                    MergedChunkInfo::New(ref chunk_info) => {
+                        let chunk_len = chunk_info.chunk_len;
+                        let offset =
+                            counters.add_new_chunk(chunk_len as usize, chunk_info.chunk.raw_size());
+                        let end_offset = offset as u64 + chunk_len;
+                        let mut guard = index_csum.lock().unwrap();
+                        let csum = guard.as_mut().unwrap();
+                        if !is_fixed_chunk_size {
+                            csum.update(&end_offset.to_le_bytes());
+                        }
+                        csum.update(&chunk_info.digest);
+                    }
+                    MergedChunkInfo::Known(ref mut known_chunk_list) => {
+                        for (chunk_len, digest) in known_chunk_list {
+                            let offset = counters.add_known_chunk(*chunk_len as usize);
+                            let end_offset = offset as u64 + *chunk_len;
+                            let mut guard = index_csum.lock().unwrap();
+                            let csum = guard.as_mut().unwrap();
+                            if !is_fixed_chunk_size {
+                                csum.update(&end_offset.to_le_bytes());
+                            }
+                            csum.update(digest);
+                            // Replace size with offset, expected by further stream
+                            *chunk_len = offset as u64;
+                        }
+                    }
+                }
+                future::ok(merged_chunk_info)
+            })
+            .merge_known_chunks();
+
+        let upload_stats = Self::upload_merged_chunk_stream(
+            self.h2.clone(),
+            wid,
+            archive_name,
+            prefix,
+            stream,
+            index_csum_2,
+            counters_readonly,
+        )
+        .await?;
+
+        let param = json!({
+            "wid": wid ,
+            "chunk-count": upload_stats.chunk_count,
+            "size": upload_stats.size,
+            "csum": hex::encode(upload_stats.csum),
+        });
+        let _value = self
+            .h2
+            .post(&format!("{prefix}_close"), Some(param))
+            .await?;
+
+        Ok(upload_stats.to_backup_stats())
+    }
+
     pub async fn upload_stream(
         &self,
         archive_name: &str,
