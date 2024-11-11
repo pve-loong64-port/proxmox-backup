@@ -737,7 +737,10 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
     let mut namespaces = if params.source.get_ns().is_root() && old_max_depth == Some(0) {
         vec![params.source.get_ns()] // backwards compat - don't query remote namespaces!
     } else {
-        params.source.list_namespaces(&mut params.max_depth).await?
+        params
+            .source
+            .list_namespaces(&mut params.max_depth, Box::new(|_| true))
+            .await?
     };
 
     check_namespace_depth_limit(&params.source.get_ns(), &params.target.ns, &namespaces)?;

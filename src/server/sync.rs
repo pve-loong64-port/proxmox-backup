@@ -208,6 +208,8 @@ impl SyncSourceReader for LocalSourceReader {
     }
 }
 
+pub type NamespaceFilter = Box<dyn Fn(&BackupNamespace) -> bool + Send>;
+
 #[async_trait::async_trait]
 /// `SyncSource` is a trait that provides an interface for synchronizing data/information from a
 /// source.
@@ -218,6 +220,7 @@ pub(crate) trait SyncSource: Send + Sync {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
+        filter_callback: NamespaceFilter,
     ) -> Result<Vec<BackupNamespace>, Error>;
 
     /// Lists groups within a specific namespace from the source.
@@ -260,6 +263,7 @@ impl SyncSource for RemoteSource {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
+        filter_callback: NamespaceFilter,
     ) -> Result<Vec<BackupNamespace>, Error> {
         if self.ns.is_root() && max_depth.map_or(false, |depth| depth == 0) {
             return Ok(vec![self.ns.clone()]);
@@ -306,6 +310,8 @@ impl SyncSource for RemoteSource {
                 .into_iter()
                 .map(|list_item| list_item.ns)
                 .collect();
+
+        let list = list.into_iter().filter(filter_callback).collect();
 
         Ok(list)
     }
@@ -400,13 +406,18 @@ impl SyncSource for LocalSource {
     async fn list_namespaces(
         &self,
         max_depth: &mut Option<usize>,
+        filter_callback: NamespaceFilter,
     ) -> Result<Vec<BackupNamespace>, Error> {
-        ListNamespacesRecursive::new_max_depth(
+        let list: Result<Vec<BackupNamespace>, Error> = ListNamespacesRecursive::new_max_depth(
             self.store.clone(),
             self.ns.clone(),
             max_depth.unwrap_or(MAX_NAMESPACE_DEPTH),
         )?
-        .collect()
+        .collect();
+
+        let list = list?.into_iter().filter(filter_callback).collect();
+
+        Ok(list)
     }
 
     async fn list_groups(
