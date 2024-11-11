@@ -44,7 +44,7 @@ pub fn check_sync_job_modify_access(
     job: &SyncJobConfig,
 ) -> bool {
     let ns_anchor_privs = user_info.lookup_privs(auth_id, &job.acl_path());
-    if ns_anchor_privs & PRIV_DATASTORE_BACKUP == 0 {
+    if ns_anchor_privs & PRIV_DATASTORE_BACKUP == 0 || ns_anchor_privs & PRIV_DATASTORE_AUDIT == 0 {
         return false;
     }
 
@@ -502,7 +502,7 @@ user: write@pbs
         r###"
 acl:1:/datastore/localstore1:read@pbs,write@pbs:DatastoreAudit
 acl:1:/datastore/localstore1:write@pbs:DatastoreBackup
-acl:1:/datastore/localstore2:write@pbs:DatastorePowerUser
+acl:1:/datastore/localstore2:write@pbs:DatastoreAudit,DatastorePowerUser
 acl:1:/datastore/localstore3:write@pbs:DatastoreAdmin
 acl:1:/remote/remote1:read@pbs,write@pbs:RemoteAudit
 acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
