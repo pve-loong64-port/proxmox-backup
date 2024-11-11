@@ -8,7 +8,8 @@ use anyhow::{bail, format_err, Error};
 use proxmox_sys::fs::{lock_dir_noblock, replace_file, CreateOptions};
 
 use pbs_api_types::{
-    Authid, BackupNamespace, BackupType, GroupFilter, BACKUP_DATE_REGEX, BACKUP_FILE_REGEX,
+    Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, BACKUP_DATE_REGEX,
+    BACKUP_FILE_REGEX,
 };
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
@@ -16,36 +17,6 @@ use crate::manifest::{
     BackupManifest, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MANIFEST_LOCK_NAME,
 };
 use crate::{DataBlob, DataStore};
-
-#[derive(Default)]
-pub struct BackupGroupDeleteStats {
-    // Count of protected snapshots, therefore not removed
-    unremoved_protected: usize,
-    // Count of deleted snapshots
-    removed_snapshots: usize,
-}
-
-impl BackupGroupDeleteStats {
-    pub fn all_removed(&self) -> bool {
-        self.unremoved_protected == 0
-    }
-
-    pub fn removed_snapshots(&self) -> usize {
-        self.removed_snapshots
-    }
-
-    pub fn protected_snapshots(&self) -> usize {
-        self.unremoved_protected
-    }
-
-    fn increment_removed_snapshots(&mut self) {
-        self.removed_snapshots += 1;
-    }
-
-    fn increment_protected_snapshots(&mut self) {
-        self.unremoved_protected += 1;
-    }
-}
 
 /// BackupGroup is a directory containing a list of BackupDir
 #[derive(Clone)]
