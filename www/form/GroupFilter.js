@@ -252,13 +252,16 @@ Ext.define('PBS.form.GroupFilter', {
 	let url;
 	if (me.remote) {
 	    url = `/api2/json/config/remote/${me.remote}/scan/${me.datastore}/groups`;
+	    if (me.namespace) {
+		url += `?namespace=${me.namespace}`;
+	    }
 	} else if (me.datastore) {
 	    url = `/api2/json/admin/datastore/${me.datastore}/groups`;
+	    if (me.namespace) {
+		url += `?ns=${me.namespace}`;
+	    }
 	} else {
 	    return;
-	}
-	if (me.namespace) {
-	    url += `?namespace=${me.namespace}`;
 	}
 	me.setDsStoreUrl(url);
 	me.dsStore.load({
@@ -279,6 +282,18 @@ Ext.define('PBS.form.GroupFilter', {
 	}
 	me.remote = undefined;
 	me.datastore = datastore;
+	me.namespace = undefined;
+	me.updateGroupSelectors();
+    },
+
+    setLocalNamespace: function(datastore, namespace) {
+	let me = this;
+	if (me.datastore === datastore && me.namespace === namespace) {
+	    return;
+	}
+	me.remote = undefined;
+	me.datastore = datastore;
+	me.namespace = namespace;
 	me.updateGroupSelectors();
     },
 
