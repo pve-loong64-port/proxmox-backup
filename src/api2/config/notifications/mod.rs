@@ -12,7 +12,7 @@ use crate::api2::admin::datastore::get_datastore_list;
 use pbs_api_types::{SyncDirection, PRIV_SYS_AUDIT};
 
 use crate::api2::admin::prune::list_prune_jobs;
-use crate::api2::admin::sync::list_sync_jobs;
+use crate::api2::admin::sync::list_config_sync_jobs;
 use crate::api2::admin::verify::list_verification_jobs;
 use crate::api2::config::media_pool::list_pools;
 use crate::api2::tape::backup::list_tape_backup_jobs;
@@ -155,7 +155,7 @@ pub fn get_values(
     }
 
     for direction in [SyncDirection::Pull, SyncDirection::Push] {
-        let sync_jobs = list_sync_jobs(None, Some(direction), param.clone(), rpcenv)?;
+        let sync_jobs = list_config_sync_jobs(None, Some(direction), param.clone(), rpcenv)?;
         for job in sync_jobs {
             values.push(MatchableValue {
                 field: "job-id".into(),

@@ -46,8 +46,8 @@ use crate::{
         permission: &Permission::Anybody,
     },
 )]
-/// List all sync jobs
-pub fn list_sync_jobs(
+/// List all configured sync jobs
+pub fn list_config_sync_jobs(
     store: Option<String>,
     sync_direction: Option<SyncDirection>,
     _param: Value,
@@ -144,5 +144,5 @@ const SYNC_INFO_ROUTER: Router = Router::new()
     .subdirs(SYNC_INFO_SUBDIRS);
 
 pub const ROUTER: Router = Router::new()
-    .get(&API_METHOD_LIST_SYNC_JOBS)
+    .get(&API_METHOD_LIST_CONFIG_SYNC_JOBS)
     .match_all("id", &SYNC_INFO_ROUTER);

@@ -21,7 +21,7 @@ use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
 use crate::api2::admin::{
-    prune::list_prune_jobs, sync::list_sync_jobs, verify::list_verification_jobs,
+    prune::list_prune_jobs, sync::list_config_sync_jobs, verify::list_verification_jobs,
 };
 use crate::api2::config::prune::{delete_prune_job, do_create_prune_job};
 use crate::api2::config::sync::delete_sync_job;
@@ -525,7 +525,9 @@ pub async fn delete_datastore(
             delete_verification_job(job.config.id, None, rpcenv)?
         }
         for direction in [SyncDirection::Pull, SyncDirection::Push] {
-            for job in list_sync_jobs(Some(name.clone()), Some(direction), Value::Null, rpcenv)? {
+            for job in
+                list_config_sync_jobs(Some(name.clone()), Some(direction), Value::Null, rpcenv)?
+            {
                 delete_sync_job(job.config.id, None, rpcenv)?
             }
         }
