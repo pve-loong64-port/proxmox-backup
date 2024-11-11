@@ -40,17 +40,17 @@ use pbs_buildcfg::configdir;
 use proxmox_time::CalendarEvent;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncJobConfig, TapeBackupJobConfig,
-    VerificationJobConfig,
+    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncDirection, SyncJobConfig,
+    TapeBackupJobConfig, VerificationJobConfig,
 };
 
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::server::{self, metric_collection};
 use proxmox_backup::tools::PROXMOX_BACKUP_TCP_KEEPALIVE_TIME;
 
-use proxmox_backup::api2::pull::do_sync_job;
 use proxmox_backup::api2::tape::backup::do_tape_backup_job;
 use proxmox_backup::server::do_prune_job;
+use proxmox_backup::server::do_sync_job;
 use proxmox_backup::server::do_verification_job;
 
 fn main() -> Result<(), Error> {
@@ -611,7 +611,14 @@ async fn schedule_datastore_sync_jobs() {
             };
 
             let auth_id = Authid::root_auth_id().clone();
-            if let Err(err) = do_sync_job(job, job_config, &auth_id, Some(event_str), false) {
+            if let Err(err) = do_sync_job(
+                job,
+                job_config,
+                &auth_id,
+                Some(event_str),
+                SyncDirection::Pull,
+                false,
+            ) {
                 eprintln!("unable to start datastore sync job {job_id} - {err}");
             }
         };

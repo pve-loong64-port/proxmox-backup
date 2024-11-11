@@ -38,6 +38,7 @@ pub mod metric_collection;
 pub(crate) mod pull;
 pub(crate) mod push;
 pub(crate) mod sync;
+pub use sync::do_sync_job;
 
 pub(crate) async fn reload_proxy_certificate() -> Result<(), Error> {
     let proxy_pid = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN)?;

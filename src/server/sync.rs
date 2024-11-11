@@ -6,16 +6,19 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
+use futures::{future::FutureExt, select};
 use http::StatusCode;
 use serde_json::json;
 use tracing::{info, warn};
 
+use proxmox_human_byte::HumanByte;
+use proxmox_rest_server::WorkerTask;
 use proxmox_router::HttpError;
 
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
-    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    SyncDirection, SyncJobConfig, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_datastore::data_blob::DataBlob;
@@ -24,6 +27,9 @@ use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, ListNamespacesRecursive, LocalChunkReader};
 
 use crate::backup::ListAccessibleBackupGroups;
+use crate::server::jobstate::Job;
+use crate::server::pull::{pull_store, PullParameters};
+use crate::server::push::{push_store, PushParameters};
 
 #[derive(Default)]
 pub(crate) struct RemovedVanishedStats {
@@ -578,4 +584,144 @@ pub(crate) fn check_namespace_depth_limit(
         );
     }
     Ok(())
+}
+
+/// Run a sync job in given direction
+pub fn do_sync_job(
+    mut job: Job,
+    sync_job: SyncJobConfig,
+    auth_id: &Authid,
+    schedule: Option<String>,
+    sync_direction: SyncDirection,
+    to_stdout: bool,
+) -> Result<String, Error> {
+    let job_id = format!(
+        "{}:{}:{}:{}:{}",
+        sync_job.remote.as_deref().unwrap_or("-"),
+        sync_job.remote_store,
+        sync_job.store,
+        sync_job.ns.clone().unwrap_or_default(),
+        job.jobname(),
+    );
+    let worker_type = job.jobtype().to_string();
+
+    if sync_job.remote.is_none() && sync_job.store == sync_job.remote_store {
+        bail!("can't sync to same datastore");
+    }
+
+    let upid_str = WorkerTask::spawn(
+        &worker_type,
+        Some(job_id.clone()),
+        auth_id.to_string(),
+        to_stdout,
+        move |worker| async move {
+            job.start(&worker.upid().to_string())?;
+
+            let worker2 = worker.clone();
+            let sync_job2 = sync_job.clone();
+
+            let worker_future = async move {
+                info!("Starting datastore sync job '{job_id}'");
+                if let Some(event_str) = schedule {
+                    info!("task triggered by schedule '{event_str}'");
+                }
+                let sync_stats = match sync_direction {
+                    SyncDirection::Pull => {
+                        info!(
+                            "sync datastore '{}' from '{}{}'",
+                            sync_job.store,
+                            sync_job
+                                .remote
+                                .as_deref()
+                                .map_or(String::new(), |remote| format!("{remote}/")),
+                            sync_job.remote_store,
+                        );
+                        let pull_params = PullParameters::try_from(&sync_job)?;
+                        pull_store(pull_params).await?
+                    }
+                    SyncDirection::Push => {
+                        info!(
+                            "sync datastore '{}' to '{}{}'",
+                            sync_job.store,
+                            sync_job
+                                .remote
+                                .as_deref()
+                                .map_or(String::new(), |remote| format!("{remote}/")),
+                            sync_job.remote_store,
+                        );
+                        let push_params = PushParameters::new(
+                            &sync_job.store,
+                            sync_job.ns.clone().unwrap_or_default(),
+                            sync_job
+                                .remote
+                                .as_deref()
+                                .context("missing required remote")?,
+                            &sync_job.remote_store,
+                            sync_job.remote_ns.clone().unwrap_or_default(),
+                            sync_job
+                                .owner
+                                .as_ref()
+                                .unwrap_or_else(|| Authid::root_auth_id())
+                                .clone(),
+                            sync_job.remove_vanished,
+                            sync_job.max_depth,
+                            sync_job.group_filter.clone(),
+                            sync_job.limit.clone(),
+                            sync_job.transfer_last,
+                        )
+                        .await?;
+                        push_store(push_params).await?
+                    }
+                };
+
+                if sync_stats.bytes != 0 {
+                    let amount = HumanByte::from(sync_stats.bytes);
+                    let rate = HumanByte::new_binary(
+                        sync_stats.bytes as f64 / sync_stats.elapsed.as_secs_f64(),
+                    );
+                    info!(
+                        "Summary: sync job {sync_direction}ed {amount} in {} chunks (average rate: {rate}/s)",
+                        sync_stats.chunk_count,
+                    );
+                } else {
+                    info!("Summary: sync job found no new data to {sync_direction}");
+                }
+
+                if let Some(removed) = sync_stats.removed {
+                    info!(
+                        "Summary: removed vanished: snapshots: {}, groups: {}, namespaces: {}",
+                        removed.snapshots, removed.groups, removed.namespaces,
+                    );
+                }
+
+                info!("sync job '{job_id}' end");
+
+                Ok(())
+            };
+
+            let mut abort_future = worker2
+                .abort_future()
+                .map(|_| Err(format_err!("sync aborted")));
+
+            let result = select! {
+                worker = worker_future.fuse() => worker,
+                abort = abort_future => abort,
+            };
+
+            let status = worker2.create_state(&result);
+
+            match job.finish(status) {
+                Ok(_) => {}
+                Err(err) => eprintln!("could not finish job state: {err}"),
+            }
+
+            if let Err(err) = crate::server::send_sync_status(&sync_job2, &result) {
+                eprintln!("send sync notification failed: {err}");
+            }
+
+            result
+        },
+    )?;
+
+    Ok(upid_str)
 }

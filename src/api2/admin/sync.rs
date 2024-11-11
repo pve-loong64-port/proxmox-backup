@@ -10,16 +10,16 @@ use proxmox_router::{
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
-use pbs_api_types::{Authid, SyncJobConfig, SyncJobStatus, DATASTORE_SCHEMA, JOB_ID_SCHEMA};
+use pbs_api_types::{
+    Authid, SyncDirection, SyncJobConfig, SyncJobStatus, DATASTORE_SCHEMA, JOB_ID_SCHEMA,
+};
 use pbs_config::sync;
 use pbs_config::CachedUserInfo;
 
 use crate::{
-    api2::{
-        config::sync::{check_sync_job_modify_access, check_sync_job_read_access},
-        pull::do_sync_job,
-    },
+    api2::config::sync::{check_sync_job_modify_access, check_sync_job_read_access},
     server::jobstate::{compute_schedule_status, Job, JobState},
+    server::sync::do_sync_job,
 };
 
 #[api(
@@ -116,7 +116,14 @@ pub fn run_sync_job(
 
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
-    let upid_str = do_sync_job(job, sync_job, &auth_id, None, to_stdout)?;
+    let upid_str = do_sync_job(
+        job,
+        sync_job,
+        &auth_id,
+        None,
+        SyncDirection::Pull,
+        to_stdout,
+    )?;
 
     Ok(upid_str)
 }

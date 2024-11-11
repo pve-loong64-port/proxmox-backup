@@ -13,10 +13,8 @@ use pbs_api_types::{
     TRANSFER_LAST_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
-use proxmox_human_byte::HumanByte;
 use proxmox_rest_server::WorkerTask;
 
-use crate::server::jobstate::Job;
 use crate::server::pull::{pull_store, PullParameters};
 
 pub fn check_pull_privs(
@@ -91,112 +89,6 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
             sync_job.transfer_last,
         )
     }
-}
-
-pub fn do_sync_job(
-    mut job: Job,
-    sync_job: SyncJobConfig,
-    auth_id: &Authid,
-    schedule: Option<String>,
-    to_stdout: bool,
-) -> Result<String, Error> {
-    let job_id = format!(
-        "{}:{}:{}:{}:{}",
-        sync_job.remote.as_deref().unwrap_or("-"),
-        sync_job.remote_store,
-        sync_job.store,
-        sync_job.ns.clone().unwrap_or_default(),
-        job.jobname()
-    );
-    let worker_type = job.jobtype().to_string();
-
-    if sync_job.remote.is_none() && sync_job.store == sync_job.remote_store {
-        bail!("can't sync to same datastore");
-    }
-
-    let upid_str = WorkerTask::spawn(
-        &worker_type,
-        Some(job_id.clone()),
-        auth_id.to_string(),
-        to_stdout,
-        move |worker| async move {
-            job.start(&worker.upid().to_string())?;
-
-            let worker2 = worker.clone();
-            let sync_job2 = sync_job.clone();
-
-            let worker_future = async move {
-                let pull_params = PullParameters::try_from(&sync_job)?;
-
-                info!("Starting datastore sync job '{job_id}'");
-                if let Some(event_str) = schedule {
-                    info!("task triggered by schedule '{event_str}'");
-                }
-
-                info!(
-                    "sync datastore '{}' from '{}{}'",
-                    sync_job.store,
-                    sync_job
-                        .remote
-                        .as_deref()
-                        .map_or(String::new(), |remote| format!("{remote}/")),
-                    sync_job.remote_store,
-                );
-
-                let pull_stats = pull_store(pull_params).await?;
-
-                if pull_stats.bytes != 0 {
-                    let amount = HumanByte::from(pull_stats.bytes);
-                    let rate = HumanByte::new_binary(
-                        pull_stats.bytes as f64 / pull_stats.elapsed.as_secs_f64(),
-                    );
-                    info!(
-                        "Summary: sync job pulled {amount} in {} chunks (average rate: {rate}/s)",
-                        pull_stats.chunk_count,
-                    );
-                } else {
-                    info!("Summary: sync job found no new data to pull");
-                }
-
-                if let Some(removed) = pull_stats.removed {
-                    info!(
-                        "Summary: removed vanished: snapshots: {}, groups: {}, namespaces: {}",
-                        removed.snapshots, removed.groups, removed.namespaces,
-                    );
-                }
-
-                info!("sync job '{}' end", &job_id);
-
-                Ok(())
-            };
-
-            let mut abort_future = worker2
-                .abort_future()
-                .map(|_| Err(format_err!("sync aborted")));
-
-            let result = select! {
-                worker = worker_future.fuse() => worker,
-                abort = abort_future => abort,
-            };
-
-            let status = worker2.create_state(&result);
-
-            match job.finish(status) {
-                Ok(_) => {}
-                Err(err) => {
-                    eprintln!("could not finish job state: {}", err);
-                }
-            }
-
-            if let Err(err) = crate::server::send_sync_status(&sync_job2, &result) {
-                eprintln!("send sync notification failed: {err}");
-            }
-
-            result
-        },
-    )?;
-
-    Ok(upid_str)
 }
 
 #[api(
