@@ -9,9 +9,11 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Error};
 use futures::future::FutureExt;
 use futures::select;
+use serde_json::Value;
 use tokio::signal::unix::{signal, SignalKind};
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
+use pbs_api_types::PathPatterns;
 use pbs_client::pxar::tools::format_single_line_entry;
 use pbs_client::pxar::{
     Flags, OverwriteFlags, PxarExtractOptions, PxarWriters, ENCODER_MAX_ENTRIES,
@@ -53,12 +55,7 @@ fn extract_archive_from_reader<R: std::io::Read>(
                 description: "Archive name.",
             },
             pattern: {
-                description: "List of paths or pattern matching files to restore",
-                type: Array,
-                items: {
-                    type: String,
-                    description: "Path or pattern matching files to restore.",
-                },
+                type: PathPatterns,
                 optional: true,
             },
             target: {
@@ -144,7 +141,6 @@ fn extract_archive_from_reader<R: std::io::Read>(
 #[allow(clippy::too_many_arguments)]
 fn extract_archive(
     archive: String,
-    pattern: Option<Vec<String>>,
     target: Option<String>,
     no_xattrs: bool,
     no_fcaps: bool,
@@ -161,6 +157,7 @@ fn extract_archive(
     strict: bool,
     payload_input: Option<String>,
     prelude_target: Option<String>,
+    param: Value,
 ) -> Result<(), Error> {
     let mut feature_flags = Flags::DEFAULT;
     if no_xattrs {
@@ -190,7 +187,6 @@ fn extract_archive(
         overwrite_flags.insert(OverwriteFlags::all());
     }
 
-    let pattern = pattern.unwrap_or_default();
     let target = target.as_ref().map_or_else(|| ".", String::as_str);
 
     let mut match_list = Vec::new();
@@ -204,11 +200,15 @@ fn extract_archive(
         }
     }
 
-    for entry in pattern {
-        match_list.push(
-            MatchEntry::parse_pattern(entry, PatternFlag::PATH_NAME, MatchType::Include)
-                .map_err(|err| format_err!("error in pattern: {}", err))?,
-        );
+    if let Some(pattern) = param["pattern"].as_array() {
+        for p in pattern {
+            if let Some(entry) = p.as_str() {
+                match_list.push(
+                    MatchEntry::parse_pattern(entry, PatternFlag::PATH_NAME, MatchType::Include)
+                        .map_err(|err| format_err!("error in pattern: {err}"))?,
+                );
+            }
+        }
     }
 
     let extract_match_default = match_list.is_empty();

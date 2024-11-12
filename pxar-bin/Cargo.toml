@@ -25,5 +25,6 @@ proxmox-router = { workspace = true, features = ["cli", "server"] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-sys.workspace = true
 
+pbs-api-types.workspace = true
 pbs-client.workspace = true
 pbs-pxar-fuse.workspace = true
