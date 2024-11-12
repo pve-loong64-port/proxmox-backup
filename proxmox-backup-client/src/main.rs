@@ -26,10 +26,10 @@ use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
-    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PruneJobOptions,
-    PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA,
-    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
-    ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
+    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPatterns,
+    PruneJobOptions, PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus,
+    BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
+    CATALOG_NAME, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
@@ -1406,6 +1406,10 @@ We do not extract '.pxar' archives when writing to standard output.
                 type: ClientRateLimitConfig,
                 flatten: true,
             },
+            pattern: {
+                type: PathPatterns,
+                optional: true,
+            },
             "allow-existing-dirs": {
                 type: Boolean,
                 description: "Do not fail if directories already exists.",
@@ -1515,6 +1519,21 @@ async fn restore(
 
     let target = json::required_string_param(&param, "target")?;
     let target = if target == "-" { None } else { Some(target) };
+
+    let mut match_list = Vec::new();
+    if let Some(pattern) = param["pattern"].as_array() {
+        if target.is_none() {
+            bail!("patterns not allowed when restoring to stdout");
+        }
+
+        for p in pattern {
+            if let Some(pattern) = p.as_str() {
+                let match_entry =
+                    MatchEntry::parse_pattern(pattern, PatternFlag::PATH_NAME, MatchType::Include)?;
+                match_list.push(match_entry);
+            }
+        }
+    };
 
     let crypto = crypto_parameters(&param)?;
 
@@ -1633,8 +1652,8 @@ async fn restore(
         let prelude_path = param["prelude-target"].as_str().map(PathBuf::from);
 
         let options = pbs_client::pxar::PxarExtractOptions {
-            match_list: &[],
-            extract_match_default: true,
+            match_list: &match_list,
+            extract_match_default: match_list.is_empty(),
             allow_existing_dirs,
             overwrite_flags,
             on_error,
