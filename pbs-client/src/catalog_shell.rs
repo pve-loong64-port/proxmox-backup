@@ -14,6 +14,7 @@ use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 
 use pathpatterns::{MatchEntry, MatchList, MatchPattern, MatchType, PatternFlag};
+use pbs_api_types::PathPattern;
 use proxmox_router::cli::{self, CliCommand, CliCommandMap, CliHelper, CommandLineInterface};
 use proxmox_schema::api;
 use proxmox_sys::fs::{create_path, CreateOptions};
@@ -240,8 +241,7 @@ async fn list_selected_command(patterns: bool) -> Result<(), Error> {
     input: {
         properties: {
             pattern: {
-                type: String,
-                description: "Match pattern for matching files in the catalog."
+                type: PathPattern,
             },
             select: {
                 type: bool,
@@ -282,9 +282,8 @@ async fn restore_selected_command(target: String) -> Result<(), Error> {
                 description: "target path for restore on local filesystem."
             },
             pattern: {
-                type: String,
+                type: PathPattern,
                 optional: true,
-                description: "match pattern to limit files for restore."
             }
         }
     }
