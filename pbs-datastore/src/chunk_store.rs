@@ -576,7 +576,7 @@ impl ChunkStore {
             Ok(stat) => {
                 if stat.st_uid != u32::from(pbs_config::backup_user()?.uid)
                     || stat.st_gid != u32::from(pbs_config::backup_group()?.gid)
-                    || stat.st_mode != file_mode
+                    || stat.st_mode & 0o777 != file_mode
                 {
                     bail!(
                             "unable to open existing chunk store path {:?} - permissions or owner not correct",
@@ -598,22 +598,22 @@ impl ChunkStore {
     /// subdirectories and the lock file.
     pub fn verify_chunkstore<T: AsRef<Path>>(path: T) -> Result<(), Error> {
         // Check datastore root path perm/owner
-        ChunkStore::check_permissions(path.as_ref(), 0o700)?;
+        ChunkStore::check_permissions(path.as_ref(), 0o755)?;
 
         let chunk_dir = Self::chunk_dir(path.as_ref());
         // Check datastore .chunks path perm/owner
-        ChunkStore::check_permissions(&chunk_dir, 0o700)?;
+        ChunkStore::check_permissions(&chunk_dir, 0o750)?;
 
         // Check all .chunks subdirectories
         for i in 0..64 * 1024 {
             let mut l1path = chunk_dir.clone();
             l1path.push(format!("{:04x}", i));
-            ChunkStore::check_permissions(&l1path, 0o700)?;
+            ChunkStore::check_permissions(&l1path, 0o750)?;
         }
 
         // Check .lock file
         let lockfile_path = Self::lockfile_path(path.as_ref());
-        ChunkStore::check_permissions(lockfile_path, 0o600)?;
+        ChunkStore::check_permissions(lockfile_path, 0o644)?;
         Ok(())
     }
 }
