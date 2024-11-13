@@ -9,7 +9,7 @@ use proxmox_uuid::Uuid;
 use pbs_api_types::{
     Authid, MediaContentEntry, MediaContentListFilter, MediaListEntry, MediaPoolConfig,
     MediaSetListEntry, MediaStatus, CHANGER_NAME_SCHEMA, MEDIA_LABEL_SCHEMA,
-    MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY,
+    MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY, PRIV_TAPE_WRITE,
     VAULT_NAME_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
@@ -366,6 +366,9 @@ pub fn move_tape(
             },
         },
     },
+    access: {
+        permission: &Permission::Privilege(&["tape"], PRIV_TAPE_WRITE, false),
+    },
 )]
 /// Destroy media (completely remove from database)
 pub fn destroy_media(
@@ -556,6 +559,9 @@ pub fn get_media_status(uuid: Uuid) -> Result<MediaStatus, Error> {
                 optional: true,
             },
         },
+    },
+    access: {
+        permission: &Permission::Privilege(&["tape"], PRIV_TAPE_MODIFY, false),
     },
 )]
 /// Update media status (None, 'full', 'damaged' or 'retired')
