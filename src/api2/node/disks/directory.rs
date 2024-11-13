@@ -249,12 +249,12 @@ pub fn delete_datastore_disk(name: String) -> Result<(), Error> {
     let (config, _) = pbs_config::datastore::config()?;
     let datastores: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
     let conflicting_datastore: Option<DataStoreConfig> =
-        datastores.into_iter().find(|ds| ds.path == path);
+        datastores.into_iter().find(|ds| ds.absolute_path() == path);
 
     if let Some(conflicting_datastore) = conflicting_datastore {
         bail!(
             "Can't remove '{}' since it's required by datastore '{}'",
-            conflicting_datastore.path,
+            conflicting_datastore.absolute_path(),
             conflicting_datastore.name
         );
     }

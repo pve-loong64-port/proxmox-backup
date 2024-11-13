@@ -178,7 +178,7 @@ impl DataStore {
             )?;
             Arc::new(ChunkStore::open(
                 name,
-                &config.path,
+                config.absolute_path(),
                 tuning.sync_level.unwrap_or_default(),
             )?)
         };
@@ -262,8 +262,11 @@ impl DataStore {
             DatastoreTuning::API_SCHEMA
                 .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
         )?;
-        let chunk_store =
-            ChunkStore::open(&name, &config.path, tuning.sync_level.unwrap_or_default())?;
+        let chunk_store = ChunkStore::open(
+            &name,
+            config.absolute_path(),
+            tuning.sync_level.unwrap_or_default(),
+        )?;
         let inner = Arc::new(Self::with_store_and_config(
             Arc::new(chunk_store),
             config,
@@ -1387,7 +1390,7 @@ impl DataStore {
             bail!("datastore is currently in use");
         }
 
-        let base = PathBuf::from(&datastore_config.path);
+        let base = PathBuf::from(datastore_config.absolute_path());
 
         let mut ok = true;
         if destroy_data {
