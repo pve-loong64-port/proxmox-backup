@@ -57,6 +57,8 @@ pub struct LsblkInfo {
     /// File system label.
     #[serde(rename = "fstype")]
     file_system_type: Option<String>,
+    /// File system UUID.
+    uuid: Option<String>,
 }
 
 impl DiskManage {
@@ -615,7 +617,7 @@ pub struct BlockDevStat {
 /// Use lsblk to read partition type uuids and file system types.
 pub fn get_lsblk_info() -> Result<Vec<LsblkInfo>, Error> {
     let mut command = std::process::Command::new("lsblk");
-    command.args(["--json", "-o", "path,parttype,fstype"]);
+    command.args(["--json", "-o", "path,parttype,fstype,uuid"]);
 
     let output = proxmox_sys::command::run_command(command, None)?;
 
@@ -701,6 +703,8 @@ pub struct PartitionInfo {
     pub size: Option<u64>,
     /// GPT partition
     pub gpt: bool,
+    /// UUID
+    pub uuid: Option<String>,
 }
 
 #[api(
@@ -891,8 +895,10 @@ fn get_partitions_info(
 
             let mounted = disk.is_mounted().unwrap_or(false);
             let mut filesystem = None;
+            let mut uuid = None;
             if let Some(devpath) = devpath.as_ref() {
                 for info in lsblk_infos.iter().filter(|i| i.path.eq(devpath)) {
+                    uuid = info.uuid.clone();
                     used = match info.partition_type.as_deref() {
                         Some("21686148-6449-6e6f-744e-656564454649") => PartitionUsageType::BIOS,
                         Some("c12a7328-f81f-11d2-ba4b-00a0c93ec93b") => PartitionUsageType::EFI,
@@ -915,6 +921,7 @@ fn get_partitions_info(
                 filesystem,
                 size: disk.size().ok(),
                 gpt: disk.has_gpt(),
+                uuid,
             }
         })
         .collect()
