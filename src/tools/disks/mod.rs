@@ -1338,3 +1338,33 @@ pub fn get_fs_uuid(disk: &Disk) -> Result<String, Error> {
 
     bail!("get_fs_uuid failed - missing UUID");
 }
+
+/// Mount a disk by its UUID and the mount point.
+pub fn mount_by_uuid(uuid: &str, mount_point: &Path) -> Result<(), Error> {
+    let mut command = std::process::Command::new("mount");
+    command.arg(&format!("UUID={uuid}"));
+    command.arg(mount_point);
+
+    proxmox_sys::command::run_command(command, None)?;
+    Ok(())
+}
+
+/// Create bind mount.
+pub fn bind_mount(path: &Path, target: &Path) -> Result<(), Error> {
+    let mut command = std::process::Command::new("mount");
+    command.arg("--bind");
+    command.arg(path);
+    command.arg(target);
+
+    proxmox_sys::command::run_command(command, None)?;
+    Ok(())
+}
+
+/// Unmount a disk by its mount point.
+pub fn unmount_by_mountpoint(path: &Path) -> Result<(), Error> {
+    let mut command = std::process::Command::new("umount");
+    command.arg(path);
+
+    proxmox_sys::command::run_command(command, None)?;
+    Ok(())
+}
