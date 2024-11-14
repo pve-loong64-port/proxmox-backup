@@ -197,6 +197,8 @@ It's recommended to setup a schedule to ensure that unused space is cleaned up
 periodically. For most setups a weekly schedule provides a good interval to
 start.
 
+.. _gc_background:
+
 GC Background
 ^^^^^^^^^^^^^
 
@@ -222,17 +224,31 @@ datastore or interfering with other backups.
 The garbage collection (GC) process is performed per datastore and is split
 into two phases:
 
-- Phase one: Mark
-  All index files are read, and the access time of the referred chunk files is
-  updated.
+- Phase one (Mark):
 
-- Phase two: Sweep
-  The task iterates over all chunks, checks their file access time, and if it
-  is older than the cutoff time (i.e., the time when GC started, plus some
-  headroom for safety and Linux file system behavior), the task knows that the
-  chunk was neither referred to in any backup index nor part of any currently
-  running backup that has no index to scan for. As such, the chunk can be
-  safely deleted.
+  All index files are read, and the access time (``atime``) of the referenced
+  chunk files is updated.
+
+- Phase two (Sweep):
+
+  The task iterates over all chunks and checks their file access time against a
+  cutoff time. The cutoff time is given by either the oldest backup writer
+  instance, if present, or 24 hours and 5 minutes after the start of garbage
+  collection.
+
+  Garbage collection considers chunk files with access time older than the
+  cutoff time to be neither referenced by any backup snapshot's index, nor part
+  of any currently running backup job. Therefore, these chunks can safely be
+  deleted.
+
+  Chunks within the grace period will not be deleted and logged at the end of
+  the garbage collection task as *Pending removals*.
+
+.. note:: The grace period for backup chunk removal is not arbitrary, but stems
+   from the fact that filesystems are typically mounted with the ``relatime``
+   option by default. This results in better performance by only updating the
+   ``atime`` property if a file has been modified since the last access or the
+   last access has been at least 24 hours ago.
 
 Manually Starting GC
 ^^^^^^^^^^^^^^^^^^^^

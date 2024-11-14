@@ -781,29 +781,25 @@ Garbage Collection
 ------------------
 
 The ``prune`` command removes only the backup index files, not the data
-from the datastore. This task is left to the garbage collection
-command. It is recommended to carry out garbage collection on a regular basis.
+from the datastore. Deletion of unused backup data from the datastore is done by
+:ref:`garbage collection<_maintenance_gc>`. It is therefore recommended to
+schedule garbage collection tasks on a regular basis. The working principle of
+garbage collection is described in more details in the related :ref:`background
+section <gc_background>`.
 
-The garbage collection works in two phases. In the first phase, all
-data blocks that are still in use are marked. In the second phase,
-unused data blocks are removed.
+To start garbage collection from the client side, run the following command:
+
+.. code-block:: console
+
+  # proxmox-backup-client garbage-collect
 
 .. note:: This command needs to read all existing backup index files
   and touches the complete chunk-store. This can take a long time
   depending on the number of chunks and the speed of the underlying
   disks.
 
-.. note:: The garbage collection will only remove chunks that haven't been used
-   for at least one day (exactly 24h 5m). This grace period is necessary because
-   chunks in use are marked by touching the chunk which updates the ``atime``
-   (access time) property. Filesystems are mounted with the ``relatime`` option
-   by default. This results in a better performance by only updating the
-   ``atime`` property if the last access has been at least 24 hours ago. The
-   downside is that touching a chunk within these 24 hours will not always
-   update its ``atime`` property.
-
-   Chunks in the grace period will be logged at the end of the garbage
-   collection task as *Pending removals*.
+The progress of the garbage collection will be displayed as shown in the example
+below:
 
 .. code-block:: console
 
