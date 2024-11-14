@@ -641,15 +641,30 @@ impl Archiver {
                 }
                 Ok(_) => (),
                 Err(err) if err.not_found() => continue,
+                Err(Errno::ESTALE) => {
+                    self.report_stale_file_handle(Some(&full_path));
+                    continue;
+                }
                 Err(err) => {
                     return Err(err).with_context(|| format!("stat failed on {full_path:?}"))
                 }
             }
 
-            let stat = stat_results
-                .map(Ok)
-                .unwrap_or_else(get_file_mode)
-                .with_context(|| format!("stat failed on {full_path:?}"))?;
+            let stat = match stat_results {
+                Some(mode) => mode,
+                None => match get_file_mode() {
+                    Ok(mode) => mode,
+                    Err(Errno::ESTALE) => {
+                        self.report_stale_file_handle(Some(&full_path));
+                        continue;
+                    }
+                    Err(err) => {
+                        return Err(
+                            Error::from(err).context(format!("stat failed on {full_path:?}"))
+                        )
+                    }
+                },
+            };
 
             self.entry_counter += 1;
             if self.entry_counter > self.entry_limit {
