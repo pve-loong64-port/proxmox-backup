@@ -484,6 +484,10 @@ impl Archiver {
                     log::warn!("failed to open file: {:?}: access denied", file_name);
                     Ok(None)
                 }
+                Err(Errno::ESTALE) => {
+                    self.report_stale_file_handle(None);
+                    Ok(None)
+                }
                 Err(Errno::EPERM) if !noatime.is_empty() => {
                     // Retry without O_NOATIME:
                     noatime = OFlag::empty();
