@@ -476,7 +476,7 @@ impl Archiver {
                 Ok(fd) => Ok(Some(fd)),
                 Err(Errno::ENOENT) => {
                     if existed {
-                        self.report_vanished_file()?;
+                        self.report_vanished_file();
                     }
                     Ok(None)
                 }
@@ -671,25 +671,22 @@ impl Archiver {
         Ok(file_list)
     }
 
-    fn report_vanished_file(&mut self) -> Result<(), Error> {
+    fn report_vanished_file(&self) {
         log::warn!("warning: file vanished while reading: {:?}", self.path);
-        Ok(())
     }
 
-    fn report_file_shrunk_while_reading(&mut self) -> Result<(), Error> {
+    fn report_file_shrunk_while_reading(&self) {
         log::warn!(
             "warning: file size shrunk while reading: {:?}, file will be padded with zeros!",
             self.path,
         );
-        Ok(())
     }
 
-    fn report_file_grew_while_reading(&mut self) -> Result<(), Error> {
+    fn report_file_grew_while_reading(&self) {
         log::warn!(
             "warning: file size increased while reading: {:?}, file will be truncated!",
             self.path,
         );
-        Ok(())
     }
 
     async fn add_entry<T: SeqWrite + Send>(
@@ -1239,14 +1236,14 @@ impl Archiver {
                 Err(err) => bail!(err),
             };
             if got as u64 > remaining {
-                self.report_file_grew_while_reading()?;
+                self.report_file_grew_while_reading();
                 got = remaining as usize;
             }
             out.write_all(&self.file_copy_buffer[..got]).await?;
             remaining -= got as u64;
         }
         if remaining > 0 {
-            self.report_file_shrunk_while_reading()?;
+            self.report_file_shrunk_while_reading();
             let to_zero = remaining.min(self.file_copy_buffer.len() as u64) as usize;
             vec::clear(&mut self.file_copy_buffer[..to_zero]);
             while remaining != 0 {
