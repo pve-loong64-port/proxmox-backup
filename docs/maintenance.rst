@@ -6,8 +6,34 @@ Maintenance Tasks
 Pruning
 -------
 
-Prune lets you specify which backup snapshots you want to keep.
-The following retention options are available:
+Prune lets you specify which backup snapshots you want to keep, removing others.
+When pruning a snapshot, only the snapshot metadata (manifest, indices, blobs,
+log and notes) is removed. The chunks containing the actual backup data and
+previously referenced by the pruned snapshot, have to be removed by a garbage
+collection run.
+
+.. Caution:: Take into consideration that sensitive information stored in a
+   given data chunk will outlive pruned snapshots and remain present in the
+   datastore as long as referenced by at least one backup snapshot. Further,
+   *even* if no snapshot references a given chunk, it will remain present until
+   removed by the garbage collection.
+
+   Moreover, file-level backups created using the change detection mode
+   ``metadata`` can reference backup chunks containing files which have vanished
+   since the previous backup. These files might still be accessible by reading
+   the chunks raw data (client or server side).
+
+   To remove chunks containing sensitive data, prune any snapshot made while the
+   data was part of the backup input and run a garbage collection. Further, if
+   using file-based backups with change detection mode ``metadata``,
+   additionally prune all snapshots since the sensitive data was no longer part
+   of the backup input and run a garbage collection.
+
+   The no longer referenced chunks will then be marked for deletion on the next
+   garbage collection run and removed by a subsequent run after the grace
+   period.
+
+The following retention options are available for pruning:
 
 ``keep-last <N>``
   Keep the last ``<N>`` backup snapshots.
