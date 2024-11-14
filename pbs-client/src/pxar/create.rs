@@ -72,7 +72,7 @@ pub struct PxarPrevRef {
     pub archive_name: String,
 }
 
-fn detect_fs_type(fd: RawFd) -> Result<i64, Error> {
+fn detect_fs_type(fd: RawFd) -> Result<i64, Errno> {
     let mut fs_stat = std::mem::MaybeUninit::uninit();
     let res = unsafe { libc::fstatfs(fd, fs_stat.as_mut_ptr()) };
     Errno::result(res)?;
@@ -671,6 +671,11 @@ impl Archiver {
         Ok(file_list)
     }
 
+    fn report_stale_file_handle(&self, path: Option<&PathBuf>) {
+        let path = path.unwrap_or(&self.path);
+        log::warn!("warning: stale file handle encountered while reading: {path:?}");
+    }
+
     fn report_vanished_file(&self) {
         log::warn!("warning: file vanished while reading: {:?}", self.path);
     }
@@ -1160,20 +1165,20 @@ impl Archiver {
     ) -> Result<(), Error> {
         let dir_name = OsStr::from_bytes(c_dir_name.to_bytes());
 
-        if !self.cache.caching_enabled() {
-            if let Some(ref catalog) = self.catalog {
-                catalog.lock().unwrap().start_directory(c_dir_name)?;
-            }
-            encoder.create_directory(dir_name, metadata).await?;
-        }
-
         let old_fs_magic = self.fs_magic;
         let old_fs_feature_flags = self.fs_feature_flags;
         let old_st_dev = self.current_st_dev;
 
         let mut skip_contents = false;
         if old_st_dev != stat.st_dev {
-            self.fs_magic = detect_fs_type(dir.as_raw_fd())?;
+            match detect_fs_type(dir.as_raw_fd()) {
+                Ok(fs_magic) => self.fs_magic = fs_magic,
+                Err(Errno::ESTALE) => {
+                    self.report_stale_file_handle(None);
+                    return Ok(());
+                }
+                Err(err) => return Err(err.into()),
+            }
             self.fs_feature_flags = Flags::from_magic(self.fs_magic);
             self.current_st_dev = stat.st_dev;
 
@@ -1182,6 +1187,13 @@ impl Archiver {
             } else if let Some(set) = &self.device_set {
                 skip_contents = !set.contains(&stat.st_dev);
             }
+        }
+
+        if !self.cache.caching_enabled() {
+            if let Some(ref catalog) = self.catalog {
+                catalog.lock().unwrap().start_directory(c_dir_name)?;
+            }
+            encoder.create_directory(dir_name, metadata).await?;
         }
 
         let result = if skip_contents {
