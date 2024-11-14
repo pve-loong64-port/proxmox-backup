@@ -740,14 +740,23 @@ impl Archiver {
             None => return Ok(()),
         };
 
-        let metadata = get_metadata(
+        let metadata = match get_metadata(
             fd.as_raw_fd(),
             stat,
             self.flags(),
             self.fs_magic,
             &mut self.fs_feature_flags,
             self.skip_e2big_xattr,
-        )?;
+        ) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                if let Some(Errno::ESTALE) = err.downcast_ref::<Errno>() {
+                    self.report_stale_file_handle(None);
+                    return Ok(());
+                }
+                return Err(err);
+            }
+        };
 
         if self.previous_payload_index.is_none() {
             return self
@@ -1294,7 +1303,14 @@ impl Archiver {
         file_name: &Path,
         metadata: &Metadata,
     ) -> Result<(), Error> {
-        let dest = nix::fcntl::readlinkat(fd.as_raw_fd(), &b""[..])?;
+        let dest = match nix::fcntl::readlinkat(fd.as_raw_fd(), &b""[..]) {
+            Ok(dest) => dest,
+            Err(Errno::ESTALE) => {
+                self.report_stale_file_handle(None);
+                return Ok(());
+            }
+            Err(err) => return Err(err.into()),
+        };
         encoder.add_symlink(metadata, file_name, dest).await?;
         Ok(())
     }
