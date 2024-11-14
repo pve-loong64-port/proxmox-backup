@@ -1,3 +1,56 @@
+rust-proxmox-backup (3.2.9-1) bookworm; urgency=medium
+
+  * client: catalog: fallback to metadata archives for dumping the catalog
+
+  * client: catalog shell: make the catalog optional and use the pxar accessor
+    for navigation if the catalog is not provided, like its the case for
+    example for split pxar archives.
+
+  * client: catalog shell: drop payload offset in `stat` output, as this is a
+    internal value that only helps on debugging some specific development.
+
+  * sync: fix premature return in snapshot-skip filter logic to avoid that the
+    first snapshot newer that the last synced one gets unconditionally
+    included.
+
+  * fix #5861: ui: remove minimum required username length in dialog for
+    changing the owner of a backup group, as PBS support usernames shorter
+    than 4 characters since a while now.
+
+  * fix #5439: allow one to reuse an existing datastore on datastore creation
+
+  * ui: disallow datastore in the file system root, this is almost never what
+    user want and they can still use the CLI for such an edge case.
+
+  * fix #5233: api: tape: add explicit required permissions for the move tape,
+    update tape and destroy tape endpoints, requiring Tape.Modify and
+    Tape.Write on the `/tape` ACL object path, respectively. This avoids
+    requiring the use of the root account for basic tape management.
+
+  * client: catalog shell: make the root element its own parent to avoid
+    navigating below archive root, which makes no sense and just causes odd
+    glitches.
+
+  * api: disk management: avoid retrieving lsblk result twice when listing
+    disks, while it's not overly expensive it certainly does not help to be
+    performant either.
+
+  * api: disk management: parallelize retrieving the output from smartctl
+    checks.
+
+  * fix #5600: pbs2to3: make check more flexible to allow one to run arbitrary
+    newer '-pve' kernels after upgrade
+
+  * client: pxar: perform match pattern check for exclusion only once
+
+  * client: pxar: add debug output for exclude pattern matches to more
+    conveniently debug possible issues.
+
+  * fix #5868: rest-server: handshake detection: avoid infinite loop on
+    connections abort
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 14 Nov 2024 16:10:10 +0100
+
 rust-proxmox-backup (3.2.8-1) bookworm; urgency=medium
 
   * switch various log statements in worker tasks to the newer, more flexible
