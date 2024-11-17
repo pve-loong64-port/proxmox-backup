@@ -1083,8 +1083,11 @@ fn get_disks(
 
         let parallel_handler =
             ParallelHandler::new("smartctl data", 4, move |device: (String, String)| {
-                let smart_data = get_smart_data(Path::new(&device.1), false)?;
-                tx.send((device.0, smart_data))?;
+                match get_smart_data(Path::new(&device.1), false) {
+                    Ok(smart_data) => tx.send((device.0, smart_data))?,
+                    // do not fail the whole disk output just because smartctl couldn't query one
+                    Err(err) => log::error!("failed to gather smart data for {} – {err}", device.1),
+                }
                 Ok(())
             });
 
