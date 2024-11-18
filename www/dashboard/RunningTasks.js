@@ -95,7 +95,7 @@ Ext.define('PBS.RunningTasks', {
 	    items: [
 		{
 		    iconCls: 'fa fa-chevron-right',
-		    tooltip: gettext('Open Task'),
+		    tooltip: gettext('View Task'),
 		    handler: 'openTaskActionColumn',
 		},
 	    ],

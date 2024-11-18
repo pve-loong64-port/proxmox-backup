@@ -109,7 +109,7 @@ Ext.define('PBS.TaskSummary', {
 				items: [
 				    {
 					iconCls: 'fa fa-chevron-right',
-					tooltip: gettext('Open Task'),
+					tooltip: gettext('View Task'),
 					handler: function(g, rowIndex) {
 					    let rec = tasklist.getStore().getAt(rowIndex);
 					    tasklist.setVisible(false);
