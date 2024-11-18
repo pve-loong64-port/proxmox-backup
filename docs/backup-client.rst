@@ -301,24 +301,15 @@ the client to avoid re-reading files with unchanged metadata whenever possible.
 When using this mode, instead of the regular pxar archive, the backup snapshot
 is stored into two separate files: the `mpxar` containing the archive's metadata
 and the `ppxar` containing a concatenation of the file contents. This splitting
-allows for efficient metadata lookups.
+allows for efficient metadata lookups. When creating the backup archives, the
+current file metadata is compared to the one looked up in the previous `mpxar`
+archive. The operational details are explained more in depth in the
+:ref:`technical documentation <change-detection-mode-metadata>`.
 
 Using the `change-detection-mode` set to `data` allows to create the same split
 archive as when using the `metadata` mode, but without using a previous
-reference and therefore reencoding all file payloads.
-When creating the backup archives, the current file metadata is compared to the
-one looked up in the previous `mpxar` archive.
-The metadata comparison includes file size, file type, ownership and permission
-information, as well as acls and attributes and most importantly the file's
-mtime, for details see the
-:ref:`pxar metadata archive format <pxar-meta-format>`.
-
-If unchanged, the entry is cached for possible re-use of content chunks without
-re-reading, by indexing the already present chunks containing the contents from
-the previous backup snapshot. Since the file might only partially re-use chunks
-(thereby introducing wasted space in the form of padding), the decision whether
-to re-use or re-encode the currently cached entries is postponed to when enough
-information is available, comparing the possible padding to a threshold value.
+reference and therefore reencoding all file payloads. For details of this mode
+please see the :ref:`technical documentation <change-detection-mode-data>`.
 
 .. _client_change_detection_mode_table:
 
