@@ -134,6 +134,111 @@ This is done to speed up the client part of the backup, since it only needs to
 encrypt chunks that are actually getting uploaded. Chunks that exist already in
 the previous backup, do not need to be encrypted and uploaded.
 
+Change Detection Mode for File-Based Backups
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The change detection mode controls how to detect and act for files which did not
+change in-between subsequent backup runs as well as the archive file format used
+to encode the directory entries.
+
+.. _change-detection-mode-legacy:
+
+Legacy Mode
++++++++++++
+
+Backup snapshots of filesystems are created by recursively scanning the
+directory entries. All entries to be included in the snapshot are read and
+serialized by encoding them using the ``pxar``
+:ref:`archive format <pxar-format>`. The resulting stream is chunked into
+:ref:`dynamically sized chunks <dynamically-sized-chunks>` and uploaded to the
+Proxmox Backup Server, deduplicating chunks based on their content digest for
+space efficient storage.
+File contents are read and chunked unconditionally, no check is performed to
+detect unchanged files.
+
+.. _change-detection-mode-data:
+
+Data Mode
++++++++++
+
+Like for ``legacy`` mode file contents are read and chunked unconditionally, no
+check is performed to detect unchanged files.
+
+However, in contrast to ``legacy`` mode, which stores entries metadata and data
+in a single self-contained ``pxar`` archive, the ``data`` mode encodes metadata
+and file contents into two separate streams. The resulting backup snapshots
+therefore contain split archives, an archive in ``mpxar``
+:ref:`format <pxar-meta-format>` containing the entries metadata and an archive
+with ``ppxar`` :ref:`format <ppxar-format>` , containing the actual file
+contents, separated by payload headers for consistency checks. The metadata
+archive stores a reference offset to the corresponding payload archive entry so
+the file contents can be accessed. Both of these archives are chunked and
+uploaded by the Proxmox backup client, resulting in separated indices and
+independent chunks.
+
+The ``mpxar`` archive can be used to efficiently fetch the associated metadata
+for archive entries without the overhead of payload data stored within the same
+chunks. This is used for example for entry lookups to list the archive contents
+or to navigate the mounted filesystem via the FUSE implementation. No dedicated
+catalog is therefore created for archives encoded using this mode.
+
+.. _change-detection-mode-metadata:
+
+Metadata Mode
++++++++++++++
+
+The ``metadata`` mode detects files whose file metadata did not change
+in-between subsequent backup runs. The metadata comparison includes file size,
+file type, ownership and permission information, as well as acls and attributes
+and most importantly the file's mtime, for details see the
+:ref:`pxar metadata archive format <pxar-meta-format>`. This mode will avoid
+reading and rechunking the file contents whenever possible by reusing the file
+content chunks of unchanged files from the previous backup snapshot.
+
+To compare the metadata, the previous snapshots ``mpxar`` metadata archive is
+downloaded at the start of the backup run and used as a reference. Further, the
+index of the payload archive ``ppxar`` is fetched and used to lookup the file
+content chunk's digests, which will be used to reindex pre-existing chunks
+without the need to reread and rechunk the file contents.
+
+During backup, the metadata and payload archives are encoded in the same manner
+as for the ``data`` mode, but for the ``metadata`` mode each entry is
+additionally looked up in the metadata reference archive for comparison first.
+If the file did not change as compared to the reference, the file is considered
+as unchanged and the Proxmox backup client enters a look-ahead caching mode. In
+this mode, the client will keep reading and comparing then following entries in
+the filesystem as long as they are reusable. Further, it keeps track of the
+payload archive offset range these file contents are stored in. The additional
+look-ahead caching is needed, as file boundaries are not required to be aligned
+with chunk boundaries, therefore reused chunks can contain possibly wasted chunk
+content (also called padding) if reused unconditionally.
+
+The look-ahead cache will greedily cache all unchanged entries up to the point
+where either the cache size limit is reached, a file entry with changed
+metadata is encountered, or the range of payload chunks considered for reuse is
+not continuous. An example for the latter is a file which disappeared in-between
+subsequent backup runs, leaving a hole in the range. At this point, the caching
+mode is disabled and the client calculates the wasted padding size which would
+be introduced by reusing the payload chunks for all the unchanged files cached
+up to this point. If the padding is acceptable (below a preset limit of 10% of
+the actually reused chunk content), the files are reused by encoding them in the
+metadata archive using updated offset references to the contents and reindexing
+the pre-existing chunks in the new ``ppxar`` archive. If however the padding is
+not acceptable, exceeding the limit, all cached entries are reencoded, not
+reusing any of the pre-existing data. The metadata as cached will be encoded in
+the metadata archive, no matter if cached file contents are to be reused or
+reencoded.
+
+This combination of look-ahead caching and reuse of pre-existing payload archive
+chunks for files with unchanged contents therefore speeds up the backup
+process by avoiding rereading and rechunking file contents whenever possible.
+
+To reduce paddings and increase chunk reusability, during creation of the
+archives in ``data`` mode and ``metadata`` mode the pxar encoder signals
+encountered file boundaries as suggested chunk boundaries to the sliding window
+chunker. The chunker then decides based on the internal state if the suggested
+boundary is accepted or disregarded.
+
 Caveats and Limitations
 -----------------------
 
@@ -183,6 +288,9 @@ between the files and chunks. This means that the Proxmox Backup Client has to
 read all files again for every backup, otherwise it would not be possible to
 generate a consistent, independent pxar archive where the original chunks can be
 reused. Note that in spite of this, only new or changed chunks will be uploaded.
+
+In order to avoid these limitations, the Change Detection Mode ``metadata`` was
+introduced.
 
 Verification of Encrypted Chunks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
