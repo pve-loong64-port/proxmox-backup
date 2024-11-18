@@ -295,19 +295,20 @@ therefore deduplicated). If the backed up files are largely unchanged,
 re-reading and then detecting the corresponding chunks don't need to be uploaded
 after all is time consuming and undesired.
 
-The backup client's `change-detection-mode` can be switched from default to
-`metadata` based detection to reduce limitations as described above, instructing
-the client to avoid re-reading files with unchanged metadata whenever possible.
+The backup client's ``change-detection-mode`` can be switched from default to
+``metadata`` based detection to reduce limitations as described above,
+instructing the client to avoid re-reading files with unchanged metadata
+whenever possible.
 When using this mode, instead of the regular pxar archive, the backup snapshot
-is stored into two separate files: the `mpxar` containing the archive's metadata
-and the `ppxar` containing a concatenation of the file contents. This splitting
-allows for efficient metadata lookups. When creating the backup archives, the
-current file metadata is compared to the one looked up in the previous `mpxar`
-archive. The operational details are explained more in depth in the
-:ref:`technical documentation <change-detection-mode-metadata>`.
+is stored into two separate files: the ``mpxar`` containing the archive's
+metadata and the ``ppxar`` containing a concatenation of the file contents. This
+splitting allows for efficient metadata lookups. When creating the backup
+archives, the current file metadata is compared to the one looked up in the
+previous ``mpxar`` archive. The operational details are explained more in depth
+in the :ref:`technical documentation <change-detection-mode-metadata>`.
 
-Using the `change-detection-mode` set to `data` allows to create the same split
-archive as when using the `metadata` mode, but without using a previous
+Using the ``change-detection-mode`` set to ``data`` allows to create the same
+split archive as when using the ``metadata`` mode, but without using a previous
 reference and therefore reencoding all file payloads. For details of this mode
 please see the :ref:`technical documentation <change-detection-mode-data>`.
 
