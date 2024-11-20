@@ -50,6 +50,13 @@ impl PushTarget {
     fn remote_user(&self) -> Authid {
         self.remote.config.auth_id.clone()
     }
+
+    fn datastore_api_path(&self, endpoint: &str) -> String {
+        format!(
+            "api2/json/admin/datastore/{store}/{endpoint}",
+            store = self.repo.store()
+        )
+    }
 }
 
 /// Parameters for a push operation
@@ -165,10 +172,7 @@ fn check_ns_remote_datastore_privs(
 
 // Fetch the list of namespaces found on target
 async fn fetch_target_namespaces(params: &PushParameters) -> Result<Vec<BackupNamespace>, Error> {
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/namespace",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("namespace");
     let mut result = params.target.client.get(&api_path, None).await?;
     let namespaces: Vec<NamespaceListItem> = serde_json::from_value(result["data"].take())?;
     let mut namespaces: Vec<BackupNamespace> = namespaces
@@ -192,10 +196,7 @@ async fn remove_target_namespace(
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
         .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
 
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/namespace",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("namespace");
 
     let mut args = serde_json::json!({
         "ns": target_namespace.name(),
@@ -224,10 +225,7 @@ async fn fetch_target_groups(
     params: &PushParameters,
     target_namespace: &BackupNamespace,
 ) -> Result<(Vec<BackupGroup>, HashSet<BackupGroup>), Error> {
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/groups",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("groups");
     let args = Some(serde_json::json!({ "ns": target_namespace.name() }));
 
     let mut result = params.target.client.get(&api_path, args).await?;
@@ -259,10 +257,7 @@ async fn remove_target_group(
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_PRUNE)
         .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
 
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/groups",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("groups");
 
     let mut args = serde_json::json!({
         "backup-id": backup_group.id,
@@ -307,10 +302,7 @@ async fn check_or_create_target_namespace(
                 parent = current;
                 continue;
             }
-            let api_path = format!(
-                "api2/json/admin/datastore/{store}/namespace",
-                store = params.target.repo.store(),
-            );
+            let api_path = params.target.datastore_api_path("namespace");
             let mut args = serde_json::json!({ "name": component.to_string() });
             if !parent.is_root() {
                 args["parent"] = serde_json::to_value(parent.clone())?;
@@ -575,10 +567,7 @@ async fn fetch_target_snapshots(
     target_namespace: &BackupNamespace,
     group: &BackupGroup,
 ) -> Result<Vec<SnapshotListItem>, Error> {
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/snapshots",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("snapshots");
     let mut args = serde_json::to_value(group)?;
     if !target_namespace.is_root() {
         args["ns"] = serde_json::to_value(target_namespace)?;
@@ -607,10 +596,7 @@ async fn forget_target_snapshot(
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_PRUNE)
         .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
 
-    let api_path = format!(
-        "api2/json/admin/datastore/{store}/snapshots",
-        store = params.target.repo.store(),
-    );
+    let api_path = params.target.datastore_api_path("snapshots");
     let mut args = serde_json::to_value(snapshot)?;
     if !target_namespace.is_root() {
         args["ns"] = serde_json::to_value(target_namespace)?;
