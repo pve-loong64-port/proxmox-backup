@@ -363,7 +363,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
     let mut stats = SyncStats::default();
     for namespace in &namespaces {
         let source_store_and_ns = print_store_and_ns(params.source.store.name(), namespace);
-        let target_namespace = params.map_to_target(&namespace)?;
+        let target_namespace = params.map_to_target(namespace)?;
         let target_store_and_ns = print_store_and_ns(params.target.repo.store(), &target_namespace);
 
         info!("----");
@@ -411,7 +411,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         // Without this pre-filtering, all namespaces unrelated to the sync would be removed!
         let mut target_sub_namespaces = Vec::new();
         for namespace in &namespaces {
-            let target_namespace = params.map_to_target(&namespace)?;
+            let target_namespace = params.map_to_target(namespace)?;
             let mut sub_namespaces = target_namespaces
                 .iter()
                 .filter(|namespace| {
@@ -432,10 +432,10 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         target_sub_namespaces.reverse();
 
         for target_namespace in target_sub_namespaces {
-            if synced_namespaces.contains(&target_namespace) {
+            if synced_namespaces.contains(target_namespace) {
                 continue;
             }
-            match remove_target_namespace(&params, &target_namespace).await {
+            match remove_target_namespace(&params, target_namespace).await {
                 Ok(delete_stats) => {
                     stats.add(SyncStats::from(RemovedVanishedStats {
                         snapshots: delete_stats.removed_snapshots(),
