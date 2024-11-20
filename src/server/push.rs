@@ -280,10 +280,10 @@ async fn remove_target_group(
 // Check if the namespace is already present on the target, create it otherwise
 async fn check_or_create_target_namespace(
     params: &PushParameters,
-    target_namespaces: &[BackupNamespace],
+    existing_target_namespaces: &[BackupNamespace],
     target_namespace: &BackupNamespace,
 ) -> Result<(), Error> {
-    if !target_namespace.is_root() && !target_namespaces.contains(target_namespace) {
+    if !target_namespace.is_root() && !existing_target_namespaces.contains(target_namespace) {
         // Namespace not present on target, create namespace.
         // Sub-namespaces have to be created by creating parent components first.
 
@@ -294,7 +294,7 @@ async fn check_or_create_target_namespace(
         for component in target_namespace.components() {
             let current = BackupNamespace::from_parent_ns(&parent, component.to_string())?;
             // Skip over pre-existing parent namespaces on target
-            if target_namespaces.contains(&current) {
+            if existing_target_namespaces.contains(&current) {
                 parent = current;
                 continue;
             }
@@ -333,25 +333,29 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
             .check_privs(&auth_id, &acl_path, privs, true)
             .is_ok()
     });
-    let mut namespaces = params
+    let mut source_namespaces = params
         .source
         .list_namespaces(&mut params.max_depth, ns_access_filter)
         .await?;
 
-    check_namespace_depth_limit(&params.source.get_ns(), &params.target.ns, &namespaces)?;
+    check_namespace_depth_limit(
+        &params.source.get_ns(),
+        &params.target.ns,
+        &source_namespaces,
+    )?;
 
-    namespaces.sort_unstable_by_key(|a| a.name_len());
+    source_namespaces.sort_unstable_by_key(|a| a.name_len());
 
     // Fetch all accessible namespaces already present on the target
-    let target_namespaces = fetch_target_namespaces(&params).await?;
+    let existing_target_namespaces = fetch_target_namespaces(&params).await?;
     // Remember synced namespaces, removing non-synced ones when remove vanished flag is set
-    let mut synced_namespaces = HashSet::with_capacity(namespaces.len());
+    let mut synced_namespaces = HashSet::with_capacity(source_namespaces.len());
 
     let (mut groups, mut snapshots) = (0, 0);
     let mut stats = SyncStats::default();
-    for namespace in &namespaces {
-        let source_store_and_ns = print_store_and_ns(params.source.store.name(), namespace);
-        let target_namespace = params.map_to_target(namespace)?;
+    for source_namespace in &source_namespaces {
+        let source_store_and_ns = print_store_and_ns(params.source.store.name(), source_namespace);
+        let target_namespace = params.map_to_target(source_namespace)?;
         let target_store_and_ns = print_store_and_ns(params.target.repo.store(), &target_namespace);
 
         info!("----");
@@ -359,15 +363,19 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
 
         synced_namespaces.insert(target_namespace.clone());
 
-        if let Err(err) =
-            check_or_create_target_namespace(&params, &target_namespaces, &target_namespace).await
+        if let Err(err) = check_or_create_target_namespace(
+            &params,
+            &existing_target_namespaces,
+            &target_namespace,
+        )
+        .await
         {
             info!("Cannot sync {source_store_and_ns} into {target_store_and_ns} - {err}");
             errors = true;
             continue;
         }
 
-        match push_namespace(namespace, &params).await {
+        match push_namespace(source_namespace, &params).await {
             Ok((sync_progress, sync_stats, sync_errors)) => {
                 errors |= sync_errors;
                 stats.add(sync_stats);
@@ -376,10 +384,10 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
                     groups += sync_progress.done_groups;
                     snapshots += sync_progress.done_snapshots;
 
-                    let ns = if namespace.is_root() {
+                    let ns = if source_namespace.is_root() {
                         "root namespace".into()
                     } else {
-                        format!("namespace {namespace}")
+                        format!("namespace {source_namespace}")
                     };
                     info!(
                         "Finished syncing {ns}, current progress: {groups} groups, {snapshots} snapshots"
@@ -388,7 +396,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
             }
             Err(err) => {
                 errors = true;
-                info!("Encountered errors while syncing namespace {namespace} - {err}");
+                info!("Encountered errors while syncing namespace {source_namespace} - {err}");
             }
         }
     }
