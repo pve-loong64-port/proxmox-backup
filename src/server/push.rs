@@ -579,16 +579,6 @@ async fn fetch_target_snapshots(
     Ok(snapshots)
 }
 
-async fn fetch_previous_backup_time(
-    params: &PushParameters,
-    target_namespace: &BackupNamespace,
-    group: &BackupGroup,
-) -> Result<Option<i64>, Error> {
-    let mut snapshots = fetch_target_snapshots(params, target_namespace, group).await?;
-    snapshots.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
-    Ok(snapshots.last().map(|snapshot| snapshot.backup.time))
-}
-
 async fn forget_target_snapshot(
     params: &PushParameters,
     target_namespace: &BackupNamespace,
@@ -635,8 +625,12 @@ pub(crate) async fn push_group(
         .unwrap_or_default();
 
     let target_namespace = params.map_to_target(namespace)?;
-    let last_snapshot_time = fetch_previous_backup_time(params, &target_namespace, group)
-        .await?
+    let mut target_snapshots = fetch_target_snapshots(params, &target_namespace, group).await?;
+    target_snapshots.sort_unstable_by_key(|a| a.backup.time);
+
+    let last_snapshot_time = target_snapshots
+        .last()
+        .map(|snapshot| snapshot.backup.time)
         .unwrap_or(i64::MIN);
 
     let mut source_snapshots = HashSet::new();
@@ -669,20 +663,9 @@ pub(crate) async fn push_group(
 
     progress.group_snapshots = snapshots.len() as u64;
 
-    let target_snapshots = fetch_target_snapshots(params, &target_namespace, group).await?;
-    let target_snapshots: Vec<BackupDir> = target_snapshots
-        .into_iter()
-        .map(|snapshot| snapshot.backup)
-        .collect();
-
     let mut stats = SyncStats::default();
     let mut fetch_previous_manifest = !target_snapshots.is_empty();
     for (pos, source_snapshot) in snapshots.into_iter().enumerate() {
-        if target_snapshots.contains(&source_snapshot) {
-            progress.done_snapshots = pos as u64 + 1;
-            info!("percentage done: {progress}");
-            continue;
-        }
         let result =
             push_snapshot(params, namespace, &source_snapshot, fetch_previous_manifest).await;
         fetch_previous_manifest = true;
@@ -696,7 +679,6 @@ pub(crate) async fn push_group(
     }
 
     if params.remove_vanished {
-        let target_snapshots = fetch_target_snapshots(params, &target_namespace, group).await?;
         for snapshot in target_snapshots {
             if source_snapshots.contains(&snapshot.backup.time) {
                 continue;
