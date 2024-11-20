@@ -233,16 +233,14 @@ async fn fetch_target_groups(
     let mut result = params.target.client.get(&api_path, args).await?;
     let groups: Vec<GroupListItem> = serde_json::from_value(result["data"].take())?;
 
-    let (mut owned, not_owned) = groups.iter().fold(
+    let (mut owned, not_owned) = groups.into_iter().fold(
         (Vec::new(), HashSet::new()),
         |(mut owned, mut not_owned), group| {
-            if let Some(ref owner) = group.owner {
-                if params.target.remote_user() == *owner {
-                    owned.push(group.backup.clone());
-                    return (owned, not_owned);
-                }
+            if Some(params.target.remote_user()) == group.owner {
+                owned.push(group.backup);
+            } else {
+                not_owned.insert(group.backup);
             }
-            not_owned.insert(group.backup.clone());
             (owned, not_owned)
         },
     );
