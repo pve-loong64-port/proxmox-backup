@@ -90,7 +90,8 @@ pub(crate) fn do_create_datastore(
         if let Ok(dir) = std::fs::read_dir(&path) {
             for file in dir {
                 let name = file?.file_name();
-                if !name.to_str().map_or(false, |name| name.starts_with('.')) {
+                let name = name.to_str();
+                if !name.map_or(false, |name| name.starts_with('.') || name == "lost+found") {
                     bail!("datastore path is not empty");
                 }
             }
