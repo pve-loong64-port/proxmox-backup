@@ -259,16 +259,12 @@ async fn remove_target_group(
 
     let api_path = params.target.datastore_api_path("groups");
 
-    let mut args = serde_json::json!({
-        "backup-id": backup_group.id,
-        "backup-type": backup_group.ty,
-    });
+    let mut args = serde_json::json!(backup_group);
+    args["ns"] = serde_json::to_value(target_namespace.name())?;
 
     if params.target.supports_prune_delete_stats {
         args["error-on-protected"] = serde_json::to_value(false)?;
     }
-
-    args["ns"] = serde_json::to_value(target_namespace.name())?;
 
     let mut result = params.target.client.delete(&api_path, Some(args)).await?;
 
