@@ -115,6 +115,8 @@ impl PushParameters {
         let version_info: ApiVersionInfo = serde_json::from_value(data)?;
         let api_version = ApiVersion::try_from(version_info)?;
         let supports_prune_delete_stats = api_version.supports_feature("prune-delete-stats");
+
+        // push assumes namespace support on the remote side, fail early if missing
         if api_version.major < 2 || (api_version.major == 2 && api_version.minor < 2) {
             bail!("unsupported remote api version, minimum v2.2 required");
         }
