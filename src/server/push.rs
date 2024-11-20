@@ -405,33 +405,30 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         // Attention: Filter out all namespaces which are not sub-namespaces of the sync target
         // namespace, or not included in the sync because of the depth limit.
         // Without this pre-filtering, all namespaces unrelated to the sync would be removed!
-        let mut target_sub_namespaces = Vec::new();
-        for namespace in &namespaces {
-            let target_namespace = params.map_to_target(namespace)?;
-            let mut sub_namespaces = target_namespaces
-                .iter()
-                .filter(|namespace| {
-                    if let Some(depth) = target_namespace.contains(namespace) {
-                        if let Some(max_depth) = params.max_depth {
-                            return depth <= max_depth;
-                        }
-                        return true;
-                    }
-                    false
-                })
-                .collect();
-            target_sub_namespaces.append(&mut sub_namespaces);
-        }
+        let max_depth = params
+            .max_depth
+            .unwrap_or_else(|| pbs_api_types::MAX_NAMESPACE_DEPTH);
+        let mut target_sub_namespaces: Vec<BackupNamespace> = existing_target_namespaces
+            .into_iter()
+            .filter(|target_namespace| {
+                params
+                    .target
+                    .ns
+                    .contains(&target_namespace)
+                    .map(|sub_depth| sub_depth <= max_depth)
+                    .unwrap_or(false)
+            })
+            .collect();
 
         // Sort by namespace length and revert for sub-namespaces to be removed before parents
         target_sub_namespaces.sort_unstable_by_key(|a| a.name_len());
         target_sub_namespaces.reverse();
 
         for target_namespace in target_sub_namespaces {
-            if synced_namespaces.contains(target_namespace) {
+            if synced_namespaces.contains(&target_namespace) {
                 continue;
             }
-            match remove_target_namespace(&params, target_namespace).await {
+            match remove_target_namespace(&params, &target_namespace).await {
                 Ok(delete_stats) => {
                     stats.add(SyncStats::from(RemovedVanishedStats {
                         snapshots: delete_stats.removed_snapshots(),
