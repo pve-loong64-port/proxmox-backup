@@ -781,7 +781,7 @@ pub(crate) async fn push_snapshot(
     };
 
     // Avoid double upload penalty by remembering already seen chunks
-    let known_chunks = Arc::new(Mutex::new(HashSet::with_capacity(1024 * 1024)));
+    let known_chunks = Arc::new(Mutex::new(HashSet::with_capacity(64 * 1024)));
 
     for entry in source_manifest.files() {
         let mut path = backup_dir.full_path();
