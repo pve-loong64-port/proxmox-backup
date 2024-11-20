@@ -194,7 +194,7 @@ async fn remove_target_namespace(
     }
 
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
-        .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
+        .map_err(|err| format_err!("Pruning remote datastore namespaces not allowed - {err}"))?;
 
     let api_path = params.target.datastore_api_path("namespace");
 
