@@ -305,12 +305,11 @@ async fn check_or_create_target_namespace(
             if !parent.is_root() {
                 args["parent"] = serde_json::to_value(parent.clone())?;
             }
-            let target_store_and_ns = print_store_and_ns(params.target.repo.store(), &current);
             match params.target.client.post(&api_path, Some(args)).await {
-                Ok(_) => info!("Created new namespace on target: {target_store_and_ns}"),
-                Err(err) => bail!(
-                    "Sync into {target_store_and_ns} failed - namespace creation failed: {err}"
-                ),
+                Ok(_) => info!("Created new namespace on target: {current}"),
+                Err(err) => {
+                    bail!("Remote creation of namespace {current} failed, remote returned: {err}")
+                }
             }
             parent = current;
         }
@@ -372,7 +371,8 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         )
         .await
         {
-            info!("Cannot sync {source_store_and_ns} into {target_store_and_ns} - {err}");
+            warn!("Encountered error: {err}");
+            warn!("Failed to sync {source_store_and_ns} into {target_store_and_ns}!");
             errors = true;
             continue;
         }
