@@ -849,7 +849,7 @@ pub(crate) async fn push_snapshot(
                 }
             }
         } else {
-            warn!("{path:?} does not exist, skipped.");
+            bail!("{path:?} does not exist, aborting upload.");
         }
     }
 
