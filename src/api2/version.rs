@@ -8,8 +8,6 @@ use proxmox_schema::api;
 
 use pbs_api_types::ApiVersionInfo;
 
-const FEATURES: &[&str] = &["prune-delete-stats"];
-
 #[api(
     returns: {
         type: ApiVersionInfo,
@@ -28,7 +26,6 @@ fn version(
         version: pbs_buildcfg::PROXMOX_PKG_VERSION.to_string(),
         release: pbs_buildcfg::PROXMOX_PKG_RELEASE.to_string(),
         repoid: pbs_buildcfg::PROXMOX_PKG_REPOID.to_string(),
-        features: FEATURES.iter().map(|feature| feature.to_string()).collect(),
     })
 }
 
