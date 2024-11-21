@@ -197,7 +197,7 @@ async fn remove_target_namespace(
     target_namespace: &BackupNamespace,
 ) -> Result<BackupGroupDeleteStats, Error> {
     if target_namespace.is_root() {
-        bail!("cannot remove root namespace from target");
+        bail!("Cannot remove root namespace from remote");
     }
 
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
@@ -295,7 +295,7 @@ async fn check_or_create_target_namespace(
         // Sub-namespaces have to be created by creating parent components first.
 
         check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
-            .map_err(|err| format_err!("Creating namespace not allowed - {err}"))?;
+            .map_err(|err| format_err!("Creating remote namespace not allowed - {err}"))?;
 
         let mut parent = BackupNamespace::root();
         for component in target_namespace.components() {
@@ -311,7 +311,7 @@ async fn check_or_create_target_namespace(
                 args["parent"] = serde_json::to_value(parent.clone())?;
             }
             match params.target.client.post(&api_path, Some(args)).await {
-                Ok(_) => info!("Created new namespace on target: {current}"),
+                Ok(_) => info!("Successfully created new namespace {current} on remote"),
                 Err(err) => {
                     bail!("Remote creation of namespace {current} failed, remote returned: {err}")
                 }
@@ -445,18 +445,19 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
                     }));
                     if delete_stats.protected_snapshots() > 0 {
                         warn!(
-                            "kept {protected_count} protected snapshots of namespace '{target_namespace}'",
+                            "Kept {protected_count} protected snapshots of remote namespace {target_namespace}",
                             protected_count = delete_stats.protected_snapshots(),
                         );
                         continue;
                     }
                 }
                 Err(err) => {
-                    warn!("failed to remove vanished namespace {target_namespace} - {err}");
+                    warn!("Encountered errors: {err}");
+                    warn!("Failed to remove vanished namespace {target_namespace} from remote!");
                     continue;
                 }
             }
-            info!("removed vanished namespace {target_namespace}");
+            info!("Successfully removed vanished namespace {target_namespace} from remote");
         }
 
         if !params.target.supports_prune_delete_stats {
@@ -481,7 +482,7 @@ pub(crate) async fn push_namespace(
     let target_namespace = params.map_to_target(namespace)?;
     // Check if user is allowed to perform backups on remote datastore
     check_ns_remote_datastore_privs(params, &target_namespace, PRIV_REMOTE_DATASTORE_BACKUP)
-        .map_err(|err| format_err!("Pushing to remote not allowed - {err}"))?;
+        .map_err(|err| format_err!("Pushing to remote namespace not allowed - {err}"))?;
 
     let mut list: Vec<BackupGroup> = params
         .source
@@ -527,7 +528,8 @@ pub(crate) async fn push_namespace(
         match push_group(params, namespace, &group, &mut progress).await {
             Ok(sync_stats) => stats.add(sync_stats),
             Err(err) => {
-                warn!("sync group '{group}' failed  - {err}");
+                warn!("Encountered errors: {err}");
+                warn!("Failed to push group {group} to remote!");
                 errors = true;
             }
         }
@@ -543,13 +545,13 @@ pub(crate) async fn push_namespace(
                 continue;
             }
 
-            info!("delete vanished group '{target_group}'");
+            info!("Removed vanished group {target_group} from remote");
 
             match remove_target_group(params, &target_namespace, &target_group).await {
                 Ok(delete_stats) => {
                     if delete_stats.protected_snapshots() > 0 {
                         warn!(
-                            "kept {protected_count} protected snapshots of group '{target_group}'",
+                            "Kept {protected_count} protected snapshots of group {target_group} on remote",
                             protected_count = delete_stats.protected_snapshots(),
                         );
                     }
@@ -560,7 +562,8 @@ pub(crate) async fn push_namespace(
                     }));
                 }
                 Err(err) => {
-                    warn!("failed to delete vanished group - {err}");
+                    warn!("Encountered errors: {err}");
+                    warn!("Failed to remove vanished group {target_group} from remote!");
                     errors = true;
                     continue;
                 }
@@ -693,7 +696,7 @@ pub(crate) async fn push_group(
             }
             if snapshot.protected {
                 info!(
-                    "don't delete vanished snapshot {name} (protected)",
+                    "Kept protected snapshot {name} on remote",
                     name = snapshot.backup
                 );
                 continue;
@@ -701,12 +704,16 @@ pub(crate) async fn push_group(
             if let Err(err) =
                 forget_target_snapshot(params, &target_namespace, &snapshot.backup).await
             {
+                info!("Encountered errors: {err}");
                 info!(
-                    "could not delete vanished snapshot {name} - {err}",
+                    "Failed to remove vanished snapshot {name} from remote!",
                     name = snapshot.backup
                 );
             }
-            info!("delete vanished snapshot {name}", name = snapshot.backup);
+            info!(
+                "Removed vanished snapshot {name} from remote",
+                name = snapshot.backup
+            );
             stats.add(SyncStats::from(RemovedVanishedStats {
                 snapshots: 1,
                 groups: 0,
