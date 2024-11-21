@@ -44,10 +44,8 @@ web-interface/API or using the ``proxmox-backup-manager`` CLI tool.
 Upload Custom Certificate
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you already have a certificate which you want to use for a Proxmox
-Mail Gateway host, you can simply upload that certificate over the web
-interface.
-
+If you already have a certificate which you want to use for a `Proxmox Backup`_
+host, you can simply upload that certificate over the web interface.
 
 .. image:: images/screenshots/pbs-gui-certs-upload-custom.png
   :target: _images/pbs-gui-certs-upload-custom.png
