@@ -422,7 +422,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
                 params
                     .target
                     .ns
-                    .contains(&target_namespace)
+                    .contains(target_namespace)
                     .map(|sub_depth| sub_depth <= max_depth)
                     .unwrap_or(false)
             })
