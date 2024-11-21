@@ -76,24 +76,31 @@ pub fn check_sync_job_modify_access(
     match sync_direction {
         SyncDirection::Pull => {
             let ns_anchor_privs = user_info.lookup_privs(auth_id, &job.acl_path());
-            if ns_anchor_privs & PRIV_DATASTORE_BACKUP == 0
-                || ns_anchor_privs & PRIV_DATASTORE_AUDIT == 0
-            {
+
+            // job visibility check
+            if ns_anchor_privs & PRIV_DATASTORE_AUDIT == 0 {
+                return false;
+            }
+
+            // creating backups on target check
+            if ns_anchor_privs & PRIV_DATASTORE_BACKUP == 0 {
                 return false;
             }
 
             if let Some(true) = job.remove_vanished {
+                // pruning backups on target check
                 if ns_anchor_privs & PRIV_DATASTORE_PRUNE == 0 {
                     return false;
                 }
             }
 
-            // same permission as changing ownership after syncing
+            // same permission as changing ownership after syncing on the target side
             if !is_correct_owner(auth_id, job) && ns_anchor_privs & PRIV_DATASTORE_MODIFY == 0 {
                 return false;
             }
 
             if let Some(remote) = &job.remote {
+                // remote read access check
                 let remote_privs =
                     user_info.lookup_privs(auth_id, &["remote", remote, &job.remote_store]);
                 return remote_privs & PRIV_REMOTE_READ != 0;
@@ -127,13 +134,13 @@ pub fn check_sync_job_modify_access(
                 return true;
             }
 
-            // check user is not the owner of the sync job, but has datastore modify permissions,
-            // which implies permissions to change group ownership
+            // check datastore modify permission if user is not the owner of the sync job
+            // this implies permissions to change group ownership
             if !is_correct_owner(auth_id, job) && source_privs & PRIV_DATASTORE_MODIFY == 0 {
                 return false;
             }
 
-            // user has Datastore.Modify, check also for Datastore.Backup to allow modify access
+            // no read on full datastore, so check backup access for owned backups
             source_privs & PRIV_DATASTORE_BACKUP != 0
         }
     }
