@@ -1,3 +1,11 @@
+rust-proxmox-backup (3.2.11-1) bookworm; urgency=medium
+
+  * fix #3044: server: implement push support for sync operations
+
+  * push sync related refactors
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 21 Nov 2024 12:03:50 +0100
+
 rust-proxmox-backup (3.2.10-1) bookworm; urgency=medium
 
   * api: disk list: do not fail but just log error on gathering smart data
