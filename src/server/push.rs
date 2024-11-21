@@ -99,11 +99,16 @@ impl PushParameters {
             remote_ns.check_max_depth(max_depth)?;
         };
         let remove_vanished = remove_vanished.unwrap_or(false);
+        let store = DataStore::lookup_datastore(store, Some(Operation::Read))?;
 
-        let source = Arc::new(LocalSource {
-            store: DataStore::lookup_datastore(store, Some(Operation::Read))?,
-            ns,
-        });
+        if !store.namespace_exists(&ns) {
+            bail!(
+                "Source namespace '{ns}' doesn't exist in datastore '{store}'!",
+                store = store.name()
+            );
+        }
+
+        let source = Arc::new(LocalSource { store, ns });
 
         let (remote_config, _digest) = pbs_config::remote::config()?;
         let remote: Remote = remote_config.lookup("remote", remote_id)?;
