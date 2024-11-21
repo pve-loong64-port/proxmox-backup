@@ -647,8 +647,10 @@ async fn run() -> Result<(), Error> {
             CliCommand::new(&API_METHOD_PUSH_DATASTORE)
                 .arg_param(&["store", "remote", "remote-store"])
                 .completion_cb("store", pbs_config::datastore::complete_datastore_name)
+                .completion_cb("ns", complete_sync_local_datastore_namespace)
                 .completion_cb("remote", pbs_config::remote::complete_remote_name)
-                .completion_cb("remote-store", complete_remote_datastore_name),
+                .completion_cb("remote-store", complete_remote_datastore_name)
+                .completion_cb("remote-ns", complete_remote_datastore_namespace),
         )
         .insert(
             "verify",
