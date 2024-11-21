@@ -282,7 +282,7 @@ async fn remove_target_group(
 // Check if the namespace is already present on the target, create it otherwise
 async fn check_or_create_target_namespace(
     params: &PushParameters,
-    existing_target_namespaces: &[BackupNamespace],
+    existing_target_namespaces: &mut Vec<BackupNamespace>,
     target_namespace: &BackupNamespace,
 ) -> Result<(), Error> {
     if !target_namespace.is_root() && !existing_target_namespaces.contains(target_namespace) {
@@ -311,6 +311,7 @@ async fn check_or_create_target_namespace(
                     bail!("Remote creation of namespace {current} failed, remote returned: {err}")
                 }
             }
+            existing_target_namespaces.push(current.clone());
             parent = current;
         }
     }
@@ -348,7 +349,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
     source_namespaces.sort_unstable_by_key(|a| a.name_len());
 
     // Fetch all accessible namespaces already present on the target
-    let existing_target_namespaces = fetch_target_namespaces(&params).await?;
+    let mut existing_target_namespaces = fetch_target_namespaces(&params).await?;
     // Remember synced namespaces, removing non-synced ones when remove vanished flag is set
     let mut synced_namespaces = HashSet::with_capacity(source_namespaces.len());
 
@@ -366,7 +367,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
 
         if let Err(err) = check_or_create_target_namespace(
             &params,
-            &existing_target_namespaces,
+            &mut existing_target_namespaces,
             &target_namespace,
         )
         .await
