@@ -129,7 +129,7 @@ impl PushParameters {
 
         // push assumes namespace support on the remote side, fail early if missing
         if api_version.major < 2 || (api_version.major == 2 && api_version.minor < 2) {
-            bail!("unsupported remote api version, minimum v2.2 required");
+            bail!("Unsupported remote api version, minimum v2.2 required");
         }
 
         let supports_prune_delete_stats = api_version.major > 3
@@ -404,7 +404,8 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
             }
             Err(err) => {
                 errors = true;
-                info!("Encountered errors while syncing namespace {source_namespace} - {err}");
+                info!("Encountered errors: {err}");
+                info!("Failed to sync {source_store_and_ns} into {target_store_and_ns}!");
             }
         }
     }
@@ -461,12 +462,12 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         }
 
         if !params.target.supports_prune_delete_stats {
-            info!("Older api version on remote detected, delete stats might be incomplete");
+            info!("Older api version on remote detected, deletion statistics might be incomplete");
         }
     }
 
     if errors {
-        bail!("sync failed with some errors.");
+        bail!("Sync failed with some errors!");
     }
 
     Ok(stats)
@@ -498,7 +499,7 @@ pub(crate) async fn push_namespace(
         .collect();
 
     info!(
-        "found {filtered} groups to sync (out of {total} total)",
+        "Found {filtered} groups to sync (out of {total} total)",
         filtered = list.len()
     );
 
@@ -518,7 +519,7 @@ pub(crate) async fn push_namespace(
 
         if not_owned_target_groups.contains(&group) {
             warn!(
-                "group '{group}' not owned by remote user '{}' on target, skip",
+                "Group '{group}' not owned by remote user '{}' on target, skipping upload",
                 params.target.remote_user(),
             );
             continue;
@@ -681,7 +682,7 @@ pub(crate) async fn push_group(
         fetch_previous_manifest = true;
 
         progress.done_snapshots = pos as u64 + 1;
-        info!("percentage done: {progress}");
+        info!("Percentage done: {progress}");
 
         // stop on error
         let sync_stats = result?;
@@ -753,7 +754,8 @@ pub(crate) async fn push_snapshot(
         Ok((manifest, _raw_size)) => manifest,
         Err(err) => {
             // No manifest in snapshot or failed to read, warn and skip
-            log::warn!("failed to load manifest - {err}");
+            log::warn!("Encountered errors: {err}");
+            log::warn!("Failed to load manifest for '{snapshot}'!");
             return Ok(stats);
         }
     };
