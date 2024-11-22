@@ -664,6 +664,10 @@ pub(crate) async fn push_group(
     let mut snapshots: Vec<BackupDir> = params.source.list_backup_dirs(namespace, group).await?;
     snapshots.sort_unstable_by(|a, b| a.time.cmp(&b.time));
 
+    if snapshots.is_empty() {
+        info!("Group '{group}' contains no snapshots to sync to remote");
+    }
+
     let total_snapshots = snapshots.len();
     let cutoff = params
         .transfer_last
