@@ -135,6 +135,12 @@ For mixing include and exclude filter, following rules apply:
 
 .. note:: The ``protected`` flag of remote backup snapshots will not be synced.
 
+Enabling the advanced option 'resync-corrupt' will re-sync all snapshots that have 
+failed to verify during the last :ref:`maintenance_verification`. Hence, a verification
+job needs to be run before a sync job with 'resync-corrupt' can be carried out. Be aware
+that a 'resync-corrupt'-job needs to check the manifests of all snapshots in a datastore
+and might take much longer than regular sync jobs.
+
 Namespace Support
 ^^^^^^^^^^^^^^^^^
 
