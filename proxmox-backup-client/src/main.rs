@@ -7,7 +7,6 @@ use std::task::Context;
 
 use anyhow::{bail, format_err, Error};
 use futures::stream::{StreamExt, TryStreamExt};
-use pbs_client::tools::has_pxar_filename_extension;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::sync::mpsc;
@@ -1374,18 +1373,6 @@ async fn dump_image<W: Write>(
     );
 
     Ok(())
-}
-
-fn parse_archive_type(name: &str) -> (String, ArchiveType) {
-    if name.ends_with(".didx") || name.ends_with(".fidx") || name.ends_with(".blob") {
-        (name.into(), ArchiveType::from_path(name).unwrap())
-    } else if has_pxar_filename_extension(name, false) {
-        (format!("{}.didx", name), ArchiveType::DynamicIndex)
-    } else if name.ends_with(".img") {
-        (format!("{}.fidx", name), ArchiveType::FixedIndex)
-    } else {
-        (format!("{}.blob", name), ArchiveType::Blob)
-    }
 }
 
 #[api(
