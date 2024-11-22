@@ -10,7 +10,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tracing::{info, warn};
 
 use pbs_api_types::{
-    print_store_and_ns, ApiVersion, ApiVersionInfo, Authid, BackupDir, BackupGroup,
+    print_store_and_ns, ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupDir, BackupGroup,
     BackupGroupDeleteStats, BackupNamespace, GroupFilter, GroupListItem, NamespaceListItem,
     Operation, RateLimitConfig, Remote, SnapshotListItem, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_MODIFY,
@@ -22,7 +22,7 @@ use pbs_datastore::data_blob::ChunkInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{ArchiveType, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::{CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, StoreProgress};
 

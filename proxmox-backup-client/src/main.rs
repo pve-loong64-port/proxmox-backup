@@ -25,10 +25,10 @@ use pxar::accessor::aio::Accessor;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
-    Authid, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType, ClientRateLimitConfig,
-    CryptMode, Fingerprint, GroupListItem, PruneJobOptions, PruneListItem, RateLimitConfig,
-    SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
-    BACKUP_TYPE_SCHEMA,
+    ArchiveType, Authid, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType,
+    ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PruneJobOptions, PruneListItem,
+    RateLimitConfig, SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
@@ -54,9 +54,7 @@ use pbs_datastore::chunk_store::verify_chunk_size;
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, LocalDynamicReadAt};
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{
-    ArchiveType, BackupManifest, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
-};
+use pbs_datastore::manifest::{BackupManifest, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::CATALOG_NAME;
 use pbs_key_config::{decrypt_key, rsa_encrypt_key_config, KeyConfig};

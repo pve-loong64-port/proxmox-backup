@@ -8,13 +8,13 @@ use nix::dir::Dir;
 
 use proxmox_sys::fs::lock_dir_noblock_shared;
 
-use pbs_api_types::{print_store_and_ns, BackupNamespace, Operation};
+use pbs_api_types::{print_store_and_ns, ArchiveType, BackupNamespace, Operation};
 
 use crate::backup_info::BackupDir;
 use crate::dynamic_index::DynamicIndexReader;
 use crate::fixed_index::FixedIndexReader;
 use crate::index::IndexFile;
-use crate::manifest::{ArchiveType, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
+use crate::manifest::{CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use crate::DataStore;
 
 /// Helper to access the contents of a datastore backup snapshot

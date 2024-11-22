@@ -11,12 +11,13 @@ use proxmox_sys::fs::lock_dir_noblock_shared;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, Authid, BackupNamespace, BackupType, CryptMode,
-    SnapshotVerifyState, VerifyState, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_VERIFY, UPID,
+    print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupNamespace, BackupType,
+    CryptMode, SnapshotVerifyState, VerifyState, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_VERIFY,
+    UPID,
 };
 use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{ArchiveType, BackupManifest, FileInfo};
+use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::{DataBlob, DataStore, StoreProgress};
 
 use crate::tools::parallel_handler::ParallelHandler;

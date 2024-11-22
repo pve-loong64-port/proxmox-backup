@@ -19,10 +19,10 @@ use proxmox_uuid::Uuid;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    parse_ns_and_snapshot, print_ns_and_snapshot, Authid, BackupDir, BackupNamespace, CryptMode,
-    NotificationMode, Operation, TapeRestoreNamespace, Userid, DATASTORE_MAP_ARRAY_SCHEMA,
-    DATASTORE_MAP_LIST_SCHEMA, DRIVE_NAME_SCHEMA, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ, TAPE_RESTORE_NAMESPACE_SCHEMA,
+    parse_ns_and_snapshot, print_ns_and_snapshot, ArchiveType, Authid, BackupDir, BackupNamespace,
+    CryptMode, NotificationMode, Operation, TapeRestoreNamespace, Userid,
+    DATASTORE_MAP_ARRAY_SCHEMA, DATASTORE_MAP_LIST_SCHEMA, DRIVE_NAME_SCHEMA, MAX_NAMESPACE_DEPTH,
+    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ, TAPE_RESTORE_NAMESPACE_SCHEMA,
     TAPE_RESTORE_SNAPSHOT_SCHEMA, UPID_SCHEMA,
 };
 use pbs_client::pxar::tools::handle_root_with_optional_format_version_prelude;
@@ -30,7 +30,7 @@ use pbs_config::CachedUserInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{ArchiveType, BackupManifest, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::{BackupManifest, MANIFEST_BLOB_NAME};
 use pbs_datastore::{DataBlob, DataStore};
 use pbs_tape::{
     BlockReadError, MediaContentHeader, TapeRead, PROXMOX_BACKUP_CONTENT_HEADER_MAGIC_1_0,

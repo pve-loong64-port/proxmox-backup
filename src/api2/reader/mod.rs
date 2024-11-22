@@ -19,13 +19,12 @@ use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
-    Authid, Operation, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA,
-    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    ArchiveType, Authid, Operation, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA,
+    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA,
+    DATASTORE_SCHEMA, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::ArchiveType;
 use pbs_datastore::{DataStore, PROXMOX_BACKUP_READER_PROTOCOL_ID_V1};
 use pbs_tools::json::required_string_param;
 

@@ -13,12 +13,12 @@ use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
-use pbs_api_types::{BackupDir, BackupNamespace};
+use pbs_api_types::{ArchiveType, BackupDir, BackupNamespace};
 use pbs_datastore::data_blob::{ChunkInfo, DataBlob, DataChunkBuilder};
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{ArchiveType, BackupManifest, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::{BackupManifest, MANIFEST_BLOB_NAME};
 use pbs_datastore::{CATALOG_NAME, PROXMOX_BACKUP_PROTOCOL_ID_V1};
 use pbs_tools::crypt_config::CryptConfig;
 

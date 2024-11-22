@@ -18,9 +18,9 @@ use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder, DataStoreConfig,
-    DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionStatus, MaintenanceMode,
-    MaintenanceType, Operation, UPID,
+    ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
+    DataStoreConfig, DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionStatus,
+    MaintenanceMode, MaintenanceType, Operation, UPID,
 };
 
 use crate::backup_info::{BackupDir, BackupGroup};
@@ -29,7 +29,6 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
-use crate::manifest::ArchiveType;
 use crate::task_tracking::{self, update_active_operations};
 use crate::DataBlob;
 

@@ -1,11 +1,9 @@
-use std::path::Path;
-
 use anyhow::{bail, format_err, Error};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use pbs_api_types::{BackupType, CryptMode, Fingerprint};
+use pbs_api_types::{ArchiveType, BackupType, CryptMode, Fingerprint};
 use pbs_tools::crypt_config::CryptConfig;
 
 pub const MANIFEST_BLOB_NAME: &str = "index.json.blob";
@@ -54,26 +52,6 @@ pub struct BackupManifest {
     #[serde(default = "empty_value")] // to be compatible with < 0.8.0 backups
     pub unprotected: Value,
     pub signature: Option<String>,
-}
-
-#[derive(PartialEq, Eq)]
-pub enum ArchiveType {
-    FixedIndex,
-    DynamicIndex,
-    Blob,
-}
-
-impl ArchiveType {
-    pub fn from_path(archive_name: impl AsRef<Path>) -> Result<Self, Error> {
-        let archive_name = archive_name.as_ref();
-        let archive_type = match archive_name.extension().and_then(|ext| ext.to_str()) {
-            Some("didx") => ArchiveType::DynamicIndex,
-            Some("fidx") => ArchiveType::FixedIndex,
-            Some("blob") => ArchiveType::Blob,
-            _ => bail!("unknown archive type: {:?}", archive_name),
-        };
-        Ok(archive_type)
-    }
 }
 
 impl BackupManifest {

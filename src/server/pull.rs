@@ -11,8 +11,9 @@ use proxmox_human_byte::HumanByte;
 use tracing::info;
 
 use pbs_api_types::{
-    print_store_and_ns, Authid, BackupDir, BackupGroup, BackupNamespace, GroupFilter, Operation,
-    RateLimitConfig, Remote, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+    print_store_and_ns, ArchiveType, Authid, BackupDir, BackupGroup, BackupNamespace, GroupFilter,
+    Operation, RateLimitConfig, Remote, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_AUDIT,
+    PRIV_DATASTORE_BACKUP,
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
@@ -20,9 +21,7 @@ use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{
-    ArchiveType, BackupManifest, FileInfo, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
-};
+use pbs_datastore::manifest::{BackupManifest, FileInfo, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{check_backup_owner, DataStore, StoreProgress};
 use pbs_tools::sha::sha256;
