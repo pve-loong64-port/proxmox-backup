@@ -539,15 +539,13 @@ unsafe fn list_snapshots_blocking(
                     }
                 };
 
-                let verification = manifest.unprotected["verify_state"].clone();
-                let verification: Option<SnapshotVerifyState> =
-                    match serde_json::from_value(verification) {
-                        Ok(verify) => verify,
-                        Err(err) => {
-                            eprintln!("error parsing verification state : '{}'", err);
-                            None
-                        }
-                    };
+                let verification: Option<SnapshotVerifyState> = match manifest.verify_state() {
+                    Ok(verify) => verify,
+                    Err(err) => {
+                        eprintln!("error parsing verification state : '{}'", err);
+                        None
+                    }
+                };
 
                 let size = Some(files.iter().map(|x| x.size.unwrap_or(0)).sum());
 

@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use anyhow::{bail, format_err, Error};
 use nix::dir::Dir;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use proxmox_sys::fs::lock_dir_noblock_shared;
 use proxmox_worker_task::WorkerTaskContext;
@@ -554,10 +554,13 @@ pub fn verify_filter(
         return true;
     }
 
-    let raw_verify_state = manifest.unprotected["verify_state"].clone();
-    match serde_json::from_value::<SnapshotVerifyState>(raw_verify_state) {
-        Err(_) => true, // no last verification, always include
-        Ok(last_verify) => {
+    match manifest.verify_state() {
+        Err(err) => {
+            warn!("error reading manifest: {err:#}");
+            true
+        }
+        Ok(None) => true, // no last verification, always include
+        Ok(Some(last_verify)) => {
             match outdated_after {
                 None => false, // never re-verify if ignored and no max age
                 Some(max_age) => {

@@ -3,7 +3,7 @@ use anyhow::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use pbs_api_types::{BackupArchiveName, BackupType, CryptMode, Fingerprint};
+use pbs_api_types::{BackupArchiveName, BackupType, CryptMode, Fingerprint, SnapshotVerifyState};
 use pbs_tools::crypt_config::CryptConfig;
 
 pub const MANIFEST_LOCK_NAME: &str = ".index.json.lck";
@@ -223,6 +223,18 @@ impl BackupManifest {
 
         let manifest: BackupManifest = serde_json::from_value(json)?;
         Ok(manifest)
+    }
+
+    /// Get the verify state of the snapshot
+    ///
+    /// Note: New snapshots, which have not been verified yet, do not have a status and this
+    /// function will return `Ok(None)`.
+    pub fn verify_state(&self) -> Result<Option<SnapshotVerifyState>, anyhow::Error> {
+        let verify = self.unprotected["verify_state"].clone();
+        if verify.is_null() {
+            return Ok(None);
+        }
+        Ok(Some(serde_json::from_value::<SnapshotVerifyState>(verify)?))
     }
 }
 

@@ -8,8 +8,8 @@ use anyhow::{bail, format_err, Error};
 use proxmox_sys::fs::{lock_dir_noblock, replace_file, CreateOptions};
 
 use pbs_api_types::{
-    Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, BACKUP_DATE_REGEX,
-    BACKUP_FILE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
+    Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, VerifyState,
+    BACKUP_DATE_REGEX, BACKUP_FILE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
@@ -552,6 +552,11 @@ impl BackupDir {
         }
 
         Ok(())
+    }
+
+    /// Load the verify state from the manifest.
+    pub fn verify_state(&self) -> Result<Option<VerifyState>, anyhow::Error> {
+        Ok(self.load_manifest()?.0.verify_state()?.map(|svs| svs.state))
     }
 }
 

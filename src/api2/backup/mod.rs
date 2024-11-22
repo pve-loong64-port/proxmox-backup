@@ -8,6 +8,7 @@ use hyper::http::request::Parts;
 use hyper::{Body, Request, Response, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tracing::warn;
 
 use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{http_err, list_subdirs_api_method};
@@ -158,14 +159,17 @@ fn upgrade_to_backup_protocol(
             let info = backup_group.last_backup(true).unwrap_or(None);
             if let Some(info) = info {
                 let (manifest, _) = info.backup_dir.load_manifest()?;
-                let verify = manifest.unprotected["verify_state"].clone();
-                match serde_json::from_value::<SnapshotVerifyState>(verify) {
-                    Ok(verify) => match verify.state {
+                match manifest.verify_state() {
+                    Ok(Some(verify)) => match verify.state {
                         VerifyState::Ok => Some(info),
                         VerifyState::Failed => None,
                     },
-                    Err(_) => {
+                    Ok(None) => {
                         // no verify state found, treat as valid
+                        Some(info)
+                    },
+                    Err(err) => {
+                        warn!("error parsing the snapshot manifest: {err:#}");
                         Some(info)
                     }
                 }
