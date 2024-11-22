@@ -14,8 +14,8 @@ use pbs_api_types::percent_encoding::percent_encode_component;
 use pbs_api_types::{
     BackupNamespace, GroupFilter, RateLimitConfig, SyncDirection, SyncJobConfig, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA,
-    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, TRANSFER_LAST_SCHEMA, UPID_SCHEMA,
-    VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA, TRANSFER_LAST_SCHEMA,
+    UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::{display_task_log, view_task_result};
 use pbs_config::sync;
@@ -307,6 +307,7 @@ async fn sync_datastore(
     group_filter: Option<Vec<GroupFilter>>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
+    resync_corrupt: Option<bool>,
     param: Value,
     sync_direction: SyncDirection,
 ) -> Result<Value, Error> {
@@ -341,6 +342,10 @@ async fn sync_datastore(
 
     if transfer_last.is_some() {
         args["transfer-last"] = json!(transfer_last)
+    }
+
+    if let Some(resync) = resync_corrupt {
+        args["resync-corrupt"] = Value::from(resync);
     }
 
     let mut limit_json = json!(limit);
@@ -405,6 +410,10 @@ async fn sync_datastore(
                 schema: TRANSFER_LAST_SCHEMA,
                 optional: true,
             },
+            "resync-corrupt": {
+                schema: RESYNC_CORRUPT_SCHEMA,
+                optional: true,
+            },
         }
    }
 )]
@@ -421,6 +430,7 @@ async fn pull_datastore(
     group_filter: Option<Vec<GroupFilter>>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
+    resync_corrupt: Option<bool>,
     param: Value,
 ) -> Result<Value, Error> {
     sync_datastore(
@@ -434,6 +444,7 @@ async fn pull_datastore(
         group_filter,
         limit,
         transfer_last,
+        resync_corrupt,
         param,
         SyncDirection::Pull,
     )
@@ -513,6 +524,7 @@ async fn push_datastore(
         group_filter,
         limit,
         transfer_last,
+        None,
         param,
         SyncDirection::Push,
     )

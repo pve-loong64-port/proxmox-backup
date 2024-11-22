@@ -358,6 +358,20 @@ Ext.define('PBS.window.SyncJobEdit', {
 			    deleteEmpty: '{!isCreate}',
 			},
 		    },
+		    {
+			fieldLabel: gettext('Re-sync corrupt snapshots'),
+			xtype: 'proxmoxcheckbox',
+			name: 'resync-corrupt',
+			autoEl: {
+			    tag: 'div',
+			    'data-qtip': gettext('Re-sync snapshots, whose verification failed.'),
+			},
+			cbind: {
+			    disabled: '{syncDirectionPush}',
+			},
+			uncheckedValue: false,
+			value: false,
+		    },
 		],
 	    },
 	    {
