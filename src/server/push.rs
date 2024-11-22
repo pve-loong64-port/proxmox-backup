@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Context, Error};
 use futures::stream::{self, StreamExt, TryStreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -179,7 +179,12 @@ fn check_ns_remote_datastore_privs(
 // Fetch the list of namespaces found on target
 async fn fetch_target_namespaces(params: &PushParameters) -> Result<Vec<BackupNamespace>, Error> {
     let api_path = params.target.datastore_api_path("namespace");
-    let mut result = params.target.client.get(&api_path, None).await?;
+    let mut result = params
+        .target
+        .client
+        .get(&api_path, None)
+        .await
+        .context("Fetching remote namespaces failed, remote returned error")?;
     let namespaces: Vec<NamespaceListItem> = serde_json::from_value(result["data"].take())?;
     let mut namespaces: Vec<BackupNamespace> = namespaces
         .into_iter()
@@ -200,7 +205,7 @@ async fn remove_target_namespace(
     }
 
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
-        .map_err(|err| format_err!("Pruning remote datastore namespaces not allowed - {err}"))?;
+        .context("Pruning remote datastore namespaces not allowed")?;
 
     let api_path = params.target.datastore_api_path("namespace");
 
@@ -213,13 +218,17 @@ async fn remove_target_namespace(
         args["error-on-protected"] = serde_json::to_value(false)?;
     }
 
-    let mut result = params.target.client.delete(&api_path, Some(args)).await?;
+    let mut result = params
+        .target
+        .client
+        .delete(&api_path, Some(args))
+        .await
+        .context(format!(
+            "Failed to remove remote namespace {target_namespace}, remote returned error"
+        ))?;
 
     if params.target.supports_prune_delete_stats {
-        let data = result["data"].take();
-        serde_json::from_value(data).map_err(|err| {
-            format_err!("removing target namespace {target_namespace} failed - {err}")
-        })
+        Ok(serde_json::from_value(result["data"].take())?)
     } else {
         Ok(BackupGroupDeleteStats::default())
     }
@@ -234,7 +243,13 @@ async fn fetch_target_groups(
     let api_path = params.target.datastore_api_path("groups");
     let args = Some(serde_json::json!({ "ns": target_namespace.name() }));
 
-    let mut result = params.target.client.get(&api_path, args).await?;
+    let mut result = params
+        .target
+        .client
+        .get(&api_path, args)
+        .await
+        .context("Failed to fetch remote groups, remote returned error")?;
+
     let groups: Vec<GroupListItem> = serde_json::from_value(result["data"].take())?;
 
     let (mut owned, not_owned) = groups.into_iter().fold(
@@ -261,7 +276,7 @@ async fn remove_target_group(
     backup_group: &BackupGroup,
 ) -> Result<BackupGroupDeleteStats, Error> {
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_PRUNE)
-        .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
+        .context("Pruning remote datastore contents not allowed")?;
 
     let api_path = params.target.datastore_api_path("groups");
 
@@ -272,12 +287,17 @@ async fn remove_target_group(
         args["error-on-protected"] = serde_json::to_value(false)?;
     }
 
-    let mut result = params.target.client.delete(&api_path, Some(args)).await?;
+    let mut result = params
+        .target
+        .client
+        .delete(&api_path, Some(args))
+        .await
+        .context(format!(
+            "Failed to remove remote group {backup_group}, remote returned error"
+        ))?;
 
     if params.target.supports_prune_delete_stats {
-        let data = result["data"].take();
-        serde_json::from_value(data)
-            .map_err(|err| format_err!("removing target group {backup_group} failed - {err}"))
+        Ok(serde_json::from_value(result["data"].take())?)
     } else {
         Ok(BackupGroupDeleteStats::default())
     }
@@ -294,7 +314,7 @@ async fn check_or_create_target_namespace(
         // Sub-namespaces have to be created by creating parent components first.
 
         check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_MODIFY)
-            .map_err(|err| format_err!("Creating remote namespace not allowed - {err}"))?;
+            .context("Creating remote namespace not allowed")?;
 
         let mut parent = BackupNamespace::root();
         for component in target_namespace.components() {
@@ -309,12 +329,18 @@ async fn check_or_create_target_namespace(
             if !parent.is_root() {
                 args["parent"] = serde_json::to_value(parent.clone())?;
             }
-            match params.target.client.post(&api_path, Some(args)).await {
-                Ok(_) => info!("Successfully created new namespace {current} on remote"),
-                Err(err) => {
-                    bail!("Remote creation of namespace {current} failed, remote returned: {err}")
-                }
-            }
+
+            params
+                .target
+                .client
+                .post(&api_path, Some(args))
+                .await
+                .context(format!(
+                    "Creation of remote namespace {current} failed, remote returned error"
+                ))?;
+
+            info!("Successfully created new namespace {current} on remote");
+
             existing_target_namespaces.push(current.clone());
             parent = current;
         }
@@ -376,7 +402,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         )
         .await
         {
-            warn!("Encountered error: {err}");
+            warn!("Encountered error: {err:#}");
             warn!("Failed to sync {source_store_and_ns} into {target_store_and_ns}!");
             errors = true;
             continue;
@@ -403,7 +429,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
             }
             Err(err) => {
                 errors = true;
-                info!("Encountered errors: {err}");
+                info!("Encountered errors: {err:#}");
                 info!("Failed to sync {source_store_and_ns} into {target_store_and_ns}!");
             }
         }
@@ -452,7 +478,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
                     }
                 }
                 Err(err) => {
-                    warn!("Encountered errors: {err}");
+                    warn!("Encountered errors: {err:#}");
                     warn!("Failed to remove vanished namespace {target_namespace} from remote!");
                     continue;
                 }
@@ -482,7 +508,7 @@ pub(crate) async fn push_namespace(
     let target_namespace = params.map_to_target(namespace)?;
     // Check if user is allowed to perform backups on remote datastore
     check_ns_remote_datastore_privs(params, &target_namespace, PRIV_REMOTE_DATASTORE_BACKUP)
-        .map_err(|err| format_err!("Pushing to remote namespace not allowed - {err}"))?;
+        .context("Pushing to remote namespace not allowed")?;
 
     let mut list: Vec<BackupGroup> = params
         .source
@@ -528,7 +554,7 @@ pub(crate) async fn push_namespace(
         match push_group(params, namespace, &group, &mut progress).await {
             Ok(sync_stats) => stats.add(sync_stats),
             Err(err) => {
-                warn!("Encountered errors: {err}");
+                warn!("Encountered errors: {err:#}");
                 warn!("Failed to push group {group} to remote!");
                 errors = true;
             }
@@ -561,7 +587,7 @@ pub(crate) async fn push_namespace(
                     }));
                 }
                 Err(err) => {
-                    warn!("Encountered errors: {err}");
+                    warn!("Encountered errors: {err:#}");
                     warn!("Failed to remove vanished group {target_group} from remote!");
                     errors = true;
                     continue;
@@ -583,7 +609,12 @@ async fn fetch_target_snapshots(
     if !target_namespace.is_root() {
         args["ns"] = serde_json::to_value(target_namespace)?;
     }
-    let mut result = params.target.client.get(&api_path, Some(args)).await?;
+    let mut result = params
+        .target
+        .client
+        .get(&api_path, Some(args))
+        .await
+        .context("Failed to fetch remote snapshots, remote returned error")?;
     let snapshots: Vec<SnapshotListItem> = serde_json::from_value(result["data"].take())?;
 
     Ok(snapshots)
@@ -595,14 +626,19 @@ async fn forget_target_snapshot(
     snapshot: &BackupDir,
 ) -> Result<(), Error> {
     check_ns_remote_datastore_privs(params, target_namespace, PRIV_REMOTE_DATASTORE_PRUNE)
-        .map_err(|err| format_err!("Pruning remote datastore contents not allowed - {err}"))?;
+        .context("Pruning remote datastore contents not allowed")?;
 
     let api_path = params.target.datastore_api_path("snapshots");
     let mut args = serde_json::to_value(snapshot)?;
     if !target_namespace.is_root() {
         args["ns"] = serde_json::to_value(target_namespace)?;
     }
-    params.target.client.delete(&api_path, Some(args)).await?;
+    params
+        .target
+        .client
+        .delete(&api_path, Some(args))
+        .await
+        .context("Failed to remove remote snapshot, remote returned error")?;
 
     Ok(())
 }
@@ -708,7 +744,7 @@ pub(crate) async fn push_group(
                     );
                 }
                 Err(err) => {
-                    warn!("Encountered errors: {err}");
+                    warn!("Encountered errors: {err:#}");
                     warn!(
                         "Failed to remove vanished snapshot {name} from remote!",
                         name = snapshot.backup
@@ -753,7 +789,7 @@ pub(crate) async fn push_snapshot(
         Ok((manifest, _raw_size)) => manifest,
         Err(err) => {
             // No manifest in snapshot or failed to read, warn and skip
-            log::warn!("Encountered errors: {err}");
+            log::warn!("Encountered errors: {err:#}");
             log::warn!("Failed to load manifest for '{snapshot}'!");
             return Ok(stats);
         }
