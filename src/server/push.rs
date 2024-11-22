@@ -545,10 +545,9 @@ pub(crate) async fn push_namespace(
                 continue;
             }
 
-            info!("Removed vanished group {target_group} from remote");
-
             match remove_target_group(params, &target_namespace, &target_group).await {
                 Ok(delete_stats) => {
+                    info!("Removed vanished group {target_group} from remote");
                     if delete_stats.protected_snapshots() > 0 {
                         warn!(
                             "Kept {protected_count} protected snapshots of group {target_group} on remote",
@@ -701,19 +700,21 @@ pub(crate) async fn push_group(
                 );
                 continue;
             }
-            if let Err(err) =
-                forget_target_snapshot(params, &target_namespace, &snapshot.backup).await
-            {
-                info!("Encountered errors: {err}");
-                info!(
-                    "Failed to remove vanished snapshot {name} from remote!",
-                    name = snapshot.backup
-                );
+            match forget_target_snapshot(params, &target_namespace, &snapshot.backup).await {
+                Ok(()) => {
+                    info!(
+                        "Removed vanished snapshot {name} from remote",
+                        name = snapshot.backup
+                    );
+                }
+                Err(err) => {
+                    warn!("Encountered errors: {err}");
+                    warn!(
+                        "Failed to remove vanished snapshot {name} from remote!",
+                        name = snapshot.backup
+                    );
+                }
             }
-            info!(
-                "Removed vanished snapshot {name} from remote",
-                name = snapshot.backup
-            );
             stats.add(SyncStats::from(RemovedVanishedStats {
                 snapshots: 1,
                 groups: 0,
