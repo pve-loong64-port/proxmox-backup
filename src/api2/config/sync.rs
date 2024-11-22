@@ -471,6 +471,9 @@ pub fn update_sync_job(
     if let Some(transfer_last) = update.transfer_last {
         data.transfer_last = Some(transfer_last);
     }
+    if let Some(resync_corrupt) = update.resync_corrupt {
+        data.resync_corrupt = Some(resync_corrupt);
+    }
 
     if update.limit.rate_in.is_some() {
         data.limit.rate_in = update.limit.rate_in;
@@ -629,6 +632,7 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         ns: None,
         owner: Some(write_auth_id.clone()),
         comment: None,
+        resync_corrupt: None,
         remove_vanished: None,
         max_depth: None,
         group_filter: None,
