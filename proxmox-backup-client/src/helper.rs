@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Error;
+use pbs_api_types::BackupArchiveName;
 use pbs_client::{BackupReader, RemoteChunkReader};
 use pbs_datastore::BackupManifest;
 use pbs_tools::crypt_config::CryptConfig;
@@ -8,7 +9,7 @@ use pbs_tools::crypt_config::CryptConfig;
 use crate::{BufferedDynamicReadAt, BufferedDynamicReader, IndexFile};
 
 pub(crate) async fn get_pxar_fuse_accessor(
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     client: Arc<BackupReader>,
     manifest: &BackupManifest,
     crypt_config: Option<Arc<CryptConfig>>,
@@ -44,7 +45,7 @@ pub(crate) async fn get_pxar_fuse_accessor(
 }
 
 pub(crate) async fn get_pxar_fuse_reader(
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     client: Arc<BackupReader>,
     manifest: &BackupManifest,
     crypt_config: Option<Arc<CryptConfig>>,
@@ -57,7 +58,7 @@ pub(crate) async fn get_pxar_fuse_reader(
 }
 
 pub(crate) async fn get_buffered_pxar_reader(
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     client: Arc<BackupReader>,
     manifest: &BackupManifest,
     crypt_config: Option<Arc<CryptConfig>>,

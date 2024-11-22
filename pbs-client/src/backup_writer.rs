@@ -13,13 +13,15 @@ use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
-use pbs_api_types::{ArchiveType, BackupDir, BackupNamespace};
+use pbs_api_types::{
+    ArchiveType, BackupArchiveName, BackupDir, BackupNamespace, CATALOG_NAME, MANIFEST_BLOB_NAME,
+};
 use pbs_datastore::data_blob::{ChunkInfo, DataBlob, DataChunkBuilder};
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{BackupManifest, MANIFEST_BLOB_NAME};
-use pbs_datastore::{CATALOG_NAME, PROXMOX_BACKUP_PROTOCOL_ID_V1};
+use pbs_datastore::manifest::BackupManifest;
+use pbs_datastore::PROXMOX_BACKUP_PROTOCOL_ID_V1;
 use pbs_tools::crypt_config::CryptConfig;
 
 use proxmox_human_byte::HumanByte;
@@ -269,7 +271,7 @@ impl BackupWriter {
     /// Upload chunks and index
     pub async fn upload_index_chunk_info(
         &self,
-        archive_name: &str,
+        archive_name: &BackupArchiveName,
         stream: impl Stream<Item = Result<MergedChunkInfo, Error>>,
         options: UploadOptions,
     ) -> Result<BackupStats, Error> {
@@ -361,7 +363,7 @@ impl BackupWriter {
 
     pub async fn upload_stream(
         &self,
-        archive_name: &str,
+        archive_name: &BackupArchiveName,
         stream: impl Stream<Item = Result<bytes::BytesMut, Error>>,
         options: UploadOptions,
         injections: Option<std::sync::mpsc::Receiver<InjectChunks>>,
@@ -387,13 +389,13 @@ impl BackupWriter {
             if !manifest
                 .files()
                 .iter()
-                .any(|file| file.filename == archive_name)
+                .any(|file| file.filename == archive_name.as_ref())
             {
                 log::info!("Previous manifest does not contain an archive called '{archive_name}', skipping download..");
             } else {
                 // try, but ignore errors
-                match ArchiveType::from_path(archive_name) {
-                    Ok(ArchiveType::FixedIndex) => {
+                match archive_name.archive_type() {
+                    ArchiveType::FixedIndex => {
                         if let Err(err) = self
                             .download_previous_fixed_index(
                                 archive_name,
@@ -405,7 +407,7 @@ impl BackupWriter {
                             log::warn!("Error downloading .fidx from previous manifest: {}", err);
                         }
                     }
-                    Ok(ArchiveType::DynamicIndex) => {
+                    ArchiveType::DynamicIndex => {
                         if let Err(err) = self
                             .download_previous_dynamic_index(
                                 archive_name,
@@ -429,12 +431,6 @@ impl BackupWriter {
             .as_u64()
             .unwrap();
 
-        let archive = if log::log_enabled!(log::Level::Debug) {
-            archive_name
-        } else {
-            pbs_tools::format::strip_server_file_extension(archive_name)
-        };
-
         let upload_stats = Self::upload_chunk_info_stream(
             self.h2.clone(),
             wid,
@@ -448,12 +444,17 @@ impl BackupWriter {
             },
             options.compress,
             injections,
-            archive,
+            archive_name,
         )
         .await?;
 
         let size_dirty = upload_stats.size - upload_stats.size_reused;
         let size: HumanByte = upload_stats.size.into();
+        let archive = if log::log_enabled!(log::Level::Debug) {
+            archive_name.to_string()
+        } else {
+            archive_name.without_type_extension()
+        };
 
         if upload_stats.chunk_injected > 0 {
             log::info!(
@@ -463,7 +464,7 @@ impl BackupWriter {
             );
         }
 
-        if archive_name != CATALOG_NAME {
+        if *archive_name != *CATALOG_NAME {
             let speed: HumanByte =
                 ((size_dirty * 1_000_000) / (upload_stats.duration.as_micros() as usize)).into();
             let size_dirty: HumanByte = size_dirty.into();
@@ -629,7 +630,7 @@ impl BackupWriter {
 
     pub async fn download_previous_fixed_index(
         &self,
-        archive_name: &str,
+        archive_name: &BackupArchiveName,
         manifest: &BackupManifest,
         known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     ) -> Result<FixedIndexReader, Error> {
@@ -664,7 +665,7 @@ impl BackupWriter {
 
     pub async fn download_previous_dynamic_index(
         &self,
-        archive_name: &str,
+        archive_name: &BackupArchiveName,
         manifest: &BackupManifest,
         known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     ) -> Result<DynamicIndexReader, Error> {
@@ -711,7 +712,7 @@ impl BackupWriter {
     pub async fn download_previous_manifest(&self) -> Result<BackupManifest, Error> {
         let mut raw_data = Vec::with_capacity(64 * 1024);
 
-        let param = json!({ "archive-name": MANIFEST_BLOB_NAME });
+        let param = json!({ "archive-name": MANIFEST_BLOB_NAME.to_string() });
         self.h2
             .download("previous", Some(param), &mut raw_data)
             .await?;
@@ -739,7 +740,7 @@ impl BackupWriter {
         crypt_config: Option<Arc<CryptConfig>>,
         compress: bool,
         injections: Option<std::sync::mpsc::Receiver<InjectChunks>>,
-        archive: &str,
+        archive: &BackupArchiveName,
     ) -> impl Future<Output = Result<UploadStats, Error>> {
         let mut counters = UploadCounters::new();
         let counters_readonly = counters.clone();
@@ -831,7 +832,7 @@ impl BackupWriter {
     fn upload_merged_chunk_stream(
         h2: H2Client,
         wid: u64,
-        archive: &str,
+        archive: &BackupArchiveName,
         prefix: &str,
         stream: impl Stream<Item = Result<MergedChunkInfo, Error>>,
         index_csum: Arc<Mutex<Option<Sha256>>>,

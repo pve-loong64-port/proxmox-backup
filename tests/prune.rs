@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Error;
 
-use pbs_api_types::PruneJobOptions;
-use pbs_datastore::manifest::MANIFEST_BLOB_NAME;
+use pbs_api_types::{PruneJobOptions, MANIFEST_BLOB_NAME};
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{BackupDir, BackupInfo};
 
@@ -34,7 +33,7 @@ fn create_info(snapshot: &str, partial: bool) -> BackupInfo {
     let mut files = Vec::new();
 
     if !partial {
-        files.push(String::from(MANIFEST_BLOB_NAME));
+        files.push(MANIFEST_BLOB_NAME.to_string());
     }
 
     BackupInfo {

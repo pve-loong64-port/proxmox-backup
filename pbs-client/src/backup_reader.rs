@@ -6,13 +6,12 @@ use std::sync::Arc;
 use futures::future::AbortHandle;
 use serde_json::{json, Value};
 
-use pbs_api_types::{BackupDir, BackupNamespace};
+use pbs_api_types::{BackupArchiveName, BackupDir, BackupNamespace, MANIFEST_BLOB_NAME};
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::data_blob_reader::DataBlobReader;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::MANIFEST_BLOB_NAME;
 use pbs_datastore::{BackupManifest, PROXMOX_BACKUP_READER_PROTOCOL_ID_V1};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::sha::sha256;
@@ -127,7 +126,8 @@ impl BackupReader {
     /// The manifest signature is verified if we have a crypt_config.
     pub async fn download_manifest(&self) -> Result<(BackupManifest, Vec<u8>), Error> {
         let mut raw_data = Vec::with_capacity(64 * 1024);
-        self.download(MANIFEST_BLOB_NAME, &mut raw_data).await?;
+        self.download(MANIFEST_BLOB_NAME.as_ref(), &mut raw_data)
+            .await?;
         let blob = DataBlob::load_from_reader(&mut &raw_data[..])?;
         // no expected digest available
         let data = blob.decode(None, None)?;
@@ -145,11 +145,11 @@ impl BackupReader {
     pub async fn download_blob(
         &self,
         manifest: &BackupManifest,
-        name: &str,
+        name: &BackupArchiveName,
     ) -> Result<DataBlobReader<'_, File>, Error> {
         let mut tmpfile = crate::tools::create_tmp_file()?;
 
-        self.download(name, &mut tmpfile).await?;
+        self.download(name.as_ref(), &mut tmpfile).await?;
 
         tmpfile.seek(SeekFrom::Start(0))?;
         let (csum, size) = sha256(&mut tmpfile)?;
@@ -167,11 +167,11 @@ impl BackupReader {
     pub async fn download_dynamic_index(
         &self,
         manifest: &BackupManifest,
-        name: &str,
+        name: &BackupArchiveName,
     ) -> Result<DynamicIndexReader, Error> {
         let mut tmpfile = crate::tools::create_tmp_file()?;
 
-        self.download(name, &mut tmpfile).await?;
+        self.download(name.as_ref(), &mut tmpfile).await?;
 
         let index = DynamicIndexReader::new(tmpfile)
             .map_err(|err| format_err!("unable to read dynamic index '{}' - {}", name, err))?;
@@ -190,11 +190,11 @@ impl BackupReader {
     pub async fn download_fixed_index(
         &self,
         manifest: &BackupManifest,
-        name: &str,
+        name: &BackupArchiveName,
     ) -> Result<FixedIndexReader, Error> {
         let mut tmpfile = crate::tools::create_tmp_file()?;
 
-        self.download(name, &mut tmpfile).await?;
+        self.download(name.as_ref(), &mut tmpfile).await?;
 
         let index = FixedIndexReader::new(tmpfile)
             .map_err(|err| format_err!("unable to read fixed index '{}' - {}", name, err))?;

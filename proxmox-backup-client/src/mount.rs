@@ -18,8 +18,7 @@ use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_systemd;
 
-use pbs_api_types::BackupNamespace;
-use pbs_client::tools::has_pxar_filename_extension;
+use pbs_api_types::{ArchiveType, BackupArchiveName, BackupNamespace};
 use pbs_client::tools::key_source::get_encryption_key_password;
 use pbs_client::{BackupReader, RemoteChunkReader};
 use pbs_datastore::cached_chunk_reader::CachedChunkReader;
@@ -47,11 +46,7 @@ const API_METHOD_MOUNT: ApiMethod = ApiMethod::new(
                 false,
                 &StringSchema::new("Group/Snapshot path.").schema()
             ),
-            (
-                "archive-name",
-                false,
-                &StringSchema::new("Backup archive name.").schema()
-            ),
+            ("archive-name", false, &BackupArchiveName::API_SCHEMA),
             (
                 "target",
                 false,
@@ -87,11 +82,7 @@ WARNING: Only do this with *trusted* backups!",
                 false,
                 &StringSchema::new("Group/Snapshot path.").schema()
             ),
-            (
-                "archive-name",
-                false,
-                &StringSchema::new("Backup archive name.").schema()
-            ),
+            ("archive-name", false, &BackupArchiveName::API_SCHEMA),
             ("repository", true, &REPO_URL_SCHEMA),
             (
                 "keyfile",
@@ -208,7 +199,8 @@ fn mount(
 
 async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
     let repo = extract_repository_from_value(&param)?;
-    let archive_name = required_string_param(&param, "archive-name")?;
+    let server_archive_name: BackupArchiveName =
+        required_string_param(&param, "archive-name")?.try_into()?;
     let client = connect(&repo)?;
 
     let target = param["target"].as_str();
@@ -230,16 +222,14 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
         }
     };
 
-    let server_archive_name = if has_pxar_filename_extension(archive_name, false) {
+    if server_archive_name.has_pxar_filename_extension() {
         if target.is_none() {
             bail!("use the 'mount' command to mount pxar archives");
         }
-        format!("{}.didx", archive_name)
-    } else if archive_name.ends_with(".img") {
+    } else if server_archive_name.ends_with(".img.fidx") {
         if target.is_some() {
             bail!("use the 'map' command to map drive images");
         }
-        format!("{}.fidx", archive_name)
     } else {
         bail!("Can only mount/map pxar archives and drive images.");
     };
@@ -291,7 +281,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
     let mut interrupt =
         futures::future::select(interrupt_int.recv().boxed(), interrupt_term.recv().boxed());
 
-    if server_archive_name.ends_with(".didx") {
+    if server_archive_name.archive_type() == ArchiveType::DynamicIndex {
         let decoder = helper::get_pxar_fuse_accessor(
             &server_archive_name,
             client.clone(),
@@ -312,7 +302,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
                 // exit on interrupted
             }
         }
-    } else if server_archive_name.ends_with(".fidx") {
+    } else if server_archive_name.archive_type() == ArchiveType::FixedIndex {
         let file_info = manifest.lookup_file_info(&server_archive_name)?;
         let index = client
             .download_fixed_index(&manifest, &server_archive_name)
@@ -326,7 +316,10 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
         );
         let reader = CachedChunkReader::new(chunk_reader, index, 8).seekable();
 
-        let name = &format!("{}:{}/{}", repo, path, archive_name);
+        let name = &format!(
+            "{repo}:{path}/{}",
+            server_archive_name.without_type_extension(),
+        );
         let name_escaped = proxmox_systemd::escape_unit(name, false);
 
         let mut session =

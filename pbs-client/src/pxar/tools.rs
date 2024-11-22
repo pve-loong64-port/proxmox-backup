@@ -14,6 +14,7 @@ use pxar::accessor::ReadAt;
 use pxar::format::StatxTimestamp;
 use pxar::{mode, Entry, EntryKind, Metadata};
 
+use pbs_api_types::BackupArchiveName;
 use pbs_datastore::catalog::{ArchiveEntry, CatalogEntryType, DirEntryAttribute};
 
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
@@ -330,7 +331,7 @@ pub fn handle_root_with_optional_format_version_prelude<R: pxar::decoder::SeqRea
 }
 
 pub async fn get_remote_pxar_reader(
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     client: Arc<BackupReader>,
     manifest: &BackupManifest,
     crypt_config: Option<Arc<CryptConfig>>,

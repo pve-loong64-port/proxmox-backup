@@ -7,9 +7,8 @@ use serde_json::Value;
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
-use pbs_api_types::BackupNamespace;
+use pbs_api_types::{BackupArchiveName, BackupNamespace, CATALOG_NAME};
 use pbs_client::pxar::tools::get_remote_pxar_reader;
-use pbs_client::tools::has_pxar_filename_extension;
 use pbs_client::tools::key_source::get_encryption_key_password;
 use pbs_client::{BackupReader, RemoteChunkReader};
 use pbs_tools::crypt_config::CryptConfig;
@@ -22,7 +21,7 @@ use crate::{
     complete_pxar_archive_name, complete_repository, connect, crypto_parameters, decrypt_key,
     dir_or_last_from_group, extract_repository_from_value, format_key_source, optional_ns_param,
     record_repository, BackupDir, BufferedDynamicReader, CatalogReader, DynamicIndexReader,
-    IndexFile, Shell, CATALOG_NAME, KEYFD_SCHEMA, REPO_URL_SCHEMA,
+    IndexFile, Shell, KEYFD_SCHEMA, REPO_URL_SCHEMA,
 };
 
 #[api(
@@ -90,7 +89,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
     let (manifest, _) = client.download_manifest().await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
-    let file_info = match manifest.lookup_file_info(CATALOG_NAME) {
+    let file_info = match manifest.lookup_file_info(&CATALOG_NAME) {
         Ok(file_info) => file_info,
         Err(err) => {
             let mut metadata_archives = Vec::new();
@@ -104,7 +103,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
 
             for archive in &metadata_archives {
                 let (reader, archive_size) = get_remote_pxar_reader(
-                    &archive,
+                    &archive.as_str().try_into()?,
                     client.clone(),
                     &manifest,
                     crypt_config.clone(),
@@ -128,7 +127,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
     };
 
     let index = client
-        .download_dynamic_index(&manifest, CATALOG_NAME)
+        .download_dynamic_index(&manifest, &CATALOG_NAME)
         .await?;
 
     let most_used = index.find_most_used_chunks(8);
@@ -170,8 +169,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
                 description: "Group/Snapshot path.",
             },
             "archive-name": {
-                type: String,
-                description: "Backup archive name.",
+                type: BackupArchiveName,
             },
             "repository": {
                 optional: true,
@@ -195,7 +193,8 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     let client = connect(&repo)?;
     let backup_ns = optional_ns_param(&param)?;
     let path = required_string_param(&param, "snapshot")?;
-    let archive_name = required_string_param(&param, "archive-name")?;
+    let server_archive_name: BackupArchiveName =
+        required_string_param(&param, "archive-name")?.try_into()?;
 
     let backup_dir = dir_or_last_from_group(&client, &repo, &backup_ns, path).await?;
 
@@ -214,9 +213,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
         }
     };
 
-    let server_archive_name = if has_pxar_filename_extension(archive_name, false) {
-        format!("{}.didx", archive_name)
-    } else {
+    if !server_archive_name.has_pxar_filename_extension() {
         bail!("Can only mount pxar archives.");
     };
 
@@ -233,7 +230,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     let (manifest, _) = client.download_manifest().await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
-    if let Err(_err) = manifest.lookup_file_info(CATALOG_NAME) {
+    if let Err(_err) = manifest.lookup_file_info(&CATALOG_NAME) {
         // No catalog, fallback to pxar archive accessor if present
         let accessor = helper::get_pxar_fuse_accessor(
             &server_archive_name,
@@ -243,7 +240,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
         )
         .await?;
 
-        let state = Shell::new(None, &server_archive_name, accessor).await?;
+        let state = Shell::new(None, &server_archive_name.as_ref(), accessor).await?;
         log::info!("Starting interactive shell");
         state.shell().await?;
         record_repository(&repo);
@@ -261,17 +258,17 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     )
     .await?;
 
-    client.download(CATALOG_NAME, &mut tmpfile).await?;
+    client.download(CATALOG_NAME.as_ref(), &mut tmpfile).await?;
     let index = DynamicIndexReader::new(tmpfile)
         .map_err(|err| format_err!("unable to read catalog index - {}", err))?;
 
     // Note: do not use values stored in index (not trusted) - instead, computed them again
     let (csum, size) = index.compute_csum();
-    manifest.verify_file(CATALOG_NAME, &csum, size)?;
+    manifest.verify_file(&CATALOG_NAME, &csum, size)?;
 
     let most_used = index.find_most_used_chunks(8);
 
-    let file_info = manifest.lookup_file_info(CATALOG_NAME)?;
+    let file_info = manifest.lookup_file_info(&CATALOG_NAME)?;
     let chunk_reader = RemoteChunkReader::new(
         client.clone(),
         crypt_config,
@@ -286,7 +283,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
 
     catalogfile.seek(SeekFrom::Start(0))?;
     let catalog_reader = CatalogReader::new(catalogfile);
-    let state = Shell::new(Some(catalog_reader), &server_archive_name, decoder).await?;
+    let state = Shell::new(Some(catalog_reader), &server_archive_name.as_ref(), decoder).await?;
 
     log::info!("Starting interactive shell");
     state.shell().await?;

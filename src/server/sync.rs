@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::{Seek, Write};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -18,11 +19,11 @@ use proxmox_router::HttpError;
 
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
-    SyncDirection, SyncJobConfig, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    SyncDirection, SyncJobConfig, CLIENT_LOG_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP,
+    PRIV_DATASTORE_READ,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_datastore::data_blob::DataBlob;
-use pbs_datastore::manifest::CLIENT_LOG_BLOB_NAME;
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, ListNamespacesRecursive, LocalChunkReader};
 
@@ -162,15 +163,19 @@ impl SyncSourceReader for RemoteSourceReader {
             .open(&tmp_path)?;
 
         // Note: be silent if there is no log - only log successful download
+        let client_log_name = &CLIENT_LOG_BLOB_NAME;
         if let Ok(()) = self
             .backup_reader
-            .download(CLIENT_LOG_BLOB_NAME, tmpfile)
+            .download(client_log_name.as_ref(), tmpfile)
             .await
         {
             if let Err(err) = std::fs::rename(&tmp_path, to_path) {
                 bail!("Atomic rename file {to_path:?} failed - {err}");
             }
-            info!("got backup log file {CLIENT_LOG_BLOB_NAME:?}");
+            info!(
+                "got backup log file {client_log_name}",
+                client_log_name = client_log_name.deref()
+            );
         }
 
         Ok(())

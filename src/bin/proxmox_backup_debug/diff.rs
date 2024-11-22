@@ -13,7 +13,7 @@ use proxmox_human_byte::HumanByte;
 use proxmox_router::cli::{CliCommand, CliCommandMap, CommandLineInterface};
 use proxmox_schema::api;
 
-use pbs_api_types::{BackupNamespace, BackupPart};
+use pbs_api_types::{BackupArchiveName, BackupNamespace, BackupPart};
 use pbs_client::tools::key_source::{
     crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
 };
@@ -70,8 +70,7 @@ pub fn diff_commands() -> CommandLineInterface {
                 type: String,
             },
             "archive-name": {
-                description: "Name of the .pxar archive",
-                type: String,
+                type: BackupArchiveName,
             },
             "repository": {
                 optional: true,
@@ -106,7 +105,7 @@ pub fn diff_commands() -> CommandLineInterface {
 async fn diff_archive_cmd(
     prev_snapshot: String,
     snapshot: String,
-    archive_name: String,
+    archive_name: BackupArchiveName,
     compare_content: bool,
     color: Option<ColorMode>,
     ns: Option<BackupNamespace>,
@@ -140,12 +139,11 @@ async fn diff_archive_cmd(
 
     let output_params = OutputParams { color };
 
-    if archive_name.ends_with(".pxar") {
-        let file_name = format!("{}.didx", archive_name);
+    if archive_name.ends_with(".pxar.didx") {
         diff_archive(
             &prev_snapshot,
             &snapshot,
-            &file_name,
+            &archive_name,
             &repo_params,
             compare_content,
             &output_params,
@@ -161,7 +159,7 @@ async fn diff_archive_cmd(
 async fn diff_archive(
     snapshot_a: &str,
     snapshot_b: &str,
-    file_name: &str,
+    file_name: &BackupArchiveName,
     repo_params: &RepoParams,
     compare_contents: bool,
     output_params: &OutputParams,
@@ -249,7 +247,7 @@ struct OutputParams {
 
 async fn open_dynamic_index(
     snapshot: &str,
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     params: &RepoParams,
 ) -> Result<(DynamicIndexReader, Accessor), Error> {
     let backup_reader = create_backup_reader(snapshot, params).await?;

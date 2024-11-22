@@ -10,11 +10,11 @@ use tokio_stream::wrappers::ReceiverStream;
 use tracing::{info, warn};
 
 use pbs_api_types::{
-    print_store_and_ns, ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupDir, BackupGroup,
-    BackupGroupDeleteStats, BackupNamespace, GroupFilter, GroupListItem, NamespaceListItem,
-    Operation, RateLimitConfig, Remote, SnapshotListItem, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_MODIFY,
-    PRIV_REMOTE_DATASTORE_PRUNE,
+    print_store_and_ns, ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupArchiveName,
+    BackupDir, BackupGroup, BackupGroupDeleteStats, BackupNamespace, GroupFilter, GroupListItem,
+    NamespaceListItem, Operation, RateLimitConfig, Remote, SnapshotListItem, CLIENT_LOG_BLOB_NAME,
+    MANIFEST_BLOB_NAME, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP,
+    PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
 };
 use pbs_client::{BackupRepository, BackupWriter, HttpClient, MergedChunkInfo, UploadOptions};
 use pbs_config::CachedUserInfo;
@@ -22,7 +22,6 @@ use pbs_datastore::data_blob::ChunkInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, StoreProgress};
 
@@ -805,10 +804,13 @@ pub(crate) async fn push_snapshot(
         let mut path = backup_dir.full_path();
         path.push(&entry.filename);
         if path.try_exists()? {
-            match ArchiveType::from_path(&entry.filename)? {
+            let archive_name = BackupArchiveName::from_path(&entry.filename)?;
+            match archive_name.archive_type() {
                 ArchiveType::Blob => {
                     let file = std::fs::File::open(path.clone())?;
-                    let backup_stats = backup_writer.upload_blob(file, &entry.filename).await?;
+                    let backup_stats = backup_writer
+                        .upload_blob(file, archive_name.as_ref())
+                        .await?;
                     stats.add(SyncStats {
                         chunk_count: backup_stats.chunk_count as usize,
                         bytes: backup_stats.size as usize,
@@ -821,7 +823,7 @@ pub(crate) async fn push_snapshot(
                         // Add known chunks, ignore errors since archive might not be present
                         let _res = backup_writer
                             .download_previous_dynamic_index(
-                                &entry.filename,
+                                &archive_name,
                                 manifest,
                                 known_chunks.clone(),
                             )
@@ -830,7 +832,7 @@ pub(crate) async fn push_snapshot(
                     let index = DynamicIndexReader::open(&path)?;
                     let chunk_reader = reader.chunk_reader(entry.chunk_crypt_mode());
                     let sync_stats = push_index(
-                        &entry.filename,
+                        &archive_name,
                         index,
                         chunk_reader,
                         &backup_writer,
@@ -845,7 +847,7 @@ pub(crate) async fn push_snapshot(
                         // Add known chunks, ignore errors since archive might not be present
                         let _res = backup_writer
                             .download_previous_fixed_index(
-                                &entry.filename,
+                                &archive_name,
                                 manifest,
                                 known_chunks.clone(),
                             )
@@ -855,7 +857,7 @@ pub(crate) async fn push_snapshot(
                     let chunk_reader = reader.chunk_reader(entry.chunk_crypt_mode());
                     let size = index.index_bytes();
                     let sync_stats = push_index(
-                        &entry.filename,
+                        &archive_name,
                         index,
                         chunk_reader,
                         &backup_writer,
@@ -874,12 +876,13 @@ pub(crate) async fn push_snapshot(
     // Fetch client log from source and push to target
     // this has to be handled individually since the log is never part of the manifest
     let mut client_log_path = backup_dir.full_path();
-    client_log_path.push(CLIENT_LOG_BLOB_NAME);
+    let client_log_name = &CLIENT_LOG_BLOB_NAME;
+    client_log_path.push(client_log_name.as_ref());
     if client_log_path.is_file() {
         backup_writer
             .upload_blob_from_file(
                 &client_log_path,
-                CLIENT_LOG_BLOB_NAME,
+                client_log_name.as_ref(),
                 upload_options.clone(),
             )
             .await?;
@@ -891,7 +894,7 @@ pub(crate) async fn push_snapshot(
     let backup_stats = backup_writer
         .upload_blob_from_data(
             manifest_string.into_bytes(),
-            MANIFEST_BLOB_NAME,
+            MANIFEST_BLOB_NAME.as_ref(),
             upload_options,
         )
         .await?;
@@ -912,7 +915,7 @@ pub(crate) async fn push_snapshot(
 // For fixed indexes, the size must be provided as given by the index reader.
 #[allow(clippy::too_many_arguments)]
 async fn push_index<'a>(
-    filename: &'a str,
+    filename: &'a BackupArchiveName,
     index: impl IndexFile + Send + 'static,
     chunk_reader: Arc<dyn AsyncReadChunk>,
     backup_writer: &BackupWriter,

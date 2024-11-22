@@ -8,13 +8,15 @@ use nix::dir::Dir;
 
 use proxmox_sys::fs::lock_dir_noblock_shared;
 
-use pbs_api_types::{print_store_and_ns, ArchiveType, BackupNamespace, Operation};
+use pbs_api_types::{
+    print_store_and_ns, ArchiveType, BackupNamespace, Operation, CLIENT_LOG_BLOB_NAME,
+    MANIFEST_BLOB_NAME,
+};
 
 use crate::backup_info::BackupDir;
 use crate::dynamic_index::DynamicIndexReader;
 use crate::fixed_index::FixedIndexReader;
 use crate::index::IndexFile;
-use crate::manifest::{CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
 use crate::DataStore;
 
 /// Helper to access the contents of a datastore backup snapshot
@@ -62,7 +64,7 @@ impl SnapshotReader {
         };
 
         let mut client_log_path = snapshot_path;
-        client_log_path.push(CLIENT_LOG_BLOB_NAME);
+        client_log_path.push(CLIENT_LOG_BLOB_NAME.as_ref());
 
         let mut file_list = vec![MANIFEST_BLOB_NAME.to_string()];
         for item in manifest.files() {

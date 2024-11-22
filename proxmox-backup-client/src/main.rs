@@ -7,6 +7,7 @@ use std::task::Context;
 
 use anyhow::{bail, format_err, Error};
 use futures::stream::{StreamExt, TryStreamExt};
+use pbs_client::tools::has_pxar_filename_extension;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::sync::mpsc;
@@ -25,10 +26,11 @@ use pxar::accessor::aio::Accessor;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType,
-    ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PruneJobOptions, PruneListItem,
-    RateLimitConfig, SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
+    ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
+    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PruneJobOptions,
+    PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus, BACKUP_ID_SCHEMA,
+    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
+    ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
@@ -36,7 +38,7 @@ use pbs_client::tools::{
     complete_archive_name, complete_auth_id, complete_backup_group, complete_backup_snapshot,
     complete_backup_source, complete_chunk_size, complete_group_or_snapshot,
     complete_img_archive_name, complete_namespace, complete_pxar_archive_name, complete_repository,
-    connect, connect_rate_limited, extract_repository_from_value, has_pxar_filename_extension,
+    connect, connect_rate_limited, extract_repository_from_value,
     key_source::{
         crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
         KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
@@ -54,9 +56,8 @@ use pbs_datastore::chunk_store::verify_chunk_size;
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, LocalDynamicReadAt};
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{BackupManifest, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::CATALOG_NAME;
 use pbs_key_config::{decrypt_key, rsa_encrypt_key_config, KeyConfig};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json;
@@ -196,8 +197,8 @@ pub async fn dir_or_last_from_group(
 async fn backup_directory<P: AsRef<Path>>(
     client: &BackupWriter,
     dir_path: P,
-    archive_name: &str,
-    payload_target: Option<&str>,
+    archive_name: &BackupArchiveName,
+    payload_target: Option<&BackupArchiveName>,
     chunk_size: Option<usize>,
     catalog: Option<Arc<Mutex<CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>>>>,
     pxar_create_options: pbs_client::pxar::PxarCreateOptions,
@@ -276,7 +277,7 @@ async fn backup_directory<P: AsRef<Path>>(
 async fn backup_image<P: AsRef<Path>>(
     client: &BackupWriter,
     image_path: P,
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     chunk_size: Option<usize>,
     upload_options: UploadOptions,
 ) -> Result<BackupStats, Error> {
@@ -606,7 +607,7 @@ fn spawn_catalog_upload(
 
     tokio::spawn(async move {
         let catalog_upload_result = client
-            .upload_stream(CATALOG_NAME, catalog_chunk_stream, upload_options, None)
+            .upload_stream(&CATALOG_NAME, catalog_chunk_stream, upload_options, None)
             .await;
 
         if let Err(ref err) = catalog_upload_result {
@@ -1005,13 +1006,21 @@ async fn create_backup(
     };
 
     for (backup_type, filename, target_base, extension, size) in upload_list {
-        let target = format!("{target_base}.{extension}");
+        let target: BackupArchiveName = format!("{target_base}.{extension}").as_str().try_into()?;
         match (backup_type, dry_run) {
             // dry-run
-            (BackupSpecificationType::CONFIG, true) => log_file("config file", &filename, &target),
-            (BackupSpecificationType::LOGFILE, true) => log_file("log file", &filename, &target),
-            (BackupSpecificationType::PXAR, true) => log_file("directory", &filename, &target),
-            (BackupSpecificationType::IMAGE, true) => log_file("image", &filename, &target),
+            (BackupSpecificationType::CONFIG, true) => {
+                log_file("config file", &filename, target.as_ref())
+            }
+            (BackupSpecificationType::LOGFILE, true) => {
+                log_file("log file", &filename, target.as_ref())
+            }
+            (BackupSpecificationType::PXAR, true) => {
+                log_file("directory", &filename, target.as_ref())
+            }
+            (BackupSpecificationType::IMAGE, true) => {
+                log_file("image", &filename, &target.as_ref())
+            }
             // no dry-run
             (BackupSpecificationType::CONFIG, false) => {
                 let upload_options = UploadOptions {
@@ -1020,11 +1029,11 @@ async fn create_backup(
                     ..UploadOptions::default()
                 };
 
-                log_file("config file", &filename, &target);
+                log_file("config file", &filename, target.as_ref());
                 let stats = client
-                    .upload_blob_from_file(&filename, &target, upload_options)
+                    .upload_blob_from_file(&filename, target.as_ref(), upload_options)
                     .await?;
-                manifest.add_file(target, stats.size, stats.csum, crypto.mode)?;
+                manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
             }
             (BackupSpecificationType::LOGFILE, false) => {
                 // fixme: remove - not needed anymore ?
@@ -1034,11 +1043,11 @@ async fn create_backup(
                     ..UploadOptions::default()
                 };
 
-                log_file("log file", &filename, &target);
+                log_file("log file", &filename, target.as_ref());
                 let stats = client
-                    .upload_blob_from_file(&filename, &target, upload_options)
+                    .upload_blob_from_file(&filename, target.as_ref(), upload_options)
                     .await?;
-                manifest.add_file(target, stats.size, stats.csum, crypto.mode)?;
+                manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
             }
             (BackupSpecificationType::PXAR, false) => {
                 let target_base = if let Some(base) = target_base.strip_suffix(".pxar") {
@@ -1050,8 +1059,14 @@ async fn create_backup(
                 let (target, payload_target) =
                     if detection_mode.is_metadata() || detection_mode.is_data() {
                         (
-                            format!("{target_base}.mpxar.{extension}"),
-                            Some(format!("{target_base}.ppxar.{extension}")),
+                            format!("{target_base}.mpxar.{extension}")
+                                .as_str()
+                                .try_into()?,
+                            Some(
+                                format!("{target_base}.ppxar.{extension}")
+                                    .as_str()
+                                    .try_into()?,
+                            ),
                         )
                     } else {
                         (target, None)
@@ -1065,12 +1080,12 @@ async fn create_backup(
                     catalog_result_rx = Some(catalog_upload_res.result);
                 }
 
-                log_file("directory", &filename, &target);
+                log_file("directory", &filename, target.as_ref());
                 if let Some(catalog) = catalog.as_ref() {
                     catalog
                         .lock()
                         .unwrap()
-                        .start_directory(std::ffi::CString::new(target.as_str())?.as_c_str())?;
+                        .start_directory(std::ffi::CString::new(target.as_ref())?.as_c_str())?;
                 }
 
                 let mut previous_ref = None;
@@ -1137,7 +1152,7 @@ async fn create_backup(
                     &client,
                     &filename,
                     &target,
-                    payload_target.as_deref(),
+                    payload_target.as_ref().as_deref(),
                     chunk_size_opt,
                     catalog.as_ref().cloned(),
                     pxar_options,
@@ -1147,20 +1162,20 @@ async fn create_backup(
 
                 if let Some(payload_stats) = payload_stats {
                     manifest.add_file(
-                        payload_target
+                        &payload_target
                             .ok_or_else(|| format_err!("missing payload target archive"))?,
                         payload_stats.size,
                         payload_stats.csum,
                         crypto.mode,
                     )?;
                 }
-                manifest.add_file(target, stats.size, stats.csum, crypto.mode)?;
+                manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
                 if let Some(catalog) = catalog.as_ref() {
                     catalog.lock().unwrap().end_directory()?;
                 }
             }
             (BackupSpecificationType::IMAGE, false) => {
-                log_file("image", &filename, &target);
+                log_file("image", &filename, target.as_ref());
 
                 let upload_options = UploadOptions {
                     previous_manifest: previous_manifest.clone(),
@@ -1172,7 +1187,7 @@ async fn create_backup(
                 let stats =
                     backup_image(&client, &filename, &target, chunk_size_opt, upload_options)
                         .await?;
-                manifest.add_file(target, stats.size, stats.csum, crypto.mode)?;
+                manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
             }
         }
     }
@@ -1194,22 +1209,30 @@ async fn create_backup(
 
         if let Some(catalog_result_rx) = catalog_result_rx {
             let stats = catalog_result_rx.await??;
-            manifest.add_file(CATALOG_NAME.to_owned(), stats.size, stats.csum, crypto.mode)?;
+            manifest.add_file(&CATALOG_NAME, stats.size, stats.csum, crypto.mode)?;
         }
     }
 
     if let Some(rsa_encrypted_key) = rsa_encrypted_key {
-        let target = ENCRYPTED_KEY_BLOB_NAME;
-        log::info!("Upload RSA encoded key to '{}' as {}", repo, target);
+        log::info!(
+            "Upload RSA encoded key to '{}' as {}",
+            repo,
+            *ENCRYPTED_KEY_BLOB_NAME
+        );
         let options = UploadOptions {
             compress: false,
             encrypt: false,
             ..UploadOptions::default()
         };
         let stats = client
-            .upload_blob_from_data(rsa_encrypted_key, target, options)
+            .upload_blob_from_data(rsa_encrypted_key, ENCRYPTED_KEY_BLOB_NAME.as_ref(), options)
             .await?;
-        manifest.add_file(target.to_string(), stats.size, stats.csum, crypto.mode)?;
+        manifest.add_file(
+            &ENCRYPTED_KEY_BLOB_NAME,
+            stats.size,
+            stats.csum,
+            crypto.mode,
+        )?;
     }
     // create manifest (index.json)
     // manifests are never encrypted, but include a signature
@@ -1225,7 +1248,7 @@ async fn create_backup(
         ..UploadOptions::default()
     };
     client
-        .upload_blob_from_data(manifest.into_bytes(), MANIFEST_BLOB_NAME, options)
+        .upload_blob_from_data(manifest.into_bytes(), MANIFEST_BLOB_NAME.as_ref(), options)
         .await?;
 
     client.finish().await?;
@@ -1238,7 +1261,7 @@ async fn create_backup(
 }
 
 async fn prepare_reference(
-    target: &str,
+    target: &BackupArchiveName,
     manifest: Arc<BackupManifest>,
     backup_writer: &BackupWriter,
     backup_reader: Arc<BackupReader>,
@@ -1250,7 +1273,11 @@ async fn prepare_reference(
             Ok((target, payload_target)) => (target, payload_target),
             Err(_) => return Ok(None),
         };
-    let payload_target = payload_target.unwrap_or_default();
+    let payload_target = if let Some(payload_target) = payload_target {
+        payload_target
+    } else {
+        return Ok(None);
+    };
 
     let metadata_ref_index = if let Ok(index) = backup_reader
         .download_dynamic_index(&manifest, &target)
@@ -1299,7 +1326,7 @@ async fn prepare_reference(
     Ok(Some(pbs_client::pxar::PxarPrevRef {
         accessor,
         payload_index: payload_ref_index,
-        archive_name: target,
+        archive_name: target.to_string(),
     }))
 }
 
@@ -1486,7 +1513,8 @@ async fn restore(
 ) -> Result<Value, Error> {
     let repo = extract_repository_from_value(&param)?;
 
-    let archive_name = json::required_string_param(&param, "archive-name")?;
+    let archive_name: BackupArchiveName =
+        json::required_string_param(&param, "archive-name")?.try_into()?;
 
     let rate_limit = RateLimitConfig::from_client_config(limit);
 
@@ -1525,11 +1553,9 @@ async fn restore(
     )
     .await?;
 
-    let (archive_name, archive_type) = parse_archive_type(archive_name);
-
     let (manifest, backup_index_data) = client.download_manifest().await?;
 
-    if archive_name == ENCRYPTED_KEY_BLOB_NAME && crypt_config.is_none() {
+    if archive_name == *ENCRYPTED_KEY_BLOB_NAME && crypt_config.is_none() {
         log::info!("Restoring encrypted key blob without original key - skipping manifest fingerprint check!")
     } else {
         if manifest.signature.is_some() {
@@ -1543,7 +1569,7 @@ async fn restore(
         manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
     }
 
-    if archive_name == MANIFEST_BLOB_NAME {
+    if archive_name == *MANIFEST_BLOB_NAME {
         if let Some(target) = target {
             replace_file(target, &backup_index_data, CreateOptions::new(), false)?;
         } else {
@@ -1557,7 +1583,7 @@ async fn restore(
         return Ok(Value::Null);
     }
 
-    if archive_type == ArchiveType::Blob {
+    if archive_name.archive_type() == ArchiveType::Blob {
         let mut reader = client.download_blob(&manifest, &archive_name).await?;
 
         if let Some(target) = target {
@@ -1576,7 +1602,7 @@ async fn restore(
             std::io::copy(&mut reader, &mut writer)
                 .map_err(|err| format_err!("unable to pipe data - {}", err))?;
         }
-    } else if archive_type == ArchiveType::DynamicIndex {
+    } else if archive_name.archive_type() == ArchiveType::DynamicIndex {
         let (archive_name, payload_archive_name) =
             pbs_client::tools::get_pxar_archive_names(&archive_name, &manifest)?;
 
@@ -1680,7 +1706,7 @@ async fn restore(
             std::io::copy(&mut reader, &mut writer)
                 .map_err(|err| format_err!("unable to pipe data - {}", err))?;
         }
-    } else if archive_type == ArchiveType::FixedIndex {
+    } else if archive_name.archive_type() == ArchiveType::FixedIndex {
         let file_info = manifest.lookup_file_info(&archive_name)?;
         let index = client
             .download_fixed_index(&manifest, &archive_name)

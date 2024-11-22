@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::ffi::OsStr;
+use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,12 +35,13 @@ use pxar::accessor::aio::Accessor;
 use pxar::EntryKind;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, Authid, BackupContent, BackupGroupDeleteStats,
-    BackupNamespace, BackupType, Counts, CryptMode, DataStoreConfig, DataStoreListItem,
-    DataStoreStatus, GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions,
-    Operation, PruneJobOptions, SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA,
-    BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
-    DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
+    print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupArchiveName,
+    BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
+    DataStoreConfig, DataStoreListItem, DataStoreStatus, GarbageCollectionJobStatus, GroupListItem,
+    JobScheduleStatus, KeepOptions, Operation, PruneJobOptions, SnapshotListItem,
+    SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
+    IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
     PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
     PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
     VERIFICATION_OUTDATED_AFTER_SCHEMA,
@@ -54,11 +56,11 @@ use pbs_datastore::data_blob_reader::DataBlobReader;
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, LocalDynamicReadAt};
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{BackupManifest, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
     check_backup_owner, task_tracking, BackupDir, BackupGroup, DataStore, LocalChunkReader,
-    StoreProgress, CATALOG_NAME,
+    StoreProgress,
 };
 use pbs_tools::json::required_string_param;
 use proxmox_rest_server::{formatter, WorkerTask};
@@ -1481,12 +1483,13 @@ pub fn download_file_decoded(
             &backup_dir_api.group,
         )?;
 
-        let file_name = required_string_param(&param, "file-name")?.to_owned();
+        let file_name: BackupArchiveName =
+            required_string_param(&param, "file-name")?.try_into()?;
         let backup_dir = datastore.backup_dir(backup_ns.clone(), backup_dir_api.clone())?;
 
         let (manifest, files) = read_backup_index(&backup_dir)?;
         for file in files {
-            if file.filename == file_name && file.crypt_mode == Some(CryptMode::Encrypt) {
+            if file.filename == file_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
                 bail!("cannot decode '{}' - is encrypted", file_name);
             }
         }
@@ -1501,12 +1504,10 @@ pub fn download_file_decoded(
 
         let mut path = datastore.base_path();
         path.push(backup_dir.relative_path());
-        path.push(&file_name);
+        path.push(file_name.as_ref());
 
-        let (_, extension) = file_name.rsplit_once('.').unwrap();
-
-        let body = match extension {
-            "didx" => {
+        let body = match file_name.archive_type() {
+            ArchiveType::DynamicIndex => {
                 let index = DynamicIndexReader::open(&path).map_err(|err| {
                     format_err!("unable to read dynamic index '{:?}' - {}", &path, err)
                 })?;
@@ -1520,7 +1521,7 @@ pub fn download_file_decoded(
                     err
                 }))
             }
-            "fidx" => {
+            ArchiveType::FixedIndex => {
                 let index = FixedIndexReader::open(&path).map_err(|err| {
                     format_err!("unable to read fixed index '{:?}' - {}", &path, err)
                 })?;
@@ -1539,7 +1540,7 @@ pub fn download_file_decoded(
                     ),
                 )
             }
-            "blob" => {
+            ArchiveType::Blob => {
                 let file = std::fs::File::open(&path)
                     .map_err(|err| http_err!(BAD_REQUEST, "File open failed: {}", err))?;
 
@@ -1553,9 +1554,6 @@ pub fn download_file_decoded(
                         },
                     ),
                 )
-            }
-            extension => {
-                bail!("cannot download '{}' files", extension);
             }
         };
 
@@ -1613,10 +1611,10 @@ pub fn upload_backup_log(
         )?;
         let backup_dir = datastore.backup_dir(backup_ns.clone(), backup_dir_api.clone())?;
 
-        let file_name = CLIENT_LOG_BLOB_NAME;
+        let file_name = &CLIENT_LOG_BLOB_NAME;
 
         let mut path = backup_dir.full_path();
-        path.push(file_name);
+        path.push(file_name.as_ref());
 
         if path.exists() {
             bail!("backup already contains a log.");
@@ -1625,6 +1623,7 @@ pub fn upload_backup_log(
         println!(
             "Upload backup log to {} {backup_dir_api}/{file_name}",
             print_store_and_ns(store, &backup_ns),
+            file_name = file_name.deref(),
         );
 
         let data = req_body
@@ -1671,7 +1670,7 @@ fn decode_path(path: &str) -> Result<Vec<u8>, Error> {
                 type: String,
             },
             "archive-name": {
-                schema: BACKUP_ARCHIVE_NAME_SCHEMA,
+                type: BackupArchiveName,
                 optional: true,
             },
         },
@@ -1688,12 +1687,10 @@ pub async fn catalog(
     ns: Option<BackupNamespace>,
     backup_dir: pbs_api_types::BackupDir,
     filepath: String,
-    archive_name: Option<String>,
+    archive_name: Option<BackupArchiveName>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<ArchiveEntry>, Error> {
-    let file_name = archive_name
-        .clone()
-        .unwrap_or_else(|| CATALOG_NAME.to_string());
+    let file_name = archive_name.clone().unwrap_or_else(|| CATALOG_NAME.clone());
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
@@ -1713,7 +1710,7 @@ pub async fn catalog(
 
     let (manifest, files) = read_backup_index(&backup_dir)?;
     for file in files {
-        if file.filename == file_name && file.crypt_mode == Some(CryptMode::Encrypt) {
+        if file.filename == file_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
             bail!("cannot decode '{file_name}' - is encrypted");
         }
     }
@@ -1722,7 +1719,7 @@ pub async fn catalog(
         tokio::task::spawn_blocking(move || {
             let mut path = datastore.base_path();
             path.push(backup_dir.relative_path());
-            path.push(&file_name);
+            path.push(file_name.as_ref());
 
             let index = DynamicIndexReader::open(&path)
                 .map_err(|err| format_err!("unable to read dynamic index '{path:?}' - {err}"))?;
@@ -1772,7 +1769,7 @@ pub const API_METHOD_PXAR_FILE_DOWNLOAD: ApiMethod = ApiMethod::new(
             ("backup-time", false, &BACKUP_TIME_SCHEMA),
             ("filepath", false, &StringSchema::new("Base64 encoded path").schema()),
             ("tar", true, &BooleanSchema::new("Download as .tar.zst").schema()),
-            ("archive-name", true, &BACKUP_ARCHIVE_NAME_SCHEMA),
+            ("archive-name", true, &BackupArchiveName::API_SCHEMA),
         ]),
     )
 ).access(
@@ -1787,11 +1784,11 @@ fn get_local_pxar_reader(
     datastore: Arc<DataStore>,
     manifest: &BackupManifest,
     backup_dir: &BackupDir,
-    pxar_name: &str,
+    pxar_name: &BackupArchiveName,
 ) -> Result<(LocalDynamicReadAt<LocalChunkReader>, u64), Error> {
     let mut path = datastore.base_path();
     path.push(backup_dir.relative_path());
-    path.push(pxar_name);
+    path.push(pxar_name.as_ref());
 
     let index = DynamicIndexReader::open(&path)
         .map_err(|err| format_err!("unable to read dynamic index '{:?}' - {}", &path, err))?;
@@ -1849,16 +1846,16 @@ pub fn pxar_file_download(
             let file_path = split.next().unwrap_or(b"/");
             (pxar_name.to_owned(), file_path.to_owned())
         };
-        let pxar_name = std::str::from_utf8(&pxar_name)?;
+        let pxar_name: BackupArchiveName = std::str::from_utf8(&pxar_name)?.try_into()?;
         let (manifest, files) = read_backup_index(&backup_dir)?;
         for file in files {
-            if file.filename == pxar_name && file.crypt_mode == Some(CryptMode::Encrypt) {
+            if file.filename == pxar_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
                 bail!("cannot decode '{}' - is encrypted", pxar_name);
             }
         }
 
         let (pxar_name, payload_archive_name) =
-            pbs_client::tools::get_pxar_archive_names(pxar_name, &manifest)?;
+            pbs_client::tools::get_pxar_archive_names(&pxar_name, &manifest)?;
         let (reader, archive_size) =
             get_local_pxar_reader(datastore.clone(), &manifest, &backup_dir, &pxar_name)?;
 

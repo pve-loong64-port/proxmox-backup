@@ -144,9 +144,6 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
-// Note: .pcat1 => Proxmox Catalog Format version 1
-pub const CATALOG_NAME: &str = "catalog.pcat1.didx";
-
 /// Directory path where active operations counters are saved.
 pub const ACTIVE_OPERATIONS_DIR: &str = concat!(
     pbs_buildcfg::PROXMOX_BACKUP_RUN_DIR_M!(),

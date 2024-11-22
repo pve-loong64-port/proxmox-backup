@@ -11,9 +11,9 @@ use proxmox_human_byte::HumanByte;
 use tracing::info;
 
 use pbs_api_types::{
-    print_store_and_ns, ArchiveType, Authid, BackupDir, BackupGroup, BackupNamespace, GroupFilter,
-    Operation, RateLimitConfig, Remote, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_BACKUP,
+    print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
+    BackupNamespace, GroupFilter, Operation, RateLimitConfig, Remote, CLIENT_LOG_BLOB_NAME,
+    MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
@@ -21,7 +21,7 @@ use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::manifest::{BackupManifest, FileInfo, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME};
+use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{check_backup_owner, DataStore, StoreProgress};
 use pbs_tools::sha::sha256;
@@ -334,16 +334,16 @@ async fn pull_snapshot<'a>(
 ) -> Result<SyncStats, Error> {
     let mut sync_stats = SyncStats::default();
     let mut manifest_name = snapshot.full_path();
-    manifest_name.push(MANIFEST_BLOB_NAME);
+    manifest_name.push(MANIFEST_BLOB_NAME.as_ref());
 
     let mut client_log_name = snapshot.full_path();
-    client_log_name.push(CLIENT_LOG_BLOB_NAME);
+    client_log_name.push(CLIENT_LOG_BLOB_NAME.as_ref());
 
     let mut tmp_manifest_name = manifest_name.clone();
     tmp_manifest_name.set_extension("tmp");
     let tmp_manifest_blob;
     if let Some(data) = reader
-        .load_file_into(MANIFEST_BLOB_NAME, &tmp_manifest_name)
+        .load_file_into(MANIFEST_BLOB_NAME.as_ref(), &tmp_manifest_name)
         .await?
     {
         tmp_manifest_blob = data;
@@ -381,11 +381,12 @@ async fn pull_snapshot<'a>(
         path.push(&item.filename);
 
         if path.exists() {
-            match ArchiveType::from_path(&item.filename)? {
+            let filename: BackupArchiveName = item.filename.as_str().try_into()?;
+            match filename.archive_type() {
                 ArchiveType::DynamicIndex => {
                     let index = DynamicIndexReader::open(&path)?;
                     let (csum, size) = index.compute_csum();
-                    match manifest.verify_file(&item.filename, &csum, size) {
+                    match manifest.verify_file(&filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             info!("detected changed file {path:?} - {err}");
@@ -395,7 +396,7 @@ async fn pull_snapshot<'a>(
                 ArchiveType::FixedIndex => {
                     let index = FixedIndexReader::open(&path)?;
                     let (csum, size) = index.compute_csum();
-                    match manifest.verify_file(&item.filename, &csum, size) {
+                    match manifest.verify_file(&filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             info!("detected changed file {path:?} - {err}");
@@ -405,7 +406,7 @@ async fn pull_snapshot<'a>(
                 ArchiveType::Blob => {
                     let mut tmpfile = std::fs::File::open(&path)?;
                     let (csum, size) = sha256(&mut tmpfile)?;
-                    match manifest.verify_file(&item.filename, &csum, size) {
+                    match manifest.verify_file(&filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             info!("detected changed file {path:?} - {err}");

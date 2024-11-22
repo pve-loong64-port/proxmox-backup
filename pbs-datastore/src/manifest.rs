@@ -3,13 +3,10 @@ use anyhow::{bail, format_err, Error};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use pbs_api_types::{ArchiveType, BackupType, CryptMode, Fingerprint};
+use pbs_api_types::{BackupArchiveName, BackupType, CryptMode, Fingerprint};
 use pbs_tools::crypt_config::CryptConfig;
 
-pub const MANIFEST_BLOB_NAME: &str = "index.json.blob";
 pub const MANIFEST_LOCK_NAME: &str = ".index.json.lck";
-pub const CLIENT_LOG_BLOB_NAME: &str = "client.log.blob";
-pub const ENCRYPTED_KEY_BLOB_NAME: &str = "rsa-encrypted.key.blob";
 
 fn crypt_mode_none() -> CryptMode {
     CryptMode::None
@@ -68,14 +65,13 @@ impl BackupManifest {
 
     pub fn add_file(
         &mut self,
-        filename: String,
+        filename: &BackupArchiveName,
         size: u64,
         csum: [u8; 32],
         crypt_mode: CryptMode,
     ) -> Result<(), Error> {
-        let _archive_type = ArchiveType::from_path(&filename)?; // check type
         self.files.push(FileInfo {
-            filename,
+            filename: filename.to_string(),
             size,
             csum,
             crypt_mode,
@@ -87,8 +83,11 @@ impl BackupManifest {
         &self.files[..]
     }
 
-    pub fn lookup_file_info(&self, name: &str) -> Result<&FileInfo, Error> {
-        let info = self.files.iter().find(|item| item.filename == name);
+    pub fn lookup_file_info(&self, name: &BackupArchiveName) -> Result<&FileInfo, Error> {
+        let info = self
+            .files
+            .iter()
+            .find(|item| item.filename == name.as_ref());
 
         match info {
             None => bail!("manifest does not contain file '{}'", name),
@@ -96,7 +95,12 @@ impl BackupManifest {
         }
     }
 
-    pub fn verify_file(&self, name: &str, csum: &[u8; 32], size: u64) -> Result<(), Error> {
+    pub fn verify_file(
+        &self,
+        name: &BackupArchiveName,
+        csum: &[u8; 32],
+        size: u64,
+    ) -> Result<(), Error> {
         let info = self.lookup_file_info(name)?;
 
         if size != info.size {
@@ -256,8 +260,13 @@ fn test_manifest_signature() -> Result<(), Error> {
 
     let mut manifest = BackupManifest::new("host/elsa/2020-06-26T13:56:05Z".parse()?);
 
-    manifest.add_file("test1.img.fidx".into(), 200, [1u8; 32], CryptMode::Encrypt)?;
-    manifest.add_file("abc.blob".into(), 200, [2u8; 32], CryptMode::None)?;
+    manifest.add_file(
+        &"test1.img.fidx".try_into()?,
+        200,
+        [1u8; 32],
+        CryptMode::Encrypt,
+    )?;
+    manifest.add_file(&"abc.blob".try_into()?, 200, [2u8; 32], CryptMode::None)?;
 
     manifest.unprotected["note"] = "This is not protected by the signature.".into();
 

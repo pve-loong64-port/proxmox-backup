@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
 use futures::StreamExt;
+use pbs_api_types::{BackupArchiveName, CATALOG_NAME};
 use serde_json::{json, Value};
 use tokio::io::AsyncWriteExt;
 
@@ -37,7 +38,6 @@ use pbs_client::{BackupReader, BackupRepository, RemoteChunkReader};
 use pbs_datastore::catalog::{ArchiveEntry, CatalogReader, DirEntryAttribute};
 use pbs_datastore::dynamic_index::BufferedDynamicReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::CATALOG_NAME;
 use pbs_key_config::decrypt_key;
 use pbs_tools::crypt_config::CryptConfig;
 
@@ -149,9 +149,9 @@ async fn list_files(
             Ok(entries)
         }
         ExtractPath::Pxar(file, mut path) => {
-            if let Ok(file_info) = manifest.lookup_file_info(CATALOG_NAME) {
+            if let Ok(file_info) = manifest.lookup_file_info(&CATALOG_NAME) {
                 let index = client
-                    .download_dynamic_index(&manifest, CATALOG_NAME)
+                    .download_dynamic_index(&manifest, &CATALOG_NAME)
                     .await?;
                 let most_used = index.find_most_used_chunks(8);
                 let chunk_reader = RemoteChunkReader::new(
@@ -172,6 +172,7 @@ async fn list_files(
                     path = vec![b'/'];
                 }
 
+                let file: BackupArchiveName = file.as_str().try_into()?;
                 let (archive_name, _payload_archive_name) =
                     pbs_client::tools::get_pxar_archive_names(&file, &manifest)?;
 
@@ -191,7 +192,7 @@ async fn list_files(
                 pbs_client::pxar::tools::pxar_metadata_catalog_lookup(
                     accessor,
                     path,
-                    Some(&archive_name),
+                    Some(archive_name.as_ref()),
                 )
                 .await
             }
@@ -476,10 +477,11 @@ async fn extract(
 
     match path {
         ExtractPath::Pxar(archive_name, path) => {
+            let archive_name: BackupArchiveName = archive_name.as_str().try_into()?;
             let (archive_name, payload_archive_name) =
                 pbs_client::tools::get_pxar_archive_names(&archive_name, &manifest)?;
             let (reader, archive_size) = get_remote_pxar_reader(
-                &archive_name,
+                &archive_name.try_into()?,
                 client.clone(),
                 &manifest,
                 crypt_config.clone(),

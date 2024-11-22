@@ -17,7 +17,9 @@ use proxmox_router::cli::{complete_file_name, shellword_split};
 use proxmox_schema::*;
 use proxmox_sys::fs::file_get_json;
 
-use pbs_api_types::{Authid, BackupNamespace, RateLimitConfig, UserWithTokens, BACKUP_REPO_URL};
+use pbs_api_types::{
+    Authid, BackupArchiveName, BackupNamespace, RateLimitConfig, UserWithTokens, BACKUP_REPO_URL,
+};
 use pbs_datastore::BackupManifest;
 
 use crate::{BackupRepository, HttpClient, HttpClientOptions};
@@ -548,19 +550,18 @@ pub fn place_xdg_file(
 }
 
 pub fn get_pxar_archive_names(
-    archive_name: &str,
+    archive_name: &BackupArchiveName,
     manifest: &BackupManifest,
-) -> Result<(String, Option<String>), Error> {
-    let (filename, ext) = match archive_name.strip_suffix(".didx") {
-        Some(filename) => (filename, ".didx"),
-        None => (archive_name, ""),
-    };
+) -> Result<(BackupArchiveName, Option<BackupArchiveName>), Error> {
+    let filename = archive_name.without_type_extension();
+    let ext = archive_name.archive_type().extension();
 
-    // Check if archive with given extension is present
+    // Check if archive is given as split archive or regular archive and is present in manifest,
+    // otherwise goto fallback below
     if manifest
         .files()
         .iter()
-        .any(|fileinfo| fileinfo.filename == format!("{filename}.didx"))
+        .any(|fileinfo| fileinfo.filename == archive_name.as_ref())
     {
         // check if already given as one of split archive name variants
         if let Some(base) = filename
@@ -568,8 +569,8 @@ pub fn get_pxar_archive_names(
             .or_else(|| filename.strip_suffix(".ppxar"))
         {
             return Ok((
-                format!("{base}.mpxar{ext}"),
-                Some(format!("{base}.ppxar{ext}")),
+                format!("{base}.mpxar.{ext}").as_str().try_into()?,
+                Some(format!("{base}.ppxar.{ext}").as_str().try_into()?),
             ));
         }
         return Ok((archive_name.to_owned(), None));
@@ -577,7 +578,10 @@ pub fn get_pxar_archive_names(
 
     // if not, try fallback from regular to split archive
     if let Some(base) = filename.strip_suffix(".pxar") {
-        return get_pxar_archive_names(&format!("{base}.mpxar{ext}"), manifest);
+        return get_pxar_archive_names(
+            &format!("{base}.mpxar.{ext}").as_str().try_into()?,
+            manifest,
+        );
     }
 
     bail!("archive not found in manifest");

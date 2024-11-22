@@ -9,13 +9,11 @@ use proxmox_sys::fs::{lock_dir_noblock, replace_file, CreateOptions};
 
 use pbs_api_types::{
     Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, BACKUP_DATE_REGEX,
-    BACKUP_FILE_REGEX,
+    BACKUP_FILE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
-use crate::manifest::{
-    BackupManifest, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MANIFEST_LOCK_NAME,
-};
+use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
 use crate::{DataBlob, DataStore};
 
 /// BackupGroup is a directory containing a list of BackupDir
@@ -139,7 +137,7 @@ impl BackupGroup {
                 }
 
                 let mut manifest_path = PathBuf::from(backup_time);
-                manifest_path.push(MANIFEST_BLOB_NAME);
+                manifest_path.push(MANIFEST_BLOB_NAME.as_ref());
 
                 use nix::fcntl::{openat, OFlag};
                 match openat(
@@ -492,7 +490,7 @@ impl BackupDir {
 
     /// Load the manifest without a lock. Must not be written back.
     pub fn load_manifest(&self) -> Result<(BackupManifest, u64), Error> {
-        let blob = self.load_blob(MANIFEST_BLOB_NAME)?;
+        let blob = self.load_blob(MANIFEST_BLOB_NAME.as_ref())?;
         let raw_size = blob.raw_size();
         let manifest = BackupManifest::try_from(blob)?;
         Ok((manifest, raw_size))
@@ -515,7 +513,7 @@ impl BackupDir {
         let raw_data = blob.raw_data();
 
         let mut path = self.full_path();
-        path.push(MANIFEST_BLOB_NAME);
+        path.push(MANIFEST_BLOB_NAME.as_ref());
 
         // atomic replace invalidates flock - no other writes past this point!
         replace_file(&path, raw_data, CreateOptions::new(), false)?;
@@ -636,7 +634,9 @@ impl BackupInfo {
 
     pub fn is_finished(&self) -> bool {
         // backup is considered unfinished if there is no manifest
-        self.files.iter().any(|name| name == MANIFEST_BLOB_NAME)
+        self.files
+            .iter()
+            .any(|name| name == MANIFEST_BLOB_NAME.as_ref())
     }
 }
 
