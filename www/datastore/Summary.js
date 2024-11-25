@@ -376,7 +376,10 @@ Ext.define('PBS.DataStoreSummary', {
 		lastRequestWasFailue = true;
 
 		me.statusStore.stopUpdate();
+		me.rrdstore.stopUpdate();
+
 		me.down('pbsDataStoreInfo').fireEvent('deactivate');
+
 		Proxmox.Utils.API2Request({
 		    url: `/config/datastore/${me.datastore}`,
 		    success: response => {
@@ -401,6 +404,7 @@ Ext.define('PBS.DataStoreSummary', {
 		// only trigger on edges, else we couple our interval to the info one
 		if (lastRequestWasFailue) {
 		    me.down('pbsDataStoreInfo').fireEvent('activate');
+		    me.rrdstore.startUpdate();
 		}
 		unmountBtn.setDisabled(false);
 		mountBtn.setDisabled(true);
