@@ -1,5 +1,8 @@
 use std::sync::LazyLock;
-use std::{collections::{HashMap, HashSet}, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
