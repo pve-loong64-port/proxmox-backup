@@ -4,7 +4,7 @@ use serde_json::Value;
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_schema::api;
 
-use pbs_api_types::JOB_ID_SCHEMA;
+use pbs_api_types::{SyncDirection, JOB_ID_SCHEMA};
 
 use proxmox_backup::api2;
 
@@ -20,6 +20,10 @@ fn render_group_filter(value: &Value, _record: &Value) -> Result<String, Error> 
 #[api(
     input: {
         properties: {
+            "sync-direction": {
+                type: SyncDirection,
+                optional: true,
+            },
             "output-format": {
                 schema: OUTPUT_FORMAT,
                 optional: true,
