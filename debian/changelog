@@ -1,3 +1,49 @@
+rust-proxmox-backup (3.2.12-1) bookworm; urgency=medium
+
+  * fix #5853: client: pxar: exclude stale files on metadata/link read
+
+  * docs: fix wrong product name in certificate docs
+
+  * docs: explain the working principle of the change detection modes
+
+  * allow datastore creation in directory with lost+found directory
+
+  * fix #5801: manager: switch datastore update command to real API call to
+    avoid early cancellation of the task.
+
+  * server: push: consistently use remote over target for error messages and
+    various smaller improvements to related log messages.
+
+  * push: move log messages for removed snapshot/group
+
+  * fix #5710: api: backup: stat known chunks on backup finish to ensure any
+    problem/corruption is caught earlier.
+
+  * pxar: extract: make invalid ACLs non-fatal, but only log them, there's
+    nothing to win by failing the restore completely.
+
+  * server: push: log encountered empty backup groups during sync
+
+  * fix #3786: ui, api, cli: add resync-corrupt option to sync jobs
+
+  * docs: add security implications of prune and change detection mode
+
+  *  fix #2996: client: backup restore: add support to pass match patterns for
+     a selective restore
+
+  * docs: add installation media preparation and installation wizard guides
+
+  * api: enforce minimum character limit of 8 on new passwords to follow
+    recent NIST recommendations.
+
+  * ui, api: support configuring a consent banner that is shown before login
+    to allow complying with some (government) policy frameworks.
+
+  * ui, api: add initial support for removable datastore providing better
+    integration for datastore located on a non-permanently attached medium.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 25 Nov 2024 22:52:11 +0100
+
 rust-proxmox-backup (3.2.11-1) bookworm; urgency=medium
 
   * fix #3044: server: implement push support for sync operations
