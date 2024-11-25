@@ -221,6 +221,49 @@ Ext.define('PBS.DataStoreSummary', {
     tbar: [
 	{
 	    xtype: 'button',
+	    text: gettext('Unmount'),
+	    hidden: true,
+	    itemId: 'unmountButton',
+	    reference: 'unmountButton',
+	    handler: function() {
+		let me = this;
+		let datastore = me.up('panel').datastore;
+		Proxmox.Utils.API2Request({
+		    url: `/admin/datastore/${datastore}/unmount`,
+		    method: 'POST',
+		    failure: response => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
+		    success: function(response, options) {
+			Ext.create('Proxmox.window.TaskViewer', {
+			    upid: response.result.data,
+			}).show();
+		    },
+		});
+	    },
+	},
+	{
+	    xtype: 'button',
+	    text: gettext('Mount'),
+	    hidden: true,
+	    itemId: 'mountButton',
+	    reference: 'mountButton',
+	    handler: function() {
+		let me = this;
+		let datastore = me.up('panel').datastore;
+		Proxmox.Utils.API2Request({
+		    url: `/admin/datastore/${datastore}/mount`,
+		    method: 'POST',
+		    failure: response => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
+		    success: function(response, options) {
+			me.up('panel').statusStore.startUpdate();
+			Ext.create('Proxmox.window.TaskViewer', {
+			    upid: response.result.data,
+			}).show();
+		    },
+		});
+	    },
+	},
+	{
+	    xtype: 'button',
 	    text: gettext('Show Connection Information'),
 	    handler: function() {
 		let me = this;
@@ -294,8 +337,12 @@ Ext.define('PBS.DataStoreSummary', {
 
     listeners: {
 	activate: function() { this.rrdstore.startUpdate(); },
+	afterrender: function() { this.statusStore.startUpdate(); },
 	deactivate: function() { this.rrdstore.stopUpdate(); },
-	destroy: function() { this.rrdstore.stopUpdate(); },
+	destroy: function() {
+	    this.rrdstore.stopUpdate();
+	    this.statusStore.stopUpdate();
+	},
 	resize: function(panel) {
 	    Proxmox.Utils.updateColumns(panel);
 	},
@@ -309,7 +356,43 @@ Ext.define('PBS.DataStoreSummary', {
 	    model: 'pve-rrd-datastore',
 	});
 
-	me.callParent();
+	me.statusStore = Ext.create('Proxmox.data.ObjectStore', {
+	    url: `/api2/json/admin/datastore/${me.datastore}/status`,
+	    interval: 1000,
+	});
+
+	me.mon(me.statusStore, 'load', (s, records, success) => {
+	    let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
+	    let unmountBtn = me.lookupReferenceHolder().lookupReference('unmountButton');
+	    if (!success) {
+		me.statusStore.stopUpdate();
+		me.down('pbsDataStoreInfo').fireEvent('deactivate');
+		Proxmox.Utils.API2Request({
+		    url: `/config/datastore/${me.datastore}`,
+		    success: response => {
+			let mode = response.result.data['maintenance-mode'];
+			let [type, _message] = PBS.Utils.parseMaintenanceMode(mode);
+			if (!response.result.data['backing-device']) {
+			    return;
+			}
+			if (!type || type === 'read-only') {
+			    unmountBtn.setDisabled(true);
+			    mountBtn.setDisabled(false);
+			} else if (type === 'unmount') {
+			    unmountBtn.setDisabled(true);
+			    mountBtn.setDisabled(true);
+			} else {
+			    unmountBtn.setDisabled(false);
+			    mountBtn.setDisabled(false);
+			}
+		    },
+		});
+	    } else {
+		me.down('pbsDataStoreInfo').fireEvent('activate');
+		unmountBtn.setDisabled(false);
+		mountBtn.setDisabled(true);
+	    }
+	});
 
 	let sp = Ext.state.Manager.getProvider();
 	me.mon(sp, 'statechange', function(provider, key, value) {
@@ -322,11 +405,19 @@ Ext.define('PBS.DataStoreSummary', {
 	    Proxmox.Utils.updateColumns(me);
 	});
 
+	me.callParent();
+
 	Proxmox.Utils.API2Request({
 	    url: `/config/datastore/${me.datastore}`,
 	    waitMsgTarget: me.down('pbsDataStoreInfo'),
 	    success: function(response) {
-		let path = Ext.htmlEncode(response.result.data.path);
+		let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
+		let unmountBtn = me.lookupReferenceHolder().lookupReference('unmountButton');
+		let data = response.result.data;
+		let path = Ext.htmlEncode(data.path);
+		const removable = !!data['backing-device'];
+		unmountBtn.setHidden(!removable);
+		mountBtn.setHidden(!removable);
 		me.down('pbsDataStoreInfo').setTitle(`${me.datastore} (${path})`);
 		me.down('pbsDataStoreNotes').setNotes(response.result.data.comment);
 	    },
