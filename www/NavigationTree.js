@@ -340,6 +340,11 @@ Ext.define('PBS.view.main.NavigationTree', {
 	me.tapeStore.load();
     },
 
+    reloadStore: function() {
+	let me = this;
+	me.rstore.load();
+    },
+
     select: function(path, silent) {
 	var me = this;
 	if (me.rstore.isLoaded() && me.tapeStore.isLoaded()) {

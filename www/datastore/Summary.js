@@ -254,7 +254,10 @@ Ext.define('PBS.DataStoreSummary', {
 		    success: function(response, options) {
 			Ext.create('Proxmox.window.TaskViewer', {
 			    upid: response.result.data,
-			    taskDone: () => me.up('panel').statusStore.load(),
+			    taskDone: () => {
+				me.up('panel').statusStore.load();
+				Ext.ComponentQuery.query('navigationtree')[0]?.reloadStore();
+			    },
 			}).show();
 		    },
 		});
@@ -276,7 +279,10 @@ Ext.define('PBS.DataStoreSummary', {
 		    success: function(response, options) {
 			Ext.create('Proxmox.window.TaskViewer', {
 			    upid: response.result.data,
-			    taskDone: () => me.up('panel').statusStore.startUpdate(),
+			    taskDone: () => {
+				me.up('panel').statusStore.startUpdate();
+				Ext.ComponentQuery.query('navigationtree')[0]?.reloadStore();
+			    },
 			}).show();
 		    },
 		});
