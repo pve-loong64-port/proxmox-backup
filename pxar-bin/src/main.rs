@@ -13,7 +13,8 @@ use serde_json::Value;
 use tokio::signal::unix::{signal, SignalKind};
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
-use pbs_api_types::PathPatterns;
+
+use pbs_api_types::PathPattern;
 use pbs_client::pxar::tools::format_single_line_entry;
 use pbs_client::pxar::{
     Flags, OverwriteFlags, PxarExtractOptions, PxarWriters, ENCODER_MAX_ENTRIES,
@@ -55,8 +56,12 @@ fn extract_archive_from_reader<R: std::io::Read>(
                 description: "Archive name.",
             },
             pattern: {
-                type: PathPatterns,
+                type: Array,
+                items: {
+                    type: PathPattern,
+                },
                 optional: true,
+                description: "Path or match pattern to limit files that get restored.",
             },
             target: {
                 description: "Target directory",

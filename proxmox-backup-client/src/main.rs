@@ -26,7 +26,7 @@ use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
-    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPatterns,
+    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPattern,
     PruneJobOptions, PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus,
     BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
     CATALOG_NAME, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
@@ -1407,7 +1407,11 @@ We do not extract '.pxar' archives when writing to standard output.
                 flatten: true,
             },
             pattern: {
-                type: PathPatterns,
+                type: Array,
+                items: {
+                    type: PathPattern,
+                },
+                description: "Path or match pattern to limit files that get restored.",
                 optional: true,
             },
             "allow-existing-dirs": {
