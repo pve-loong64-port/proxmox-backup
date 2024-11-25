@@ -86,6 +86,15 @@ Ext.define('PBS.window.MaintenanceOptions', {
 	    };
 	}
 
+        let unmounting = options['maintenance-type'] === 'unmount';
+        let defaultType = options['maintenance-type'] === '__default__';
+        if (unmounting) {
+            options['maintenance-type'] = '';
+        }
+
 	me.callParent([options]);
+
+        me.lookupReference('type-field').setDisabled(unmounting);
+        me.lookupReference('message-field').setDisabled(unmounting || defaultType);
     },
 });

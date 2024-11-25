@@ -775,7 +775,7 @@ Ext.define('PBS.Utils', {
 	let extra = '';
 
 	if (activeTasks !== undefined) {
-	    const conflictingTasks = activeTasks.write + (type === 'offline' ? activeTasks.read : 0);
+	    const conflictingTasks = activeTasks.write + (type === 'offline' || type === 'unmount' ? activeTasks.read : 0);
 
 	    if (conflictingTasks > 0) {
 		extra += '| <i class="fa fa-spinner fa-pulse fa-fw"></i> ';
@@ -794,6 +794,8 @@ Ext.define('PBS.Utils', {
 	    case 'read-only': modeText = gettext("Read-only");
 		break;
 	    case 'offline': modeText = gettext("Offline");
+		break;
+	    case 'unmount': modeText = gettext("Unmounting");
 		break;
 	}
 	return `${modeText} ${extra}`;
