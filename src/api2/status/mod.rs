@@ -10,11 +10,12 @@ use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, DataStoreStatusListItem, Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+    Authid, DataStoreConfig, DataStoreMountStatus, DataStoreStatusListItem, Operation,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 
 use pbs_config::CachedUserInfo;
-use pbs_datastore::DataStore;
+use pbs_datastore::{get_datastore_mount_status, DataStore};
 
 use crate::server::metric_collection::rrd::extract_rrd_data;
 use crate::tools::statistics::linear_regression;
@@ -51,10 +52,26 @@ pub async fn datastore_status(
     for (store, (_, _)) in &config.sections {
         let user_privs = user_info.lookup_privs(&auth_id, &["datastore", store]);
         let allowed = (user_privs & (PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_BACKUP)) != 0;
+
+        let store_config = config.lookup::<DataStoreConfig>("datastore", store)?;
+
+        let mount_status = match get_datastore_mount_status(&store_config) {
+            Some(true) => DataStoreMountStatus::Mounted,
+            Some(false) => {
+                list.push(DataStoreStatusListItem::empty(
+                    store,
+                    None,
+                    DataStoreMountStatus::NotMounted,
+                ));
+                continue;
+            }
+            None => DataStoreMountStatus::NonRemovable,
+        };
+
         if !allowed {
             if let Ok(datastore) = DataStore::lookup_datastore(store, Some(Operation::Lookup)) {
                 if can_access_any_namespace(datastore, &auth_id, &user_info) {
-                    list.push(DataStoreStatusListItem::empty(store, None));
+                    list.push(DataStoreStatusListItem::empty(store, None, mount_status));
                 }
             }
             continue;
@@ -63,7 +80,11 @@ pub async fn datastore_status(
         let datastore = match DataStore::lookup_datastore(store, Some(Operation::Read)) {
             Ok(datastore) => datastore,
             Err(err) => {
-                list.push(DataStoreStatusListItem::empty(store, Some(err.to_string())));
+                list.push(DataStoreStatusListItem::empty(
+                    store,
+                    Some(err.to_string()),
+                    mount_status,
+                ));
                 continue;
             }
         };
@@ -74,6 +95,7 @@ pub async fn datastore_status(
             total: Some(status.total),
             used: Some(status.used),
             avail: Some(status.available),
+            mount_status,
             history: None,
             history_start: None,
             history_delta: None,

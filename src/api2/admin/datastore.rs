@@ -38,14 +38,15 @@ use pxar::EntryKind;
 use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupArchiveName,
     BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
-    DataStoreConfig, DataStoreListItem, DataStoreStatus, GarbageCollectionJobStatus, GroupListItem,
-    JobScheduleStatus, KeepOptions, MaintenanceMode, MaintenanceType, Operation, PruneJobOptions,
-    SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA,
-    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
-    CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME,
-    MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID,
-    UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    DataStoreConfig, DataStoreListItem, DataStoreMountStatus, DataStoreStatus,
+    GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions, MaintenanceMode,
+    MaintenanceType, Operation, PruneJobOptions, SnapshotListItem, SnapshotVerifyState,
+    BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
+    BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
+    IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
+    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
+    VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};
 use pbs_config::CachedUserInfo;
@@ -1323,8 +1324,8 @@ pub fn get_datastore_list(
 
     let mut list = Vec::new();
 
-    for (store, (_, data)) in &config.sections {
-        let acl_path = &["datastore", store];
+    for (store, (_, data)) in config.sections {
+        let acl_path = &["datastore", &store];
         let user_privs = user_info.lookup_privs(&auth_id, acl_path);
         let allowed = (user_privs & (PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_BACKUP)) != 0;
 
@@ -1335,15 +1336,20 @@ pub fn get_datastore_list(
             }
         }
 
+        let store_config: DataStoreConfig = serde_json::from_value(data)?;
+
+        let mount_status = match pbs_datastore::get_datastore_mount_status(&store_config) {
+            Some(true) => DataStoreMountStatus::Mounted,
+            Some(false) => DataStoreMountStatus::NotMounted,
+            None => DataStoreMountStatus::NonRemovable,
+        };
+
         if allowed || allow_id {
             list.push(DataStoreListItem {
                 store: store.clone(),
-                comment: if !allowed {
-                    None
-                } else {
-                    data["comment"].as_str().map(String::from)
-                },
-                maintenance: data["maintenance-mode"].as_str().map(String::from),
+                comment: store_config.comment.filter(|_| allowed),
+                mount_status,
+                maintenance: store_config.maintenance_mode,
             });
         }
     }
