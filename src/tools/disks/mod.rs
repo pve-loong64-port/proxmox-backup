@@ -898,7 +898,10 @@ fn get_partitions_info(
             let mut uuid = None;
             if let Some(devpath) = devpath.as_ref() {
                 for info in lsblk_infos.iter().filter(|i| i.path.eq(devpath)) {
-                    uuid = info.uuid.clone();
+                    uuid = info
+                        .uuid
+                        .clone()
+                        .filter(|uuid| pbs_api_types::UUID_REGEX.is_match(uuid));
                     used = match info.partition_type.as_deref() {
                         Some("21686148-6449-6e6f-744e-656564454649") => PartitionUsageType::BIOS,
                         Some("c12a7328-f81f-11d2-ba4b-00a0c93ec93b") => PartitionUsageType::EFI,
