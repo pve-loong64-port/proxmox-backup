@@ -52,16 +52,22 @@ Ext.define('PBS.window.MaintenanceOptions', {
 	items: [
 	    {
 		xtype: 'pbsMaintenanceType',
+		reference: 'type-field',
 		name: 'maintenance-type',
 		fieldLabel: gettext('Maintenance Type'),
 		value: '__default__',
 		deleteEmpty: true,
+		listeners: {
+		    change: (field, newValue) => {
+			field.up('form').down('[name=maintenance-msg]').setDisabled(newValue === '__default__');
+		    },
+		},
 	    },
 	    {
 		xtype: 'proxmoxtextfield',
+		reference: 'message-field',
 		name: 'maintenance-msg',
 		fieldLabel: gettext('Description'),
-		// FIXME: disable if maintenance type is none
 	    },
 	],
     },
