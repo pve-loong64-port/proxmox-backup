@@ -123,6 +123,11 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
                 description: "Configure a datastore using the directory.",
                 type: bool,
                 optional: true,
+                default: false,
+            },
+            "removable-datastore": {
+                description: "The added datastore is removable.",
+                type: bool,
             },
             filesystem: {
                 type: FileSystemType,
@@ -141,7 +146,8 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
 pub fn create_datastore_disk(
     name: String,
     disk: String,
-    add_datastore: Option<bool>,
+    add_datastore: bool,
+    removable_datastore: bool,
     filesystem: Option<FileSystemType>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
@@ -156,7 +162,6 @@ pub fn create_datastore_disk(
     }
 
     let mount_point = format!("{}{}", BASE_MOUNT_DIR, &name);
-
     // check if the default path exists already.
     // bail if it is not empty or another filesystem mounted on top
     let default_path = std::path::PathBuf::from(&mount_point);
@@ -183,7 +188,6 @@ pub fn create_datastore_disk(
         move |_worker| {
             info!("create datastore '{name}' on disk {disk}");
 
-            let add_datastore = add_datastore.unwrap_or(false);
             let filesystem = filesystem.unwrap_or(FileSystemType::Ext4);
 
             let manager = DiskManage::new();
@@ -196,18 +200,24 @@ pub fn create_datastore_disk(
             let uuid = get_fs_uuid(&partition)?;
             let uuid_path = format!("/dev/disk/by-uuid/{}", uuid);
 
-            let mount_unit_name =
-                create_datastore_mount_unit(&name, &mount_point, filesystem, &uuid_path)?;
+            if !removable_datastore {
+                let mount_unit_name =
+                    create_datastore_mount_unit(&name, &mount_point, filesystem, &uuid_path)?;
 
-            crate::tools::systemd::reload_daemon()?;
-            crate::tools::systemd::enable_unit(&mount_unit_name)?;
-            crate::tools::systemd::start_unit(&mount_unit_name)?;
+                crate::tools::systemd::reload_daemon()?;
+                crate::tools::systemd::enable_unit(&mount_unit_name)?;
+                crate::tools::systemd::start_unit(&mount_unit_name)?;
+            }
 
             if add_datastore {
                 let lock = pbs_config::datastore::lock_config()?;
-                let datastore: DataStoreConfig =
-                    serde_json::from_value(json!({ "name": name, "path": mount_point }))?;
-
+                let datastore: DataStoreConfig = if removable_datastore {
+                    serde_json::from_value(
+                        json!({ "name": name, "path": format!("/{name}"), "backing-device": uuid }),
+                    )?
+                } else {
+                    serde_json::from_value(json!({ "name": name, "path": mount_point }))?
+                };
                 let (config, _digest) = pbs_config::datastore::config()?;
 
                 if config.sections.contains_key(&datastore.name) {
