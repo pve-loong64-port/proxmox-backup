@@ -30,6 +30,7 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
+use pbs_datastore::get_datastore_mount_status;
 use proxmox_rest_server::WorkerTask;
 
 use crate::server::jobstate;
@@ -574,6 +575,15 @@ pub async fn delete_datastore(
         http_bail!(NOT_FOUND, "datastore '{}' does not exist.", name);
     }
 
+    let store_config: DataStoreConfig = config.lookup("datastore", &name)?;
+
+    if destroy_data && get_datastore_mount_status(&store_config) == Some(false) {
+        http_bail!(
+            BAD_REQUEST,
+            "cannot destroy data on '{name}' unless the datastore is mounted"
+        );
+    }
+
     if !keep_job_configs {
         for job in list_verification_jobs(Some(name.clone()), Value::Null, rpcenv)? {
             delete_verification_job(job.config.id, None, rpcenv)?
@@ -604,6 +614,18 @@ pub async fn delete_datastore(
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+    if let Ok(proxy_pid) = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN)
+    {
+        let sock = proxmox_daemon::command_socket::path_from_pid(proxy_pid);
+        let _ = proxmox_daemon::command_socket::send_raw(
+            sock,
+            &format!(
+                "{{\"command\":\"update-datastore-cache\",\"args\":\"{}\"}}\n",
+                name.clone()
+            ),
+        )
+        .await;
+    };
 
     let upid = WorkerTask::new_thread(
         "delete-datastore",
@@ -621,6 +643,23 @@ pub async fn delete_datastore(
                 proxmox_async::runtime::block_on(crate::server::notify_datastore_removed())
             {
                 warn!("failed to notify after datastore removal: {err}");
+            }
+
+            // cleanup for removable datastores
+            //  - unmount
+            //  - remove mount dir, if destroy_data
+            if store_config.backing_device.is_some() {
+                let mount_point = store_config.absolute_path();
+                if get_datastore_mount_status(&store_config) == Some(true) {
+                    if let Err(e) = unmount_by_mountpoint(Path::new(&mount_point)) {
+                        warn!("could not unmount device after deletion: {e}");
+                    }
+                }
+                if destroy_data {
+                    if let Err(e) = std::fs::remove_dir(&mount_point) {
+                        warn!("could not remove directory after deletion: {e}");
+                    }
+                }
             }
 
             Ok(())

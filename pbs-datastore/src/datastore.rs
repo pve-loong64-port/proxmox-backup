@@ -1535,7 +1535,9 @@ impl DataStore {
                         // weird, but ok
                     }
                     Err(err) if err.is_errno(nix::errno::Errno::EBUSY) => {
-                        warn!("Cannot delete datastore directory (is it a mount point?).")
+                        if datastore_config.backing_device.is_none() {
+                            warn!("Cannot delete datastore directory (is it a mount point?).")
+                        }
                     }
                     Err(err) if err.is_errno(nix::errno::Errno::ENOTEMPTY) => {
                         warn!("Datastore directory not empty, not deleting.")
