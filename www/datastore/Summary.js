@@ -272,9 +272,9 @@ Ext.define('PBS.DataStoreSummary', {
 		    method: 'POST',
 		    failure: response => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
 		    success: function(response, options) {
-			me.up('panel').statusStore.startUpdate();
 			Ext.create('Proxmox.window.TaskViewer', {
 			    upid: response.result.data,
+			    taskDone: () => me.up('panel').statusStore.startUpdate(),
 			}).show();
 		    },
 		});
