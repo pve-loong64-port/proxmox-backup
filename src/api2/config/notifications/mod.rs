@@ -9,7 +9,7 @@ use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use crate::api2::admin::datastore::get_datastore_list;
-use pbs_api_types::{SyncDirection, PRIV_SYS_AUDIT};
+use pbs_api_types::PRIV_SYS_AUDIT;
 
 use crate::api2::admin::prune::list_prune_jobs;
 use crate::api2::admin::sync::list_config_sync_jobs;
@@ -156,15 +156,13 @@ pub fn get_values(
         });
     }
 
-    for direction in [SyncDirection::Pull, SyncDirection::Push] {
-        let sync_jobs = list_config_sync_jobs(None, Some(direction.into()), param.clone(), rpcenv)?;
-        for job in sync_jobs {
-            values.push(MatchableValue {
-                field: "job-id".into(),
-                value: job.config.id,
-                comment: job.config.comment,
-            });
-        }
+    let sync_jobs = list_config_sync_jobs(None, None, param.clone(), rpcenv)?;
+    for job in sync_jobs {
+        values.push(MatchableValue {
+            field: "job-id".into(),
+            value: job.config.id,
+            comment: job.config.comment,
+        });
     }
 
     let verify_jobs = list_verification_jobs(None, param.clone(), rpcenv)?;
@@ -188,7 +186,6 @@ pub fn get_values(
         "package-updates",
         "prune",
         "sync",
-        "sync-push",
         "system-mail",
         "tape-backup",
         "tape-load",

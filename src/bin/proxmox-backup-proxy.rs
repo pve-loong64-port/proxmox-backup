@@ -40,8 +40,8 @@ use pbs_buildcfg::configdir;
 use proxmox_time::CalendarEvent;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncDirection, SyncJobConfig,
-    TapeBackupJobConfig, VerificationJobConfig,
+    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncJobConfig, TapeBackupJobConfig,
+    VerificationJobConfig,
 };
 
 use proxmox_backup::auth_helpers::*;
@@ -595,14 +595,7 @@ async fn schedule_datastore_sync_jobs() {
         Ok((config, _digest)) => config,
     };
 
-    for (job_id, (job_type, job_config)) in config.sections {
-        let sync_direction = match SyncDirection::from_config_type_str(&job_type) {
-            Ok(direction) => direction,
-            Err(err) => {
-                eprintln!("unexpected config type in sync job config - {err}");
-                continue;
-            }
-        };
+    for (job_id, (_, job_config)) in config.sections {
         let job_config: SyncJobConfig = match serde_json::from_value(job_config) {
             Ok(c) => c,
             Err(err) => {
@@ -624,14 +617,7 @@ async fn schedule_datastore_sync_jobs() {
             };
 
             let auth_id = Authid::root_auth_id().clone();
-            if let Err(err) = do_sync_job(
-                job,
-                job_config,
-                &auth_id,
-                Some(event_str),
-                sync_direction,
-                false,
-            ) {
+            if let Err(err) = do_sync_job(job, job_config, &auth_id, Some(event_str), false) {
                 eprintln!("unable to start datastore sync job {job_id} - {err}");
             }
         };

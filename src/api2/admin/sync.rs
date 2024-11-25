@@ -85,9 +85,9 @@ pub fn list_config_sync_jobs(
     let sync_direction = sync_direction.unwrap_or_default();
 
     let mut list = Vec::with_capacity(config.sections.len());
-    for (_, (sync_type, job)) in config.sections.into_iter() {
+    for (_, (_, job)) in config.sections.into_iter() {
         let job: SyncJobConfig = serde_json::from_value(job)?;
-        let direction = SyncDirection::from_config_type_str(&sync_type)?;
+        let direction = job.sync_direction.unwrap_or_default();
 
         match &store {
             Some(store) if &job.store != store => continue,
@@ -100,7 +100,7 @@ pub fn list_config_sync_jobs(
             _ => {}
         }
 
-        if !check_sync_job_read_access(&user_info, &auth_id, &job, direction) {
+        if !check_sync_job_read_access(&user_info, &auth_id, &job) {
             continue;
         }
 
@@ -144,15 +144,9 @@ pub fn run_sync_job(
     let user_info = CachedUserInfo::new()?;
 
     let (config, _digest) = sync::config()?;
-    let (config_type, config_section) = config
-        .sections
-        .get(&id)
-        .ok_or_else(|| format_err!("No sync job with id '{id}' found in config"))?;
+    let sync_job: SyncJobConfig = config.lookup("sync", &id)?;
 
-    let sync_direction = SyncDirection::from_config_type_str(config_type)?;
-    let sync_job = SyncJobConfig::deserialize(config_section)?;
-
-    if !check_sync_job_modify_access(&user_info, &auth_id, &sync_job, sync_direction) {
+    if !check_sync_job_modify_access(&user_info, &auth_id, &sync_job) {
         bail!("permission check failed, '{auth_id}' is missing access");
     }
 
@@ -160,7 +154,7 @@ pub fn run_sync_job(
 
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
-    let upid_str = do_sync_job(job, sync_job, &auth_id, None, sync_direction, to_stdout)?;
+    let upid_str = do_sync_job(job, sync_job, &auth_id, None, to_stdout)?;
 
     Ok(upid_str)
 }

@@ -4,9 +4,10 @@ use serde_json::Value;
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_schema::api;
 
-use pbs_api_types::{SyncDirection, JOB_ID_SCHEMA};
+use pbs_api_types::JOB_ID_SCHEMA;
 
 use proxmox_backup::api2;
+use crate::api2::admin::sync::ListSyncDirection;
 
 fn render_group_filter(value: &Value, _record: &Value) -> Result<String, Error> {
     if let Some(group_filters) = value.as_array() {
@@ -21,7 +22,7 @@ fn render_group_filter(value: &Value, _record: &Value) -> Result<String, Error> 
     input: {
         properties: {
             "sync-direction": {
-                type: SyncDirection,
+                type: ListSyncDirection,
                 optional: true,
             },
             "output-format": {

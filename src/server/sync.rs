@@ -597,7 +597,6 @@ pub fn do_sync_job(
     sync_job: SyncJobConfig,
     auth_id: &Authid,
     schedule: Option<String>,
-    sync_direction: SyncDirection,
     to_stdout: bool,
 ) -> Result<String, Error> {
     let job_id = format!(
@@ -609,6 +608,7 @@ pub fn do_sync_job(
         job.jobname(),
     );
     let worker_type = job.jobtype().to_string();
+    let sync_direction = sync_job.sync_direction.unwrap_or_default();
 
     if sync_job.remote.is_none() && sync_job.store == sync_job.remote_store {
         bail!("can't sync to same datastore");

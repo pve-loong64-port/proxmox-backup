@@ -17,12 +17,12 @@ use pbs_config::sync;
 
 use pbs_config::CachedUserInfo;
 use pbs_datastore::check_backup_owner;
+use crate::api2::admin::sync::ListSyncDirection;
 
 pub fn check_sync_job_read_access(
     user_info: &CachedUserInfo,
     auth_id: &Authid,
     job: &SyncJobConfig,
-    sync_direction: SyncDirection,
 ) -> bool {
     // check for audit access on datastore/namespace, applies for pull and push direction
     let ns_anchor_privs = user_info.lookup_privs(auth_id, &job.acl_path());
@@ -30,6 +30,7 @@ pub fn check_sync_job_read_access(
         return false;
     }
 
+    let sync_direction = job.sync_direction.unwrap_or_default();
     match sync_direction {
         SyncDirection::Pull => {
             if let Some(remote) = &job.remote {
@@ -71,8 +72,8 @@ pub fn check_sync_job_modify_access(
     user_info: &CachedUserInfo,
     auth_id: &Authid,
     job: &SyncJobConfig,
-    sync_direction: SyncDirection,
 ) -> bool {
+    let sync_direction = job.sync_direction.unwrap_or_default();
     match sync_direction {
         SyncDirection::Pull => {
             let ns_anchor_privs = user_info.lookup_privs(auth_id, &job.acl_path());
@@ -150,7 +151,7 @@ pub fn check_sync_job_modify_access(
     input: {
         properties: {
             "sync-direction": {
-                type: SyncDirection,
+                type: ListSyncDirection,
                 optional: true,
             },
         },
@@ -168,23 +169,29 @@ pub fn check_sync_job_modify_access(
 /// List all sync jobs
 pub fn list_sync_jobs(
     _param: Value,
-    sync_direction: Option<SyncDirection>,
+    sync_direction: Option<ListSyncDirection>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<SyncJobConfig>, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let user_info = CachedUserInfo::new()?;
+    let sync_direction = sync_direction.unwrap_or_default();
 
     let (config, digest) = sync::config()?;
 
-    let sync_direction = sync_direction.unwrap_or_default();
-    let list = config.convert_to_typed_array(sync_direction.as_config_type_str())?;
+    let list: Vec<SyncJobConfig> = config.convert_to_typed_array("sync")?;
 
     rpcenv["digest"] = hex::encode(digest).into();
 
     let list = list
         .into_iter()
         .filter(|sync_job| {
-            check_sync_job_read_access(&user_info, &auth_id, sync_job, sync_direction)
+            let direction = sync_job.sync_direction.unwrap_or_default();
+            match &sync_direction {
+                ListSyncDirection::Pull if direction != SyncDirection::Pull => return false,
+                ListSyncDirection::Push if direction != SyncDirection::Push => return false,
+                _ => {}
+            }
+            check_sync_job_read_access(&user_info, &auth_id, sync_job)
         })
         .collect();
     Ok(list)
@@ -198,10 +205,6 @@ pub fn list_sync_jobs(
                 type: SyncJobConfig,
                 flatten: true,
             },
-            "sync-direction": {
-                type: SyncDirection,
-                optional: true,
-            },
         },
     },
     access: {
@@ -212,16 +215,14 @@ pub fn list_sync_jobs(
 /// Create a new sync job.
 pub fn create_sync_job(
     config: SyncJobConfig,
-    sync_direction: Option<SyncDirection>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let user_info = CachedUserInfo::new()?;
-    let sync_direction = sync_direction.unwrap_or_default();
 
     let _lock = sync::lock_config()?;
 
-    if !check_sync_job_modify_access(&user_info, &auth_id, &config, sync_direction) {
+    if !check_sync_job_modify_access(&user_info, &auth_id, &config) {
         bail!("permission check failed");
     }
 
@@ -229,6 +230,7 @@ pub fn create_sync_job(
         bail!("source and target datastore can't be the same");
     }
 
+    let sync_direction = config.sync_direction.unwrap_or_default();
     if sync_direction == SyncDirection::Push && config.resync_corrupt.is_some() {
         bail!("push jobs do not support resync-corrupt option");
     }
@@ -248,7 +250,7 @@ pub fn create_sync_job(
         param_bail!("id", "job '{}' already exists.", config.id);
     }
 
-    section_config.set_data(&config.id, sync_direction.as_config_type_str(), &config)?;
+    section_config.set_data(&config.id, "sync", &config)?;
 
     sync::save_config(&section_config)?;
 
@@ -278,17 +280,9 @@ pub fn read_sync_job(id: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Sync
 
     let (config, digest) = sync::config()?;
 
-    let (sync_job, sync_direction) =
-        if let Some((config_type, config_section)) = config.sections.get(&id) {
-            (
-                SyncJobConfig::deserialize(config_section)?,
-                SyncDirection::from_config_type_str(config_type)?,
-            )
-        } else {
-            http_bail!(NOT_FOUND, "job '{id}' does not exist.")
-        };
+    let sync_job = config.lookup("sync", &id)?;
 
-    if !check_sync_job_read_access(&user_info, &auth_id, &sync_job, sync_direction) {
+    if !check_sync_job_read_access(&user_info, &auth_id, &sync_job) {
         bail!("permission check failed");
     }
 
@@ -330,6 +324,8 @@ pub enum DeletableProperty {
     MaxDepth,
     /// Delete the transfer_last property,
     TransferLast,
+    /// Delete the sync_direction property,
+    SyncDirection,
 }
 
 #[api(
@@ -383,17 +379,11 @@ pub fn update_sync_job(
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    let (mut data, sync_direction) =
-        if let Some((config_type, config_section)) = config.sections.get(&id) {
-            (
-                SyncJobConfig::deserialize(config_section)?,
-                SyncDirection::from_config_type_str(config_type)?,
-            )
-        } else {
-            http_bail!(NOT_FOUND, "job '{id}' does not exist.")
-        };
+    let mut data: SyncJobConfig = config.lookup("sync", &id)?;
 
-    if sync_direction == SyncDirection::Push && update.resync_corrupt.is_some() {
+    if update.sync_direction.unwrap_or_default() == SyncDirection::Push
+        && update.resync_corrupt.is_some()
+    {
         bail!("push jobs do not support resync-corrupt option");
     }
 
@@ -442,6 +432,9 @@ pub fn update_sync_job(
                 DeletableProperty::TransferLast => {
                     data.transfer_last = None;
                 }
+                DeletableProperty::SyncDirection => {
+                    data.sync_direction = None;
+                }
             }
         }
     }
@@ -482,6 +475,9 @@ pub fn update_sync_job(
     if let Some(resync_corrupt) = update.resync_corrupt {
         data.resync_corrupt = Some(resync_corrupt);
     }
+    if let Some(sync_direction) = update.sync_direction {
+        data.sync_direction = Some(sync_direction);
+    }
 
     if update.limit.rate_in.is_some() {
         data.limit.rate_in = update.limit.rate_in;
@@ -519,11 +515,11 @@ pub fn update_sync_job(
         }
     }
 
-    if !check_sync_job_modify_access(&user_info, &auth_id, &data, sync_direction) {
+    if !check_sync_job_modify_access(&user_info, &auth_id, &data) {
         bail!("permission check failed");
     }
 
-    config.set_data(&id, sync_direction.as_config_type_str(), &data)?;
+    config.set_data(&id, "sync", &data)?;
 
     sync::save_config(&config)?;
 
@@ -570,15 +566,16 @@ pub fn delete_sync_job(
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    if let Some((config_type, config_section)) = config.sections.get(&id) {
-        let sync_direction = SyncDirection::from_config_type_str(config_type)?;
-        let job = SyncJobConfig::deserialize(config_section)?;
-        if !check_sync_job_modify_access(&user_info, &auth_id, &job, sync_direction) {
-            bail!("permission check failed");
+    match config.lookup("sync", &id) {
+        Ok(job) => {
+            if !check_sync_job_modify_access(&user_info, &auth_id, &job) {
+                bail!("permission check failed");
+            }
+            config.sections.remove(&id);
         }
-        config.sections.remove(&id);
-    } else {
-        http_bail!(NOT_FOUND, "job '{}' does not exist.", id)
+        Err(_) => {
+            http_bail!(NOT_FOUND, "job '{}' does not exist.", id)
+        }
     }
 
     sync::save_config(&config)?;
@@ -647,62 +644,36 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         schedule: None,
         limit: pbs_api_types::RateLimitConfig::default(), // no limit
         transfer_last: None,
+        sync_direction: None, // use default
     };
 
     // should work without ACLs
-    assert!(check_sync_job_read_access(
-        &user_info,
-        root_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
-    assert!(check_sync_job_modify_access(
-        &user_info,
-        root_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(check_sync_job_read_access(&user_info, root_auth_id, &job));
+    assert!(check_sync_job_modify_access(&user_info, root_auth_id, &job,));
 
     // user without permissions must fail
     assert!(!check_sync_job_read_access(
         &user_info,
         &no_perm_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
     assert!(!check_sync_job_modify_access(
         &user_info,
         &no_perm_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // reading without proper read permissions on either remote or local must fail
-    assert!(!check_sync_job_read_access(
-        &user_info,
-        &read_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(!check_sync_job_read_access(&user_info, &read_auth_id, &job,));
 
     // reading without proper read permissions on local end must fail
     job.remote = Some("remote1".to_string());
-    assert!(!check_sync_job_read_access(
-        &user_info,
-        &read_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(!check_sync_job_read_access(&user_info, &read_auth_id, &job,));
 
     // reading without proper read permissions on remote end must fail
     job.remote = Some("remote0".to_string());
     job.store = "localstore1".to_string();
-    assert!(!check_sync_job_read_access(
-        &user_info,
-        &read_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(!check_sync_job_read_access(&user_info, &read_auth_id, &job,));
 
     // writing without proper write permissions on either end must fail
     job.store = "localstore0".to_string();
@@ -710,7 +681,6 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // writing without proper write permissions on local end must fail
@@ -723,53 +693,38 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // reset remote to one where users have access
     job.remote = Some("remote1".to_string());
 
     // user with read permission can only read, but not modify/run
-    assert!(check_sync_job_read_access(
-        &user_info,
-        &read_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(check_sync_job_read_access(&user_info, &read_auth_id, &job,));
     job.owner = Some(read_auth_id.clone());
     assert!(!check_sync_job_modify_access(
         &user_info,
         &read_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
     job.owner = None;
     assert!(!check_sync_job_modify_access(
         &user_info,
         &read_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
     job.owner = Some(write_auth_id.clone());
     assert!(!check_sync_job_modify_access(
         &user_info,
         &read_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // user with simple write permission can modify/run
-    assert!(check_sync_job_read_access(
-        &user_info,
-        &write_auth_id,
-        &job,
-        SyncDirection::Pull,
-    ));
+    assert!(check_sync_job_read_access(&user_info, &write_auth_id, &job,));
     assert!(check_sync_job_modify_access(
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // but can't modify/run with deletion
@@ -778,7 +733,6 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // unless they have Datastore.Prune as well
@@ -787,7 +741,6 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // changing owner is not possible
@@ -796,7 +749,6 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // also not to the default 'root@pam'
@@ -805,7 +757,6 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     // unless they have Datastore.Modify as well
@@ -815,14 +766,12 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
     job.owner = None;
     assert!(check_sync_job_modify_access(
         &user_info,
         &write_auth_id,
         &job,
-        SyncDirection::Pull,
     ));
 
     Ok(())

@@ -13,9 +13,8 @@ use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
     Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreNotify, DatastoreTuning, KeepOptions,
-    MaintenanceMode, PruneJobConfig, PruneJobOptions, SyncDirection, DATASTORE_SCHEMA,
-    PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY,
-    PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    MaintenanceMode, PruneJobConfig, PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -591,15 +590,8 @@ pub async fn delete_datastore(
         for job in list_verification_jobs(Some(name.clone()), Value::Null, rpcenv)? {
             delete_verification_job(job.config.id, None, rpcenv)?
         }
-        for direction in [SyncDirection::Pull, SyncDirection::Push] {
-            for job in list_config_sync_jobs(
-                Some(name.clone()),
-                Some(direction.into()),
-                Value::Null,
-                rpcenv,
-            )? {
-                delete_sync_job(job.config.id, None, rpcenv)?
-            }
+        for job in list_config_sync_jobs(Some(name.clone()), None, Value::Null, rpcenv)? {
+            delete_sync_job(job.config.id, None, rpcenv)?
         }
         for job in list_prune_jobs(Some(name.clone()), Value::Null, rpcenv)? {
             delete_prune_job(job.config.id, None, rpcenv)?
