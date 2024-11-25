@@ -6,7 +6,7 @@ use anyhow::Error;
 use proxmox_schema::{ApiType, Schema};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use pbs_api_types::{SyncDirection, SyncJobConfig, JOB_ID_SCHEMA};
+use pbs_api_types::{SyncJobConfig, JOB_ID_SCHEMA};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
@@ -18,19 +18,10 @@ fn init() -> SectionConfig {
         _ => unreachable!(),
     };
 
-    let pull_plugin = SectionConfigPlugin::new(
-        SyncDirection::Pull.as_config_type_str().to_string(),
-        Some(String::from("id")),
-        obj_schema,
-    );
-    let push_plugin = SectionConfigPlugin::new(
-        SyncDirection::Push.as_config_type_str().to_string(),
-        Some(String::from("id")),
-        obj_schema,
-    );
+    let sync_plugin =
+        SectionConfigPlugin::new("sync".to_string(), Some(String::from("id")), obj_schema);
     let mut config = SectionConfig::new(&JOB_ID_SCHEMA);
-    config.register_plugin(pull_plugin);
-    config.register_plugin(push_plugin);
+    config.register_plugin(sync_plugin);
 
     config
 }
