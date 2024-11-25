@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Error};
+use anyhow::{bail, format_err, Error};
 use hex::FromHex;
 use serde_json::Value;
 use tracing::warn;
@@ -21,7 +21,8 @@ use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
 use crate::api2::admin::{
-    prune::list_prune_jobs, sync::list_config_sync_jobs, verify::list_verification_jobs,
+    datastore::do_mount_device, prune::list_prune_jobs, sync::list_config_sync_jobs,
+    verify::list_verification_jobs,
 };
 use crate::api2::config::prune::{delete_prune_job, do_create_prune_job};
 use crate::api2::config::sync::delete_sync_job;
@@ -32,6 +33,7 @@ use pbs_config::CachedUserInfo;
 use proxmox_rest_server::WorkerTask;
 
 use crate::server::jobstate;
+use crate::tools::disks::unmount_by_mountpoint;
 
 #[api(
     input: {
@@ -73,37 +75,58 @@ pub(crate) fn do_create_datastore(
     datastore: DataStoreConfig,
     reuse_datastore: bool,
 ) -> Result<(), Error> {
-    let path: PathBuf = datastore.path.clone().into();
+    let path: PathBuf = datastore.absolute_path().into();
 
     if path.parent().is_none() {
         bail!("cannot create datastore in root path");
     }
+
+    let need_unmount = datastore.backing_device.is_some();
+    if need_unmount {
+        do_mount_device(datastore.clone())?;
+    };
 
     let tuning: DatastoreTuning = serde_json::from_value(
         DatastoreTuning::API_SCHEMA
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
 
-    if reuse_datastore {
-        ChunkStore::verify_chunkstore(&path)?;
+    let res = if reuse_datastore {
+        ChunkStore::verify_chunkstore(&path)
     } else {
+        let mut is_empty = true;
         if let Ok(dir) = std::fs::read_dir(&path) {
             for file in dir {
                 let name = file?.file_name();
                 let name = name.to_str();
                 if !name.map_or(false, |name| name.starts_with('.') || name == "lost+found") {
-                    bail!("datastore path is not empty");
+                    is_empty = false;
+                    break;
                 }
             }
         }
-        let backup_user = pbs_config::backup_user()?;
-        let _store = ChunkStore::create(
-            &datastore.name,
-            path,
-            backup_user.uid,
-            backup_user.gid,
-            tuning.sync_level.unwrap_or_default(),
-        )?;
+        if is_empty {
+            let backup_user = pbs_config::backup_user()?;
+            ChunkStore::create(
+                &datastore.name,
+                path.clone(),
+                backup_user.uid,
+                backup_user.gid,
+                tuning.sync_level.unwrap_or_default(),
+            )
+            .map(|_| ())
+        } else {
+            Err(format_err!("datastore path not empty"))
+        }
+    };
+
+    if res.is_err() {
+        if need_unmount {
+            if let Err(e) = unmount_by_mountpoint(&path) {
+                warn!("could not unmount device: {e}");
+            }
+        }
+        return res;
     }
 
     config.set_data(&datastore.name, "datastore", &datastore)?;
@@ -145,6 +168,17 @@ pub fn create_datastore(
 
     if section_config.sections.contains_key(&config.name) {
         param_bail!("name", "datastore '{}' already exists.", config.name);
+    }
+
+    if config.backing_device.is_none() && !config.path.starts_with("/") {
+        param_bail!("path", "expected an abolute path, '{}' is not", config.path);
+    }
+    if config.backing_device.is_some() && config.path.starts_with("/") {
+        param_bail!(
+            "path",
+            "expected a relative on-device path, '{}' is not",
+            config.path
+        );
     }
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
