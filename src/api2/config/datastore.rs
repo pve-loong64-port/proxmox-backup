@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, format_err, Error};
@@ -79,6 +79,25 @@ pub(crate) fn do_create_datastore(
 
     if path.parent().is_none() {
         bail!("cannot create datastore in root path");
+    }
+
+    let new_store_path = Path::new(&datastore.path);
+    for store in config.convert_to_typed_array::<DataStoreConfig>("datastore")? {
+        if store.backing_device != datastore.backing_device {
+            continue;
+        }
+
+        // Since we check for that on creation, we assume all removable datastore
+        // paths are relative, so don't have a leading `/`.
+        let store_path = Path::new(&store.path);
+        if store_path.starts_with(&new_store_path) || new_store_path.starts_with(&store_path) {
+            param_bail!(
+                "path",
+                "nested datastores not allowed: '{}' already in '{}'",
+                store.name,
+                store.path
+            );
+        }
     }
 
     let need_unmount = datastore.backing_device.is_some();
