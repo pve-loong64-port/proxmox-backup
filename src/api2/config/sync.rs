@@ -229,6 +229,10 @@ pub fn create_sync_job(
         bail!("source and target datastore can't be the same");
     }
 
+    if sync_direction == SyncDirection::Push && config.resync_corrupt.is_some() {
+        bail!("push jobs do not support resync-corrupt option");
+    }
+
     if let Some(max_depth) = config.max_depth {
         if let Some(ref ns) = config.ns {
             ns.check_max_depth(max_depth)?;
@@ -388,6 +392,10 @@ pub fn update_sync_job(
         } else {
             http_bail!(NOT_FOUND, "job '{id}' does not exist.")
         };
+
+    if sync_direction == SyncDirection::Push && update.resync_corrupt.is_some() {
+        bail!("push jobs do not support resync-corrupt option");
+    }
 
     if let Some(delete) = delete {
         for delete_prop in delete {
