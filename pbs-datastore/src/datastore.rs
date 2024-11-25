@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -14,6 +15,7 @@ use proxmox_schema::ApiType;
 use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::fs::{lock_dir_noblock, DirLockGuard};
+use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_worker_task::WorkerTaskContext;
 
@@ -44,6 +46,70 @@ pub fn check_backup_owner(owner: &Authid, auth_id: &Authid) -> Result<(), Error>
         bail!("backup owner check failed ({} != {})", auth_id, owner);
     }
     Ok(())
+}
+
+/// Check if a device with a given UUID is currently mounted at store_mount_point by
+/// comparing the `st_rdev` values of `/dev/disk/by-uuid/<uuid>` and the source device in
+/// /proc/self/mountinfo.
+///
+/// If we can't check if it is mounted, we treat that as not mounted,
+/// returning false.
+///
+/// Reasons it could fail other than not being mounted where expected:
+///  - could not read /proc/self/mountinfo
+///  - could not stat /dev/disk/by-uuid/<uuid>
+///  - /dev/disk/by-uuid/<uuid> is not a block device
+///
+/// Since these are very much out of our control, there is no real value in distinguishing
+/// between them, so for this function they all are treated as 'device not mounted'
+fn is_datastore_mounted_at(store_mount_point: String, device_uuid: &str) -> bool {
+    use nix::sys::stat::SFlag;
+
+    let store_mount_point = Path::new(&store_mount_point);
+
+    let dev_node = match nix::sys::stat::stat(format!("/dev/disk/by-uuid/{device_uuid}").as_str()) {
+        Ok(stat) if SFlag::from_bits_truncate(stat.st_mode) == SFlag::S_IFBLK => stat.st_rdev,
+        _ => return false,
+    };
+
+    let Ok(mount_info) = MountInfo::read() else {
+        return false;
+    };
+
+    for (_, entry) in mount_info {
+        let Some(source) = entry.mount_source else {
+            continue;
+        };
+
+        if entry.mount_point != store_mount_point || !source.as_bytes().starts_with(b"/") {
+            continue;
+        }
+
+        if let Ok(stat) = nix::sys::stat::stat(source.as_os_str()) {
+            let sflag = SFlag::from_bits_truncate(stat.st_mode);
+
+            if sflag == SFlag::S_IFBLK && stat.st_rdev == dev_node {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+pub fn get_datastore_mount_status(config: &DataStoreConfig) -> Option<bool> {
+    let Some(ref device_uuid) = config.backing_device else {
+        return None;
+    };
+    Some(is_datastore_mounted_at(config.absolute_path(), device_uuid))
+}
+
+pub fn ensure_datastore_is_mounted(config: &DataStoreConfig) -> Result<(), Error> {
+    match get_datastore_mount_status(config) {
+        Some(true) => Ok(()),
+        Some(false) => Err(format_err!("Datastore '{}' is not mounted", config.name)),
+        None => Ok(()),
+    }
 }
 
 /// Datastore Management
@@ -156,6 +222,12 @@ impl DataStore {
             }
         }
 
+        if get_datastore_mount_status(&config) == Some(false) {
+            let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
+            datastore_cache.remove(&config.name);
+            bail!("datastore '{}' is not mounted", config.name);
+        }
+
         let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
         let entry = datastore_cache.get(name);
 
@@ -258,6 +330,8 @@ impl DataStore {
         operation: Option<Operation>,
     ) -> Result<Arc<Self>, Error> {
         let name = config.name.clone();
+
+        ensure_datastore_is_mounted(&config)?;
 
         let tuning: DatastoreTuning = serde_json::from_value(
             DatastoreTuning::API_SCHEMA

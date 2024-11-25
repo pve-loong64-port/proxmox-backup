@@ -176,6 +176,10 @@ fn collect_disk_stats_sync() -> (DiskStat, Vec<DiskStat>) {
                     continue;
                 }
 
+                if pbs_datastore::get_datastore_mount_status(&config) == Some(false) {
+                    continue;
+                }
+
                 datastores.push(gather_disk_stats(
                     disk_manager.clone(),
                     Path::new(&config.absolute_path()),
