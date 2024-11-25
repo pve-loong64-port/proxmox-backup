@@ -165,6 +165,44 @@ following command creates a new datastore called ``store1`` on
   # proxmox-backup-manager datastore create store1 /backup/disk1/store1
 
 
+Removable Datastores
+^^^^^^^^^^^^^^^^^^^^
+Removable datastores have a ``backing-device`` associated with them, they can be
+mounted and unmounted. Other than that they behave the same way a normal datastore
+would.
+
+They can be created on already correctly formatted partitions, which, as with normal
+datastores, should be either ``ext4`` or ``xfs``.  It is also possible to create them
+on completely unused disks through "Administration" > "Disks / Storage" > "Directory",
+using this method the disk will be partitioned and formatted automatically for the datastore.
+
+Devices with only one datastore on them will be mounted automatically. It is possible to create a
+removable datastore on one PBS and use it on multiple instances, the device just has to be added
+on each instance as a removable datastore by checking "reuse datastore" on creation.
+If the device already contains a datastore at the specified path it'll just be added as
+a new datastore to the PBS instance and will be mounted whenever plugged in. Unmounting has
+to be done through the UI by clicking "Unmount" on the summary page or using the CLI.
+
+A single device can house multiple datastores, they only limitation is that they are not
+allowed to be nested.
+
+.. code-block:: console
+
+  # proxmox-backup-manager datastore unmount store1
+
+both will wait for any running tasks to finish and unmount the device.
+
+All removable datastores are mounted under /mnt/datastore/<name>, and the specified path
+refers to the path on the device.
+
+All datastores present on a device can be listed using ``proxmox-backup-debug``.
+
+.. code-block:: console
+
+  # proxmox-backup-debug inspect device /dev/...
+
+
+
 Managing Datastores
 ^^^^^^^^^^^^^^^^^^^
 
