@@ -31,6 +31,40 @@ Ext.define('PBS.config.SyncJobView', {
     controller: {
 	xclass: 'Ext.app.ViewController',
 
+	search: function(tf, value) {
+	    let me = this;
+	    let view = me.getView();
+	    let store = view.getStore();
+	    if (!value && value !== 0) {
+		store.clearFilter();
+		tf.triggers.clear.setVisible(false);
+		return;
+	    }
+	    tf.triggers.clear.setVisible(true);
+	    if (value.length < 2) return;
+
+	    store.clearFilter();
+
+	    let fieldsToSearch = ['direction', 'id', 'remote', 'remote-store', 'owner'];
+	    if (!view.datastore) {
+		fieldsToSearch.push('store');
+	    }
+	    value = value.toLowerCase();
+
+
+	    store.addFilter(function(rec) {
+		let found = false;
+		for (const field of fieldsToSearch) {
+		    let recValue = rec.data[field] ?? '';
+		    if (recValue.toString().toLowerCase().indexOf(value) !== -1) {
+			found = true;
+			break;
+		    }
+		}
+		return found;
+	    });
+	},
+
 	addPullSyncJob: function() {
 	    this.addSyncJob('pull');
 	},
@@ -196,6 +230,34 @@ Ext.define('PBS.config.SyncJobView', {
 	    text: gettext('Run now'),
 	    handler: 'runSyncJob',
 	    disabled: true,
+	},
+	'->',
+	{
+	    xtype: 'tbtext',
+	    html: gettext('Search'),
+	},
+	{
+	    xtype: 'textfield',
+	    reference: 'searchbox',
+	    emptyText: gettext('(remote) store, remote, id, owner, direction'),
+	    minWidth: 300,
+	    triggers: {
+		clear: {
+		    cls: 'pmx-clear-trigger',
+		    weight: -1,
+		    hidden: true,
+		    handler: function() {
+			this.triggers.clear.setVisible(false);
+			this.setValue('');
+		    },
+		},
+	    },
+	    listeners: {
+		change: {
+		    fn: 'search',
+		    buffer: 500,
+		},
+	    },
 	},
     ],
 
