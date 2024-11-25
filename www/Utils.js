@@ -740,14 +740,29 @@ Ext.define('PBS.Utils', {
 	return `${icon} ${value}`;
     },
 
-    // FIXME: this "parser" is brittle and relies on the order the arguments will appear in
+    /**
+     * Parses maintenance mode property string.
+     * Examples:
+     *   "offline,message=foo" -> ["offline", "foo"]
+     *   "offline" -> ["offline", null]
+     *   "message=foo,offline" -> ["offline", "foo"]
+     *   null/undefined -> [null, null]
+     *
+     * @param {string|null} mode - Maintenance mode string to parse.
+     * @return {Array<string|null>} - Parsed maintenance mode values.
+     */
     parseMaintenanceMode: function(mode) {
-	let [type, message] = mode.split(/,(.+)/);
-	type = type.split("=").pop();
-	message = message ? message.split("=")[1]
-	    .replace(/^"(.*)"$/, '$1')
-	    .replaceAll('\\"', '"') : null;
-	return [type, message];
+	if (!mode) {
+	    return [null, null];
+	}
+	return mode.split(',').reduce(([m, msg], pair) => {
+	    const [key, value] = pair.split('=');
+	    if (key === 'message') {
+		return [m, value.replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"')];
+	    } else {
+		return [value ?? key, msg];
+	    }
+	}, [null, null]);
     },
 
     renderMaintenance: function(mode, activeTasks) {
