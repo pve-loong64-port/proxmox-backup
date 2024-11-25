@@ -44,6 +44,7 @@ fn list_sync_jobs(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value
 
     let options = default_table_format_options()
         .column(ColumnConfig::new("id"))
+        .column(ColumnConfig::new("sync-direction"))
         .column(ColumnConfig::new("store"))
         .column(ColumnConfig::new("remote"))
         .column(ColumnConfig::new("remote-store"))
