@@ -43,6 +43,20 @@ Ext.define('PBS.window.CreateDirectory', {
 	    name: 'add-datastore',
 	    fieldLabel: gettext('Add as Datastore'),
 	    value: '1',
+	    listeners: {
+		change(field, newValue, _oldValue) {
+		    let form = field.up('form');
+		    let rmBox = form.down('[name=removable-datastore]');
+
+		    rmBox.setDisabled(!newValue);
+		    rmBox.setValue(false);
+		},
+	    },
+	},
+	{
+	    xtype: 'proxmoxcheckbox',
+	    name: 'removable-datastore',
+	    fieldLabel: gettext('is removable'),
 	},
     ],
 });

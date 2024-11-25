@@ -150,6 +150,8 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
             "removable-datastore": {
                 description: "The added datastore is removable.",
                 type: bool,
+                optional: true,
+                default: false,
             },
             filesystem: {
                 type: FileSystemType,

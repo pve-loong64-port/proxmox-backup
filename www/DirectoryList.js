@@ -122,6 +122,19 @@ Ext.define('PBS.admin.Directorylist', {
 
     columns: [
 	{
+	    text: '<span class="fa fa-plug"/>',
+	    flex: 0,
+	    width: 35,
+	    dataIndex: 'removable',
+	    renderer: function(_text, _, row) {
+		if (row.data.removable) {
+		    return `<i class="fa fa-check"/>`;
+		} else {
+		    return '';
+		}
+	    },
+	},
+	{
 	    text: gettext('Path'),
 	    dataIndex: 'path',
 	    flex: 1,
