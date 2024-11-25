@@ -226,6 +226,19 @@ Ext.define('PBS.DataStoreSummary', {
     tbar: [
 	{
 	    xtype: 'button',
+	    text: gettext('Show Connection Information'),
+	    handler: function() {
+		let me = this;
+		let datastore = me.up('panel').datastore;
+		Ext.create('PBS.window.DatastoreRepoInfo', {
+		    datastore,
+		    autoShow: true,
+		});
+	    },
+	},
+	{ xtype: 'tbseparator', reference: 'mountButtonSeparator', hidden: true },
+	{
+	    xtype: 'button',
 	    text: gettext('Unmount'),
 	    hidden: true,
 	    itemId: 'unmountButton',
@@ -264,18 +277,6 @@ Ext.define('PBS.DataStoreSummary', {
 			    upid: response.result.data,
 			}).show();
 		    },
-		});
-	    },
-	},
-	{
-	    xtype: 'button',
-	    text: gettext('Show Connection Information'),
-	    handler: function() {
-		let me = this;
-		let datastore = me.up('panel').datastore;
-		Ext.create('PBS.window.DatastoreRepoInfo', {
-		    datastore,
-		    autoShow: true,
 		});
 	    },
 	},
@@ -416,15 +417,16 @@ Ext.define('PBS.DataStoreSummary', {
 	    url: `/config/datastore/${me.datastore}`,
 	    waitMsgTarget: me.down('pbsDataStoreInfo'),
 	    success: function(response) {
-		let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
-		let unmountBtn = me.lookupReferenceHolder().lookupReference('unmountButton');
 		let data = response.result.data;
-		let path = Ext.htmlEncode(data.path);
+
 		const removable = !!data['backing-device'];
-		unmountBtn.setHidden(!removable);
-		mountBtn.setHidden(!removable);
+		me.lookupReferenceHolder().lookupReference('mountButtonSeparator').setHidden(!removable);
+		me.lookupReferenceHolder().lookupReference('mountButton').setHidden(!removable);
+		me.lookupReferenceHolder().lookupReference('unmountButton').setHidden(!removable);
+
+		let path = Ext.htmlEncode(data.path);
 		me.down('pbsDataStoreInfo').setTitle(`${me.datastore} (${path})`);
-		me.down('pbsDataStoreNotes').setNotes(response.result.data.comment);
+		me.down('pbsDataStoreNotes').setNotes(data.comment);
 	    },
 	    failure: function(response) {
 		// fallback if e.g. we have no permissions to the config
