@@ -79,6 +79,14 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/file-formats.html#dynamic-index-format",
     "title": "Dynamic Index Format (``.didx``)"
   },
+  "minimum-system-requirements": {
+    "link": "/docs/system-requirements.html#minimum-system-requirements",
+    "title": "Minimum Server Requirements, for Evaluation"
+  },
+  "installation-media": {
+    "link": "/docs/installation-media.html#installation-media",
+    "title": "Installation Media"
+  },
   "sysadmin-package-repositories": {
     "link": "/docs/installation.html#sysadmin-package-repositories",
     "title": "Debian Package Repositories"
@@ -95,13 +103,25 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/installation.html#package-repositories-client-only",
     "title": "Proxmox Backup Client-only Repository"
   },
-  "package-repositories-client-only-apt": {
-    "link": "/docs/installation.html#package-repositories-client-only-apt",
-    "title": "APT-based Proxmox Backup Client Repository"
-  },
   "node-options-http-proxy": {
     "link": "/docs/installation.html#node-options-http-proxy",
     "title": "Repository Access Behind HTTP Proxy"
+  },
+  "using-the-installer": {
+    "link": "/docs/using-the-installer.html#using-the-installer",
+    "title": "Install `Proxmox Backup`_ Server using the Installer"
+  },
+  "advanced-lvm-options": {
+    "link": "/docs/using-the-installer.html#advanced-lvm-options",
+    "title": "Advanced LVM Configuration Options"
+  },
+  "advanced-zfs-options": {
+    "link": "/docs/using-the-installer.html#advanced-zfs-options",
+    "title": "Advanced ZFS Configuration Options"
+  },
+  "nomodeset-kernel-param": {
+    "link": "/docs/using-the-installer.html#nomodeset-kernel-param",
+    "title": "Adding the ``nomodeset`` Kernel Parameter"
   },
   "get-help": {
     "link": "/docs/introduction.html#get-help",
@@ -122,6 +142,10 @@ const proxmoxOnlineHelpInfo = {
   "maintenance-gc": {
     "link": "/docs/maintenance.html#maintenance-gc",
     "title": "Garbage Collection"
+  },
+  "gc-background": {
+    "link": "/docs/maintenance.html#gc-background",
+    "title": "GC Background"
   },
   "maintenance-verification": {
     "link": "/docs/maintenance.html#maintenance-verification",
@@ -226,6 +250,10 @@ const proxmoxOnlineHelpInfo = {
   "chapter-zfs": {
     "link": "/docs/sysadmin.html#chapter-zfs",
     "title": "ZFS on Linux"
+  },
+  "zfs-swap": {
+    "link": "/docs/sysadmin.html#zfs-swap",
+    "title": "Swap on ZFS"
   },
   "local-zfs-special-device": {
     "link": "/docs/sysadmin.html#local-zfs-special-device",
@@ -390,6 +418,18 @@ const proxmoxOnlineHelpInfo = {
   "tech-design-overview": {
     "link": "/docs/technical-overview.html#tech-design-overview",
     "title": "Technical Overview"
+  },
+  "change-detection-mode-legacy": {
+    "link": "/docs/technical-overview.html#change-detection-mode-legacy",
+    "title": "Legacy Mode"
+  },
+  "change-detection-mode-data": {
+    "link": "/docs/technical-overview.html#change-detection-mode-data",
+    "title": "Data Mode"
+  },
+  "change-detection-mode-metadata": {
+    "link": "/docs/technical-overview.html#change-detection-mode-metadata",
+    "title": "Metadata Mode"
   },
   "terms": {
     "link": "/docs/terminology.html#terms",
