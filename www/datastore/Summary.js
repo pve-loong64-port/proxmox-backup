@@ -368,10 +368,13 @@ Ext.define('PBS.DataStoreSummary', {
 	    interval: 1000,
 	});
 
+	let lastRequestWasFailue = false;
 	me.mon(me.statusStore, 'load', (s, records, success) => {
 	    let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
 	    let unmountBtn = me.lookupReferenceHolder().lookupReference('unmountButton');
 	    if (!success) {
+		lastRequestWasFailue = true;
+
 		me.statusStore.stopUpdate();
 		me.down('pbsDataStoreInfo').fireEvent('deactivate');
 		Proxmox.Utils.API2Request({
@@ -395,9 +398,13 @@ Ext.define('PBS.DataStoreSummary', {
 		    },
 		});
 	    } else {
-		me.down('pbsDataStoreInfo').fireEvent('activate');
+		// only trigger on edges, else we couple our interval to the info one
+		if (lastRequestWasFailue) {
+		    me.down('pbsDataStoreInfo').fireEvent('activate');
+		}
 		unmountBtn.setDisabled(false);
 		mountBtn.setDisabled(true);
+		lastRequestWasFailue = false;
 	    }
 	});
 
