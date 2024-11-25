@@ -62,6 +62,20 @@ pub fn complete_datastore_name(_arg: &str, _param: &HashMap<String, String>) -> 
     }
 }
 
+pub fn complete_removable_datastore_name(
+    _arg: &str,
+    _param: &HashMap<String, String>,
+) -> Vec<String> {
+    match config() {
+        Ok((data, _digest)) => data
+            .sections
+            .into_iter()
+            .filter_map(|(name, (_, c))| c.get("backing-device").map(|_| name))
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
 pub fn complete_acl_path(_arg: &str, _param: &HashMap<String, String>) -> Vec<String> {
     let mut list = vec![
         String::from("/"),

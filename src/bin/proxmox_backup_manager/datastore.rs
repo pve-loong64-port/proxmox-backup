@@ -43,6 +43,34 @@ fn list_datastores(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
 }
 
 #[api(
+    protected: true,
+    input: {
+        properties: {
+            store: {
+                schema: DATASTORE_SCHEMA,
+            },
+            digest: {
+                optional: true,
+                schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
+            },
+        },
+    },
+)]
+/// Mount a removable datastore.
+async fn mount_datastore(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
+    param["node"] = "localhost".into();
+
+    let info = &api2::admin::datastore::API_METHOD_MOUNT;
+    let result = match info.handler {
+        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
+        _ => unreachable!(),
+    };
+
+    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    Ok(())
+}
+
+#[api(
     input: {
         properties: {
             name: {
@@ -99,6 +127,34 @@ async fn create_datastore(mut param: Value) -> Result<Value, Error> {
     view_task_result(&client, result, &output_format).await?;
 
     Ok(Value::Null)
+}
+
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: {
+                schema: DATASTORE_SCHEMA,
+            },
+            digest: {
+                optional: true,
+                schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
+            },
+        },
+    },
+)]
+/// Unmount a removable datastore.
+async fn unmount_datastore(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
+    param["node"] = "localhost".into();
+
+    let info = &api2::admin::datastore::API_METHOD_UNMOUNT;
+    let result = match info.handler {
+        ApiHandler::Async(handler) => (handler)(param, info, rpcenv).await?,
+        _ => unreachable!(),
+    };
+
+    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    Ok(())
 }
 
 #[api(
@@ -192,6 +248,15 @@ pub fn datastore_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_DATASTORES))
         .insert(
+            "mount",
+            CliCommand::new(&API_METHOD_MOUNT_DATASTORE)
+                .arg_param(&["store"])
+                .completion_cb(
+                    "store",
+                    pbs_config::datastore::complete_removable_datastore_name,
+                ),
+        )
+        .insert(
             "show",
             CliCommand::new(&API_METHOD_SHOW_DATASTORE)
                 .arg_param(&["name"])
@@ -200,6 +265,15 @@ pub fn datastore_commands() -> CommandLineInterface {
         .insert(
             "create",
             CliCommand::new(&API_METHOD_CREATE_DATASTORE).arg_param(&["name", "path"]),
+        )
+        .insert(
+            "unmount",
+            CliCommand::new(&API_METHOD_UNMOUNT_DATASTORE)
+                .arg_param(&["store"])
+                .completion_cb(
+                    "store",
+                    pbs_config::datastore::complete_removable_datastore_name,
+                ),
         )
         .insert(
             "update",
