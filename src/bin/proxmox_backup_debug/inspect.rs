@@ -331,6 +331,151 @@ fn inspect_file(
     Ok(())
 }
 
+/// Return the count of VM, CT and host backup groups and the count of namespaces
+/// as this tuple (vm, ct, host, ns)
+fn get_basic_ds_info(path: String) -> Result<(i64, i64, i64, i64), Error> {
+    let mut vms = 0;
+    let mut cts = 0;
+    let mut hosts = 0;
+    let mut ns = 0;
+    let mut walker = WalkDir::new(path).into_iter();
+
+    while let Some(entry_result) = walker.next() {
+        let entry = entry_result?;
+        if !entry.file_type().is_dir() {
+            continue;
+        }
+
+        let Some(name) = entry.path().file_name().and_then(|a| a.to_str()) else {
+            continue;
+        };
+
+        if name == ".chunks" {
+            walker.skip_current_dir();
+            continue;
+        }
+
+        let dir_count = std::fs::read_dir(entry.path())?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .count() as i64;
+
+        match name {
+            "ns" => ns += dir_count,
+            "vm" => {
+                vms += dir_count;
+                walker.skip_current_dir();
+            }
+            "ct" => {
+                cts += dir_count;
+                walker.skip_current_dir();
+            }
+            "host" => {
+                hosts += dir_count;
+                walker.skip_current_dir();
+            }
+            _ => {
+                // root or ns dir
+            }
+        }
+    }
+
+    Ok((vms, cts, hosts, ns))
+}
+
+#[api(
+    input: {
+        properties: {
+            device: {
+                description: "Device path, usually /dev/...",
+                type: String,
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        }
+    }
+)]
+/// Inspect a device for possible datastores on it
+fn inspect_device(device: String, param: Value) -> Result<(), Error> {
+    let output_format = get_output_format(&param);
+    let tmp_mount_path = format!(
+        "{}/{:x}",
+        pbs_buildcfg::rundir!("/mount"),
+        proxmox_uuid::Uuid::generate()
+    );
+
+    let default_options = proxmox_sys::fs::CreateOptions::new();
+    proxmox_sys::fs::create_path(
+        &tmp_mount_path,
+        Some(default_options.clone()),
+        Some(default_options.clone()),
+    )?;
+    let mut mount_cmd = std::process::Command::new("mount");
+    mount_cmd.arg(device.clone());
+    mount_cmd.arg(tmp_mount_path.clone());
+    proxmox_sys::command::run_command(mount_cmd, None)?;
+
+    let mut walker = WalkDir::new(tmp_mount_path.clone()).into_iter();
+
+    let mut stores = Vec::new();
+
+    let mut ds_count = 0;
+    while let Some(entry_result) = walker.next() {
+        let entry = entry_result?;
+
+        if entry.file_type().is_dir()
+            && entry
+                .file_name()
+                .to_str()
+                .map_or(false, |name| name == ".chunks")
+        {
+            let store_path = entry
+                .path()
+                .to_str()
+                .and_then(|n| n.strip_suffix("/.chunks"));
+
+            if let Some(store_path) = store_path {
+                ds_count += 1;
+                let (vm, ct, host, ns) = get_basic_ds_info(store_path.to_string())?;
+                stores.push(json!({
+                    "path": store_path.strip_prefix(&tmp_mount_path).unwrap_or("???"),
+                    "vm-count": vm,
+                    "ct-count": ct,
+                    "host-count": host,
+                    "ns-count": ns,
+                }));
+            };
+
+            walker.skip_current_dir();
+        }
+    }
+
+    let mut umount_cmd = std::process::Command::new("umount");
+    umount_cmd.arg(tmp_mount_path.clone());
+    proxmox_sys::command::run_command(umount_cmd, None)?;
+    std::fs::remove_dir(std::path::Path::new(&tmp_mount_path))?;
+
+    if output_format == "text" {
+        println!("Device containes {} stores", ds_count);
+        println!("---------------");
+        for s in stores {
+            println!(
+                "Datastore at {} | VM: {}, CT: {}, HOST: {}, NS: {}",
+                s["path"], s["vm-count"], s["ct-count"], s["host-count"], s["ns-count"]
+            );
+        }
+    } else {
+        format_and_print_result(
+            &json!({"store_count": stores.len(), "stores": stores}),
+            &output_format,
+        );
+    }
+
+    Ok(())
+}
+
 pub fn inspect_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert(
@@ -340,6 +485,10 @@ pub fn inspect_commands() -> CommandLineInterface {
         .insert(
             "file",
             CliCommand::new(&API_METHOD_INSPECT_FILE).arg_param(&["file"]),
+        )
+        .insert(
+            "device",
+            CliCommand::new(&API_METHOD_INSPECT_DEVICE).arg_param(&["device"]),
         );
 
     cmd_def.into()
