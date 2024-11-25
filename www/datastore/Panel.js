@@ -68,7 +68,7 @@ Ext.define('PBS.DataStorePanel', {
 	{
 	    iconCls: 'fa fa-refresh',
 	    itemId: 'syncjobs',
-	    xtype: 'pbsSyncJobPullPushView',
+	    xtype: 'pbsSyncJobView',
 	    cbind: {
 		datastore: '{datastore}',
 	    },

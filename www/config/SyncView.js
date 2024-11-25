@@ -26,26 +26,25 @@ Ext.define('PBS.config.SyncJobView', {
     stateful: true,
     stateId: 'grid-sync-jobs-v1',
 
-    title: gettext('Sync Jobs - Pull Direction'),
-    ownerHeader: gettext('Owner'),
-
-    cbindData: function(initialConfig) {
-	let me = this;
-	if (me.syncDirection === 'push') {
-	    me.title = gettext('Sync Jobs - Push Direction');
-	    me.ownerHeader = gettext('Local User');
-	}
-    },
+    title: gettext('Sync Jobs'),
 
     controller: {
 	xclass: 'Ext.app.ViewController',
 
-	addSyncJob: function() {
+	addPullSyncJob: function() {
+	    this.addSyncJob('pull');
+	},
+
+	addPushSyncJob: function() {
+	    this.addSyncJob('push');
+	},
+
+	addSyncJob: function(syncDirection) {
 	    let me = this;
 	    let view = me.getView();
             Ext.create('PBS.window.SyncJobEdit', {
 		datastore: view.datastore,
-		syncDirection: view.syncDirection,
+		syncDirection,
 		listeners: {
 		    destroy: function() {
 			me.reload();
@@ -63,7 +62,7 @@ Ext.define('PBS.config.SyncJobView', {
             Ext.create('PBS.window.SyncJobEdit', {
 		datastore: view.datastore,
                 id: selection[0].data.id,
-		syncDirection: view.syncDirection,
+		syncDirection: selection[0].data.direction,
 		listeners: {
 		    destroy: function() {
 			me.reload();
@@ -125,9 +124,7 @@ Ext.define('PBS.config.SyncJobView', {
 	    if (view.datastore !== undefined) {
 		params.store = view.datastore;
 	    }
-	    if (view.syncDirection !== undefined) {
-		params["sync-direction"] = view.syncDirection;
-	    }
+	    params['sync-direction'] = 'all';
 	    view.getStore().rstore.getProxy().setExtraParams(params);
 	    Proxmox.Utils.monStoreErrors(view, view.getStore().rstore);
 	},
@@ -158,10 +155,21 @@ Ext.define('PBS.config.SyncJobView', {
 
     tbar: [
 	{
-	    xtype: 'proxmoxButton',
 	    text: gettext('Add'),
-	    handler: 'addSyncJob',
-	    selModel: false,
+	    menu: [
+		{
+		    text: gettext('Add Pull Sync Job'),
+		    iconCls: "fa fa-fw fa-download",
+		    handler: 'addPullSyncJob',
+		    selModel: false,
+		},
+		{
+		    text: gettext('Add Push Sync Job'),
+		    iconCls: "fa fa-fw fa-upload",
+		    handler: 'addPushSyncJob',
+		    selModel: false,
+		},
+	    ],
 	},
 	{
 	    xtype: 'proxmoxButton',
@@ -206,6 +214,23 @@ Ext.define('PBS.config.SyncJobView', {
 	    sortable: true,
 	},
 	{
+	    header: gettext('Direction'),
+	    dataIndex: 'direction',
+	    renderer: function(value) {
+		let iconCls, text;
+		if (value === 'pull') {
+		    iconCls = 'download';
+		    text = gettext('Pull');
+		} else {
+		    iconCls = 'upload';
+		    text = gettext('Push');
+		}
+		return `<i class="fa fa-fw fa-${iconCls}"></i> ${text}`;
+	    },
+	    width: 100,
+	    sortable: true,
+	},
+	{
 	    header: gettext('Local Store'),
 	    dataIndex: 'store',
 	    width: 120,
@@ -245,9 +270,10 @@ Ext.define('PBS.config.SyncJobView', {
 	    sortable: true,
 	},
 	{
-	    cbind: {
-		header: '{ownerHeader}',
-	    },
+	    header: `${gettext('Local Owner/User')} <i class="fa fa-question-circle" data-qtip="
+	    ${gettext("Pull: The local owner.")}<br>
+	    ${gettext("Push: The local user used for access control.")}
+	    "></i>`,
 	    dataIndex: 'owner',
 	    renderer: 'render_optional_owner',
 	    flex: 2,

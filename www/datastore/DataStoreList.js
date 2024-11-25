@@ -239,7 +239,7 @@ Ext.define('PBS.datastore.DataStores', {
 	{
 	    iconCls: 'fa fa-refresh',
 	    itemId: 'syncjobs',
-	    xtype: 'pbsSyncJobPullPushView',
+	    xtype: 'pbsSyncJobView',
 	},
 	{
 	    iconCls: 'fa fa-check-circle',

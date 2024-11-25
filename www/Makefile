@@ -62,7 +62,6 @@ JSSRC=							\
 	config/TrafficControlView.js			\
 	config/ACLView.js				\
 	config/SyncView.js				\
-	config/SyncPullPushView.js			\
 	config/VerifyView.js				\
 	config/PruneView.js				\
 	config/GCView.js				\
