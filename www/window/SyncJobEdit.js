@@ -69,6 +69,14 @@ Ext.define('PBS.window.SyncJobEdit', {
 	    let nsSelector = view.down('pbsNamespaceSelector[name=ns]');
 	    nsSelector.setDatastore(value);
 	},
+
+	init: function() {
+	    let view = this.getView();
+	    if (view.syncDirectionPush && view.datastore !== undefined) {
+		let localNs = view.down('pbsNamespaceSelector[name=ns]').getValue();
+		view.down('pbsGroupFilter').setLocalNamespace(view.datastore, localNs);
+	    }
+	},
     },
 
     setValues: function(values) {
@@ -121,6 +129,16 @@ Ext.define('PBS.window.SyncJobEdit', {
 			    xtype: 'pbsDataStoreSelector',
 			    allowBlank: false,
 			},
+			listeners: {
+			    change: function(field, localStore) {
+				let me = this;
+				let view = me.up('pbsSyncJobEdit');
+				if (view.syncDirectionPush) {
+				    let localNs = view.down('pbsNamespaceSelector[name=ns]').getValue();
+				    view.down('pbsGroupFilter').setLocalNamespace(localStore, localNs);
+				}
+			    },
+			},
 		    },
 		    {
 			xtype: 'pbsNamespaceSelector',
@@ -133,6 +151,11 @@ Ext.define('PBS.window.SyncJobEdit', {
 			    change: function(field, localNs) {
 				let me = this;
 				let view = me.up('pbsSyncJobEdit');
+
+				if (view.syncDirectionPush) {
+				    let localStore = view.down('field[name=store]').getValue();
+				    view.down('pbsGroupFilter').setLocalNamespace(localStore, localNs);
+				}
 
 				let remoteNs = view.down('pbsRemoteNamespaceSelector[name=remote-ns]').getValue();
 				let maxDepthField = view.down('field[name=max-depth]');
@@ -268,7 +291,8 @@ Ext.define('PBS.window.SyncJobEdit', {
 				remoteNamespaceField.setRemote(remote);
 				remoteNamespaceField.setRemoteStore(value);
 
-				if (!me.syncDirectionPush) {
+				let view = me.up('pbsSyncJobEdit');
+				if (!view.syncDirectionPush) {
 				    me.up('tabpanel').down('pbsGroupFilter').setRemoteDatastore(remote, value);
 				} else {
 				    let localStore = me.up('pbsSyncJobEdit').down('field[name=store]').getValue();
@@ -293,7 +317,10 @@ Ext.define('PBS.window.SyncJobEdit', {
 
 				let remote = view.down('field[name=remote]').getValue();
 				let remoteStore = view.down('field[name=remote-store]').getValue();
-				me.up('tabpanel').down('pbsGroupFilter').setRemoteNamespace(remote, remoteStore, remoteNs);
+
+				if (!view.syncDirectionPush) {
+				    me.up('tabpanel').down('pbsGroupFilter').setRemoteNamespace(remote, remoteStore, remoteNs);
+				}
 
 				let localNs = view.down('pbsNamespaceSelector[name=ns]').getValue();
 				let maxDepthField = view.down('field[name=max-depth]');
