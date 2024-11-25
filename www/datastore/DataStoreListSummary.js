@@ -22,6 +22,7 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
 	    stillbad: 0,
 	    deduplication: 1.0,
 	    error: "",
+	    removable: false,
 	    maintenance: '',
 	},
     },

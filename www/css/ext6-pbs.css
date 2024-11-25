@@ -271,6 +271,10 @@ span.snapshot-comment-column {
     content: "\ ";
 }
 
+.x-treelist-item-icon.fa-plug, .pmx-tree-icon-custom.fa-plug {
+    font-size: 12px;
+}
+
 /* datastore maintenance */
 .pmx-tree-icon-custom.maintenance:after {
     content: "\f0ad";
@@ -287,6 +291,10 @@ span.snapshot-comment-column {
 }
 
 .pmx-tree-icon-custom.destroying:before {
+    color: #888;
+}
+
+.pmx-tree-icon-custom.unplugged:before {
     color: #888;
 }
 

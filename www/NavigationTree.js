@@ -267,13 +267,25 @@ Ext.define('PBS.view.main.NavigationTree', {
 		    j++;
 		}
 
-		let [qtip, iconCls] = ['', 'fa fa-database'];
+		let mountStatus = records[i].data['mount-status'] ?? 'nonremovable';
+		let isRemovable = mountStatus !== 'nonremovable';
+		let mainIcon = `fa fa-${isRemovable ? 'plug' : 'database'}`;
+		let [qtip, iconCls] = ['', mainIcon];
 		const maintenance = records[i].data.maintenance;
+
+		const removable_not_mounted = records[i].data['mount-status'] === 'notmounted';
+		if (removable_not_mounted) {
+		    iconCls = `${mainIcon} pmx-tree-icon-custom unplugged`;
+		    qtip = gettext('Removable datastore not mounted');
+		}
 		if (maintenance) {
 		    const [type, message] = PBS.Utils.parseMaintenanceMode(maintenance);
 		    qtip = `${type}${message ? ': ' + message : ''}`;
-		    let maintenanceTypeCls = type === 'delete' ? 'destroying' : 'maintenance';
-		    iconCls = `fa fa-database pmx-tree-icon-custom ${maintenanceTypeCls}`;
+		    let maintenanceTypeCls = 'maintenance';
+		    if (type === 'delete') {
+			maintenanceTypeCls = 'destroying';
+		    }
+		    iconCls = `${mainIcon} pmx-tree-icon-custom ${maintenanceTypeCls}`;
 		}
 
 		if (getChildTextAt(j).localeCompare(name) !== 0) {
