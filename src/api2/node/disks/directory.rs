@@ -45,6 +45,8 @@ pub struct DatastoreMountInfo {
     pub path: String,
     /// The mounted device.
     pub device: String,
+    /// This is removable
+    pub removable: bool,
     /// File system type
     pub filesystem: Option<String>,
     /// Mount options
@@ -61,7 +63,7 @@ pub struct DatastoreMountInfo {
         }
     },
     returns: {
-        description: "List of systemd datastore mount units.",
+        description: "List of removable-datastore devices and systemd datastore mount units.",
         type: Array,
         items: {
             type: DatastoreMountInfo,
@@ -100,6 +102,28 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
             path: data.Where,
             filesystem: data.Type,
             options: data.Options,
+            removable: false,
+        });
+    }
+
+    let (config, _digest) = pbs_config::datastore::config()?;
+    let store_list: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
+
+    for item in store_list
+        .into_iter()
+        .filter(|store| store.backing_device.is_some())
+    {
+        let Some(backing_device) = item.backing_device.as_deref() else {
+            continue;
+        };
+        list.push(DatastoreMountInfo {
+            unitfile: "datastore config".to_string(),
+            name: item.name.clone(),
+            device: format!("/dev/disk/by-uuid/{backing_device}"),
+            path: item.absolute_path(),
+            filesystem: None,
+            options: None,
+            removable: true,
         });
     }
 
