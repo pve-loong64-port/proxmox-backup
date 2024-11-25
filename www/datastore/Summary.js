@@ -61,16 +61,21 @@ Ext.define('PBS.DataStoreInfo', {
 		Proxmox.Utils.API2Request({
 		    url: `/config/datastore/${me.view.datastore}`,
 		    success: function(response) {
-			const config = response.result.data;
-			if (config['maintenance-mode']) {
-			    const [_type, msg] = PBS.Utils.parseMaintenanceMode(config['maintenance-mode']);
-			    me.view.el.mask(
-				`${gettext('Datastore is in maintenance mode')}${msg ? ': ' + msg : ''}`,
-				'fa pbs-maintenance-mask',
-			    );
-			} else {
+			let maintenanceString = response.result.data['maintenance-mode'];
+			let removable = !!response.result.data['backing-device'];
+			if (!maintenanceString && !removable) {
 			    me.view.el.mask(gettext('Datastore is not available'));
+			    return;
 			}
+
+			let [_type, msg] = PBS.Utils.parseMaintenanceMode(maintenanceString);
+			let isUnplugged = !maintenanceString && removable;
+			let maskMessage = isUnplugged
+			    ? gettext('Datastore is not mounted')
+			    : `${gettext('Datastore is in maintenance mode')}${msg ? ': ' + msg : ''}`;
+
+			let maskIcon = isUnplugged ? 'fa pbs-unplugged-mask' : 'fa pbs-maintenance-mask';
+			me.view.el.mask(maskMessage, maskIcon);
 		    },
 		});
 		return;
