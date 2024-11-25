@@ -116,7 +116,8 @@ impl Drop for DataStore {
                 && pbs_config::datastore::config()
                     .and_then(|(s, _)| s.lookup::<DataStoreConfig>("datastore", self.name()))
                     .map_or(false, |c| {
-                        c.get_maintenance_mode().map_or(false, |m| m.is_offline())
+                        c.get_maintenance_mode()
+                            .map_or(false, |m| m.clear_from_cache())
                     });
 
             if remove_from_cache {
@@ -216,7 +217,7 @@ impl DataStore {
         let datastore: DataStoreConfig = config.lookup("datastore", name)?;
         if datastore
             .get_maintenance_mode()
-            .map_or(false, |m| m.is_offline())
+            .map_or(false, |m| m.clear_from_cache())
         {
             // the datastore drop handler does the checking if tasks are running and clears the
             // cache entry, so we just have to trigger it here
