@@ -16,3 +16,6 @@ SUBSYSTEM=="scsi_generic", SUBSYSTEMS=="scsi", ATTRS{type}=="1", ENV{ID_SCSI_SER
   SYMLINK+="tape/by-id/scsi-$env{ID_SCSI_SERIAL}-sg"
 
 LABEL="persistent_storage_tape_end"
+
+# triggers the mounting of a removable device
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}!="", TAG+="systemd", ENV{SYSTEMD_WANTS}="removable-device-attach@$env{ID_FS_UUID}"

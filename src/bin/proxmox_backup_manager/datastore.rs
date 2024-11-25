@@ -9,7 +9,7 @@ use proxmox_backup::api2;
 use proxmox_backup::api2::config::datastore::DeletableProperty;
 use proxmox_backup::client_helpers::connect_to_localhost;
 
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use serde_json::Value;
 
 #[api(
@@ -244,6 +244,52 @@ async fn update_datastore(name: String, mut param: Value) -> Result<(), Error> {
     Ok(())
 }
 
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            uuid: {
+                type: String,
+                description: "The UUID of the device that should be mounted",
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        },
+    },
+)]
+/// Try mounting a removable datastore given the UUID.
+async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let uuid = param["uuid"]
+        .as_str()
+        .ok_or_else(|| format_err!("uuid has to be specified"))?;
+
+    let (config, _digest) = pbs_config::datastore::config()?;
+    let list: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
+    let matching_stores: Vec<DataStoreConfig> = list
+        .into_iter()
+        .filter(|store: &DataStoreConfig| {
+            store
+                .backing_device
+                .clone()
+                .map_or(false, |device| device.eq(&uuid))
+        })
+        .collect();
+
+    if matching_stores.len() != 1 {
+        return Ok(Value::Null);
+    }
+
+    if let Some(store) = matching_stores.get(0) {
+        api2::admin::datastore::do_mount_device(store.clone())?;
+    }
+
+    // we don't want to fail for UUIDs that are not associated with datastores, as that produces
+    // quite some noise in the logs, given this is check for every device that is plugged in.
+    Ok(Value::Null)
+}
+
 pub fn datastore_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_DATASTORES))
@@ -288,6 +334,10 @@ pub fn datastore_commands() -> CommandLineInterface {
                     "prune-schedule",
                     pbs_config::datastore::complete_calendar_event,
                 ),
+        )
+        .insert(
+            "uuid-mount",
+            CliCommand::new(&API_METHOD_UUID_MOUNT).arg_param(&["uuid"]),
         )
         .insert(
             "remove",

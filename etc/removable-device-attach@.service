@@ -1,0 +1,8 @@
+[Unit]
+Description=Try to mount the removable device of a datastore with uuid '%i'.
+After=proxmox-backup-proxy.service
+Requires=proxmox-backup-proxy.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/proxmox-backup-manager datastore uuid-mount %i

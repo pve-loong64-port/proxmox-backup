@@ -2,6 +2,7 @@ include ../defines.mk
 
 UNITS := \
 	proxmox-backup-daily-update.timer \
+	removable-device-attach@.service
 
 DYNAMIC_UNITS := \
 	proxmox-backup-banner.service \

@@ -4,6 +4,7 @@ etc/proxmox-backup-daily-update.service /lib/systemd/system/
 etc/proxmox-backup-daily-update.timer /lib/systemd/system/
 etc/proxmox-backup-proxy.service /lib/systemd/system/
 etc/proxmox-backup.service /lib/systemd/system/
+etc/removable-device-attach@.service /lib/systemd/system/
 usr/bin/pmt
 usr/bin/pmtx
 usr/bin/proxmox-tape
