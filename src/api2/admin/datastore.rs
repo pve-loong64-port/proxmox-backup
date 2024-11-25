@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
@@ -30,6 +30,7 @@ use proxmox_sys::fs::{
     file_read_firstline, file_read_optional_string, replace_file, CreateOptions,
 };
 use proxmox_time::CalendarEvent;
+use proxmox_worker_task::WorkerTaskContext;
 
 use pxar::accessor::aio::Accessor;
 use pxar::EntryKind;
@@ -38,13 +39,13 @@ use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupArchiveName,
     BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
     DataStoreConfig, DataStoreListItem, DataStoreStatus, GarbageCollectionJobStatus, GroupListItem,
-    JobScheduleStatus, KeepOptions, Operation, PruneJobOptions, SnapshotListItem,
-    SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
-    IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
-    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
-    VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    JobScheduleStatus, KeepOptions, MaintenanceMode, MaintenanceType, Operation, PruneJobOptions,
+    SnapshotListItem, SnapshotVerifyState, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA,
+    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
+    CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME,
+    MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+    PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID,
+    UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};
 use pbs_config::CachedUserInfo;
@@ -59,8 +60,8 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
-    check_backup_owner, task_tracking, BackupDir, BackupGroup, DataStore, LocalChunkReader,
-    StoreProgress,
+    check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, BackupGroup,
+    DataStore, LocalChunkReader, StoreProgress,
 };
 use pbs_tools::json::required_string_param;
 use proxmox_rest_server::{formatter, WorkerTask};
@@ -2392,6 +2393,283 @@ pub async fn set_backup_owner(
     .await?
 }
 
+fn setup_mounted_device(datastore: &DataStoreConfig, tmp_mount_path: &str) -> Result<(), Error> {
+    let default_options = proxmox_sys::fs::CreateOptions::new();
+    let mount_point = datastore.absolute_path();
+    let full_store_path = format!(
+        "{tmp_mount_path}/{}",
+        datastore.path.trim_start_matches('/')
+    );
+    let backup_user = pbs_config::backup_user()?;
+    let options = CreateOptions::new()
+        .owner(backup_user.uid)
+        .group(backup_user.gid);
+
+    proxmox_sys::fs::create_path(
+        &mount_point,
+        Some(default_options.clone()),
+        Some(options.clone()),
+    )
+    .map_err(|e| format_err!("creating mountpoint '{mount_point}' failed: {e}"))?;
+
+    // can't be created before it is mounted, so we have to do it here
+    proxmox_sys::fs::create_path(
+        &full_store_path,
+        Some(default_options.clone()),
+        Some(options.clone()),
+    )
+    .map_err(|e| format_err!("creating datastore path '{full_store_path}' failed: {e}"))?;
+
+    info!(
+        "bind mount '{}'({}) to '{}'",
+        datastore.name, datastore.path, mount_point
+    );
+
+    crate::tools::disks::bind_mount(Path::new(&full_store_path), Path::new(&mount_point))
+}
+
+/// Here we
+///
+/// 1. mount the removable device to `<PBS_RUN_DIR>/mount/<RANDOM_UUID>`
+/// 2. bind mount `<PBS_RUN_DIR>/mount/<RANDOM_UUID>/<datastore.path>` to `/mnt/datastore/<datastore.name>`
+/// 3. unmount `<PBS_RUN_DIR>/mount/<RANDOM_UUID>`
+///
+/// leaving us with the datastore being mounted directly with its name under /mnt/datastore/...
+///
+/// The reason for the randomized device mounting paths is to avoid two tasks trying to mount to
+/// the same path, this is *very* unlikely since the device is only mounted really shortly, but
+/// technically possible.
+pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
+    if let Some(uuid) = datastore.backing_device.as_ref() {
+        if pbs_datastore::get_datastore_mount_status(&datastore) == Some(true) {
+            bail!(
+                "device is already mounted at '{}'",
+                datastore.absolute_path()
+            );
+        }
+        let tmp_mount_path = format!(
+            "{}/{:x}",
+            pbs_buildcfg::rundir!("/mount"),
+            proxmox_uuid::Uuid::generate()
+        );
+
+        let default_options = proxmox_sys::fs::CreateOptions::new();
+        proxmox_sys::fs::create_path(
+            &tmp_mount_path,
+            Some(default_options.clone()),
+            Some(default_options.clone()),
+        )?;
+
+        info!("temporarily mounting '{uuid}' to '{}'", tmp_mount_path);
+        crate::tools::disks::mount_by_uuid(uuid, Path::new(&tmp_mount_path))
+            .map_err(|e| format_err!("mounting to tmp path failed: {e}"))?;
+
+        let setup_result = setup_mounted_device(&datastore, &tmp_mount_path);
+
+        let mut unmounted = true;
+        if let Err(e) = crate::tools::disks::unmount_by_mountpoint(Path::new(&tmp_mount_path)) {
+            unmounted = false;
+            warn!("unmounting from tmp path '{tmp_mount_path} failed: {e}'");
+        }
+        if unmounted {
+            if let Err(e) = std::fs::remove_dir(std::path::Path::new(&tmp_mount_path)) {
+                warn!("removing tmp path '{tmp_mount_path} failed: {e}'");
+            }
+        }
+
+        setup_result.map_err(|e| {
+            format_err!(
+                "Datastore '{}' could not be created: {}.",
+                datastore.name,
+                e
+            )
+        })?;
+    } else {
+        bail!(
+            "Datastore '{}' cannot be mounted because it is not removable.",
+            datastore.name
+        )
+    }
+    Ok(())
+}
+
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: {
+                schema: DATASTORE_SCHEMA,
+            },
+        }
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_AUDIT, false),
+    },
+)]
+/// Mount removable datastore.
+pub fn mount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let (section_config, _digest) = pbs_config::datastore::config()?;
+    let datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
+
+    if datastore.backing_device.is_none() {
+        bail!("datastore '{store}' is not removable");
+    }
+
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    let upid = WorkerTask::new_thread(
+        "mount-device",
+        Some(store),
+        auth_id.to_string(),
+        to_stdout,
+        move |_worker| do_mount_device(datastore),
+    )?;
+
+    Ok(json!(upid))
+}
+
+fn expect_maintanance_unmounting(
+    store: &str,
+) -> Result<(pbs_config::BackupLockGuard, DataStoreConfig), Error> {
+    let lock = pbs_config::datastore::lock_config()?;
+    let (section_config, _digest) = pbs_config::datastore::config()?;
+    let store_config: DataStoreConfig = section_config.lookup("datastore", store)?;
+
+    if store_config
+        .get_maintenance_mode()
+        .map_or(true, |m| m.ty != MaintenanceType::Unmount)
+    {
+        bail!("maintenance mode is not 'Unmount'");
+    }
+
+    Ok((lock, store_config))
+}
+
+fn unset_maintenance(
+    _lock: pbs_config::BackupLockGuard,
+    mut config: DataStoreConfig,
+) -> Result<(), Error> {
+    let (mut section_config, _digest) = pbs_config::datastore::config()?;
+    config.maintenance_mode = None;
+    section_config.set_data(&config.name, "datastore", &config)?;
+    pbs_config::datastore::save_config(&section_config)?;
+    Ok(())
+}
+
+fn do_unmount_device(
+    datastore: DataStoreConfig,
+    worker: Option<&dyn WorkerTaskContext>,
+) -> Result<(), Error> {
+    if datastore.backing_device.is_none() {
+        bail!("can't unmount non-removable datastore");
+    }
+    let mount_point = datastore.absolute_path();
+
+    let mut active_operations = task_tracking::get_active_operations(&datastore.name)?;
+    let mut old_status = String::new();
+    let mut aborted = false;
+    while active_operations.read + active_operations.write > 0 {
+        if let Some(worker) = worker {
+            if worker.abort_requested() || expect_maintanance_unmounting(&datastore.name).is_err() {
+                aborted = true;
+                break;
+            }
+            let status = format!(
+                "cannot unmount yet, still {} read and {} write operations active",
+                active_operations.read, active_operations.write
+            );
+            if status != old_status {
+                info!("{status}");
+                old_status = status;
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        active_operations = task_tracking::get_active_operations(&datastore.name)?;
+    }
+
+    if aborted || worker.map_or(false, |w| w.abort_requested()) {
+        let _ = expect_maintanance_unmounting(&datastore.name)
+            .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
+            .and_then(|(lock, config)| {
+                unset_maintenance(lock, config)
+                    .inspect_err(|e| warn!("could not reset maintenance mode: {e}"))
+            });
+        bail!("aborted, due to user request");
+    } else {
+        let (lock, config) = expect_maintanance_unmounting(&datastore.name)?;
+        crate::tools::disks::unmount_by_mountpoint(Path::new(&mount_point))?;
+        unset_maintenance(lock, config)
+            .map_err(|e| format_err!("could not reset maintenance mode: {e}"))?;
+    }
+    Ok(())
+}
+
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: { schema: DATASTORE_SCHEMA },
+        },
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, true),
+    }
+)]
+/// Unmount a removable device that is associated with the datastore
+pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let _lock = pbs_config::datastore::lock_config()?;
+    let (mut section_config, _digest) = pbs_config::datastore::config()?;
+    let mut datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
+
+    if datastore.backing_device.is_none() {
+        bail!("datastore '{store}' is not removable");
+    }
+
+    ensure_datastore_is_mounted(&datastore)?;
+
+    datastore.set_maintenance_mode(Some(MaintenanceMode {
+        ty: MaintenanceType::Unmount,
+        message: None,
+    }))?;
+    section_config.set_data(&store, "datastore", &datastore)?;
+    pbs_config::datastore::save_config(&section_config)?;
+
+    drop(_lock);
+
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    if let Ok(proxy_pid) = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN)
+    {
+        let sock = proxmox_daemon::command_socket::path_from_pid(proxy_pid);
+        let _ = proxmox_daemon::command_socket::send_raw(
+            sock,
+            &format!(
+                "{{\"command\":\"update-datastore-cache\",\"args\":\"{}\"}}\n",
+                &store
+            ),
+        )
+        .await;
+    }
+
+    let upid = WorkerTask::new_thread(
+        "unmount-device",
+        Some(store),
+        auth_id.to_string(),
+        to_stdout,
+        move |worker| do_unmount_device(datastore, Some(&worker)),
+    )?;
+
+    Ok(json!(upid))
+}
+
 #[sortable]
 const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
     (
@@ -2430,6 +2708,7 @@ const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
             .get(&API_METHOD_LIST_GROUPS)
             .delete(&API_METHOD_DELETE_GROUP),
     ),
+    ("mount", &Router::new().post(&API_METHOD_MOUNT)),
     (
         "namespace",
         // FIXME: move into datastore:: sub-module?!
@@ -2464,6 +2743,7 @@ const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
             .delete(&API_METHOD_DELETE_SNAPSHOT),
     ),
     ("status", &Router::new().get(&API_METHOD_STATUS)),
+    ("unmount", &Router::new().post(&API_METHOD_UNMOUNT)),
     (
         "upload-backup-log",
         &Router::new().upload(&API_METHOD_UPLOAD_BACKUP_LOG),
