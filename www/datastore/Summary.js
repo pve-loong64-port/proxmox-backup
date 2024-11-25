@@ -110,6 +110,7 @@ Ext.define('PBS.DataStoreInfo', {
 
 	startStore: function() { this.store.startUpdate(); },
 	stopStore: function() { this.store.stopUpdate(); },
+	doSingleStoreLoad: function() { this.store.load(); },
 
 	init: function(view) {
 	    let me = this;
@@ -378,7 +379,9 @@ Ext.define('PBS.DataStoreSummary', {
 		me.statusStore.stopUpdate();
 		me.rrdstore.stopUpdate();
 
-		me.down('pbsDataStoreInfo').fireEvent('deactivate');
+		let infoPanelController = me.down('pbsDataStoreInfo').getController();
+		infoPanelController.stopStore();
+		infoPanelController.doSingleStoreLoad();
 
 		Proxmox.Utils.API2Request({
 		    url: `/config/datastore/${me.datastore}`,
