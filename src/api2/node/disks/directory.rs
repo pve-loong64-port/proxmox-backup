@@ -11,8 +11,8 @@ use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
 
 use pbs_api_types::{
-    DataStoreConfig, BLOCKDEVICE_NAME_SCHEMA, DATASTORE_SCHEMA, NODE_SCHEMA, PRIV_SYS_AUDIT,
-    PRIV_SYS_MODIFY, UPID_SCHEMA,
+    DataStoreConfig, BLOCKDEVICE_NAME_SCHEMA, DATASTORE_MOUNT_DIR, DATASTORE_SCHEMA, NODE_SCHEMA,
+    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA,
 };
 
 use crate::tools::disks::{
@@ -22,8 +22,6 @@ use crate::tools::disks::{
 use crate::tools::systemd::{self, types::*};
 
 use proxmox_rest_server::WorkerTask;
-
-const BASE_MOUNT_DIR: &str = "/mnt/datastore/";
 
 #[api(
     properties: {
@@ -91,7 +89,7 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
 
         let name = data
             .Where
-            .strip_prefix(BASE_MOUNT_DIR)
+            .strip_prefix(DATASTORE_MOUNT_DIR)
             .unwrap_or(&data.Where)
             .to_string();
 
@@ -185,7 +183,7 @@ pub fn create_datastore_disk(
         bail!("disk '{}' is already in use.", disk);
     }
 
-    let mount_point = format!("{}{}", BASE_MOUNT_DIR, &name);
+    let mount_point = format!("{}/{}", DATASTORE_MOUNT_DIR, &name);
     // check if the default path exists already.
     // bail if it is not empty or another filesystem mounted on top
     let default_path = std::path::PathBuf::from(&mount_point);
@@ -193,7 +191,7 @@ pub fn create_datastore_disk(
     match std::fs::metadata(&default_path) {
         Err(_) => {} // path does not exist
         Ok(stat) => {
-            let basedir_dev = std::fs::metadata(BASE_MOUNT_DIR)?.st_dev();
+            let basedir_dev = std::fs::metadata(DATASTORE_MOUNT_DIR)?.st_dev();
             if stat.st_dev() != basedir_dev {
                 bail!("path {default_path:?} already exists and is mountpoint");
             }
@@ -278,7 +276,7 @@ pub fn create_datastore_disk(
 )]
 /// Remove a Filesystem mounted under `/mnt/datastore/<name>`.
 pub fn delete_datastore_disk(name: String) -> Result<(), Error> {
-    let path = format!("{}{}", BASE_MOUNT_DIR, name);
+    let path = format!("{}/{}", DATASTORE_MOUNT_DIR, name);
     // path of datastore cannot be changed
     let (config, _) = pbs_config::datastore::config()?;
     let datastores: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
