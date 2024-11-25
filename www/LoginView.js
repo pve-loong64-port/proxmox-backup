@@ -26,7 +26,7 @@ Ext.define('PBS.LoginView', {
 		    autoShow: true,
 		    consent: Proxmox.Markdown.parse(
 			Ext.htmlEncode(
-			    Proxmox.Utils.base64ToUtf8(Proxmox.consentText)
+			    Proxmox.Utils.base64ToUtf8(Proxmox.consentText),
 			),
 		    ),
 		});
