@@ -1,7 +1,7 @@
 //! Datastore Synchronization Job Management
 
 use anyhow::{bail, format_err, Error};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use proxmox_router::{
@@ -23,6 +23,30 @@ use crate::{
     server::sync::do_sync_job,
 };
 
+// FIXME: 4.x make 'all' the default
+#[api()]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+/// The direction of the listed sync jobs: push, pull or all.
+pub enum ListSyncDirection {
+    /// All directions
+    All,
+    /// Sync direction push
+    Push,
+    /// Sync direction pull
+    #[default]
+    Pull,
+}
+
+impl From<SyncDirection> for ListSyncDirection {
+    fn from(value: SyncDirection) -> Self {
+        match value {
+            SyncDirection::Pull => ListSyncDirection::Pull,
+            SyncDirection::Push => ListSyncDirection::Push,
+        }
+    }
+}
+
 #[api(
     input: {
         properties: {
@@ -31,7 +55,7 @@ use crate::{
                 optional: true,
             },
             "sync-direction": {
-                type: SyncDirection,
+                type: ListSyncDirection,
                 optional: true,
             },
         },
@@ -49,7 +73,7 @@ use crate::{
 /// List all configured sync jobs
 pub fn list_config_sync_jobs(
     store: Option<String>,
-    sync_direction: Option<SyncDirection>,
+    sync_direction: Option<ListSyncDirection>,
     _param: Value,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<SyncJobStatus>, Error> {
@@ -59,23 +83,27 @@ pub fn list_config_sync_jobs(
     let (config, digest) = sync::config()?;
 
     let sync_direction = sync_direction.unwrap_or_default();
-    let job_config_iter = config
-        .convert_to_typed_array(sync_direction.as_config_type_str())?
-        .into_iter()
-        .filter(|job: &SyncJobConfig| {
-            if let Some(store) = &store {
-                &job.store == store
-            } else {
-                true
-            }
-        })
-        .filter(|job: &SyncJobConfig| {
-            check_sync_job_read_access(&user_info, &auth_id, job, sync_direction)
-        });
 
-    let mut list = Vec::new();
+    let mut list = Vec::with_capacity(config.sections.len());
+    for (_, (sync_type, job)) in config.sections.into_iter() {
+        let job: SyncJobConfig = serde_json::from_value(job)?;
+        let direction = SyncDirection::from_config_type_str(&sync_type)?;
 
-    for job in job_config_iter {
+        match &store {
+            Some(store) if &job.store != store => continue,
+            _ => {}
+        }
+
+        match &sync_direction {
+            ListSyncDirection::Pull if direction != SyncDirection::Pull => continue,
+            ListSyncDirection::Push if direction != SyncDirection::Push => continue,
+            _ => {}
+        }
+
+        if !check_sync_job_read_access(&user_info, &auth_id, &job, direction) {
+            continue;
+        }
+
         let last_state = JobState::load("syncjob", &job.id)
             .map_err(|err| format_err!("could not open statefile for {}: {}", &job.id, err))?;
 
@@ -84,7 +112,7 @@ pub fn list_config_sync_jobs(
         list.push(SyncJobStatus {
             config: job,
             status,
-            direction: sync_direction,
+            direction,
         });
     }
 

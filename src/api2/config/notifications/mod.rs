@@ -157,7 +157,7 @@ pub fn get_values(
     }
 
     for direction in [SyncDirection::Pull, SyncDirection::Push] {
-        let sync_jobs = list_config_sync_jobs(None, Some(direction), param.clone(), rpcenv)?;
+        let sync_jobs = list_config_sync_jobs(None, Some(direction.into()), param.clone(), rpcenv)?;
         for job in sync_jobs {
             values.push(MatchableValue {
                 field: "job-id".into(),

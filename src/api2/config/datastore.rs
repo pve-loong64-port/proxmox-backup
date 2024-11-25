@@ -592,9 +592,12 @@ pub async fn delete_datastore(
             delete_verification_job(job.config.id, None, rpcenv)?
         }
         for direction in [SyncDirection::Pull, SyncDirection::Push] {
-            for job in
-                list_config_sync_jobs(Some(name.clone()), Some(direction), Value::Null, rpcenv)?
-            {
+            for job in list_config_sync_jobs(
+                Some(name.clone()),
+                Some(direction.into()),
+                Value::Null,
+                rpcenv,
+            )? {
                 delete_sync_job(job.config.id, None, rpcenv)?
             }
         }
