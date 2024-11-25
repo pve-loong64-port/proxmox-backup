@@ -49,6 +49,7 @@ JSSRC=							\
 	form/NamespaceMaxDepth.js			\
 	form/CalendarEvent.js				\
 	form/PermissionPathSelector.js			\
+	form/PartitionSelector.js			\
 	form/GroupSelector.js				\
 	form/GroupFilter.js				\
 	form/VerifyOutdatedAfter.js			\
