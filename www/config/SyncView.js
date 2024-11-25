@@ -140,7 +140,7 @@ Ext.define('PBS.config.SyncJobView', {
 	type: 'diff',
 	autoDestroy: true,
 	autoDestroyRstore: true,
-	sorters: 'id',
+	sorters: ['store', 'direction', 'id'],
 	rstore: {
 	    type: 'update',
 	    storeid: 'pbs-sync-jobs-status',
