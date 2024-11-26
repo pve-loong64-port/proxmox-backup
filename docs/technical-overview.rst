@@ -141,6 +141,25 @@ The change detection mode controls how to detect and act for files which did not
 change in-between subsequent backup runs as well as the archive file format used
 to encode the directory entries.
 
+There are 3 modes available, the current default ``legacy`` mode, as well as the
+``data`` and ``metadata`` mode. While the ``legacy`` mode encodes all contents
+in a single ``pxar`` archive, the latter two modes split data and metadata into
+``ppxar`` and ``mpxar`` archives. This is done to allow for fast comparison of
+metadata with the previous snapshot, used by the ``metadata`` mode to detect
+reusable files. The ``data`` mode refrains from reusing unchanged files by
+rechunking the file uncoditionally. This mode therefore assures that no file
+changes are missed even if the metadata are unchanged.
+
+.. NOTE:: ``pxar`` and ``mpxar``/``ppxar`` file formats are different and cannot
+    be deduplicated as efficiently if a datastore stores archive snapshots of
+    both types.
+
+As the change detection modes are client side changes, they are backwards
+compatible with older versions of Proxmox Backup Server. Exploring the backup
+contents for the new archive format via the web interface requires however a
+Proxmox Backup Server with version 3.2.5 or higher. Upgrading to the latest
+version is recommended for full feature compatibility.
+
 .. _change-detection-mode-legacy:
 
 Legacy Mode
@@ -182,6 +201,11 @@ chunks. This is used for example for entry lookups to list the archive contents
 or to navigate the mounted filesystem via the FUSE implementation. No dedicated
 catalog is therefore created for archives encoded using this mode.
 
+By not comparing metadata to the previous backup snapshot, no files will be
+considered reusable by this mode, in contrast to the ``metadata`` mode.
+Latter can reuse files which have changed, but file size and mtime did not
+change because restored after changing the files contents.
+
 .. _change-detection-mode-metadata:
 
 Metadata Mode
@@ -191,9 +215,15 @@ The ``metadata`` mode detects files whose file metadata did not change
 in-between subsequent backup runs. The metadata comparison includes file size,
 file type, ownership and permission information, as well as acls and attributes
 and most importantly the file's mtime, for details see the
-:ref:`pxar metadata archive format <pxar-meta-format>`. This mode will avoid
-reading and rechunking the file contents whenever possible by reusing the file
-content chunks of unchanged files from the previous backup snapshot.
+:ref:`pxar metadata archive format <pxar-meta-format>`. Files ctime and inode
+number are not stored and used for comparison, since some tools (e.g.
+``vzdump``) might sync the contents of the filesystem to a temporary location
+before actually performing the backup via the Proxmox backup client. For these
+cases, ctime and inode number will always change.
+
+This mode will avoid reading and rechunking the file contents whenever possible
+by reusing the file content chunks of unchanged files from the previous backup
+snapshot.
 
 To compare the metadata, the previous snapshots ``mpxar`` metadata archive is
 downloaded at the start of the backup run and used as a reference. Further, the
