@@ -176,15 +176,31 @@ datastores, should be either ``ext4`` or ``xfs``.  It is also possible to create
 on completely unused disks through "Administration" > "Disks / Storage" > "Directory",
 using this method the disk will be partitioned and formatted automatically for the datastore.
 
-Devices with only one datastore on them will be mounted automatically. It is possible to create a
-removable datastore on one PBS and use it on multiple instances, the device just has to be added
-on each instance as a removable datastore by checking "reuse datastore" on creation.
-If the device already contains a datastore at the specified path it'll just be added as
-a new datastore to the PBS instance and will be mounted whenever plugged in. Unmounting has
+Devices with only one datastore on them will be mounted automatically. Unmounting has
 to be done through the UI by clicking "Unmount" on the summary page or using the CLI.
+If unmounting should fail, the reason is logged in the unmount-task, and the datastore
+will stay in maintenance mode ``unmounting``, which prevents any IO operations. If that should
+happen, the maintenace mode has to be reset manually using:
+
+.. code-block:: console
+
+  # proxmox-backup-manager datastore update --maintenance-mode offline
+
+to prevent any IO, or to clear it use:
+
+.. code-block:: console
+
+  # proxmox-backup-manager datastore update --delete maintenance-mode
+
 
 A single device can house multiple datastores, they only limitation is that they are not
 allowed to be nested.
+
+Removable datastores are created on the the device with the given relative path that is specified
+on creation. In order to use a datastore on multiple PBS instances, it has to be created on one,
+and added with ``Reuse existing datastore`` checked on the others. The path you set on creation
+is how multiple datastores on a signle device are identified. So When adding on a new PBS instance,
+it has to match what was set on creation.
 
 .. code-block:: console
 
@@ -201,6 +217,11 @@ All datastores present on a device can be listed using ``proxmox-backup-debug``.
 
   # proxmox-backup-debug inspect device /dev/...
 
+
+Verify jobs are skipped if the removable datastore should not be mounted when they are scheduled,
+Sync jobs start, but fail with an error saying the datastore was not mounted. The reason is that
+syncs not happening as schduled should at least be noticable. GC and pruning, like verification,
+is skipped without a failed task if the datastore should not be mounted.
 
 
 Managing Datastores
