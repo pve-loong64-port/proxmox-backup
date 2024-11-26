@@ -114,8 +114,10 @@ Ext.define('PBS.DataStoreEdit', {
 				uuidEditField.setValue('');
 				if (isRemovable) {
 				    pathField.setFieldLabel(gettext('Path on Device'));
+				    pathField.setEmptyText(gettext('A relative path'));
 				} else {
 				    pathField.setFieldLabel(gettext('Backing Path'));
+				    pathField.setEmptyText(gettext('An absolute path'));
 				}
 			    },
 			},
