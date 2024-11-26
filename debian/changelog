@@ -1,3 +1,53 @@
+rust-proxmox-backup (3.2.13-1) bookworm; urgency=medium
+
+  * update pxar dependency to fix selective extraction with the newly
+    supported match patterns.
+
+  * reuse-datastore: avoid creating another prune job
+
+  * api: notification: add API routes for webhook targets
+
+  * management cli: add CLI for webhook targets
+
+  * ui: utils: enable webhook edit window
+
+  * ui: utils: add task description for mounting/unmounting
+
+  * ui: add onlineHelp for consent-banner option
+
+  * docs: client: fix example commands for client usage
+
+  * docs: explain some further caveats of the change detection modes
+
+  * ui: use same label for removable datastore created from disk
+
+  * api: maintenance: allow setting of maintenance mode if 'unmounting'
+
+  * docs: add more information for removable datastores
+
+  * ui: sync jobs: revert to single list for pull/push jobs, improve
+    distinction between push and pull jobs through other means.
+
+  * ui: sync jobs: change default sorting to 'store' -> 'direction' -> 'id'
+
+  * ui: sync jobs: add search filter-box
+
+  * config: sync: use same config section type `sync` for push and pull, note
+    that this breaks existing configurations and needs manual clean-up. As the
+    package versions never made it beyond test this is ignored, as while it's
+    not really ideal we never give guarantees for testing package versions,
+    and the maintenance burden with the old style would not be ideal either.
+
+  * api: removable datastores: require Sys.Modify permission on /system/disks
+
+  * ui: allow resetting unmounting maintenance
+
+  * datastore: re-phrase error message when datastore is unavailable
+
+  * client: backup writer: fix regression in progress output
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 26 Nov 2024 17:05:23 +0100
+
 rust-proxmox-backup (3.2.12-1) bookworm; urgency=medium
 
   * fix #5853: client: pxar: exclude stale files on metadata/link read
