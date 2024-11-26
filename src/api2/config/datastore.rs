@@ -24,7 +24,7 @@ use crate::api2::admin::{
     datastore::do_mount_device, prune::list_prune_jobs, sync::list_config_sync_jobs,
     verify::list_verification_jobs,
 };
-use crate::api2::config::prune::{delete_prune_job, do_create_prune_job};
+use crate::api2::config::prune::{delete_prune_job, do_create_prune_job, has_prune_job};
 use crate::api2::config::sync::delete_sync_job;
 use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_backup_jobs};
 use crate::api2::config::verify::delete_verification_job;
@@ -204,23 +204,26 @@ pub fn create_datastore(
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
-    let prune_job_config = config.prune_schedule.as_ref().map(|schedule| {
-        let mut id = format!("default-{}-{}", config.name, Uuid::generate());
-        id.truncate(32);
+    let mut prune_job_config = None;
+    if config.keep.keeps_something() || !has_prune_job(&config.name)? {
+        prune_job_config = config.prune_schedule.as_ref().map(|schedule| {
+            let mut id = format!("default-{}-{}", config.name, Uuid::generate());
+            id.truncate(32);
 
-        PruneJobConfig {
-            id,
-            store: config.name.clone(),
-            comment: None,
-            disable: false,
-            schedule: schedule.clone(),
-            options: PruneJobOptions {
-                keep: config.keep.clone(),
-                max_depth: None,
-                ns: None,
-            },
-        }
-    });
+            PruneJobConfig {
+                id,
+                store: config.name.clone(),
+                comment: None,
+                disable: false,
+                schedule: schedule.clone(),
+                options: PruneJobOptions {
+                    keep: config.keep.clone(),
+                    max_depth: None,
+                    ns: None,
+                },
+            }
+        });
+    }
 
     // clearing prune settings in the datastore config, as they are now handled by prune jobs
     let config = DataStoreConfig {

@@ -77,6 +77,17 @@ pub fn do_create_prune_job(config: PruneJobConfig) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn has_prune_job(datastore: &str) -> Result<bool, Error> {
+    let (section_config, _digest) = prune::config()?;
+    for (_, (_, job_config)) in section_config.sections {
+        let job_config: PruneJobConfig = serde_json::from_value(job_config)?;
+        if job_config.store == datastore {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 #[api(
     protected: true,
     input: {
