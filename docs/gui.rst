@@ -40,6 +40,8 @@ Proxmox Backup Server supports various languages and authentication back ends
 .. note:: For convenience, you can save the username on the client side, by
   selecting the "Save User name" checkbox at the bottom of the window.
 
+.. _consent_banner:
+
 Consent Banner
 ^^^^^^^^^^^^^^
 

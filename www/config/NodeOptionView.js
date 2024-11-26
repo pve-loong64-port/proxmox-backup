@@ -59,6 +59,7 @@ Ext.define('PBS.NodeOptionView', {
 	    name: 'consent-text',
 	    text: gettext('Consent Text'),
 	    deleteEmpty: true,
+	    onlineHelp: 'consent_banner',
 	},
     ],
 });
