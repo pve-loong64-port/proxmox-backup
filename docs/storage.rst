@@ -178,9 +178,9 @@ using this method the disk will be partitioned and formatted automatically for t
 
 Devices with only one datastore on them will be mounted automatically. Unmounting has
 to be done through the UI by clicking "Unmount" on the summary page or using the CLI.
-If unmounting should fail, the reason is logged in the unmount-task, and the datastore
-will stay in maintenance mode ``unmounting``, which prevents any IO operations. If that should
-happen, the maintenace mode has to be reset manually using:
+If unmounting fails, the reason is logged in the unmount task log, and the
+datastore will stay in maintenance mode ``unmounting``, which prevents any IO
+operations. In such cases, the maintenance mode has to be reset manually using:
 
 .. code-block:: console
 
@@ -218,11 +218,10 @@ All datastores present on a device can be listed using ``proxmox-backup-debug``.
   # proxmox-backup-debug inspect device /dev/...
 
 
-Verify jobs are skipped if the removable datastore should not be mounted when they are scheduled,
-Sync jobs start, but fail with an error saying the datastore was not mounted. The reason is that
-syncs not happening as schduled should at least be noticable. GC and pruning, like verification,
-is skipped without a failed task if the datastore should not be mounted.
-
+Verify, Prune and Garbage Collection jobs are skipped if the removable
+datastore is not mounted when they are scheduled. Sync jobs start, but fail
+with an error saying the datastore was not mounted. The reason is that syncs
+not happening as scheduled should at least be noticable.
 
 Managing Datastores
 ^^^^^^^^^^^^^^^^^^^
