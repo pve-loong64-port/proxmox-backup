@@ -95,7 +95,7 @@ proxmox-worker-task = "0.1"
 # other proxmox crates
 pathpatterns = "0.3"
 proxmox-acme = "0.5.3"
-pxar = "0.12"
+pxar = "0.12.1"
 
 # PBS workspace
 pbs-api-types = { path = "pbs-api-types" }
