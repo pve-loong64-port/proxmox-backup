@@ -218,7 +218,7 @@ impl DataStore {
 
         if let Some(maintenance_mode) = config.get_maintenance_mode() {
             if let Err(error) = maintenance_mode.check(operation) {
-                bail!("datastore '{name}' is in {error}");
+                bail!("datastore '{name}' is unavailable: {error}");
             }
         }
 
