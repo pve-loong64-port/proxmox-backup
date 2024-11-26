@@ -47,6 +47,16 @@ impl From<SyncDirection> for ListSyncDirection {
     }
 }
 
+impl ListSyncDirection {
+    /// Checks whether a `ListSyncDirection` matches a given `SyncDirection`
+    pub fn matches(&self, other: SyncDirection) -> bool {
+        if *self == ListSyncDirection::All {
+            return true;
+        }
+        *self == other.into()
+    }
+}
+
 #[api(
     input: {
         properties: {
@@ -94,10 +104,8 @@ pub fn list_config_sync_jobs(
             _ => {}
         }
 
-        match &sync_direction {
-            ListSyncDirection::Pull if direction != SyncDirection::Pull => continue,
-            ListSyncDirection::Push if direction != SyncDirection::Push => continue,
-            _ => {}
+        if !sync_direction.matches(direction) {
+            continue;
         }
 
         if !check_sync_job_read_access(&user_info, &auth_id, &job) {

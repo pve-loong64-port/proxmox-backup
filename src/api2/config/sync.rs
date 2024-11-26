@@ -15,9 +15,9 @@ use pbs_api_types::{
 };
 use pbs_config::sync;
 
+use crate::api2::admin::sync::ListSyncDirection;
 use pbs_config::CachedUserInfo;
 use pbs_datastore::check_backup_owner;
-use crate::api2::admin::sync::ListSyncDirection;
 
 pub fn check_sync_job_read_access(
     user_info: &CachedUserInfo,
@@ -185,13 +185,8 @@ pub fn list_sync_jobs(
     let list = list
         .into_iter()
         .filter(|sync_job| {
-            let direction = sync_job.sync_direction.unwrap_or_default();
-            match &sync_direction {
-                ListSyncDirection::Pull if direction != SyncDirection::Pull => return false,
-                ListSyncDirection::Push if direction != SyncDirection::Push => return false,
-                _ => {}
-            }
-            check_sync_job_read_access(&user_info, &auth_id, sync_job)
+            sync_direction.matches(sync_job.sync_direction.unwrap_or_default())
+                && check_sync_job_read_access(&user_info, &auth_id, sync_job)
         })
         .collect();
     Ok(list)
