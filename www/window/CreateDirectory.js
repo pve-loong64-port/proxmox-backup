@@ -56,7 +56,7 @@ Ext.define('PBS.window.CreateDirectory', {
 	{
 	    xtype: 'proxmoxcheckbox',
 	    name: 'removable-datastore',
-	    fieldLabel: gettext('is removable'),
+	    fieldLabel: gettext('Removable datastore'),
 	},
     ],
 });
