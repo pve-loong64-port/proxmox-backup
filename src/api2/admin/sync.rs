@@ -120,7 +120,6 @@ pub fn list_config_sync_jobs(
         list.push(SyncJobStatus {
             config: job,
             status,
-            direction,
         });
     }
 

@@ -45,7 +45,7 @@ Ext.define('PBS.config.SyncJobView', {
 
 	    store.clearFilter();
 
-	    let fieldsToSearch = ['direction', 'id', 'remote', 'remote-store', 'owner'];
+	    let fieldsToSearch = ['sync-direction', 'id', 'remote', 'remote-store', 'owner'];
 	    if (!view.datastore) {
 		fieldsToSearch.push('store');
 	    }
@@ -96,7 +96,7 @@ Ext.define('PBS.config.SyncJobView', {
             Ext.create('PBS.window.SyncJobEdit', {
 		datastore: view.datastore,
                 id: selection[0].data.id,
-		syncDirection: selection[0].data.direction,
+		syncDirection: selection[0].data['sync-direction'],
 		listeners: {
 		    destroy: function() {
 			me.reload();
@@ -174,7 +174,7 @@ Ext.define('PBS.config.SyncJobView', {
 	type: 'diff',
 	autoDestroy: true,
 	autoDestroyRstore: true,
-	sorters: ['store', 'direction', 'id'],
+	sorters: ['store', 'sync-direction', 'id'],
 	rstore: {
 	    type: 'update',
 	    storeid: 'pbs-sync-jobs-status',
@@ -277,15 +277,15 @@ Ext.define('PBS.config.SyncJobView', {
 	},
 	{
 	    header: gettext('Direction'),
-	    dataIndex: 'direction',
+	    dataIndex: 'sync-direction',
 	    renderer: function(value) {
 		let iconCls, text;
-		if (value === 'pull') {
-		    iconCls = 'download';
-		    text = gettext('Pull');
-		} else {
+		if (value === 'push') {
 		    iconCls = 'upload';
 		    text = gettext('Push');
+		} else {
+		    iconCls = 'download';
+		    text = gettext('Pull');
 		}
 		return `<i class="fa fa-fw fa-${iconCls}"></i> ${text}`;
 	    },
