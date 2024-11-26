@@ -79,6 +79,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/file-formats.html#dynamic-index-format",
     "title": "Dynamic Index Format (``.didx``)"
   },
+  "consent-banner": {
+    "link": "/docs/gui.html#consent-banner",
+    "title": "Consent Banner"
+  },
   "minimum-system-requirements": {
     "link": "/docs/system-requirements.html#minimum-system-requirements",
     "title": "Minimum Server Requirements, for Evaluation"
@@ -202,6 +206,10 @@ const proxmoxOnlineHelpInfo = {
   "notification-targets-gotify": {
     "link": "/docs/notifications.html#notification-targets-gotify",
     "title": "Gotify"
+  },
+  "notification-targets-webhook": {
+    "link": "/docs/notifications.html#notification-targets-webhook",
+    "title": "Webhook"
   },
   "notification-matchers": {
     "link": "/docs/notifications.html#notification-matchers",
