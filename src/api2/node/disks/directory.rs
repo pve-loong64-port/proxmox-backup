@@ -237,7 +237,7 @@ pub fn create_datastore_disk(
                 let lock = pbs_config::datastore::lock_config()?;
                 let datastore: DataStoreConfig = if removable_datastore {
                     serde_json::from_value(
-                        json!({ "name": name, "path": format!("/{name}"), "backing-device": uuid }),
+                        json!({ "name": name, "path": name, "backing-device": uuid }),
                     )?
                 } else {
                     serde_json::from_value(json!({ "name": name, "path": mount_point }))?
