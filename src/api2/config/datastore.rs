@@ -14,7 +14,8 @@ use proxmox_uuid::Uuid;
 use pbs_api_types::{
     Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreNotify, DatastoreTuning, KeepOptions,
     MaintenanceMode, PruneJobConfig, PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -172,6 +173,7 @@ pub(crate) fn do_create_datastore(
         },
     },
     access: {
+        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modfiy on '/system/disks'.",
         permission: &Permission::Privilege(&["datastore"], PRIV_DATASTORE_ALLOCATE, false),
     },
 )]
@@ -202,6 +204,11 @@ pub fn create_datastore(
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    if config.backing_device.is_some() {
+        let user_info = CachedUserInfo::new()?;
+        user_info.check_privs(&auth_id, &["system", "disks"], PRIV_SYS_MODIFY, false)?;
+    }
 
     let mut prune_job_config = None;
     if config.keep.keeps_something() || !has_prune_job(&config.name)? {
@@ -550,6 +557,7 @@ pub fn update_datastore(
         },
     },
     access: {
+        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modfiy on '/system/disks'.",
         permission: &Permission::Privilege(&["datastore", "{name}"], PRIV_DATASTORE_ALLOCATE, false),
     },
     returns: {
@@ -578,6 +586,12 @@ pub async fn delete_datastore(
     }
 
     let store_config: DataStoreConfig = config.lookup("datastore", &name)?;
+
+    if store_config.backing_device.is_some() {
+        let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+        let user_info = CachedUserInfo::new()?;
+        user_info.check_privs(&auth_id, &["system", "disks"], PRIV_SYS_MODIFY, false)?;
+    }
 
     if destroy_data && get_datastore_mount_status(&store_config) == Some(false) {
         http_bail!(

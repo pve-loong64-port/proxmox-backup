@@ -45,7 +45,7 @@ use pbs_api_types::{
     BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
     IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
     PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
-    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, UPID, UPID_SCHEMA,
+    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA,
     VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};
@@ -2512,7 +2512,10 @@ pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
         schema: UPID_SCHEMA,
     },
     access: {
-        permission: &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_AUDIT, false),
+        permission: &Permission::And(&[
+            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_AUDIT, false),
+            &Permission::Privilege(&["system", "disks"], PRIV_SYS_MODIFY, false)
+        ]),
     },
 )]
 /// Mount removable datastore.
@@ -2625,7 +2628,10 @@ fn do_unmount_device(
         schema: UPID_SCHEMA,
     },
     access: {
-        permission: &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, true),
+        permission: &Permission::And(&[
+            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, true),
+            &Permission::Privilege(&["system", "disks"], PRIV_SYS_MODIFY, false)
+        ]),
     }
 )]
 /// Unmount a removable device that is associated with the datastore
