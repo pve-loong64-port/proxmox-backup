@@ -847,9 +847,9 @@ impl BackupWriter {
         let (upload_queue, upload_result) =
             Self::append_chunk_queue(h2.clone(), wid, append_chunk_path, uploaded_len.clone());
 
-        let progress_handle = if archive.ends_with(".img")
-            || archive.ends_with(".pxar")
-            || archive.ends_with(".ppxar")
+        let progress_handle = if archive.ends_with(".img.fidx")
+            || archive.ends_with(".pxar.didx")
+            || archive.ends_with(".ppxar.didx")
         {
             let counters = counters.clone();
             Some(tokio::spawn(async move {
