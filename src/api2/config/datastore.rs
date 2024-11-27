@@ -82,21 +82,30 @@ pub(crate) fn do_create_datastore(
         bail!("cannot create datastore in root path");
     }
 
-    let new_store_path = Path::new(&datastore.path);
+    let new_store_path = PathBuf::from(&datastore.absolute_path());
+    let removable = datastore.backing_device.is_some();
     for store in config.convert_to_typed_array::<DataStoreConfig>("datastore")? {
-        if store.backing_device != datastore.backing_device {
-            continue;
+        // Relative paths must not be nested on the backing device of removable datastores
+        if removable && store.backing_device == datastore.backing_device {
+            let new_path = Path::new(&datastore.path);
+            let path = Path::new(&store.path);
+            if new_path.starts_with(path) || path.starts_with(new_path) {
+                param_bail!(
+                    "path",
+                    "paths on backing device must not be nested - {path:?} already used by '{store}'!",
+                    store = store.name
+                );
+            }
         }
 
-        // Since we check for that on creation, we assume all removable datastore
-        // paths are relative, so don't have a leading `/`.
-        let store_path = Path::new(&store.path);
+        // No two datastores should have a nested absolute path
+        let store_path = PathBuf::from(store.absolute_path());
         if store_path.starts_with(&new_store_path) || new_store_path.starts_with(&store_path) {
             param_bail!(
                 "path",
-                "nested datastores not allowed: '{}' already in '{}'",
+                "nested datastores not allowed: '{}' already in {:?}",
                 store.name,
-                store.path
+                store_path,
             );
         }
     }
