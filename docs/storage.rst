@@ -172,9 +172,14 @@ mounted and unmounted. Other than that they behave the same way a normal datasto
 would.
 
 They can be created on already correctly formatted partitions, which, as with normal
-datastores, should be either ``ext4`` or ``xfs``.  It is also possible to create them
-on completely unused disks through "Administration" > "Disks / Storage" > "Directory",
-using this method the disk will be partitioned and formatted automatically for the datastore.
+datastores, should be either ``ext4`` or ``xfs``.
+
+.. note:: FAT filesystems don't support the concept of POSIX file ownership. Since
+   datastores rely on it, removable datastores can't be created on those filesystems.
+
+It is also possible to create them on completely unused disks through
+"Administration" > "Disks / Storage" > "Directory", using this method the disk will
+be partitioned and formatted automatically for the datastore.
 
 Devices with only one datastore on them will be mounted automatically. Unmounting has
 to be done through the UI by clicking "Unmount" on the summary page or using the CLI.
