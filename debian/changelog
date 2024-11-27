@@ -1,3 +1,24 @@
+rust-proxmox-backup (3.3.0-1) bookworm; urgency=medium
+
+  * GC: add safety-check for nested datastore
+
+  * ui: make some more strings translatable
+
+  * docs: make sphinx ignore the environment cache to avoid missing synopsis
+    in some HTML output, like for example the "Command Syntax" appendix.
+
+  * docs: add note for why FAT is not supported for as backing file system for
+    datastores
+
+  * api: disks: directory: fail if mount unit already exists for a new file
+    system
+
+  * : filter partitions without proper UUID in partition selector
+
+  * ui: version info: replace wrong hyphen separator with dot
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 27 Nov 2024 20:38:41 +0100
+
 rust-proxmox-backup (3.2.14-1) bookworm; urgency=medium
 
   * pull-sync: do not interpret older missing snapshots as needs-resync
