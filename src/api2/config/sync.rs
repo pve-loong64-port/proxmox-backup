@@ -129,6 +129,11 @@ pub fn check_sync_job_modify_access(
             }
 
             let source_privs = user_info.lookup_privs(auth_id, &job.acl_path());
+            // only allow to modify jobs the user is also allowed to read
+            if source_privs & PRIV_DATASTORE_AUDIT == 0 {
+                return false;
+            }
+
             // check user is allowed to read from (local) source datastore/namespace, independent
             // of job ownership
             if source_privs & PRIV_DATASTORE_READ != 0 {
