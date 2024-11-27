@@ -2448,10 +2448,11 @@ fn setup_mounted_device(datastore: &DataStoreConfig, tmp_mount_path: &str) -> Re
 pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
     if let Some(uuid) = datastore.backing_device.as_ref() {
         if pbs_datastore::get_datastore_mount_status(&datastore) == Some(true) {
-            bail!(
+            info!(
                 "device is already mounted at '{}'",
                 datastore.absolute_path()
             );
+            return Ok(());
         }
         let tmp_mount_path = format!(
             "{}/{:x}",
