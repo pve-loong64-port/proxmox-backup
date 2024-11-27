@@ -269,7 +269,7 @@ Ext.define('PBS.Dashboard', {
 	},
 	{
 	    iconCls: 'fa fa-ticket',
-	    title: 'Subscription',
+	    title: gettext('Subscription'),
 	    height: 250,
 	    reference: 'subscription',
 	    xtype: 'pbsSubscriptionInfo',
