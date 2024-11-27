@@ -171,11 +171,16 @@ Removable datastores have a ``backing-device`` associated with them, they can be
 mounted and unmounted. Other than that they behave the same way a normal datastore
 would.
 
-They can be created on already correctly formatted partitions, which, as with normal
-datastores, should be either ``ext4`` or ``xfs``.
+They can be created on already correctly formatted partitions, which should be
+either ``ext4`` or ``xfs`` as with normal datastores, but most modern file
+systems supported by the Proxmox Linux kernel should work.
 
-.. note:: FAT filesystems don't support the concept of POSIX file ownership. Since
-   datastores rely on it, removable datastores can't be created on those filesystems.
+.. note:: FAT-based file systems do not support the POSIX file ownership
+   concept and have relatively low limits on the number of files per directory.
+   Therefore, creating a datastore is not supported on FAT file systems.
+   Because some external drives are preformatted with such a FAT-based file
+   system, you may need to reformat the drive before you can use it as a
+   backing-device for a removable datastore.
 
 It is also possible to create them on completely unused disks through
 "Administration" > "Disks / Storage" > "Directory", using this method the disk will
