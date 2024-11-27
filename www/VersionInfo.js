@@ -16,7 +16,7 @@ Ext.define('PBS.view.main.VersionInfo', {
     tpl: [
 	'Backup Server',
 	'<tpl if="version">',
-	' {version}-{release}',
+	' {version}.{release}',
 	'</tpl>',
     ],
 
