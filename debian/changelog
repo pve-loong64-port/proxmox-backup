@@ -1,3 +1,27 @@
+rust-proxmox-backup (3.2.14-1) bookworm; urgency=medium
+
+  * pull-sync: do not interpret older missing snapshots as needs-resync
+
+  * api: directory: use relative path when creating removable datastore
+
+  * ui: prune keep input: actually clear value on clear trigger click
+
+  * ui: datastore edit: fix empty-text for path field
+
+  * sync: push: pass full error context when returning error to job
+
+  * api: mount removable datastore: only log an informational message if the
+    correct device is already mounted.
+
+  * api: sync: restrict edit permissions for the new push sync jobs to avoid
+    that a user is able to create or edit sync jobs in push direction, but not
+    able to see them.
+
+  * api: create datastore: fix checks to avoid that any datastore can contain
+    another one to better handle the case for the new removable datastores.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 27 Nov 2024 14:42:56 +0100
+
 rust-proxmox-backup (3.2.13-1) bookworm; urgency=medium
 
   * update pxar dependency to fix selective extraction with the newly
