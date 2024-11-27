@@ -8,7 +8,7 @@ Ext.define('pbs-partition-list', {
 	    transform: (rawData) => rawData.data
 		.flatMap(disk => (disk.partitions
 			.map(part => ({ ...part, model: disk.model })) ?? [])
-			.filter(partition => partition.used === 'filesystem')),
+			.filter(partition => partition.used === 'filesystem' && !!partition.uuid)),
 	},
     },
     idProperty: 'devpath',
