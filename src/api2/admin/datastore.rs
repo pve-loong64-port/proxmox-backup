@@ -2513,7 +2513,7 @@ pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
     },
     access: {
         permission: &Permission::And(&[
-            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_AUDIT, false),
+            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, false),
             &Permission::Privilege(&["system", "disks"], PRIV_SYS_MODIFY, false)
         ]),
     },
