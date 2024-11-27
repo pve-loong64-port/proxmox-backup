@@ -104,7 +104,7 @@ Ext.define('PBS.store.NavigationStore', {
 		],
 	    },
 	    {
-		text: "Tape Backup",
+		text: gettext('Tape Backup'),
 		iconCls: 'pbs-icon-tape',
 		id: 'tape_management',
 		path: 'pbsTapeManagement',
