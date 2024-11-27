@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, format_err, Context, Error};
 use futures::stream::{self, StreamExt, TryStreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -379,7 +379,9 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
     source_namespaces.sort_unstable_by_key(|a| a.name_len());
 
     // Fetch all accessible namespaces already present on the target
-    let mut existing_target_namespaces = fetch_target_namespaces(&params).await?;
+    let mut existing_target_namespaces = fetch_target_namespaces(&params)
+        .await
+        .map_err(|err| format_err!("{err:#}"))?;
     // Remember synced namespaces, removing non-synced ones when remove vanished flag is set
     let mut synced_namespaces = HashSet::with_capacity(source_namespaces.len());
 
