@@ -458,7 +458,7 @@ fn inspect_device(device: String, param: Value) -> Result<(), Error> {
     std::fs::remove_dir(std::path::Path::new(&tmp_mount_path))?;
 
     if output_format == "text" {
-        println!("Device containes {} stores", ds_count);
+        println!("Device contains {ds_count} stores");
         println!("---------------");
         for s in stores {
             println!(

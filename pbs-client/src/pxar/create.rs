@@ -439,13 +439,13 @@ impl Archiver {
                         );
                         return Ok(Some(range));
                     }
-                    log::debug!("reencode: {file_name:?} not a regular file.");
+                    log::debug!("re-encode: {file_name:?} not a regular file.");
                     return Ok(None);
                 }
-                log::debug!("reencode: {file_name:?} metadata did not match.");
+                log::debug!("re-encode: {file_name:?} metadata did not match.");
                 return Ok(None);
             }
-            log::debug!("reencode: {file_name:?} not found in previous archive.");
+            log::debug!("re-encode: {file_name:?} not found in previous archive.");
         }
 
         Ok(None)
@@ -1063,7 +1063,7 @@ impl Archiver {
     }
 
     // Take ownership of cached entries and encode them to the archive
-    // Encode with reused payload chunks when base offset is some, reencode otherwise
+    // Encode with reused payload chunks when base offset is some, re-encode otherwise
     async fn encode_entries_to_archive<T: SeqWrite + Send>(
         &mut self,
         encoder: &mut Encoder<'_, T>,

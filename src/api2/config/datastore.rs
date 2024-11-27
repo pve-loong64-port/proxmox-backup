@@ -159,7 +159,7 @@ pub(crate) fn do_create_datastore(
         },
     },
     access: {
-        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modfiy on '/system/disks'.",
+        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modify on '/system/disks'.",
         permission: &Permission::Privilege(&["datastore"], PRIV_DATASTORE_ALLOCATE, false),
     },
 )]
@@ -178,7 +178,7 @@ pub fn create_datastore(
     }
 
     if config.backing_device.is_none() && !config.path.starts_with("/") {
-        param_bail!("path", "expected an abolute path, '{}' is not", config.path);
+        param_bail!("path", "expected an absolute path, '{}' is not", config.path);
     }
     if config.backing_device.is_some() && config.path.starts_with("/") {
         param_bail!(
@@ -543,7 +543,7 @@ pub fn update_datastore(
         },
     },
     access: {
-        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modfiy on '/system/disks'.",
+        description: "Requires Datastore.Allocate and, for a backing-device, Sys.Modify on '/system/disks'.",
         permission: &Permission::Privilege(&["datastore", "{name}"], PRIV_DATASTORE_ALLOCATE, false),
     },
     returns: {
