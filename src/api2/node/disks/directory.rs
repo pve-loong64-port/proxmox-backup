@@ -204,6 +204,11 @@ pub fn create_datastore_disk(
         }
     }
 
+    let (mount_unit_path, _) = datastore_mount_unit_path_info(&mount_point);
+    if std::path::PathBuf::from(&mount_unit_path).exists() {
+        bail!("systemd mount unit {mount_unit_path:?} already exists");
+    }
+
     let upid_str = WorkerTask::new_thread(
         "dircreate",
         Some(name.clone()),
