@@ -17,26 +17,27 @@ It includes the following:
 
 * Web-based management interface
 
-.. note:: All existing data on the selected drives will be removed during the
-   installation process. The installer does not add boot menu entries for other
-   operating systems.
+.. note:: Any existing data on the selected drives will be overwritten
+   during the installation process. The installer does not add boot
+   menu entries for other operating systems.
 
-Please insert the :ref:`installation_media` (for example, USB flash drive or
-CD-ROM) and boot from it.
+Please insert the :ref:`installation_medium` (for example, USB flash
+drive or DVD) and boot from it.
 
-.. note:: Make sure that booting from the installation medium (for example, USB)
-   is enabled in your server's firmware settings. Secure boot needs to be
-   disabled when booting an installer prior to `Proxmox Backup`_ Server version
-   3.1.
+.. note:: You may need to go into your server's firmware settings, to
+   enable booting from your installation medium (for example, USB) and
+   set the desired boot order. When booting an installer prior to
+   `Proxmox Backup`_ Server version 3.1, Secure Boot needs to be
+   disabled.
 
 .. image:: images/screenshots/pbs-installer-grub-menu.png
   :target: _images/pbs-installer-grub-menu.png
   :align: right
   :alt: Proxmox Backup Server Installer GRUB Menu
 
-After choosing the correct entry (for example, *Boot from USB*) the `Proxmox
-Backup`_ Server menu will be displayed, and one of the following options can be
-selected:
+After choosing the correct entry (for example, *Boot from USB*) the
+Proxmox Backup Server menu will be displayed, and one of the following
+options can be selected:
 
 **Install Proxmox Backup Server (Graphical)**
 

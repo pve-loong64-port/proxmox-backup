@@ -149,7 +149,7 @@ Currently there's only a client-repository for APT based systems.
 .. _package_repositories_client_only_apt:
 
 APT-based Proxmox Backup Client Repository
-++++++++++++++++++++++++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For modern Linux distributions using `apt` as package manager, like all Debian
 and Ubuntu Derivative do, you may be able to use the APT-based repository.

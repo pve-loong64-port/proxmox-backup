@@ -9,7 +9,7 @@ Debian_ from the provided package repository.
 
 .. include:: installation-media.rst
 
-.. include:: package-repositories.rst
+.. _install_pbs:
 
 Server Installation
 -------------------
@@ -20,24 +20,34 @@ for various management tasks such as disk management.
 .. note:: You always need a backup server. It is not possible to use
    Proxmox Backup without the server part.
 
-The disk image (ISO file) provided by Proxmox includes a complete Debian system
-as well as all necessary packages for the Proxmox Backup Server.
+Using our provided disk image (ISO file) is the recommended
+installation method, as it includes a convenient installer, a complete
+Debian system as well as all necessary packages for the Proxmox Backup
+Server.
 
-The installer will guide you through the setup process and allow
-you to partition the local disk(s), apply basic system configuration
-(for example timezone, language, network), and install all required packages.
-The provided ISO will get you started in just a few minutes, and is the
-recommended method for new and existing users.
+Once you have created an :ref:`installation_medium`, the booted
+:ref:`installer <using_the_installer>` will guide you through the
+setup process. It will help you to partition your disks, apply basic
+settings such as the language, time zone and network configuration,
+and finally install all required packages within minutes.
 
-Alternatively, Proxmox Backup Server can be installed on top of an
-existing Debian system. This option is only recommended for advanced users
-because detailed knowledge about Proxmox Backup Server is required.
+As an alternative to the interactive installer, advanced users may
+wish to install Proxmox Backup Server
+:ref:`unattended <install_pbs_unattended>`.
+
+With sufficient Debian knowledge, you can also install Proxmox Backup
+Server :ref:`on top of Debian <install_pbs_on_debian>` yourself.
+
+While not recommended, Proxmox Backup Server could also be installed
+:ref:`on Proxmox VE <install_pbs_on_pve>`.
 
 .. include:: using-the-installer.rst
 
+.. _install_pbs_unattended:
+
 Install `Proxmox Backup`_ Server Unattended
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It is possible to install `Proxmox Backup`_ Server automatically in an
+It is possible to install Proxmox Backup Server automatically in an
 unattended manner. This enables you to fully automate the setup process on
 bare-metal. Once the installation is complete and the host has booted up,
 automation tools like Ansible can be used to further configure the installation.
@@ -51,6 +61,7 @@ installation ISO.  For more details and information on the unattended
 installation see `our wiki
 <https://pve.proxmox.com/wiki/Automated_Installation>`_.
 
+.. _install_pbs_on_debian:
 
 Install `Proxmox Backup`_ Server on Debian
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,6 +99,8 @@ support, and a set of common and useful packages.
    your web browser, using HTTPS on port 8007. For example at
    ``https://<ip-or-dns-name>:8007``
 
+.. _install_pbs_on_pve:
+
 Install Proxmox Backup Server on `Proxmox VE`_
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -108,6 +121,8 @@ After configuring the
    your web browser, using HTTPS on port 8007. For example at
    ``https://<ip-or-dns-name>:8007``
 
+.. _install_pbc:
+
 Client Installation
 -------------------
 
@@ -123,7 +138,7 @@ you need to run:
   # apt update
   # apt install proxmox-backup-client
 
-
 .. note:: The client-only repository should be usable by most recent Debian and
    Ubuntu derivatives.
 
+.. include:: package-repositories.rst

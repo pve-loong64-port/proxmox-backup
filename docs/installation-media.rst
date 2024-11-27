@@ -1,44 +1,53 @@
-.. _installation_media:
+.. _installation_medium:
 
-Installation Media
-------------------
+Installation Medium
+-------------------
 
-Prepare Installation Media
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proxmox Backup Server can be installed via
+:ref:`different methods <install_pbs>`. The recommended method is the
+usage of an installation medium, to simply boot the interactive
+installer.
+
+Prepare Installation Medium
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Download the installer ISO image from |DOWNLOADS|.
 
-The `Proxmox Backup`_ Server installation media is a hybrid ISO image. It works
-in two ways:
+The Proxmox Backup Server installation medium is a hybrid ISO image.
+It works in two ways:
 
-- An ISO image file ready to burn to a CD or DVD.
+- An ISO image file ready to burn to a DVD.
 
 - A raw sector (IMG) image file ready to copy to a USB flash drive (USB stick).
 
-Using a USB flash drive to install `Proxmox Backup`_ Server is the recommended
-way since it is the faster option.
+Using a USB flash drive to install Proxmox Backup Server is the
+recommended way since it is the faster and more frequently available
+option these days.
 
 Prepare a USB Flash Drive as Installation Medium
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The flash drive needs to have at least 1 GB of storage available.
+The flash drive needs to have at least 2 GB of storage space.
 
 .. note::
 
-   Do not use *UNetbootin*. It does not work with the `Proxmox Backup`_ Server
-   installation image.
+   Do not use *UNetbootin*. It does not work with the Proxmox Backup
+   Server installation image.
 
 .. important::
 
-   Make sure that the USB flash drive is not mounted and does not
-   contain any important data.
+   Existing data on the USB flash drive will be overwritten.
+   Therefore, make sure that it does not contain any still needed data
+   and unmount it afterwards again before proceeding.
 
 Instructions for GNU/Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-On Unix-like operating system use the ``dd`` command to copy the ISO
+On Unix-like operating systems use the ``dd`` command to copy the ISO
 image to the USB flash drive. First find the correct device name of the
-USB flash drive (see below). Then run the ``dd`` command.
+USB flash drive (see below). Then run the ``dd`` command. Depending on
+your environment, you will need to have root privileges to execute
+``dd``.
 
 .. code-block:: console
 
@@ -132,16 +141,17 @@ Using Rufus
 
 Rufus is a more lightweight alternative, but you need to use the **DD
 mode** to make it work. Download Rufus from https://rufus.ie/. Either
-install it or use
+install it or use the portable version. Select the destination drive
+and the downloaded Proxmox ISO file.
 
 .. important::
 
    Once you click *Start*, you have to click *No* on the dialog asking to
    download a different version of Grub. In the next dialog select **DD mode**.
 
-Boot your Server from the USB Flash Drive
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use the Installation Medium
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Connect the USB flash drive to your server and make sure that booting from USB
-is enabled (check your servers firmware settings). Then follow the steps of the
-:ref:`installation wizard <using_the_installer>`.
+Insert the created USB flash drive (or DVD) into your server. Continue
+by reading the :ref:`installer <using_the_installer>` chapter, which
+also describes possible boot issues.
