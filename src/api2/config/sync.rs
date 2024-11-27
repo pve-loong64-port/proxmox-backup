@@ -167,7 +167,10 @@ pub fn check_sync_job_modify_access(
         items: { type: SyncJobConfig },
     },
     access: {
-        description: "Limited to sync job entries where user has Datastore.Audit on target datastore, and Remote.Audit on source remote.",
+        description: "Limited to sync job entries where user has Datastore.Audit on target \
+datastore, and Remote.Audit on source remote for sync jobs in pull direction.\n\
+For push direction the user requires RemoteDatastore.Audit on the remote datastore and \
+Datastore.Audit on the local datastore.",
         permission: &Permission::Anybody,
     },
 )]
@@ -208,7 +211,12 @@ pub fn list_sync_jobs(
         },
     },
     access: {
-        description: "User needs Datastore.Backup on target datastore, and Remote.Read on source remote. Additionally, remove_vanished requires Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify",
+        description: "For sync jobs in pull direction user needs Datastore.Backup on target \
+datastore, and Remote.Read on source remote. Additionally, remove_vanished requires \
+Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify.\n\
+For sync jobs in push direction, user needs RemoteDatastore.Backup on remote datastore, and \
+Datastore.Audit, Datastore.Read and Datastore.Modify on the source datastore, the latter not \
+required sync job owned by user. Additionally, remove vanished requires RemoteDatastore.Modify.",
         permission: &Permission::Anybody,
     },
 )]
@@ -269,7 +277,10 @@ pub fn create_sync_job(
     },
     returns: { type: SyncJobConfig },
     access: {
-        description: "Limited to sync job entries where user has Datastore.Audit on target datastore, and Remote.Audit on source remote.",
+        description: "Limited to sync job entries where user has Datastore.Audit on target \
+datastore, and Remote.Audit on source remote for sync jobs in pull direction.\n\
+For push direction the user requires RemoteDatastore.Audit on the remote datastore and \
+Datastore.Audit on the local datastore.",
         permission: &Permission::Anybody,
     },
 )]
@@ -355,7 +366,12 @@ pub enum DeletableProperty {
     },
     access: {
         permission: &Permission::Anybody,
-        description: "User needs Datastore.Backup on target datastore, and Remote.Read on source remote. Additionally, remove_vanished requires Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify",
+        description: "For sync jobs in pull direction user needs Datastore.Backup on target \
+datastore, and Remote.Read on source remote. Additionally, remove_vanished requires \
+Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify.\n\
+For sync jobs in push direction, user needs RemoteDatastore.Backup on remote datastore, and \
+Datastore.Audit, Datastore.Read and Datastore.Modify on the source datastore, the latter not \
+required sync job owned by user. Additionally, remove vanished requires RemoteDatastore.Modify.",
     },
 )]
 /// Update sync job config.
@@ -545,7 +561,12 @@ pub fn update_sync_job(
     },
     access: {
         permission: &Permission::Anybody,
-        description: "User needs Datastore.Backup on target datastore, and Remote.Read on source remote. Additionally, remove_vanished requires Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify",
+        description: "For sync jobs in pull direction user needs Datastore.Backup on target \
+datastore, and Remote.Read on source remote. Additionally, remove_vanished requires \
+Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify.\n\
+For sync jobs in push direction, user needs RemoteDatastore.Backup on remote datastore, and \
+Datastore.Audit, Datastore.Read and Datastore.Modify on the source datastore, the latter not \
+required sync job owned by user. Additionally, remove vanished requires RemoteDatastore.Modify.",
     },
 )]
 /// Remove a sync job configuration
