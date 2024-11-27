@@ -32,7 +32,7 @@ Ext.define('PBS.PruneKeepInput', {
 	    hidden: true,
 	    handler: function() {
 		this.triggers.clear.setVisible(false);
-		this.setValue(this.originalValue);
+		this.setValue("");
 	    },
 	},
     },
