@@ -256,9 +256,9 @@ The following permissions are required for a sync job in push direction:
 
 #. ``Remote.Audit`` on ``/remote/{remote}`` and ``Remote.DatastoreBackup`` on
    ``/remote/{remote}/{remote-store}/{remote-ns}`` path or subnamespace.
-#. At least ``Datastore.Read`` on the local source datastore namespace
-   (``/datastore/{store}/{ns}``) or ``Datastore.Backup`` if owner of the sync
-   job.
+#. At least ``Datastore.Read`` and ``Datastore.Audit`` on the local source
+   datastore namespace (``/datastore/{store}/{ns}``) or ``Datastore.Backup`` if
+   owner of the sync job.
 #. ``Remote.DatastorePrune`` on ``/remote/{remote}/{remote-store}/{remote-ns}``
    path to remove vanished snapshots and groups. Make sure to use a dedicated
    remote for each sync job in push direction as noted above.
