@@ -1257,7 +1257,7 @@ Ext.define('PBS.DataStoreContent', {
 	},
 	{
 	    xtype: 'proxmoxButton',
-	    text: gettext('Add NS'),
+	    text: gettext('Add Namespace'),
 	    iconCls: 'fa fa-plus-square',
 	    handler: 'addNS',
 	},
