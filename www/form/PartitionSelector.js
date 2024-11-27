@@ -5,10 +5,11 @@ Ext.define('pbs-partition-list', {
 	type: 'proxmox',
 	url: "/api2/json/nodes/localhost/disks/list?skipsmart=1&include-partitions=1",
 	reader: {
-	    transform: (rawData) => rawData.data
-		.flatMap(disk => (disk.partitions
-			.map(part => ({ ...part, model: disk.model })) ?? [])
-			.filter(partition => partition.used === 'filesystem' && !!partition.uuid)),
+	    transform: ({ data }) => data
+		.flatMap(disk =>
+		    (disk.partitions.map(part => ({ ...part, model: disk.model })) ?? [])
+		        .filter(partition => partition.used === 'filesystem' && !!partition.uuid),
+		),
 	},
     },
     idProperty: 'devpath',
