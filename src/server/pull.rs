@@ -551,20 +551,22 @@ async fn pull_group(
                     .store
                     .backup_dir(target_ns.clone(), dir.clone());
                 if let Ok(local_dir) = local_dir {
-                    match local_dir.verify_state() {
-                        Ok(Some(state)) => {
-                            if state == VerifyState::Failed {
+                    if local_dir.full_path().exists() {
+                        match local_dir.verify_state() {
+                            Ok(Some(state)) => {
+                                if state == VerifyState::Failed {
+                                    return Some((dir, true));
+                                }
+                            }
+                            Ok(None) => {
+                                // The verify_state item was not found in the manifest, this means the
+                                // snapshot is new.
+                            }
+                            Err(_) => {
+                                // There was an error loading the manifest, probably better if we
+                                // resync.
                                 return Some((dir, true));
                             }
-                        }
-                        Ok(None) => {
-                            // The verify_state item was not found in the manifest, this means the
-                            // snapshot is new.
-                        }
-                        Err(_) => {
-                            // There was an error loading the manifest, probably better if we
-                            // resync.
-                            return Some((dir, true));
                         }
                     }
                 }
