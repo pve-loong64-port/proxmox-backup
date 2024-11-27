@@ -324,16 +324,23 @@ pub const ROUTER: Router = Router::new()
     .post(&API_METHOD_CREATE_DATASTORE_DISK)
     .match_all("name", &ITEM_ROUTER);
 
+fn datastore_mount_unit_path_info(mount_point: &str) -> (String, String) {
+    let mut mount_unit_name = proxmox_systemd::escape_unit(mount_point, true);
+    mount_unit_name.push_str(".mount");
+
+    (
+        format!("/etc/systemd/system/{mount_unit_name}"),
+        mount_unit_name,
+    )
+}
+
 fn create_datastore_mount_unit(
     datastore_name: &str,
     mount_point: &str,
     fs_type: FileSystemType,
     what: &str,
 ) -> Result<String, Error> {
-    let mut mount_unit_name = proxmox_systemd::escape_unit(mount_point, true);
-    mount_unit_name.push_str(".mount");
-
-    let mount_unit_path = format!("/etc/systemd/system/{}", mount_unit_name);
+    let (mount_unit_path, mount_unit_name) = datastore_mount_unit_path_info(mount_point);
 
     let unit = SystemdUnitSection {
         Description: format!(
