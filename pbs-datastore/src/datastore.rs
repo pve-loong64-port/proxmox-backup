@@ -1150,6 +1150,17 @@ impl DataStore {
             // writer" information and thus no safe atime cutoff
             let _exclusive_lock = self.inner.chunk_store.try_exclusive_lock()?;
 
+            let (config, _digest) = pbs_config::datastore::config()?;
+            let gc_store_config: DataStoreConfig = config.lookup("datastore", &self.name())?;
+            let all_stores = config.convert_to_typed_array("datastore")?;
+            if let Err(err) = gc_store_config.ensure_not_nested(&all_stores) {
+                info!(
+                    "Current datastore path: {path}",
+                    path = gc_store_config.absolute_path()
+                );
+                bail!("Aborting GC for safety reasons: {err}");
+            }
+
             let phase1_start_time = proxmox_time::epoch_i64();
             let oldest_writer = self
                 .inner
