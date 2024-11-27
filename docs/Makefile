@@ -89,7 +89,7 @@ API_VIEWER_FILES :=							\
 	/usr/share/javascript/proxmox-widget-toolkit-dev/APIViewer.js	\
 
 # Sphinx documentation setup
-SPHINXOPTS    =
+SPHINXOPTS    = -E
 SPHINXBUILD   = sphinx-build
 BUILDDIR      = output
 
