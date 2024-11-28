@@ -35,6 +35,15 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
 	let me = this;
 	let vm = me.getViewModel();
 
+	if (statusData['mount-status'] === 'notmounted') {
+	    let maskMessage = gettext('Datastore is not mounted');
+	    let maskIcon = 'fa pbs-unplugged-mask';
+	    me.mask(maskMessage, maskIcon);
+	    return;
+	} else if (me.isMasked()) {
+	    me.unmask();
+	}
+
 	if (statusData.error !== undefined) {
 	    Proxmox.Utils.API2Request({
 		url: `/config/datastore/${statusData.store}`,
