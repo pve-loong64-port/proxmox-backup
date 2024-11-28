@@ -1,3 +1,15 @@
+rust-proxmox-backup (3.3.0-2) bookworm; urgency=medium
+
+  * tree-wide: fix various typos.
+
+  * ui: fix remove vanished tooltip to be valid for both sync directions.
+
+  * ui: mask unmounted datastores in datastore overview.
+
+  * server: push: fix supported api version check for minor version bump.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 28 Nov 2024 13:03:03 +0100
+
 rust-proxmox-backup (3.3.0-1) bookworm; urgency=medium
 
   * GC: add safety-check for nested datastore
