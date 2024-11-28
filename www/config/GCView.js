@@ -33,7 +33,11 @@ Ext.define('PBS.config.GCJobView', {
 		// after the store is loaded, select the row to enable the Edit,.. buttons
 		store.rstore.proxy.on({
 		    'afterload': {
-			fn: () => view.getSelectionModel().select(0),
+			fn: () => {
+			    if (view.store) {
+				view.getSelectionModel().select(0);
+			    }
+			},
 			single: true,
 		    },
 		});
