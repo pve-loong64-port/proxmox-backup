@@ -132,7 +132,8 @@ impl PushParameters {
         }
 
         let supports_prune_delete_stats = api_version.major > 3
-            || (api_version.major == 3 && api_version.minor >= 2 && api_version.release >= 11);
+            || (api_version.major == 3 && api_version.minor >= 3)
+            || (api_version.major == 3 && api_version.minor == 2 && api_version.release >= 11);
 
         let target = PushTarget {
             remote,
