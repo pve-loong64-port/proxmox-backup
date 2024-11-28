@@ -343,7 +343,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 			name: 'remove-vanished',
 			autoEl: {
 			    tag: 'div',
-			    'data-qtip': gettext('Remove snapshots from local datastore if they vanished from source datastore?'),
+			    'data-qtip': gettext('Remove snapshots from sync target datastore if they vanished from source datastore?'),
 			},
 			uncheckedValue: false,
 			value: false,
