@@ -127,13 +127,11 @@ impl PushParameters {
         let api_version = ApiVersion::try_from(version_info)?;
 
         // push assumes namespace support on the remote side, fail early if missing
-        if api_version.major < 2 || (api_version.major == 2 && api_version.minor < 2) {
+        if api_version < ApiVersion::new(2, 2, 0) {
             bail!("Unsupported remote api version, minimum v2.2 required");
         }
 
-        let supports_prune_delete_stats = api_version.major > 3
-            || (api_version.major == 3 && api_version.minor >= 3)
-            || (api_version.major == 3 && api_version.minor == 2 && api_version.release >= 11);
+        let supports_prune_delete_stats = api_version >= ApiVersion::new(3, 2, 11);
 
         let target = PushTarget {
             remote,
