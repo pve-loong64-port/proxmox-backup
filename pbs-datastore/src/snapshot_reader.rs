@@ -102,7 +102,7 @@ impl SnapshotReader {
         let raw_fd = nix::fcntl::openat(
             self.locked_dir.as_raw_fd(),
             Path::new(filename),
-            nix::fcntl::OFlag::O_RDONLY,
+            nix::fcntl::OFlag::O_RDONLY | nix::fcntl::OFlag::O_CLOEXEC,
             nix::sys::stat::Mode::empty(),
         )?;
         let file = unsafe { File::from_raw_fd(raw_fd) };

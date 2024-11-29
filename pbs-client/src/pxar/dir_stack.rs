@@ -57,7 +57,7 @@ impl PxarDir {
         let dir = Dir::openat(
             parent,
             self.file_name.as_os_str(),
-            OFlag::O_DIRECTORY,
+            OFlag::O_DIRECTORY | OFlag::O_CLOEXEC,
             Mode::empty(),
         )?;
 

@@ -143,7 +143,7 @@ impl BackupGroup {
                 match openat(
                     l2_fd,
                     &manifest_path,
-                    OFlag::O_RDONLY,
+                    OFlag::O_RDONLY | OFlag::O_CLOEXEC,
                     nix::sys::stat::Mode::empty(),
                 ) {
                     Ok(rawfd) => {
