@@ -736,6 +736,7 @@ fn spawn_catalog_upload(
    }
 )]
 /// Create (host) backup.
+#[allow(clippy::too_many_arguments)]
 async fn create_backup(
     param: Value,
     all_file_systems: bool,
@@ -1490,6 +1491,7 @@ We do not extract '.pxar' archives when writing to standard output.
     }
 )]
 /// Restore backup repository.
+#[allow(clippy::too_many_arguments)]
 async fn restore(
     param: Value,
     allow_existing_dirs: bool,
