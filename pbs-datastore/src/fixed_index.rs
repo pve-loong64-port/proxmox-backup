@@ -90,7 +90,7 @@ impl FixedIndexReader {
         let ctime = i64::from_le(header.ctime);
         let chunk_size = u64::from_le(header.chunk_size);
 
-        let index_length = ((size + chunk_size - 1) / chunk_size) as usize;
+        let index_length = size.div_ceil(chunk_size) as usize;
         let index_size = index_length * 32;
 
         let expected_index_size = (stat.st_size as usize) - header_size;
@@ -285,7 +285,7 @@ impl FixedIndexWriter {
 
         file.write_all(&buffer)?;
 
-        let index_length = (size + chunk_size - 1) / chunk_size;
+        let index_length = size.div_ceil(chunk_size);
         let index_size = index_length * 32;
         nix::unistd::ftruncate(file.as_raw_fd(), (header_size + index_size) as i64)?;
 
