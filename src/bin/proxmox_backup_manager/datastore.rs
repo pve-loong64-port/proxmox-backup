@@ -281,7 +281,7 @@ async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Va
         return Ok(Value::Null);
     }
 
-    if let Some(store) = matching_stores.get(0) {
+    if let Some(store) = matching_stores.first() {
         api2::admin::datastore::do_mount_device(store.clone())?;
     }
 
