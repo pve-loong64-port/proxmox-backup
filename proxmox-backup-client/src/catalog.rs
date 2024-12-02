@@ -98,7 +98,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
                     metadata_archives.push(archive.filename.clone());
                 }
             }
-            metadata_archives.sort_unstable_by(|a, b| a.cmp(b));
+            metadata_archives.sort_unstable();
 
             for archive in &metadata_archives {
                 let (reader, archive_size) = get_remote_pxar_reader(
