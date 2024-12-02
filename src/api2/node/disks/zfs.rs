@@ -290,7 +290,7 @@ pub fn create_zpool(
             let mut command = std::process::Command::new("zfs");
             command.arg("set");
             if let Some(compression) = compression {
-                command.arg(&format!("compression={}", compression));
+                command.arg(format!("compression={compression}"));
             }
             command.args(["relatime=on", &name]);
             info!("# {command:?}");

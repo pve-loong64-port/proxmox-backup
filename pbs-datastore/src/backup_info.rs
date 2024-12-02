@@ -428,7 +428,7 @@ impl BackupDir {
 
         std::fs::create_dir_all(&path)?;
         let ts = self.backup_time_string();
-        path.push(&format!("{ts}{MANIFEST_LOCK_NAME}"));
+        path.push(format!("{ts}{MANIFEST_LOCK_NAME}"));
 
         Ok(path)
     }

@@ -240,7 +240,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
         )
         .await?;
 
-        let state = Shell::new(None, &server_archive_name.as_ref(), accessor).await?;
+        let state = Shell::new(None, server_archive_name.as_ref(), accessor).await?;
         log::info!("Starting interactive shell");
         state.shell().await?;
         record_repository(&repo);
@@ -283,7 +283,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
 
     catalogfile.seek(SeekFrom::Start(0))?;
     let catalog_reader = CatalogReader::new(catalogfile);
-    let state = Shell::new(Some(catalog_reader), &server_archive_name.as_ref(), decoder).await?;
+    let state = Shell::new(Some(catalog_reader), server_archive_name.as_ref(), decoder).await?;
 
     log::info!("Starting interactive shell");
     state.shell().await?;

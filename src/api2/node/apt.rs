@@ -181,7 +181,7 @@ pub fn get_versions() -> Result<Vec<APTUpdateInfo>, Error> {
         "proxmox-backup",
         "proxmox-backup-server",
         &running_daemon_version,
-        &PACKAGES,
+        PACKAGES,
     )
 }
 

@@ -1151,7 +1151,7 @@ impl DataStore {
             let _exclusive_lock = self.inner.chunk_store.try_exclusive_lock()?;
 
             let (config, _digest) = pbs_config::datastore::config()?;
-            let gc_store_config: DataStoreConfig = config.lookup("datastore", &self.name())?;
+            let gc_store_config: DataStoreConfig = config.lookup("datastore", self.name())?;
             let all_stores = config.convert_to_typed_array("datastore")?;
             if let Err(err) = gc_store_config.ensure_not_nested(&all_stores) {
                 info!(

@@ -529,7 +529,7 @@ impl Shell {
                         None => bail!("no such file or directory: {entry:?}"),
                     }
                 } else {
-                    let pxar_entry = parent_pxar_entry(&stack)?;
+                    let pxar_entry = parent_pxar_entry(stack)?;
                     let parent_dir = pxar_entry.enter_directory().await?;
                     match parent_dir.lookup(entry).await? {
                         Some(entry) => {
@@ -575,7 +575,7 @@ impl Shell {
                         None => bail!("no such file or directory: {:?}", entry),
                     }
                 } else {
-                    let pxar_entry = parent_pxar_entry(&stack)?;
+                    let pxar_entry = parent_pxar_entry(stack)?;
                     let parent_dir = block_on(pxar_entry.enter_directory())?;
                     match block_on(parent_dir.lookup(entry))? {
                         Some(entry) => {
@@ -766,7 +766,7 @@ impl Shell {
                 let mut out = std::io::stdout();
                 let items = crate::pxar::tools::pxar_metadata_read_dir(dir).await?;
                 for item in items {
-                    out.write_all(&item.file_name().as_bytes())?;
+                    out.write_all(item.file_name().as_bytes())?;
                     out.write_all(b"\n")?;
                 }
                 return Ok(());

@@ -1017,9 +1017,7 @@ async fn create_backup(
             (BackupSpecificationType::PXAR, true) => {
                 log_file("directory", &filename, target.as_ref())
             }
-            (BackupSpecificationType::IMAGE, true) => {
-                log_file("image", &filename, &target.as_ref())
-            }
+            (BackupSpecificationType::IMAGE, true) => log_file("image", &filename, target.as_ref()),
             // no dry-run
             (BackupSpecificationType::CONFIG, false) => {
                 let upload_options = UploadOptions {

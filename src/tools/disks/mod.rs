@@ -1215,7 +1215,7 @@ pub fn change_parttype(part_disk: &Disk, part_type: &str) -> Result<(), Error> {
         let minor = unsafe { libc::minor(stat.st_rdev) };
         let partnum_path = &format!("/sys/dev/block/{}:{}/partition", major, minor);
         let partnum: u32 = std::fs::read_to_string(partnum_path)?.trim_end().parse()?;
-        sgdisk_command.arg(&format!("-t{}:{}", partnum, part_type));
+        sgdisk_command.arg(format!("-t{}:{}", partnum, part_type));
         let part_disk_parent = match part_disk.parent() {
             Some(disk) => disk,
             None => bail!("disk {:?} has no node in /dev", part_disk.syspath()),
@@ -1355,7 +1355,7 @@ pub fn get_fs_uuid(disk: &Disk) -> Result<String, Error> {
 /// Mount a disk by its UUID and the mount point.
 pub fn mount_by_uuid(uuid: &str, mount_point: &Path) -> Result<(), Error> {
     let mut command = std::process::Command::new("mount");
-    command.arg(&format!("UUID={uuid}"));
+    command.arg(format!("UUID={uuid}"));
     command.arg(mount_point);
 
     proxmox_sys::command::run_command(command, None)?;
