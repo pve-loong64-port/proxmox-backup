@@ -192,7 +192,7 @@ impl Filesystems {
         let mut supported_fs = Vec::new();
         for f in BufReader::new(File::open("/proc/filesystems")?)
             .lines()
-            .filter_map(Result::ok)
+            .map_while(Result::ok)
         {
             // ZFS is treated specially, don't attempt to do a regular mount with it
             let f = f.trim();
