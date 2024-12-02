@@ -30,7 +30,6 @@ pub trait Chunker {
 /// information please take a look at the [Rolling
 /// Hash](https://en.wikipedia.org/wiki/Rolling_hash) article from
 /// Wikipedia.
-
 pub struct ChunkerImpl {
     h: u32,
     window_size: usize,

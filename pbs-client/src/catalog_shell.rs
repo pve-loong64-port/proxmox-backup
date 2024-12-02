@@ -303,7 +303,6 @@ async fn restore_command(target: String, pattern: Option<String>) -> Result<(), 
 /// The `Path` type's component iterator does not tell us anything about trailing slashes or
 /// trailing `Component::CurDir` entries. Since we only support regular paths we'll roll our own
 /// here:
-
 pub struct Shell {
     /// Readline instance handling input and callbacks
     rl: rustyline::Editor<CliHelper>,

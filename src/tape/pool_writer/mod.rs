@@ -332,7 +332,7 @@ impl PoolWriter {
 
     /// Move to EOM (if not already there), then write the current
     /// catalog to the tape. On success, this return 'Ok(true)'.
-
+    ///
     /// Please note that this may fail when there is not enough space
     /// on the media (return value 'Ok(false, _)'). In that case, the
     /// archive is marked incomplete. The caller should mark the media
@@ -439,7 +439,7 @@ impl PoolWriter {
     /// archive writing specified files (as .pxar) into it. On
     /// success, this return 'Ok(true)' and the media catalog gets
     /// updated.
-
+    ///
     /// Please note that this may fail when there is not enough space
     /// on the media (return value 'Ok(false, _)'). In that case, the
     /// archive is marked incomplete, and we do not use it. The caller
