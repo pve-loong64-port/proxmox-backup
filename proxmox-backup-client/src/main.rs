@@ -1149,7 +1149,7 @@ async fn create_backup(
                     &client,
                     &filename,
                     &target,
-                    payload_target.as_ref().as_deref(),
+                    payload_target.as_ref(),
                     chunk_size_opt,
                     catalog.as_ref().cloned(),
                     pxar_options,
