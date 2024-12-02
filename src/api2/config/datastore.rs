@@ -178,7 +178,11 @@ pub fn create_datastore(
     }
 
     if config.backing_device.is_none() && !config.path.starts_with("/") {
-        param_bail!("path", "expected an absolute path, '{}' is not", config.path);
+        param_bail!(
+            "path",
+            "expected an absolute path, '{}' is not",
+            config.path
+        );
     }
     if config.backing_device.is_some() && config.path.starts_with("/") {
         param_bail!(
