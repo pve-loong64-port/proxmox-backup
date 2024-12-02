@@ -16,7 +16,6 @@ use tokio::signal::unix::{signal, SignalKind};
 use proxmox_router::{cli::*, ApiHandler, ApiMethod, RpcEnvironment};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
-use proxmox_systemd;
 
 use pbs_api_types::{ArchiveType, BackupArchiveName, BackupNamespace};
 use pbs_client::tools::key_source::get_encryption_key_password;

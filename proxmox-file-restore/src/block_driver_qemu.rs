@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use proxmox_sys::fs::lock_file;
-use proxmox_systemd;
 
 use pbs_api_types::{file_restore::FileRestoreFormat, BackupDir, BackupNamespace};
 use pbs_client::{BackupRepository, VsockClient, DEFAULT_VSOCK_PORT};
