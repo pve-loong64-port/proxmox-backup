@@ -427,8 +427,10 @@ fn test_suggested_boundary() {
     chunks1.push((last, buffer.len() - last));
 
     let mut pos = 0;
-    let mut ctx = Context::default();
-    ctx.total = buffer.len() as u64;
+    let mut ctx = Context {
+        total: buffer.len() as u64,
+        ..Default::default()
+    };
     chunker.reset();
     // Suggest chunk boundary within regular chunk
     tx.send(32 * 1024).unwrap();
