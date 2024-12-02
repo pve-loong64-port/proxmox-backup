@@ -98,9 +98,7 @@ fn is_datastore_mounted_at(store_mount_point: String, device_uuid: &str) -> bool
 }
 
 pub fn get_datastore_mount_status(config: &DataStoreConfig) -> Option<bool> {
-    let Some(ref device_uuid) = config.backing_device else {
-        return None;
-    };
+    let device_uuid = config.backing_device.as_ref()?;
     Some(is_datastore_mounted_at(config.absolute_path(), device_uuid))
 }
 
