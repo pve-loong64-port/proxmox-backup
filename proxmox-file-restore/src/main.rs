@@ -479,7 +479,7 @@ async fn extract(
             let (archive_name, payload_archive_name) =
                 pbs_client::tools::get_pxar_archive_names(&archive_name, &manifest)?;
             let (reader, archive_size) = get_remote_pxar_reader(
-                &archive_name.try_into()?,
+                &archive_name,
                 client.clone(),
                 &manifest,
                 crypt_config.clone(),

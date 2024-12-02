@@ -169,8 +169,6 @@ fn mount(
     // Process should be daemonized.
     // Make sure to fork before the async runtime is instantiated to avoid troubles.
     let (pr, pw) = proxmox_sys::pipe()?;
-    let pr: OwnedFd = pr.into(); // until next sys bump
-    let pw: OwnedFd = pw.into();
     match unsafe { fork() } {
         Ok(ForkResult::Parent { .. }) => {
             drop(pw);
