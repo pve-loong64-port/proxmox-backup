@@ -1543,9 +1543,8 @@ async fn restore(
         None => None,
         Some(ref key) => {
             let (key, _, _) =
-                decrypt_key(&key.key, &get_encryption_key_password).map_err(|err| {
+                decrypt_key(&key.key, &get_encryption_key_password).inspect_err(|_err| {
                     log::error!("{}", format_key_source(&key.source, "encryption"));
-                    err
                 })?;
             Some(Arc::new(CryptConfig::new(key)?))
         }

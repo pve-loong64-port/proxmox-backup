@@ -122,9 +122,8 @@ async fn diff_archive_cmd(
         None => None,
         Some(key) => {
             let (key, _created, _fingerprint) = decrypt_key(&key.key, &get_encryption_key_password)
-                .map_err(|err| {
+                .inspect_err(|_err| {
                     log::error!("{}", format_key_source(&key.source, "encryption"));
-                    err
                 })?;
             let crypt_config = CryptConfig::new(key)?;
             Some(Arc::new(crypt_config))
