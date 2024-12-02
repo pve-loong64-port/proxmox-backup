@@ -32,7 +32,7 @@
 //!
 //!   * `FILENAME`          -- name of the first directory entry (strictly ordered!)
 //!   * `<archive>`         -- serialization of the first directory entry's metadata and contents,
-//!  following the exact same archive format
+//!     following the exact same archive format
 //!   * `FILENAME`          -- name of the second directory entry (strictly ordered!)
 //!   * `<archive>`         -- serialization of the second directory entry
 //!   * ...

@@ -246,8 +246,8 @@ fn verify_archive(info: &FileInfo, csum: &[u8; 32], size: u64) -> Result<(), Err
 ///
 /// Pulling an archive consists of the following steps:
 /// - Load archive file into tmp file
-/// -- Load file into tmp file
-/// -- Verify tmp file checksum
+///   -- Load file into tmp file
+///   -- Verify tmp file checksum
 /// - if archive is an index, pull referenced chunks
 /// - Rename tmp file into real path
 async fn pull_single_archive<'a>(
@@ -328,10 +328,10 @@ async fn pull_single_archive<'a>(
 ///
 /// Pulling a snapshot consists of the following steps:
 /// - (Re)download the manifest
-/// -- if it matches and is not corrupt, only download log and treat snapshot as already synced
+///   -- if it matches and is not corrupt, only download log and treat snapshot as already synced
 /// - Iterate over referenced files
-/// -- if file already exists, verify contents
-/// -- if not, pull it from the remote
+///   -- if file already exists, verify contents
+///   -- if not, pull it from the remote
 /// - Download log if not already existing
 async fn pull_snapshot<'a>(
     reader: Arc<dyn SyncSourceReader + 'a>,
@@ -495,7 +495,7 @@ async fn pull_snapshot_from<'a>(
 /// - Sort by snapshot time
 /// - Get last snapshot timestamp on local datastore
 /// - Iterate over list of snapshots
-/// -- pull snapshot, unless it's not finished yet or older than last local snapshot
+///   -- pull snapshot, unless it's not finished yet or older than last local snapshot
 /// - (remove_vanished) list all local snapshots, remove those that don't exist on remote
 ///
 /// Backwards-compat: if `source_namespace` is [None], only the group type and ID will be sent to the
@@ -760,8 +760,8 @@ fn check_and_remove_vanished_ns(
 /// Pulling a store consists of the following steps:
 /// - Query list of namespaces on the remote
 /// - Iterate list
-/// -- create sub-NS if needed (and allowed)
-/// -- attempt to pull each NS in turn
+///   -- create sub-NS if needed (and allowed)
+///   -- attempt to pull each NS in turn
 /// - (remove_vanished && max_depth > 0) remove sub-NS which are not or no longer available on the remote
 ///
 /// Backwards compat: if the remote namespace is `/` and recursion is disabled, no namespace is
