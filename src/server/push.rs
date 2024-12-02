@@ -444,7 +444,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
         // Without this pre-filtering, all namespaces unrelated to the sync would be removed!
         let max_depth = params
             .max_depth
-            .unwrap_or_else(|| pbs_api_types::MAX_NAMESPACE_DEPTH);
+            .unwrap_or(pbs_api_types::MAX_NAMESPACE_DEPTH);
         let mut target_sub_namespaces: Vec<BackupNamespace> = existing_target_namespaces
             .into_iter()
             .filter(|target_namespace| {
