@@ -1,4 +1,4 @@
-///! Daemon binary to run inside a micro-VM for secure single file restore of disk images
+//! Daemon binary to run inside a micro-VM for secure single file restore of disk images
 use std::fs::File;
 use std::io::prelude::*;
 use std::os::unix::{

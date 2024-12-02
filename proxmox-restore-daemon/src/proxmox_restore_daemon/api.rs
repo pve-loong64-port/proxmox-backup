@@ -1,4 +1,4 @@
-///! File-restore API running inside the restore VM
+//! File-restore API running inside the restore VM
 use std::ffi::OsStr;
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
