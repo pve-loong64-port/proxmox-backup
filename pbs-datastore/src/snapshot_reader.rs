@@ -131,7 +131,7 @@ pub struct SnapshotChunkIterator<'a, F: Fn(&[u8; 32]) -> bool> {
     current_index: Option<(Arc<Box<dyn IndexFile + Send>>, usize, Vec<(usize, u64)>)>,
 }
 
-impl<'a, F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'a, F> {
+impl<F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'_, F> {
     type Item = Result<[u8; 32], Error>;
 
     fn next(&mut self) -> Option<Self::Item> {

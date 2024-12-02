@@ -145,7 +145,7 @@ impl<'a> ListAccessibleBackupGroups<'a> {
 pub static NS_PRIVS_OK: u64 =
     PRIV_DATASTORE_MODIFY | PRIV_DATASTORE_READ | PRIV_DATASTORE_BACKUP | PRIV_DATASTORE_AUDIT;
 
-impl<'a> Iterator for ListAccessibleBackupGroups<'a> {
+impl Iterator for ListAccessibleBackupGroups<'_> {
     type Item = Result<BackupGroup, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {

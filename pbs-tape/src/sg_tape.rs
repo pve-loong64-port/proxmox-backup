@@ -1180,7 +1180,7 @@ impl<'a> SgTapeReader<'a> {
     }
 }
 
-impl<'a> BlockRead for SgTapeReader<'a> {
+impl BlockRead for SgTapeReader<'_> {
     fn read_block(&mut self, buffer: &mut [u8]) -> Result<usize, BlockReadError> {
         if self.end_of_file {
             return Err(BlockReadError::Error(proxmox_lang::io_format_err!(
@@ -1212,7 +1212,7 @@ impl<'a> SgTapeWriter<'a> {
     }
 }
 
-impl<'a> BlockWrite for SgTapeWriter<'a> {
+impl BlockWrite for SgTapeWriter<'_> {
     fn write_block(&mut self, buffer: &[u8]) -> Result<bool, std::io::Error> {
         self.sg_tape.write_block(buffer)
     }

@@ -46,7 +46,7 @@ impl<'a> MultiVolumeWriter<'a> {
     }
 }
 
-impl<'a> TapeWrite for MultiVolumeWriter<'a> {
+impl TapeWrite for MultiVolumeWriter<'_> {
     fn write_all(&mut self, buf: &[u8]) -> Result<bool, std::io::Error> {
         if self.finished {
             proxmox_lang::io_bail!("multi-volume writer already finished: internal error");

@@ -558,7 +558,7 @@ struct ChunkCacher<'a, S> {
     index: &'a DynamicIndexReader,
 }
 
-impl<'a, S: ReadChunk> pbs_tools::lru_cache::Cacher<usize, CachedChunk> for ChunkCacher<'a, S> {
+impl<S: ReadChunk> pbs_tools::lru_cache::Cacher<usize, CachedChunk> for ChunkCacher<'_, S> {
     fn fetch(&mut self, index: usize) -> Result<Option<CachedChunk>, Error> {
         let info = match self.index.chunk_info(index) {
             Some(info) => info,

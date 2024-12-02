@@ -125,7 +125,7 @@ impl<'a, T: TapeWrite + ?Sized> PxarTapeWriter<'a, T> {
     }
 }
 
-impl<'a, T: TapeWrite + ?Sized> pxar::encoder::SeqWrite for PxarTapeWriter<'a, T> {
+impl<T: TapeWrite + ?Sized> pxar::encoder::SeqWrite for PxarTapeWriter<'_, T> {
     fn poll_seq_write(
         self: Pin<&mut Self>,
         _cx: &mut Context,

@@ -39,7 +39,7 @@ impl<'a> MultiVolumeReader<'a> {
     }
 }
 
-impl<'a> Read for MultiVolumeReader<'a> {
+impl Read for MultiVolumeReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
         if self.complete {
             return Ok(0);

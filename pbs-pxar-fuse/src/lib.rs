@@ -187,16 +187,16 @@ struct LookupRef<'a> {
     lookup: *const Lookup,
 }
 
-unsafe impl<'a> Send for LookupRef<'a> {}
-unsafe impl<'a> Sync for LookupRef<'a> {}
+unsafe impl Send for LookupRef<'_> {}
+unsafe impl Sync for LookupRef<'_> {}
 
-impl<'a> Clone for LookupRef<'a> {
+impl Clone for LookupRef<'_> {
     fn clone(&self) -> Self {
         self.get_ref(self.session)
     }
 }
 
-impl<'a> std::ops::Deref for LookupRef<'a> {
+impl std::ops::Deref for LookupRef<'_> {
     type Target = Lookup;
 
     fn deref(&self) -> &Self::Target {
@@ -204,7 +204,7 @@ impl<'a> std::ops::Deref for LookupRef<'a> {
     }
 }
 
-impl<'a> Drop for LookupRef<'a> {
+impl Drop for LookupRef<'_> {
     fn drop(&mut self) {
         if self.lookup.is_null() {
             return;

@@ -195,7 +195,7 @@ where
     }
 }
 
-impl<'a, T, F> Iterator for ExtractorIter<'a, T, F>
+impl<T, F> Iterator for ExtractorIter<'_, T, F>
 where
     T: pxar::decoder::SeqRead,
     F: FnMut(&Path),
