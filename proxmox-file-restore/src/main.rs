@@ -663,7 +663,7 @@ fn main() {
 
 /// Returns a runtime dir owned by the current user.
 /// Note that XDG_RUNTIME_DIR is not always available, especially for non-login users like
-/// "www-data", so we use a custom one in /run/proxmox-backup/<uid> instead.
+/// "www-data", so we use a custom one in `/run/proxmox-backup/<uid>` instead.
 pub fn get_user_run_dir() -> Result<std::path::PathBuf, Error> {
     let uid = nix::unistd::Uid::current();
     let mut path: std::path::PathBuf = pbs_buildcfg::PROXMOX_BACKUP_RUN_DIR.into();
