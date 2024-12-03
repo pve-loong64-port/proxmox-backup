@@ -202,23 +202,22 @@ where
 {
     type Item = Result<(), Error>;
 
-    /// Performs the extraction of [`Entries`][E] yielded by the [`Decoder`][D].
+    /// Performs the extraction of [`Entries`][Entry] yielded by the [`Decoder`][D].
     ///
     /// In detail, the [`ExtractorIter`] will stop if and only if one of the
     /// following conditions is true:
     ///   * The [`Decoder`][D] is exhausted
     ///   * The [`Decoder`][D] failed to read from the archive and consequently
     ///     yielded an [`io::Error`]
-    ///   * The [`Entry`][E]'s filename is invalid (contains nul bytes or a slash)
+    ///   * The [`Entry`]'s filename is invalid (contains nul bytes or a slash)
     ///
     /// Should an error occur during any point of extraction (**not** while
-    /// fetching the next [`Entry`][E]), the error may be handled by the
+    /// fetching the next [`Entry`]), the error may be handled by the
     /// [`ErrorHandler`] provided by the [`PxarExtractOptions`] used to
     /// initialize the iterator.
     ///
     /// Extraction errors will have a corresponding [`PxarExtractContext`] attached.
     ///
-    /// [E]: pxar::Entry
     /// [D]: pxar::decoder::Decoder
     fn next(&mut self) -> Option<Self::Item> {
         if self.state.end_reached {
