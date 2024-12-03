@@ -12,8 +12,8 @@ use pbs_api_types::{Authid, Role, Userid, ROLE_NAME_NO_ACCESS};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
 
-/// Map of pre-defined [Roles](Role) to their associated [privileges](PRIVILEGES) combination
-/// and description.
+/// Map of pre-defined [Roles](Role) to their associated
+/// [privileges](pbs_api_types::PRIVILEGES) combination and description.
 pub static ROLE_NAMES: LazyLock<HashMap<&'static str, (u64, &'static str)>> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
