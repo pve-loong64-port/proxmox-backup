@@ -56,9 +56,9 @@ pub fn check_backup_owner(owner: &Authid, auth_id: &Authid) -> Result<(), Error>
 /// returning false.
 ///
 /// Reasons it could fail other than not being mounted where expected:
-///  - could not read /proc/self/mountinfo
-///  - could not stat /dev/disk/by-uuid/<uuid>
-///  - /dev/disk/by-uuid/<uuid> is not a block device
+///  - could not read `/proc/self/mountinfo`
+///  - could not stat `/dev/disk/by-uuid/<uuid>`
+///  - `/dev/disk/by-uuid/<uuid>` is not a block device
 ///
 /// Since these are very much out of our control, there is no real value in distinguishing
 /// between them, so for this function they all are treated as 'device not mounted'
