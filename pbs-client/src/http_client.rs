@@ -25,6 +25,7 @@ use proxmox_async::broadcast_future::BroadcastFuture;
 use proxmox_http::client::HttpsConnector;
 use proxmox_http::uri::{build_authority, json_object_to_query};
 use proxmox_http::{ProxyConfig, RateLimiter};
+use proxmox_log::{error, info, warn};
 
 use pbs_api_types::percent_encoding::DEFAULT_ENCODE_SET;
 use pbs_api_types::{Authid, RateLimitConfig, Userid};
@@ -348,14 +349,14 @@ impl HttpClient {
                             if let Err(err) =
                                 store_fingerprint(prefix.as_ref().unwrap(), &server, &fingerprint)
                             {
-                                log::error!("{}", err);
+                                error!("{}", err);
                             }
                         }
                         *verified_fingerprint.lock().unwrap() = Some(fingerprint);
                         true
                     }
                     Err(err) => {
-                        log::error!("certificate validation failed - {}", err);
+                        error!("certificate validation failed - {}", err);
                         false
                     }
                 },
@@ -393,7 +394,7 @@ impl HttpClient {
 
         let proxy_config = ProxyConfig::from_proxy_env()?;
         if let Some(config) = proxy_config {
-            log::info!("Using proxy connection: {}:{}", config.host, config.port);
+            info!("Using proxy connection: {}:{}", config.host, config.port);
             https.set_proxy(config);
         }
 
@@ -461,14 +462,14 @@ impl HttpClient {
                                 &auth.token,
                             ) {
                                 if std::io::stdout().is_terminal() {
-                                    log::error!("storing login ticket failed: {}", err);
+                                    error!("storing login ticket failed: {}", err);
                                 }
                             }
                         }
                         *auth2.write().unwrap() = auth;
                     }
                     Err(err) => {
-                        log::error!("re-authentication failed: {}", err);
+                        error!("re-authentication failed: {}", err);
                     }
                 }
             }
@@ -498,7 +499,7 @@ impl HttpClient {
                         &auth.token,
                     ) {
                         if std::io::stdout().is_terminal() {
-                            log::error!("storing login ticket failed: {}", err);
+                            error!("storing login ticket failed: {}", err);
                         }
                     }
                 }
@@ -600,14 +601,14 @@ impl HttpClient {
             if expected_fingerprint == fp_string {
                 return Ok(Some(fp_string));
             } else {
-                log::warn!("WARNING: certificate fingerprint does not match expected fingerprint!");
-                log::warn!("expected:    {}", expected_fingerprint);
+                warn!("WARNING: certificate fingerprint does not match expected fingerprint!");
+                warn!("expected:    {}", expected_fingerprint);
             }
         }
 
         // If we're on a TTY, query the user
         if interactive && std::io::stdin().is_terminal() {
-            log::info!("fingerprint: {}", fp_string);
+            info!("fingerprint: {}", fp_string);
             loop {
                 eprint!("Are you sure you want to continue connecting? (y/n): ");
                 let _ = std::io::stdout().flush();
@@ -797,7 +798,7 @@ impl HttpClient {
             .handshake(upgraded)
             .await?;
 
-        let connection = connection.map_err(|_| log::error!("HTTP/2.0 connection failed"));
+        let connection = connection.map_err(|_| error!("HTTP/2.0 connection failed"));
 
         let (connection, abort) = futures::future::abortable(connection);
         // A cancellable future returns an Option which is None when cancelled and

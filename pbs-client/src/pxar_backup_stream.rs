@@ -14,6 +14,7 @@ use nix::sys::stat::Mode;
 
 use proxmox_async::blocking::TokioWriterAdapter;
 use proxmox_io::StdChannelWriter;
+use proxmox_log::debug;
 
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogWriter};
 
@@ -88,7 +89,7 @@ impl PxarBackupStream {
                 ),
                 crate::pxar::Flags::DEFAULT,
                 move |path| {
-                    log::debug!("{:?}", path);
+                    debug!("{:?}", path);
                     Ok(())
                 },
                 options,

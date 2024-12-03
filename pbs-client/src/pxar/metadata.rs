@@ -9,6 +9,7 @@ use nix::sys::stat::Mode;
 
 use pxar::Metadata;
 
+use proxmox_log::{info, warn};
 use proxmox_sys::c_result;
 use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{self, acl, xattr};
@@ -221,7 +222,7 @@ fn apply_xattrs(
         }
 
         if !xattr::is_valid_xattr_name(xattr.name()) {
-            log::info!("skipping invalid xattr named {:?}", xattr.name());
+            info!("skipping invalid xattr named {:?}", xattr.name());
             continue;
         }
 
@@ -282,7 +283,7 @@ fn apply_acls(
             acl.add_entry_full(acl::ACL_GROUP_OBJ, None, mode)?;
 
             if !metadata.acl.users.is_empty() || !metadata.acl.groups.is_empty() {
-                log::warn!(
+                warn!(
                     "Warning: {:?}: Missing GROUP_OBJ entry in ACL, resetting to value of MASK",
                     path_info,
                 );
@@ -300,7 +301,7 @@ fn apply_acls(
     }
 
     if !acl.is_valid() {
-        log::warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
+        warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
     }
 
     acl.set_file(c_proc_path, acl::ACL_TYPE_ACCESS)?;
@@ -329,7 +330,7 @@ fn apply_acls(
         }
 
         if !acl.is_valid() {
-            log::warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
+            warn!("Warning: {path_info:?} - ACL invalid, attempting restore anyway..");
         }
 
         acl.set_file(c_proc_path, acl::ACL_TYPE_DEFAULT)?;

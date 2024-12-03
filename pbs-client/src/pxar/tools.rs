@@ -21,6 +21,7 @@ use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::BackupManifest;
 use pbs_tools::crypt_config::CryptConfig;
+use proxmox_log::{debug, info};
 
 use crate::{BackupReader, RemoteChunkReader};
 
@@ -307,11 +308,11 @@ pub fn handle_root_with_optional_format_version_prelude<R: pxar::decoder::SeqRea
     match first.kind() {
         pxar::EntryKind::Directory => {
             let version = pxar::format::FormatVersion::Version1;
-            log::debug!("pxar format version '{version:?}'");
+            debug!("pxar format version '{version:?}'");
             Ok((first, None))
         }
         pxar::EntryKind::Version(version) => {
-            log::debug!("pxar format version '{version:?}'");
+            debug!("pxar format version '{version:?}'");
             let second = decoder
                 .next()
                 .ok_or_else(|| format_err!("missing root entry"))??;
@@ -405,14 +406,14 @@ pub async fn pxar_metadata_catalog_dump_dir<T: Clone + Send + Sync + ReadAt>(
                         if let Ok(s) = proxmox_time::strftime_local("%FT%TZ", mtime) {
                             mtime_string = s;
                         }
-                        log::info!("{etype} {entry_path:?} {size} {mtime_string}");
+                        info!("{etype} {entry_path:?} {size} {mtime_string}");
                     }
                     DirEntryAttribute::Directory { .. } => {
-                        log::info!("{etype} {entry_path:?}");
+                        info!("{etype} {entry_path:?}");
                         let dir = entry.enter_directory().await?;
                         pxar_metadata_catalog_dump_dir(dir, path_prefix).await?;
                     }
-                    _ => log::info!("{etype} {entry_path:?}"),
+                    _ => info!("{etype} {entry_path:?}"),
                 }
             }
 

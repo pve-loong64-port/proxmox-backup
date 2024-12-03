@@ -25,6 +25,7 @@ use pbs_datastore::PROXMOX_BACKUP_PROTOCOL_ID_V1;
 use pbs_tools::crypt_config::CryptConfig;
 
 use proxmox_human_byte::HumanByte;
+use proxmox_log::{debug, enabled, info, trace, warn, Level};
 use proxmox_time::TimeSpan;
 
 use super::backup_stats::{BackupStats, UploadCounters, UploadStats};
@@ -391,7 +392,7 @@ impl BackupWriter {
                 .iter()
                 .any(|file| file.filename == archive_name.as_ref())
             {
-                log::info!("Previous manifest does not contain an archive called '{archive_name}', skipping download..");
+                info!("Previous manifest does not contain an archive called '{archive_name}', skipping download..");
             } else {
                 // try, but ignore errors
                 match archive_name.archive_type() {
@@ -404,7 +405,7 @@ impl BackupWriter {
                             )
                             .await
                         {
-                            log::warn!("Error downloading .fidx from previous manifest: {}", err);
+                            warn!("Error downloading .fidx from previous manifest: {}", err);
                         }
                     }
                     ArchiveType::DynamicIndex => {
@@ -416,7 +417,7 @@ impl BackupWriter {
                             )
                             .await
                         {
-                            log::warn!("Error downloading .didx from previous manifest: {}", err);
+                            warn!("Error downloading .didx from previous manifest: {}", err);
                         }
                     }
                     _ => { /* do nothing */ }
@@ -450,14 +451,14 @@ impl BackupWriter {
 
         let size_dirty = upload_stats.size - upload_stats.size_reused;
         let size: HumanByte = upload_stats.size.into();
-        let archive = if log::log_enabled!(log::Level::Debug) {
+        let archive = if enabled!(Level::DEBUG) {
             archive_name.to_string()
         } else {
             archive_name.without_type_extension()
         };
 
         if upload_stats.chunk_injected > 0 {
-            log::info!(
+            info!(
                 "{archive}: reused {} from previous snapshot for unchanged files ({} chunks)",
                 HumanByte::from(upload_stats.size_injected),
                 upload_stats.chunk_injected,
@@ -469,37 +470,33 @@ impl BackupWriter {
                 ((size_dirty * 1_000_000) / (upload_stats.duration.as_micros() as usize)).into();
             let size_dirty: HumanByte = size_dirty.into();
             let size_compressed: HumanByte = upload_stats.size_compressed.into();
-            log::info!(
+            info!(
                 "{archive}: had to backup {size_dirty} of {size} (compressed {size_compressed}) in {:.2} s (average {speed}/s)",
                 upload_stats.duration.as_secs_f64()
             );
         } else {
-            log::info!("Uploaded backup catalog ({})", size);
+            info!("Uploaded backup catalog ({})", size);
         }
 
         if upload_stats.size_reused > 0 && upload_stats.size > 1024 * 1024 {
             let reused_percent = upload_stats.size_reused as f64 * 100. / upload_stats.size as f64;
             let reused: HumanByte = upload_stats.size_reused.into();
-            log::info!(
+            info!(
                 "{}: backup was done incrementally, reused {} ({:.1}%)",
-                archive,
-                reused,
-                reused_percent
+                archive, reused, reused_percent
             );
         }
-        if log::log_enabled!(log::Level::Debug) && upload_stats.chunk_count > 0 {
-            log::debug!(
+        if enabled!(Level::DEBUG) && upload_stats.chunk_count > 0 {
+            debug!(
                 "{}: Reused {} from {} chunks.",
-                archive,
-                upload_stats.chunk_reused,
-                upload_stats.chunk_count
+                archive, upload_stats.chunk_reused, upload_stats.chunk_count
             );
-            log::debug!(
+            debug!(
                 "{}: Average chunk size was {}.",
                 archive,
                 HumanByte::from(upload_stats.size / upload_stats.chunk_count)
             );
-            log::debug!(
+            debug!(
                 "{}: Average time per request: {} microseconds.",
                 archive,
                 (upload_stats.duration.as_micros()) / (upload_stats.chunk_count as u128)
@@ -544,7 +541,7 @@ impl BackupWriter {
                     response
                         .map_err(Error::from)
                         .and_then(H2Client::h2api_response)
-                        .map_ok(move |result| log::debug!("RESPONSE: {:?}", result))
+                        .map_ok(move |result| debug!("RESPONSE: {:?}", result))
                         .map_err(|err| format_err!("pipelined request failed: {}", err))
                 })
                 .map(|result| {
@@ -602,7 +599,7 @@ impl BackupWriter {
                                 digest_list.push(hex::encode(digest));
                                 offset_list.push(offset);
                             }
-                            log::debug!("append chunks list len ({})", digest_list.len());
+                            debug!("append chunks list len ({})", digest_list.len());
                             let param = json!({ "wid": wid, "digest-list": digest_list, "offset-list": offset_list });
                             let request = H2Client::request_builder("localhost", "PUT", &path, None, Some("application/json")).unwrap();
                             let param_data = bytes::Bytes::from(param.to_string().into_bytes());
@@ -654,7 +651,7 @@ impl BackupWriter {
             known_chunks.insert(*index.index_digest(i).unwrap());
         }
 
-        log::debug!(
+        debug!(
             "{}: known chunks list length is {}",
             archive_name,
             index.index_count()
@@ -688,7 +685,7 @@ impl BackupWriter {
             known_chunks.insert(*index.index_digest(i).unwrap());
         }
 
-        log::debug!(
+        debug!(
             "{}: known chunks list length is {}",
             archive_name,
             index.index_count()
@@ -860,7 +857,7 @@ impl BackupWriter {
                     let size_uploaded = HumanByte::from(uploaded_len.load(Ordering::SeqCst));
                     let elapsed = TimeSpan::from(start_time.elapsed());
 
-                    log::info!("processed {size} in {elapsed}, uploaded {size_uploaded}");
+                    info!("processed {size} in {elapsed}, uploaded {size_uploaded}");
                 }
             }))
         } else {
@@ -876,7 +873,7 @@ impl BackupWriter {
                     let digest = chunk_info.digest;
                     let digest_str = hex::encode(digest);
 
-                    log::trace!(
+                    trace!(
                         "upload new chunk {} ({} bytes, offset {})",
                         digest_str,
                         chunk_info.chunk_len,
@@ -967,7 +964,7 @@ impl BackupWriter {
                 break;
             }
 
-            log::debug!("send test data ({} bytes)", data.len());
+            debug!("send test data ({} bytes)", data.len());
             let request =
                 H2Client::request_builder("localhost", "POST", "speedtest", None, None).unwrap();
             let request_future = self
@@ -982,13 +979,13 @@ impl BackupWriter {
 
         let _ = upload_result.await?;
 
-        log::info!(
+        info!(
             "Uploaded {} chunks in {} seconds.",
             repeat,
             start_time.elapsed().as_secs()
         );
         let speed = ((item_len * (repeat as usize)) as f64) / start_time.elapsed().as_secs_f64();
-        log::info!(
+        info!(
             "Time per request: {} microseconds.",
             (start_time.elapsed().as_micros()) / (repeat as u128)
         );

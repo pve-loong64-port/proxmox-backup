@@ -22,6 +22,7 @@ use pxar::format::Device;
 use pxar::{Entry, EntryKind, Metadata};
 
 use proxmox_io::{sparse_copy, sparse_copy_async};
+use proxmox_log::{debug, error, info};
 use proxmox_sys::c_result;
 use proxmox_sys::fs::{create_path, CreateOptions};
 
@@ -140,10 +141,10 @@ where
                 if let pxar::EntryKind::Prelude(ref prelude) = entry.kind() {
                     prelude_file.write_all(prelude.as_ref())?;
                 } else {
-                    log::info!("unexpected entry kind for prelude");
+                    info!("unexpected entry kind for prelude");
                 }
             } else {
-                log::info!("No prelude entry found, skip prelude restore.");
+                info!("No prelude entry found, skip prelude restore.");
             }
         }
 
@@ -886,7 +887,7 @@ where
                         let metadata = realfile.entry().metadata();
                         let realpath = Path::new(link);
 
-                        log::debug!("adding '{}' to tar", path.display());
+                        debug!("adding '{}' to tar", path.display());
 
                         let stripped_path = match realpath.strip_prefix(prefix) {
                             Ok(path) => path,
@@ -915,7 +916,7 @@ where
                     }
                 }
                 EntryKind::Symlink(link) if !link.data.is_empty() => {
-                    log::debug!("adding '{}' to tar", path.display());
+                    debug!("adding '{}' to tar", path.display());
                     let realpath = Path::new(link);
                     let mut header = tar::Header::new_gnu();
                     header.set_entry_type(tar::EntryType::Symlink);
@@ -927,7 +928,7 @@ where
                         .context("could not send symlink entry")?;
                 }
                 EntryKind::Fifo => {
-                    log::debug!("adding '{}' to tar", path.display());
+                    debug!("adding '{}' to tar", path.display());
                     let mut header = tar::Header::new_gnu();
                     header.set_entry_type(tar::EntryType::Fifo);
                     add_metadata_to_header(&mut header, metadata);
@@ -941,7 +942,7 @@ where
                         .context("could not send fifo entry")?;
                 }
                 EntryKind::Directory => {
-                    log::debug!("adding '{}' to tar", path.display());
+                    debug!("adding '{}' to tar", path.display());
                     // we cannot add the root path itself
                     if path != Path::new("/") {
                         let mut header = tar::Header::new_gnu();
@@ -956,7 +957,7 @@ where
                     }
                 }
                 EntryKind::Device(device) => {
-                    log::debug!("adding '{}' to tar", path.display());
+                    debug!("adding '{}' to tar", path.display());
                     let entry_type = if metadata.stat.is_chardev() {
                         tar::EntryType::Char
                     } else {
@@ -979,7 +980,7 @@ where
     }
 
     tarencoder.finish().await.map_err(|err| {
-        log::error!("error during finishing of zip: {}", err);
+        error!("error during finishing of zip: {}", err);
         err
     })?;
     Ok(())
@@ -1028,7 +1029,7 @@ where
 
             match entry.kind() {
                 EntryKind::File { .. } => {
-                    log::debug!("adding '{}' to zip", path.display());
+                    debug!("adding '{}' to zip", path.display());
                     let entry = ZipEntry::new(
                         path,
                         metadata.stat.mtime.secs,
@@ -1047,7 +1048,7 @@ where
                         .with_context(|| format!("error looking up {:?}", path))?;
                     let realfile = accessor.follow_hardlink(&entry).await?;
                     let metadata = realfile.entry().metadata();
-                    log::debug!("adding '{}' to zip", path.display());
+                    debug!("adding '{}' to zip", path.display());
                     let entry = ZipEntry::new(
                         path,
                         metadata.stat.mtime.secs,
@@ -1060,7 +1061,7 @@ where
                         .context("could not send file entry")?;
                 }
                 EntryKind::Directory => {
-                    log::debug!("adding '{}' to zip", path.display());
+                    debug!("adding '{}' to zip", path.display());
                     let entry = ZipEntry::new(
                         path,
                         metadata.stat.mtime.secs,
@@ -1150,7 +1151,7 @@ where
     let mut extractor = get_extractor(destination, root.metadata().clone())?;
 
     if let Err(err) = seq_files_extractor(&mut extractor, decoder).await {
-        log::error!("error extracting pxar archive: {}", err);
+        error!("error extracting pxar archive: {}", err);
     }
 
     Ok(())
@@ -1214,7 +1215,7 @@ where
     let metadata = entry.metadata();
     let (file_name_os, file_name) = get_filename(entry)?;
 
-    log::debug!("extracting: {}", file.path().display());
+    debug!("extracting: {}", file.path().display());
 
     match file.kind() {
         EntryKind::Directory => {
@@ -1266,7 +1267,7 @@ where
         let (file_name_os, file_name) = get_filename(&entry)?;
 
         if !matches!(entry.kind(), EntryKind::GoodbyeTable) {
-            log::debug!("extracting: {}", entry.path().display());
+            debug!("extracting: {}", entry.path().display());
         }
 
         if let Err(err) = async {
@@ -1302,13 +1303,13 @@ where
         }
         .await
         {
-            let display = entry.path().display().to_string();
-            log::error!(
+            let display_string = entry.path().display().to_string();
+            error!(
                 "error extracting {}: {}",
                 if matches!(entry.kind(), EntryKind::GoodbyeTable) {
                     "<directory>"
                 } else {
-                    &display
+                    &display_string
                 },
                 err
             );

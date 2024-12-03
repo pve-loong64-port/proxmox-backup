@@ -27,6 +27,7 @@ use pxar::{EntryKind, Metadata, PxarVariant};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::vec;
+use proxmox_log::{debug, error, info, warn};
 use proxmox_sys::fs::{self, acl, xattr};
 
 use pbs_datastore::catalog::BackupCatalogWriter;
@@ -315,25 +316,25 @@ where
     encoder.close().await?;
 
     if metadata_mode {
-        log::info!("Change detection summary:");
-        log::info!(
+        info!("Change detection summary:");
+        info!(
             " - {} total files ({} hardlinks)",
             archiver.reuse_stats.files_reused_count
                 + archiver.reuse_stats.files_reencoded_count
                 + archiver.reuse_stats.files_hardlink_count,
             archiver.reuse_stats.files_hardlink_count,
         );
-        log::info!(
+        info!(
             " - {} unchanged, reusable files with {} data",
             archiver.reuse_stats.files_reused_count,
             HumanByte::from(archiver.reuse_stats.total_reused_payload_size),
         );
-        log::info!(
+        info!(
             " - {} changed or non-reusable files with {} data",
             archiver.reuse_stats.files_reencoded_count,
             HumanByte::from(archiver.reuse_stats.total_reencoded_size),
         );
-        log::info!(
+        info!(
             " - {} padding in {} partially reused chunks",
             HumanByte::from(
                 archiver.reuse_stats.total_injected_size
@@ -434,18 +435,18 @@ impl Archiver {
                     {
                         let range =
                             *offset..*offset + size + size_of::<pxar::format::Header>() as u64;
-                        log::debug!(
+                        debug!(
                             "reusable: {file_name:?} at range {range:?} has unchanged metadata."
                         );
                         return Ok(Some(range));
                     }
-                    log::debug!("re-encode: {file_name:?} not a regular file.");
+                    debug!("re-encode: {file_name:?} not a regular file.");
                     return Ok(None);
                 }
-                log::debug!("re-encode: {file_name:?} metadata did not match.");
+                debug!("re-encode: {file_name:?} metadata did not match.");
                 return Ok(None);
             }
-            log::debug!("re-encode: {file_name:?} not found in previous archive.");
+            debug!("re-encode: {file_name:?} not found in previous archive.");
         }
 
         Ok(None)
@@ -481,7 +482,7 @@ impl Archiver {
                     Ok(None)
                 }
                 Err(Errno::EACCES) => {
-                    log::warn!("failed to open file: {:?}: access denied", file_name);
+                    warn!("failed to open file: {:?}: access denied", file_name);
                     Ok(None)
                 }
                 Err(Errno::ESTALE) => {
@@ -515,10 +516,9 @@ impl Archiver {
             let line = match line {
                 Ok(line) => line,
                 Err(err) => {
-                    log::warn!(
+                    warn!(
                         "ignoring .pxarexclude after read error in {:?}: {}",
-                        self.path,
-                        err,
+                        self.path, err,
                     );
                     self.patterns.truncate(old_pattern_count);
                     return Ok(());
@@ -558,7 +558,7 @@ impl Archiver {
                     }
                 }
                 Err(err) => {
-                    log::error!("bad pattern in {:?}: {}", self.path, err);
+                    error!("bad pattern in {:?}: {}", self.path, err);
                 }
             }
         }
@@ -640,7 +640,7 @@ impl Archiver {
 
             match match_result {
                 Ok(Some(MatchType::Exclude)) => {
-                    log::debug!("matched by exclude pattern '{full_path:?}'");
+                    debug!("matched by exclude pattern '{full_path:?}'");
                     continue;
                 }
                 Ok(_) => (),
@@ -692,22 +692,22 @@ impl Archiver {
 
     fn report_stale_file_handle(&self, path: Option<&PathBuf>) {
         let path = path.unwrap_or(&self.path);
-        log::warn!("warning: stale file handle encountered while reading: {path:?}");
+        warn!("warning: stale file handle encountered while reading: {path:?}");
     }
 
     fn report_vanished_file(&self) {
-        log::warn!("warning: file vanished while reading: {:?}", self.path);
+        warn!("warning: file vanished while reading: {:?}", self.path);
     }
 
     fn report_file_shrunk_while_reading(&self) {
-        log::warn!(
+        warn!(
             "warning: file size shrunk while reading: {:?}, file will be padded with zeros!",
             self.path,
         );
     }
 
     fn report_file_grew_while_reading(&self) {
-        log::warn!(
+        warn!(
             "warning: file size increased while reading: {:?}, file will be truncated!",
             self.path,
         );
@@ -766,7 +766,7 @@ impl Archiver {
 
         // Avoid having to many open file handles in cached entries
         if self.cache.is_full() {
-            log::debug!("Max cache size reached, reuse cached entries");
+            debug!("Max cache size reached, reuse cached entries");
             self.flush_cached_reusing_if_below_threshold(encoder, true)
                 .await?;
         }
@@ -803,7 +803,7 @@ impl Archiver {
                 .await?
             {
                 if !self.cache.try_extend_range(payload_range.clone()) {
-                    log::debug!("Cache range has hole, new range: {payload_range:?}");
+                    debug!("Cache range has hole, new range: {payload_range:?}");
                     self.flush_cached_reusing_if_below_threshold(encoder, true)
                         .await?;
                     // range has to be set after flushing of cached entries, which resets the range
@@ -814,7 +814,7 @@ impl Archiver {
                 // actual chunks, which needs to be added before encoding the payload reference
                 let offset =
                     PayloadOffset::default().add(payload_range.start - self.cache.range().start);
-                log::debug!("Offset relative to range start: {offset:?}");
+                debug!("Offset relative to range start: {offset:?}");
 
                 self.cache.insert(
                     fd,
@@ -1018,7 +1018,7 @@ impl Archiver {
             // do not reuse chunks if introduced padding higher than threshold
             // opt for re-encoding in that case
             if ratio > CHUNK_PADDING_THRESHOLD {
-                log::debug!(
+                debug!(
                     "Padding ratio: {ratio} > {CHUNK_PADDING_THRESHOLD}, padding: {}, total {}, chunks: {}",
                     HumanByte::from(padding),
                     HumanByte::from(total_size),
@@ -1027,7 +1027,7 @@ impl Archiver {
                 self.cache.update_last_chunk(prev_last_chunk);
                 self.encode_entries_to_archive(encoder, None).await?;
             } else {
-                log::debug!(
+                debug!(
                     "Padding ratio: {ratio} < {CHUNK_PADDING_THRESHOLD}, padding: {}, total {}, chunks: {}",
                     HumanByte::from(padding),
                     HumanByte::from(total_size),
@@ -1078,7 +1078,7 @@ impl Archiver {
         let (entries, start_path) = self.cache.take_and_reset();
         let old_path = self.path.clone();
         self.path = start_path;
-        log::debug!(
+        debug!(
             "Got {} cache entries to encode: reuse is {}",
             entries.len(),
             base_offset.is_some()
@@ -1147,7 +1147,7 @@ impl Archiver {
             let mut size = PayloadOffset::default();
 
             for chunk in chunks.iter() {
-                log::debug!(
+                debug!(
                     "Injecting chunk with {} padding (chunk size {})",
                     HumanByte::from(chunk.padding),
                     HumanByte::from(chunk.size()),
@@ -1175,7 +1175,7 @@ impl Archiver {
             };
 
             injection_boundary = injection_boundary.add(size.raw());
-            log::debug!("Advance payload position by: {size:?}");
+            debug!("Advance payload position by: {size:?}");
             encoder.advance(size)?;
         }
 
@@ -1225,7 +1225,7 @@ impl Archiver {
         }
 
         let result = if skip_contents {
-            log::info!("skipping mount point: {:?}", self.path);
+            info!("skipping mount point: {:?}", self.path);
             Ok(())
         } else {
             let mut dir_accessor = None;

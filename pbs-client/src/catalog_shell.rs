@@ -23,6 +23,7 @@ use pxar::{EntryKind, Metadata};
 
 use pbs_datastore::catalog::{self, DirEntryAttribute};
 use proxmox_async::runtime::{block_in_place, block_on};
+use proxmox_log::error;
 
 use crate::pxar::Flags;
 
@@ -106,7 +107,7 @@ fn complete_path(complete_me: &str, _map: &HashMap<String, String>) -> Vec<Strin
     match shell.complete_path(complete_me) {
         Ok(list) => list,
         Err(err) => {
-            log::error!("error during completion: {}", err);
+            error!("error during completion: {}", err);
             Vec::new()
         }
     }
@@ -417,7 +418,7 @@ impl Shell {
             let args = match cli::shellword_split(&line) {
                 Ok(args) => args,
                 Err(err) => {
-                    log::error!("Error: {}", err);
+                    error!("Error: {}", err);
                     continue;
                 }
             };
