@@ -415,7 +415,7 @@ impl proxmox_auth_api::api::AuthContext for PbsAuthContext {
         "PBSAuthCookie"
     }
 
-    /// Check if a userid is enabled and return a [`UserInformation`] handle.
+    /// Check if a userid is enabled and return a [`proxmox_router::UserInformation`] handle.
     fn auth_id_is_active(&self, auth_id: &Authid) -> Result<bool, Error> {
         Ok(pbs_config::CachedUserInfo::new()?.is_active_auth_id(auth_id))
     }
