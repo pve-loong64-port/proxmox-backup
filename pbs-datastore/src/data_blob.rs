@@ -552,7 +552,7 @@ impl<'a, 'b> DataChunkBuilder<'a, 'b> {
 /// Check if the error code returned by `zstd_safe::compress`, or anything else that does FFI calls
 /// into zstd code, was `70` 'Destination buffer is too small' by subtracting the error code from
 /// `0` (with underflow), see `ERR_getErrorCode` in
-/// https://github.com/facebook/zstd/blob/dev/lib/common/error_private.h
+/// <https://github.com/facebook/zstd/blob/dev/lib/common/error_private.h>
 ///
 /// There is a test below to ensure we catch any change in the interface or internal value.
 fn zstd_error_is_target_too_small(err: usize) -> bool {
