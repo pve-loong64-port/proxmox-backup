@@ -1,3 +1,20 @@
+rust-proxmox-backup (3.3.1-1) bookworm; urgency=medium
+
+  * tree-wide: add missing O_CLOEXEC flags to `openat` calls to avoid passing
+    any open FD to new child processes which can have undesired side-effects
+    like keeping a lock open longer than it should.
+
+  * cargo: update proxmox dependency of rest-server and sys crates to include
+    some fixes for open FDs and a fix for the active task worker tracking, as
+    on failing to update the index file the daemon did not finished the
+    worker, causing a reference count issue where an old daemon could keep
+    running forever.
+
+  * ui: check that store is set before trying to select anythin in the garbage
+    collection (GC) job view.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 03 Dec 2024 18:11:04 +0100
+
 rust-proxmox-backup (3.3.0-2) bookworm; urgency=medium
 
   * tree-wide: fix various typos.
