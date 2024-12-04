@@ -1107,7 +1107,7 @@ async fn create_backup(
                                 &target,
                                 manifest.clone(),
                                 &client,
-                                backup_reader.clone(),
+                                backup_reader,
                                 crypt_config.clone(),
                                 crypto.mode,
                             )
@@ -1310,7 +1310,7 @@ async fn prepare_reference(
     let most_used = metadata_ref_index.find_most_used_chunks(8);
     let file_info = manifest.lookup_file_info(&target)?;
     let chunk_reader = RemoteChunkReader::new(
-        backup_reader.clone(),
+        backup_reader,
         crypt_config.clone(),
         file_info.chunk_crypt_mode(),
         most_used,
