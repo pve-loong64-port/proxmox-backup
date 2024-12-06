@@ -279,7 +279,7 @@ pub async fn start_vm(
         if !file.ends_with(".img.fidx") {
             continue;
         }
-        drives.push("-drive".to_owned());
+        drives.push("-blockdev".to_owned());
         let keyfile = if let Some(ref keyfile) = details.keyfile {
             format!(",,keyfile={keyfile}")
         } else {
@@ -291,7 +291,7 @@ pub async fn start_vm(
             format!(",,namespace={}", details.namespace)
         };
         drives.push(format!(
-            "file=pbs:repository={}{},,snapshot={},,archive={}{},read-only=on,if=none,id=drive{}",
+            "driver=pbs,repository={}{},snapshot={},archive={}{},read-only=on,node-name=drive{}",
             details.repo, namespace, details.snapshot, file, keyfile, id
         ));
 
