@@ -423,6 +423,7 @@ impl Archiver {
         previous_metadata_accessor: &Option<Directory<MetadataArchiveReader>>,
         file_name: &Path,
         metadata: &Metadata,
+        file_size: u64,
     ) -> Result<Option<Range<u64>>, Error> {
         if let Some(previous_metadata_accessor) = previous_metadata_accessor {
             if let Some(file_entry) = previous_metadata_accessor.lookup(file_name).await? {
@@ -433,6 +434,9 @@ impl Archiver {
                         ..
                     } = file_entry.entry().kind()
                     {
+                        if file_size != *size {
+                            return Ok(None);
+                        }
                         let range =
                             *offset..*offset + size + size_of::<pxar::format::Header>() as u64;
                         debug!(
@@ -798,8 +802,9 @@ impl Archiver {
             }
 
             let file_name: &Path = OsStr::from_bytes(c_file_name.to_bytes()).as_ref();
+            let file_size = stat.st_size as u64;
             if let Some(payload_range) = self
-                .is_reusable_entry(previous_metadata, file_name, &metadata)
+                .is_reusable_entry(previous_metadata, file_name, &metadata, file_size)
                 .await?
             {
                 if !self.cache.try_extend_range(payload_range.clone()) {
