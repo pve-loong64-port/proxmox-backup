@@ -83,6 +83,9 @@ allows you to send push notifications to various devices and
 applications. It provides a simple API and web interface, making it easy to
 integrate with different platforms and services.
 
+.. NOTE:: Gotify targets will respect the HTTP proxy settings from
+   Configuration → Other → HTTP proxy
+
 See :ref:`notifications.cfg` for all configuration options.
 
 .. _notification_targets_webhook:
@@ -127,6 +130,10 @@ For convenience, the following helpers are available:
 * ``{{ json <value/property> }}``: Render a value as JSON. This can be useful
   to pass a whole sub-namespace (e.g. ``fields``) as a part of a JSON payload
   (e.g. ``{{ json fields }}``).
+
+
+.. NOTE:: Webhook targets will respect the HTTP proxy settings from
+   Configuration → Other → HTTP proxy
 
 Example - ntfy.sh
 """""""""""""""""
