@@ -1,3 +1,15 @@
+rust-proxmox-backup (3.3.2-1) bookworm; urgency=medium
+
+  * pbs-client: remove `log` dependency and migrate to our common,
+    `tracing`-based, logging infrastructure. No semantic change intended.
+
+  * file restore: switch to more modern blockdev option for drives in QEMU
+    wrapper for the restore VM.
+
+  * pxar: client: fix missing file size check for metadata comparison
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 09 Dec 2024 10:37:32 +0100
+
 rust-proxmox-backup (3.3.1-1) bookworm; urgency=medium
 
   * tree-wide: add missing O_CLOEXEC flags to `openat` calls to avoid passing
