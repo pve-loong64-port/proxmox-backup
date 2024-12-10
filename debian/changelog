@@ -1,3 +1,10 @@
+rust-proxmox-backup (3.3.2-2) bookworm; urgency=medium
+
+  * file-restore: fix regression with the new blockdev method used to pass
+    disks of a backup to the isolated virtual machine.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 10 Dec 2024 12:14:47 +0100
+
 rust-proxmox-backup (3.3.2-1) bookworm; urgency=medium
 
   * pbs-client: remove `log` dependency and migrate to our common,
