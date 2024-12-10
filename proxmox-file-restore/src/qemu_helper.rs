@@ -281,14 +281,14 @@ pub async fn start_vm(
         }
         drives.push("-blockdev".to_owned());
         let keyfile = if let Some(ref keyfile) = details.keyfile {
-            format!(",,keyfile={keyfile}")
+            format!(",keyfile={keyfile}")
         } else {
             "".to_owned()
         };
         let namespace = if details.namespace.is_root() {
             String::new()
         } else {
-            format!(",,namespace={}", details.namespace)
+            format!(",namespace={}", details.namespace)
         };
         drives.push(format!(
             "driver=pbs,repository={}{},snapshot={},archive={}{},read-only=on,node-name=drive{}",
