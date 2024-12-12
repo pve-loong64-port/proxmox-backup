@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{bail, format_err, Error};
 use nix::dir::Dir;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -72,14 +72,8 @@ struct FixedWriterState {
     incremental: bool,
 }
 
-#[derive(Copy, Clone)]
-struct KnownChunkInfo {
-    uploaded: bool,
-    length: u32,
-}
-
-// key=digest, value=KnownChunkInfo
-type KnownChunksMap = HashMap<[u8; 32], KnownChunkInfo>;
+// key=digest, value=length
+type KnownChunksMap = HashMap<[u8; 32], u32>;
 
 struct SharedBackupState {
     finished: bool,
@@ -165,13 +159,7 @@ impl BackupEnvironment {
 
         state.ensure_unfinished()?;
 
-        state.known_chunks.insert(
-            digest,
-            KnownChunkInfo {
-                uploaded: false,
-                length,
-            },
-        );
+        state.known_chunks.insert(digest, length);
 
         Ok(())
     }
@@ -225,13 +213,7 @@ impl BackupEnvironment {
         }
 
         // register chunk
-        state.known_chunks.insert(
-            digest,
-            KnownChunkInfo {
-                uploaded: true,
-                length: size,
-            },
-        );
+        state.known_chunks.insert(digest, size);
 
         Ok(())
     }
@@ -266,13 +248,7 @@ impl BackupEnvironment {
         }
 
         // register chunk
-        state.known_chunks.insert(
-            digest,
-            KnownChunkInfo {
-                uploaded: true,
-                length: size,
-            },
-        );
+        state.known_chunks.insert(digest, size);
 
         Ok(())
     }
@@ -280,23 +256,7 @@ impl BackupEnvironment {
     pub fn lookup_chunk(&self, digest: &[u8; 32]) -> Option<u32> {
         let state = self.state.lock().unwrap();
 
-        state
-            .known_chunks
-            .get(digest)
-            .map(|known_chunk_info| known_chunk_info.length)
-    }
-
-    /// stat known chunks from previous backup, so excluding newly uploaded ones
-    pub fn stat_prev_known_chunks(&self) -> Result<(), Error> {
-        let state = self.state.lock().unwrap();
-        for (digest, known_chunk_info) in &state.known_chunks {
-            if !known_chunk_info.uploaded {
-                self.datastore
-                    .stat_chunk(digest)
-                    .with_context(|| format!("stat failed on {}", hex::encode(digest)))?;
-            }
-        }
-        Ok(())
+        state.known_chunks.get(digest).copied()
     }
 
     /// Store the writer with an unique ID
