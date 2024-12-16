@@ -152,7 +152,7 @@ not commonly used in your country.
   :alt: Proxmox Backup Server Installer - Password and email configuration
 
 Next the password of the superuser (``root``) and an email address needs to be
-specified. The password must consist of at least 5 characters. It's highly
+specified. The password must consist of at least 8 characters. It's highly
 recommended to use a stronger password. Some guidelines are:
 
 |
