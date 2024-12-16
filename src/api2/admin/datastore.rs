@@ -1336,15 +1336,15 @@ pub fn get_datastore_list(
             }
         }
 
-        let store_config: DataStoreConfig = serde_json::from_value(data)?;
-
-        let mount_status = match pbs_datastore::get_datastore_mount_status(&store_config) {
-            Some(true) => DataStoreMountStatus::Mounted,
-            Some(false) => DataStoreMountStatus::NotMounted,
-            None => DataStoreMountStatus::NonRemovable,
-        };
-
         if allowed || allow_id {
+            let store_config: DataStoreConfig = serde_json::from_value(data)?;
+
+            let mount_status = match pbs_datastore::get_datastore_mount_status(&store_config) {
+                Some(true) => DataStoreMountStatus::Mounted,
+                Some(false) => DataStoreMountStatus::NotMounted,
+                None => DataStoreMountStatus::NonRemovable,
+            };
+
             list.push(DataStoreListItem {
                 store: store.clone(),
                 comment: store_config.comment.filter(|_| allowed),
