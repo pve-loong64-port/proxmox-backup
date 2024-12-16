@@ -5,8 +5,11 @@ Build & Release Notes
 ``rustup`` Toolchain
 ====================
 
-We normally want to build with the ``rustc`` Debian package. To do that
-you can set the following ``rustup`` configuration:
+We normally want to build with the ``rustc`` Debian package (see below). If you
+still want to use ``rustup`` for other reasons (e.g. to easily switch between
+the official stable, beta, and nightly compilers), you should set the following
+``rustup`` configuration to use the Debian-provided ``rustc`` compiler
+by default:
 
     # rustup toolchain link system /usr
     # rustup default system
