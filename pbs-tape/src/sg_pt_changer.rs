@@ -910,7 +910,7 @@ mod test {
 
         if let Some(voltag) = &desc.pvoltag {
             res.extend_from_slice(voltag.as_bytes());
-            let rem = SCSI_VOLUME_TAG_LEN - voltag.as_bytes().len();
+            let rem = SCSI_VOLUME_TAG_LEN - voltag.len();
             if rem > 0 {
                 res.resize(res.len() + rem, 0);
             }
