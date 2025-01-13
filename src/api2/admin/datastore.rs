@@ -2601,7 +2601,7 @@ fn do_unmount_device(
         active_operations = task_tracking::get_active_operations(&datastore.name)?;
     }
 
-    if aborted || worker.map_or(false, |w| w.abort_requested()) {
+    if aborted || worker.is_some_and(|w| w.abort_requested()) {
         let _ = expect_maintanance_unmounting(&datastore.name)
             .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
             .and_then(|(lock, config)| {

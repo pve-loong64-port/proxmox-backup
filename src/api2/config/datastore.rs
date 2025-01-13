@@ -105,7 +105,7 @@ pub(crate) fn do_create_datastore(
             for file in dir {
                 let name = file?.file_name();
                 let name = name.to_str();
-                if !name.map_or(false, |name| name.starts_with('.') || name == "lost+found") {
+                if !name.is_some_and(|name| name.starts_with('.') || name == "lost+found") {
                     is_empty = false;
                     break;
                 }

@@ -429,7 +429,7 @@ fn inspect_device(device: String, param: Value) -> Result<(), Error> {
             && entry
                 .file_name()
                 .to_str()
-                .map_or(false, |name| name == ".chunks")
+                .is_some_and(|name| name == ".chunks")
         {
             let store_path = entry
                 .path()

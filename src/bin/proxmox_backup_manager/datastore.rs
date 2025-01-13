@@ -273,7 +273,7 @@ async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Va
             store
                 .backing_device
                 .clone()
-                .map_or(false, |device| device.eq(&uuid))
+                .is_some_and(|device| device.eq(&uuid))
         })
         .collect();
 
