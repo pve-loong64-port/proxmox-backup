@@ -417,10 +417,9 @@ impl Iterator for ListNamespacesRecursive {
                 if state.is_empty() {
                     return None; // there's a state but it's empty -> we're all done
                 }
-                let iter = match state.last_mut() {
-                    Some(iter) => iter,
-                    None => return None, // unexpected, should we just unwrap?
-                };
+                // should we just unwrap on None?
+                let iter = state.last_mut()?;
+
                 match iter.next() {
                     Some(Ok(ns)) => {
                         if state.len() < self.max_depth as usize {
