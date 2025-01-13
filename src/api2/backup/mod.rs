@@ -20,7 +20,7 @@ use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupNamespace, BackupType, Operation, SnapshotVerifyState, VerifyState,
+    ArchiveType, Authid, BackupNamespace, BackupType, Operation, VerifyState,
     BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
     BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA, PRIV_DATASTORE_BACKUP,
 };
