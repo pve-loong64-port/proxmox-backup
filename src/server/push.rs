@@ -955,8 +955,8 @@ pub(crate) async fn push_snapshot(
 //
 // For fixed indexes, the size must be provided as given by the index reader.
 #[allow(clippy::too_many_arguments)]
-async fn push_index<'a>(
-    filename: &'a BackupArchiveName,
+async fn push_index(
+    filename: &BackupArchiveName,
     index: impl IndexFile + Send + 'static,
     chunk_reader: Arc<dyn AsyncReadChunk>,
     backup_writer: &BackupWriter,

@@ -802,9 +802,9 @@ fn add_metadata_to_header(header: &mut tar::Header, metadata: &Metadata) {
     header.set_gid(metadata.stat.gid as u64);
 }
 
-async fn tar_add_file<'a, W, T>(
+async fn tar_add_file<W, T>(
     tar: &mut proxmox_compression::tar::Builder<W>,
-    contents: Option<Contents<'a, T>>,
+    contents: Option<Contents<'_, T>>,
     size: u64,
     metadata: &Metadata,
     path: &Path,
