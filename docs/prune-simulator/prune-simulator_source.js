@@ -354,12 +354,17 @@ Ext.onReady(function() {
 		    specValues.forEach(function(value) {
 			if (value.includes('..')) {
 			    let [start, end] = value.split('..');
+			    let step = 1;
+			    if (end.includes('/')) {
+				[end, step] = end.split('/');
+				step = assertValid(step);
+			    }
 			    start = assertValid(start);
 			    end = assertValid(end);
 			    if (start > end) {
 				throw "interval start is bigger then interval end '" + start + " > " + end + "'";
 			    }
-			    for (let i = start; i <= end; i++) {
+			    for (let i = start; i <= end; i += step) {
 				matches[i] = 1;
 			    }
 			} else if (value.includes('/')) {
