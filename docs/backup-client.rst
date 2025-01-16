@@ -470,6 +470,8 @@ version of your master key. The following command sends the output of the
   proxmox-backup-client key paperkey --output-format text > qrkey.txt
 
 
+.. _client_restoring_data:
+
 Restoring Data
 --------------
 

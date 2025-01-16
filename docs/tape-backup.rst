@@ -61,6 +61,7 @@ In general, LTO tapes offer the following advantages:
 Note that `Proxmox Backup Server` already stores compressed data, so using the
 tape compression feature has no advantage.
 
+.. _tape-supported-hardware:
 
 Supported Hardware
 ------------------
@@ -969,6 +970,8 @@ You can restore from a tape even without an existing catalog, but only the
 whole media set. If you do this, the catalog will be automatically created.
 
 
+.. _tape_key_management:
+
 Encryption Key Management
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1180,3 +1183,159 @@ In combination with fitting prune settings and tape backup schedules, this
 achieves long-term storage of some backups, while keeping the recent
 backups on smaller media sets that expire roughly every 4 weeks (that is, three
 plus the current week).
+
+
+Disaster Recovery
+-----------------
+
+.. _Command-line Tools: command-line-tools.html
+
+In case of major disasters, important data, or even whole servers might be
+destroyed or at least damaged up to the point where everything - sometimes
+including the backup server - has to be restored from a backup. For such cases,
+the following step-by-step guide will help you to set up the Proxmox Backup
+Server and restore everything from tape backups.
+
+The following guide will explain the necessary steps using both the web GUI and
+the command line tools. For an overview of the command line tools, see
+`Command-line Tools`_.
+
+
+Setting Up a Datastore
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. _proxmox-backup-manager: proxmox-backup-manager/man1.html
+
+.. _Installation: installation.html
+
+After you set up a new Proxmox Backup Server, as outlined in the `Installation`_
+chapter, first set up a datastore so a tape can be restored to it:
+
+#. Go to **Administration -> Storage / Disks** and make sure that the disk that
+   will be used as a datastore shows up.
+
+#. Under the **Directory** or **ZFS** tabs, you can either choose to create a
+   directory or create a ZFS ``zpool``, respectively. Here you can also directly
+   add the newly created directory or ZFS ``zpool`` as a datastore.
+
+Alternatively, the `proxmox-backup-manager`_ can be used to perform the same
+tasks. For more information, check the :ref:`datastore_intro` documentation.
+
+
+Setting Up the Tape Drive
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#. Make sure you have a properly working tape drive and/or changer matching to
+   medium you want to restore from.
+
+#. Connect the tape changer(s) and the tape drive(s) to the backup server. These
+   should be detected automatically by Linux. You can get a list of available
+   drives using:
+
+   .. code-block:: console
+
+    # proxmox-tape drive scan
+    ┌────────────────────────────────┬────────┬─────────────┬────────┐
+    │ path                           │ vendor │ model       │ serial │
+    ╞════════════════════════════════╪════════╪═════════════╪════════╡
+    │ /dev/tape/by-id/scsi-12345-sg  │ IBM    │ ULT3580-TD4 │  12345 │
+    └────────────────────────────────┴────────┴─────────────┴────────┘
+
+   You can get a list of available changers with:
+
+   .. code-block:: console
+
+    # proxmox-tape changer scan
+    ┌─────────────────────────────┬─────────┬──────────────┬────────┐
+    │ path                        │ vendor  │ model        │ serial │
+    ╞═════════════════════════════╪═════════╪══════════════╪════════╡
+    │ /dev/tape/by-id/scsi-CC2C52 │ Quantum │ Superloader3 │ CC2C52 │
+    └─────────────────────────────┴─────────┴──────────────┴────────┘
+
+   For more information, please read the chapters
+   on :ref:`tape_changer_config` and :ref:`tape_drive_config`.
+
+#. If you have a tape changer, go to the web interface of the Proxmox Backup
+   Server, go to **Tape Backup -> Changers** and add it. For examples using the
+   command line, read the chapter on :ref:`tape_changer_config`. If the changer
+   has been detected correctly by Linux, the changer should show up in the list.
+
+#. In the web interface, go to **Tape Backup -> Drives** and add the tape drive
+   that will be used to read the tapes. For examples using the command line,
+   read the chapter on :ref:`tape_drive_config`. If the tape drive has been
+   detected correctly by Linux, the drive should show up in the list. If the
+   drive also has a tape changer, make sure to select the changer as well and
+   assign it the correct drive number.
+
+
+Restoring Data From the Tape
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. _proxmox-tape: proxmox-tape/man1.html
+
+.. _proxmox-backup-client: proxmox-backup-client/man1.html
+
+.. _Restore: https://pve.proxmox.com/pve-docs/chapter-vzdump.html#vzdump_restore
+
+The following guide will explain the steps necessary to restore data from a
+tape, which can be done over either the web GUI or the command line. For details
+on the command line, read the documentation on the `proxmox-tape`_ tool.
+
+To restore data from tapes, do the following:
+
+#. Insert the first tape (as displayed on the label) into the tape drive or, if
+   a tape changer is available, use the tape changer to insert the tape into the
+   right drive. The web GUI can also be used to load or transfer tapes between
+   tape drives by selecting the changer.
+
+#. If the backup has been encrypted, the encryption keys need to be restored as
+   well. In the **Encryption Keys** tab, press **Restore Key**. For more
+   details or examples that use the command line, read the
+   :ref:`tape_key_management` chapter.
+
+#. The procedure for restoring data is slightly different depending on whether
+   you are using a standalone tape drive or a changer:
+
+   * For changers, the procedure is simple:
+
+     #. Insert all tapes from the media set you want to restore from.
+
+     #. Click on the changer in the web GUI, click **Inventory**, make sure
+        **Restore Catalog** is selected and press OK.
+
+   * For standalone drives, the procedure would be:
+
+     #. Insert the first tape of the media set.
+
+     #. Click **Catalog**.
+
+     #. Eject the tape, then repeat the steps for the remaining tapes of the
+        media set.
+
+#. Go back to **Tape Backup**. In the **Content** tab, press **Restore** and
+   select the desired media set. Choose the snapshot you want to restore, press
+   **Next**, select the drive and target datastore and press **Restore**.
+
+#. By going to the datastore where the data has been restored, under the
+   **Content** tab you should be able to see the restored snapshots. In order to
+   access the backups from another machine, you will need to configure the
+   access to the backup server. Go to **Configuration -> Access Control** and
+   either create a new user, or a new API token (API tokens allow easy
+   revocation if the token is compromised). Under **Permissions**, add the
+   desired permissions, e.g. **DatastoreBackup**.
+
+#. You can now perform virtual machine, container or file restores. You now have
+   the following options:
+
+     * If you want to restore files on Linux distributions that are not based on
+       Proxmox products or you prefer using a command line tool, you can use the
+       `proxmox-backup-client`_, as explained in the
+       :ref:`client_restoring_data` chapter. Use the newly created API token to
+       be able to access the data. You can then restore individual files or
+       mount an archive to your system.
+
+     * If you want to restore virtual machines or containers on a Proxmox VE
+       server, add the datastore of the backup server as storage and go to
+       **Backups**. Here you can restore VMs and containers, including their
+       configuration. For more information on restoring backups in Proxmox VE,
+       visit the `Restore`_ chapter of the Proxmox VE documentation.
