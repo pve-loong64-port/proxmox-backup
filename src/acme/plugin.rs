@@ -241,12 +241,12 @@ async fn standalone_respond(
 ) -> Result<Response<Body>, hyper::Error> {
     if req.method() == hyper::Method::GET && req.uri().path() == path.as_str() {
         Ok(Response::builder()
-            .status(http::StatusCode::OK)
+            .status(hyper::http::StatusCode::OK)
             .body(key_auth.as_bytes().to_vec().into())
             .unwrap())
     } else {
         Ok(Response::builder()
-            .status(http::StatusCode::NOT_FOUND)
+            .status(hyper::http::StatusCode::NOT_FOUND)
             .body("Not found.".into())
             .unwrap())
     }

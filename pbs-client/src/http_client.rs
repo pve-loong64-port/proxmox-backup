@@ -4,10 +4,10 @@ use std::time::Duration;
 
 use anyhow::{bail, format_err, Error};
 use futures::*;
-use http::header::HeaderValue;
-use http::Uri;
-use http::{Request, Response};
 use hyper::client::{Client, HttpConnector};
+use hyper::http::header::HeaderValue;
+use hyper::http::Uri;
+use hyper::http::{Request, Response};
 use hyper::Body;
 use openssl::{
     ssl::{SslConnector, SslMethod},
@@ -782,7 +782,7 @@ impl HttpClient {
             .map_err(|_| format_err!("http upgrade request timed out"))??;
         let status = resp.status();
 
-        if status != http::StatusCode::SWITCHING_PROTOCOLS {
+        if status != hyper::http::StatusCode::SWITCHING_PROTOCOLS {
             Self::api_response(resp).await?;
             bail!("unknown error");
         }

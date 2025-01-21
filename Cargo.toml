@@ -127,7 +127,6 @@ futures = "0.3"
 h2 = { version = "0.4", features = [ "stream" ] }
 handlebars = "3.0"
 hex = "0.4.3"
-http = "0.2"
 hyper = { version = "0.14", features = [ "full" ] }
 libc = "0.2"
 log = "0.4.17"
@@ -174,7 +173,6 @@ endian_trait.workspace = true
 futures.workspace = true
 h2.workspace = true
 hex.workspace = true
-http.workspace = true
 hyper.workspace = true
 libc.workspace = true
 log.workspace = true

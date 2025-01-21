@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
 use futures::{future::FutureExt, select};
-use http::StatusCode;
+use hyper::http::StatusCode;
 use serde_json::json;
 use tracing::{info, warn};
 

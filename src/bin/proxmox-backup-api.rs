@@ -3,7 +3,7 @@ use std::pin::{pin, Pin};
 
 use anyhow::{bail, Error};
 use futures::*;
-use http::Response;
+use hyper::http::Response;
 use hyper::{Body, StatusCode};
 use tracing::level_filters::LevelFilter;
 

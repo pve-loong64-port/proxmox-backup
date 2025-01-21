@@ -108,7 +108,7 @@ fn upgrade_to_backup_protocol(
             bail!("invalid protocol name");
         }
 
-        if parts.version >= http::version::Version::HTTP_2 {
+        if parts.version >= hyper::http::version::Version::HTTP_2 {
             bail!(
                 "unexpected http version '{:?}' (expected version < 2)",
                 parts.version

@@ -39,8 +39,11 @@ async fn handle_connection(socket: TcpStream) -> Result<(), Error> {
         let body = Body::from(buffer);
 
         let response = Response::builder()
-            .status(http::StatusCode::OK)
-            .header(http::header::CONTENT_TYPE, "application/octet-stream")
+            .status(hyper::http::StatusCode::OK)
+            .header(
+                hyper::http::header::CONTENT_TYPE,
+                "application/octet-stream",
+            )
             .body(body)
             .unwrap();
         future::ok::<_, Error>(response)

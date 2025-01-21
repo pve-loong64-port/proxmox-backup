@@ -3,8 +3,8 @@ use std::io::{BufRead, BufReader};
 
 use anyhow::{bail, Error};
 use futures::FutureExt;
-use http::request::Parts;
-use http::{header, Response, StatusCode};
+use hyper::http::request::Parts;
+use hyper::http::{header, Response, StatusCode};
 use hyper::Body;
 use serde_json::{json, Value};
 

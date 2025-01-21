@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
-use http::HeaderMap;
+use hyper::http::HeaderMap;
 use hyper::{Body, Method, Response, StatusCode};
 
 use proxmox_router::UserInformation;
@@ -64,7 +64,7 @@ pub fn check_auth<'a>(
     })
 }
 
-pub fn get_index() -> Pin<Box<dyn Future<Output = http::Response<Body>> + Send>> {
+pub fn get_index() -> Pin<Box<dyn Future<Output = hyper::http::Response<Body>> + Send>> {
     Box::pin(async move {
         let index = "<center><h1>Proxmox Backup Restore Daemon/h1></center>";
 

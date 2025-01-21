@@ -3,10 +3,10 @@ use std::task::{Context, Poll};
 
 use anyhow::{bail, format_err, Error};
 use futures::*;
-use http::Uri;
-use http::{Request, Response};
 use hyper::client::connect::{Connected, Connection};
 use hyper::client::Client;
+use hyper::http::Uri;
+use hyper::http::{Request, Response};
 use hyper::Body;
 use pin_project_lite::pin_project;
 use serde_json::Value;

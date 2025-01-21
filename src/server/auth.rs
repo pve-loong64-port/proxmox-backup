@@ -4,7 +4,7 @@ use proxmox_router::UserInformation;
 use pbs_config::CachedUserInfo;
 
 pub async fn check_pbs_auth(
-    headers: &http::HeaderMap,
+    headers: &hyper::http::HeaderMap,
     method: &hyper::Method,
 ) -> Result<(String, Box<dyn UserInformation + Sync + Send>), AuthError> {
     let user_info = CachedUserInfo::new()?;

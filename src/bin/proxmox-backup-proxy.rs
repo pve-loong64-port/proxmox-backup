@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, format_err, Context, Error};
 use futures::*;
-use http::request::Parts;
-use http::Response;
 use hyper::header;
+use hyper::http::request::Parts;
+use hyper::http::Response;
 use hyper::{Body, StatusCode};
 use tracing::level_filters::LevelFilter;
 use tracing::{info, warn};
@@ -75,7 +75,7 @@ fn main() -> Result<(), Error> {
 
 /// check for a cookie with the user-preferred language, fallback to the config one if not set or
 /// not existing
-fn get_language(headers: &http::HeaderMap) -> String {
+fn get_language(headers: &hyper::http::HeaderMap) -> String {
     let exists = |l: &str| Path::new(&format!("/usr/share/pbs-i18n/pbs-lang-{l}.js")).exists();
 
     match cookie_from_header(headers, "PBSLangCookie") {
@@ -87,7 +87,7 @@ fn get_language(headers: &http::HeaderMap) -> String {
     }
 }
 
-fn get_theme(headers: &http::HeaderMap) -> String {
+fn get_theme(headers: &hyper::http::HeaderMap) -> String {
     let exists = |t: &str| {
         t.len() < 32
             && !t.contains('/')

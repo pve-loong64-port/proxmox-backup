@@ -54,7 +54,7 @@ fn send_request(
 ) -> impl Future<Output = Result<usize, Error>> {
     println!("sending request");
 
-    let request = http::Request::builder()
+    let request = hyper::http::Request::builder()
         .uri("http://localhost/")
         .body(())
         .unwrap();
