@@ -126,7 +126,8 @@ Ext.onReady(function() {
 			if (data.mark !== 'keep') {
 			    return `<div style="text-decoration: line-through;">${text}</div>`;
 			}
-			if (me.useColors) {
+			let pruneList = this.up('prunesimulatorPruneList');
+			if (pruneList.useColors) {
 			    let bgColor = COLORS[data.keepName];
 			    let textColor = TEXT_COLORS[data.keepName];
 			    return `<div style="background-color: ${bgColor};color: ${textColor};">${text}</div>`;
