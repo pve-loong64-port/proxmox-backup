@@ -29,7 +29,6 @@ exclude = [ "build", "debian", "tests/catar_data/test_symlink/symlink1"]
 
 [workspace]
 members = [
-    "pbs-api-types",
     "pbs-buildcfg",
     "pbs-client",
     "pbs-config",
@@ -91,6 +90,7 @@ proxmox-tfa = { version = "5", features = [ "api", "api-types" ] }
 proxmox-time = "2"
 proxmox-uuid = "1"
 proxmox-worker-task = "0.1"
+pbs-api-types = "0.2.0"
 
 # other proxmox crates
 pathpatterns = "0.3"
@@ -98,7 +98,6 @@ proxmox-acme = "0.5.3"
 pxar = "0.12.1"
 
 # PBS workspace
-pbs-api-types = { path = "pbs-api-types" }
 pbs-buildcfg = { path = "pbs-buildcfg" }
 pbs-client = { path = "pbs-client" }
 pbs-config = { path = "pbs-config" }
@@ -236,13 +235,13 @@ proxmox-tfa.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true
 proxmox-worker-task.workspace = true
+pbs-api-types.workspace = true
 
 # in their respective repo
 proxmox-acme.workspace = true
 pxar.workspace = true
 
 # proxmox-backup workspace/internal crates
-pbs-api-types.workspace = true
 pbs-buildcfg.workspace = true
 pbs-client.workspace = true
 pbs-config.workspace = true
