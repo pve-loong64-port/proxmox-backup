@@ -677,6 +677,7 @@ async fn run() -> Result<(), Error> {
         .insert("garbage-collection", garbage_collection_commands())
         .insert("acme", acme_mgmt_cli())
         .insert("cert", cert_mgmt_cli())
+        .insert("s3", s3_commands())
         .insert("subscription", subscription_commands())
         .insert("sync-job", sync_job_commands())
         .insert("verify-job", verify_job_commands())

@@ -9,6 +9,7 @@ pub mod gc;
 pub mod metrics;
 pub mod namespace;
 pub mod prune;
+pub mod s3;
 pub mod sync;
 pub mod traffic_control;
 pub mod verify;
@@ -19,6 +20,7 @@ const SUBDIRS: SubdirMap = &sorted!([
     ("metrics", &metrics::ROUTER),
     ("prune", &prune::ROUTER),
     ("gc", &gc::ROUTER),
+    ("s3", &s3::ROUTER),
     ("sync", &sync::ROUTER),
     ("traffic-control", &traffic_control::ROUTER),
     ("verify", &verify::ROUTER),

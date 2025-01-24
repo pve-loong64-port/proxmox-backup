@@ -27,6 +27,8 @@ mod prune;
 pub use prune::*;
 mod remote;
 pub use remote::*;
+mod s3;
+pub use s3::*;
 mod subscription;
 pub use subscription::*;
 mod sync;
