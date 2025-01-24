@@ -147,7 +147,7 @@ in a single ``pxar`` archive, the latter two modes split data and metadata into
 ``ppxar`` and ``mpxar`` archives. This is done to allow for fast comparison of
 metadata with the previous snapshot, used by the ``metadata`` mode to detect
 reusable files. The ``data`` mode refrains from reusing unchanged files by
-rechunking the file uncoditionally. This mode therefore assures that no file
+rechunking the file unconditionally. This mode therefore assures that no file
 changes are missed even if the metadata are unchanged.
 
 .. NOTE:: ``pxar`` and ``mpxar``/``ppxar`` file formats are different and cannot

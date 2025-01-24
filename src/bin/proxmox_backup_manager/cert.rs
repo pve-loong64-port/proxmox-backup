@@ -48,7 +48,7 @@ fn cert_info() -> Result<(), Error> {
     input: {
         properties: {
             force: {
-	        description: "Force generation of new SSL certifate.",
+	        description: "Force generation of new SSL certificate.",
 	        type:  Boolean,
 	        optional:true,
 	    },

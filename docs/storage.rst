@@ -209,7 +209,7 @@ allowed to be nested.
 Removable datastores are created on the the device with the given relative path that is specified
 on creation. In order to use a datastore on multiple PBS instances, it has to be created on one,
 and added with ``Reuse existing datastore`` checked on the others. The path you set on creation
-is how multiple datastores on a signle device are identified. So When adding on a new PBS instance,
+is how multiple datastores on a single device are identified. So when adding on a new PBS instance,
 it has to match what was set on creation.
 
 .. code-block:: console
@@ -231,7 +231,7 @@ All datastores present on a device can be listed using ``proxmox-backup-debug``.
 Verify, Prune and Garbage Collection jobs are skipped if the removable
 datastore is not mounted when they are scheduled. Sync jobs start, but fail
 with an error saying the datastore was not mounted. The reason is that syncs
-not happening as scheduled should at least be noticable.
+not happening as scheduled should at least be noticeable.
 
 Managing Datastores
 ^^^^^^^^^^^^^^^^^^^
