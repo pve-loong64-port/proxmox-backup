@@ -422,11 +422,16 @@ async fn run_task_scheduler() {
         tokio::time::sleep_until(tokio::time::Instant::from_std(delay_target)).await;
 
         match schedule_tasks().catch_unwind().await {
-            Err(panic) => match panic.downcast::<&str>() {
-                Ok(msg) => eprintln!("task scheduler panic: {msg}"),
-                Err(_) => eprintln!("task scheduler panic - unknown type"),
+            Err(panic) => {
+                if let Some(msg) = panic.downcast_ref::<&str>() {
+                    tracing::error!("task scheduler panic: {msg}");
+                } else if let Some(msg) = panic.downcast_ref::<String>() {
+                    tracing::error!("task scheduler panic: {msg}");
+                } else {
+                    tracing::error!("task scheduler panic - cannot show error message due to unknown error type")
+                }
             },
-            Ok(Err(err)) => eprintln!("task scheduler failed - {err:?}"),
+            Ok(Err(err)) => tracing::error!("task scheduler failed - {err:?}"),
             Ok(Ok(_)) => {}
         }
     }

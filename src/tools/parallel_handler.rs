@@ -135,12 +135,12 @@ impl<I: Send + 'static> ParallelHandler<I> {
         let mut i = 0;
         while let Some(handle) = self.handles.pop() {
             if let Err(panic) = handle.join() {
-                match panic.downcast::<&str>() {
-                    Ok(panic_msg) => msg_list.push(format!(
-                        "thread {} ({}) panicked: {}",
-                        self.name, i, panic_msg
-                    )),
-                    Err(_) => msg_list.push(format!("thread {} ({}) panicked", self.name, i)),
+                if let Some(panic_msg) = panic.downcast_ref::<&str>() {
+                    msg_list.push(format!("thread {} ({i}) panicked: {panic_msg}", self.name));
+                } else if let Some(panic_msg) = panic.downcast_ref::<String>() {
+                    msg_list.push(format!("thread {} ({i}) panicked: {panic_msg}", self.name));
+                } else {
+                    msg_list.push(format!("thread {} ({i}) panicked", self.name));
                 }
             }
             i += 1;
