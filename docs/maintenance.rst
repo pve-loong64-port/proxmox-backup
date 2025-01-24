@@ -233,8 +233,8 @@ into two phases:
 
   The task iterates over all chunks and checks their file access time against a
   cutoff time. The cutoff time is given by either the oldest backup writer
-  instance, if present, or 24 hours and 5 minutes after the start of garbage
-  collection.
+  instance, if present, or 24 hours and 5 minutes before the start of the
+  garbage collection.
 
   Garbage collection considers chunk files with access time older than the
   cutoff time to be neither referenced by any backup snapshot's index, nor part
