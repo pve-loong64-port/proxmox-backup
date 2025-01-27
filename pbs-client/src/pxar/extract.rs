@@ -133,9 +133,18 @@ where
 
         if let Some(ref path) = options.prelude_path {
             if let Some(entry) = prelude {
-                let mut prelude_file = OpenOptions::new()
-                    .create(true)
-                    .write(true)
+                let overwrite = options.overwrite_flags.contains(OverwriteFlags::FILE);
+
+                let mut open_options = OpenOptions::new();
+                open_options.write(true);
+                if overwrite {
+                    open_options.create(true);
+                    open_options.truncate(true);
+                } else {
+                    open_options.create_new(true);
+                }
+
+                let mut prelude_file = open_options
                     .open(path)
                     .with_context(|| format!("error creating prelude file '{path:?}'"))?;
                 if let pxar::EntryKind::Prelude(ref prelude) = entry.kind() {
