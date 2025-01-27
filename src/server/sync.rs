@@ -159,6 +159,7 @@ impl SyncSourceReader for RemoteSourceReader {
         let tmpfile = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .read(true)
             .open(&tmp_path)?;
 

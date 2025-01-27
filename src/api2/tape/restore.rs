@@ -1711,6 +1711,7 @@ fn try_restore_snapshot_archive<R: pxar::decoder::SeqRead>(
             let mut tmpfile = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .read(true)
                 .open(&tmp_path)
                 .map_err(|err| format_err!("restore {:?} failed - {}", tmp_path, err))?;
