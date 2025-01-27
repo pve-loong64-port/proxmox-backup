@@ -19,6 +19,7 @@ use tracing::{info, warn};
 use proxmox_async::blocking::WrappedReaderStream;
 use proxmox_async::{io::AsyncChannelWriter, stream::AsyncReaderStream};
 use proxmox_compression::zstd::ZstdEncoder;
+use proxmox_log::LogContext;
 use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
     Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
@@ -1112,9 +1113,13 @@ pub fn prune(
         )?;
         Ok(json!(upid))
     } else {
-        let (worker, _) = WorkerTask::new("prune", Some(worker_id), auth_id.to_string(), true)?;
-        let result = prune_group(worker.clone());
-        worker.log_result(&Ok(()));
+        let (worker, logger) =
+            WorkerTask::new("prune", Some(worker_id), auth_id.to_string(), true)?;
+        let result = LogContext::new(logger).sync_scope(|| {
+            let result = prune_group(worker.clone());
+            worker.log_result(&Ok(()));
+            result
+        });
         Ok(json!(result))
     }
 }
