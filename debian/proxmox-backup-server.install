@@ -40,6 +40,7 @@ usr/share/man/man5/tape-job.cfg.5
 usr/share/man/man5/tape.cfg.5
 usr/share/man/man5/user.cfg.5
 usr/share/man/man5/verification.cfg.5
+usr/share/man/man5/prune.cfg.5
 usr/share/proxmox-backup/templates/default/acme-err-body.txt.hbs
 usr/share/proxmox-backup/templates/default/acme-err-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/gc-err-body.txt.hbs

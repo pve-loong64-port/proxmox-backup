@@ -108,6 +108,21 @@ Options
 .. include:: config/notifications-priv/config.rst
 
 
+``prune.cfg``
+~~~~~~~~~~~~~
+
+File Format
+^^^^^^^^^^^
+
+.. include:: config/prune/format.rst
+
+
+Options
+^^^^^^^
+
+.. include:: config/prune/config.rst
+
+
 ``tape.cfg``
 ~~~~~~~~~~~~
 

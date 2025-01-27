@@ -13,6 +13,7 @@ GENERATED_SYNOPSIS := 						\
 	config/tape/config.rst					\
 	config/user/config.rst					\
 	config/verification/config.rst				\
+	config/prune/config.rst				\
 	pmt/synopsis.rst					\
 	pmtx/synopsis.rst					\
 	proxmox-backup-client/catalog-shell-synopsis.rst 	\
@@ -52,6 +53,7 @@ MAN5_PAGES :=				\
 	tape.cfg.5			\
 	user.cfg.5			\
 	verification.cfg.5		\
+	prune.cfg.5				\
 
 PRUNE_SIMULATOR_FILES := 					\
 	prune-simulator/index.html				\
