@@ -7,8 +7,8 @@ verification.cfg
 Description
 ===========
 
-The file /etc/proxmox-backup/sync.cfg is a configuration file for Proxmox
-Backup Server. It contains the verification job configuration.
+The file /etc/proxmox-backup/verification.cfg is a configuration file for
+Proxmox Backup Server. It contains the verification job configuration.
 
 File Format
 ===========
