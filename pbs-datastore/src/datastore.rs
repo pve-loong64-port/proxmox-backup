@@ -749,9 +749,9 @@ impl DataStore {
 
         let mut open_options = std::fs::OpenOptions::new();
         open_options.write(true);
-        open_options.truncate(true);
 
         if force {
+            open_options.truncate(true);
             open_options.create(true);
         } else {
             open_options.create_new(true);

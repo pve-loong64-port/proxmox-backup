@@ -1598,7 +1598,6 @@ async fn restore(
         if let Some(target) = target {
             let mut writer = std::fs::OpenOptions::new()
                 .write(true)
-                .create(true)
                 .create_new(true)
                 .open(target)
                 .map_err(|err| {
@@ -1724,7 +1723,6 @@ async fn restore(
         let mut writer = if let Some(target) = target {
             std::fs::OpenOptions::new()
                 .write(true)
-                .create(true)
                 .create_new(true)
                 .open(target)
                 .map_err(|err| format_err!("unable to create target file {:?} - {}", target, err))?
