@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Error};
 use nix::dir::Dir;
 use tracing::{error, info, warn};
 
@@ -399,12 +399,20 @@ pub fn verify_backup_dir_with_lock(
         state: verify_result,
         upid,
     };
-    let verify_state = serde_json::to_value(verify_state)?;
-    backup_dir
-        .update_manifest(|manifest| {
+
+    if let Err(err) = {
+        let verify_state = serde_json::to_value(verify_state)?;
+        backup_dir.update_manifest(|manifest| {
             manifest.unprotected["verify_state"] = verify_state;
         })
-        .map_err(|err| format_err!("unable to update manifest blob - {}", err))?;
+    } {
+        info!(
+            "verify {}:{} - manifest update error: {err}",
+            verify_worker.datastore.name(),
+            backup_dir.dir(),
+        );
+        return Ok(false);
+    }
 
     Ok(error_count == 0)
 }
