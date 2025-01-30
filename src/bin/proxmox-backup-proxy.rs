@@ -430,7 +430,7 @@ async fn run_task_scheduler() {
                 } else {
                     tracing::error!("task scheduler panic - cannot show error message due to unknown error type")
                 }
-            },
+            }
             Ok(Err(err)) => tracing::error!("task scheduler failed - {err:?}"),
             Ok(Ok(_)) => {}
         }
