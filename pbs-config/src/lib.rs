@@ -10,6 +10,7 @@ pub mod network;
 pub mod notifications;
 pub mod prune;
 pub mod remote;
+pub mod s3;
 pub mod sync;
 pub mod tape_job;
 pub mod token_shadow;

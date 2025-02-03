@@ -19,6 +19,7 @@ serde_json.workspace = true
 
 proxmox-notify.workspace = true
 proxmox-router = { workspace = true, default-features = false }
+proxmox-s3-client.workspace = true
 proxmox-schema.workspace = true
 proxmox-section-config.workspace = true
 proxmox-shared-memory.workspace = true
