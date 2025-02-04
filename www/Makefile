@@ -61,6 +61,7 @@ JSSRC=							\
 	config/RemoteView.js				\
 	config/TrafficControlView.js			\
 	config/ACLView.js				\
+	config/S3ClientView.js				\
 	config/SyncView.js				\
 	config/VerifyView.js				\
 	config/PruneView.js				\
@@ -85,6 +86,7 @@ JSSRC=							\
 	window/PruneJobEdit.js				\
 	window/GCJobEdit.js				\
 	window/UserEdit.js				\
+	window/S3ClientEdit.js				\
 	window/Settings.js				\
 	window/TokenEdit.js				\
 	window/VerifyJobEdit.js				\

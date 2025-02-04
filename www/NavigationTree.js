@@ -80,6 +80,12 @@ Ext.define('PBS.store.NavigationStore', {
                         path: 'pbsSubscription',
                         leaf: true,
                     },
+                    {
+                        text: gettext('S3 Remotes'),
+                        iconCls: 'fa fa-cloud-upload',
+                        path: 'pbsS3ClientView',
+                        leaf: true,
+                    },
                 ],
             },
             {
