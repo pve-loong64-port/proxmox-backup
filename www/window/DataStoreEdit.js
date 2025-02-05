@@ -61,6 +61,7 @@ Ext.define('PBS.DataStoreEdit', {
                         comboItems: [
                             ['__default__', gettext('Local')],
                             ['removable', gettext('Removable')],
+                            ['s3', gettext('S3 (experimental)')],
                         ],
                         cbind: {
                             disabled: '{!isCreate}',
@@ -68,18 +69,32 @@ Ext.define('PBS.DataStoreEdit', {
                         listeners: {
                             change: function (checkbox, selected) {
                                 let isRemovable = selected === 'removable';
+                                let isS3 = selected === 's3';
 
                                 let inputPanel = checkbox.up('inputpanel');
                                 let pathField = inputPanel.down('[name=path]');
                                 let uuidEditField = inputPanel.down('[name=backing-device]');
+                                let bucketField = inputPanel.down('[name=bucket]');
+                                let s3ClientSelector = inputPanel.down('[name=s3client]');
 
                                 uuidEditField.setDisabled(!isRemovable);
                                 uuidEditField.allowBlank = !isRemovable;
                                 uuidEditField.setValue('');
 
+                                bucketField.setDisabled(!isS3);
+                                bucketField.allowBlank = !isS3;
+                                bucketField.setValue('');
+
+                                s3ClientSelector.setDisabled(!isS3);
+                                s3ClientSelector.allowBlank = !isS3;
+                                s3ClientSelector.setValue('');
+
                                 if (isRemovable) {
                                     pathField.setFieldLabel(gettext('Path on Device'));
                                     pathField.setEmptyText(gettext('A relative path'));
+                                } else if (isS3) {
+                                    pathField.setFieldLabel(gettext('Local Cache'));
+                                    pathField.setEmptyText(gettext('An absolute path'));
                                 } else {
                                     pathField.setFieldLabel(gettext('Backing Path'));
                                     pathField.setEmptyText(gettext('An absolute path'));
@@ -97,6 +112,15 @@ Ext.define('PBS.DataStoreEdit', {
                         fieldLabel: gettext('Backing Path'),
                         emptyText: gettext('An absolute path'),
                         validator: (val) => val?.trim() !== '/',
+                    },
+                    {
+                        xtype: 'pbsS3ClientSelector',
+                        name: 's3client',
+                        fieldLabel: gettext('S3 Endpoint ID'),
+                        disabled: true,
+                        cbind: {
+                            editable: '{isCreate}',
+                        },
                     },
                 ],
                 column2: [
@@ -132,6 +156,13 @@ Ext.define('PBS.DataStoreEdit', {
                         },
                         emptyText: gettext('Device path'),
                     },
+                    {
+                        xtype: 'proxmoxtextfield',
+                        name: 'bucket',
+                        fieldLabel: gettext('Bucket'),
+                        allowBlank: false,
+                        disabled: true,
+                    },
                 ],
                 columnB: [
                     {
@@ -154,7 +185,20 @@ Ext.define('PBS.DataStoreEdit', {
                     if (me.isCreate) {
                         // New datastores default to using the notification system
                         values['notification-mode'] = 'notification-system';
+
+                        if (values.s3client) {
+                            let s3BackendConf = {
+                                type: 's3',
+                                client: values.s3client,
+                                bucket: values.bucket,
+                            };
+                            values.backend = PBS.Utils.printPropertyString(s3BackendConf);
+                        }
                     }
+
+                    delete values.s3client;
+                    delete values.bucket;
+
                     return values;
                 },
             },

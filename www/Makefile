@@ -42,6 +42,7 @@ JSSRC=							\
 	Schema.js					\
 	form/TokenSelector.js				\
 	form/AuthidSelector.js				\
+	form/S3ClientSelector.js			\
 	form/RemoteSelector.js				\
 	form/RemoteTargetSelector.js   			\
 	form/DataStoreSelector.js			\
