@@ -336,35 +336,25 @@ pub fn verify_backup_dir_with_lock(
     filter: Option<&dyn Fn(&BackupManifest) -> bool>,
     _snap_lock: Dir,
 ) -> Result<bool, Error> {
+    let datastore_name = verify_worker.datastore.name();
+    let backup_dir_name = backup_dir.dir();
+
     let manifest = match backup_dir.load_manifest() {
         Ok((manifest, _)) => manifest,
         Err(err) => {
-            info!(
-                "verify {}:{} - manifest load error: {}",
-                verify_worker.datastore.name(),
-                backup_dir.dir(),
-                err,
-            );
+            info!("verify {datastore_name}:{backup_dir_name} - manifest load error: {err}");
             return Ok(false);
         }
     };
 
     if let Some(filter) = filter {
         if !filter(&manifest) {
-            info!(
-                "SKIPPED: verify {}:{} (recently verified)",
-                verify_worker.datastore.name(),
-                backup_dir.dir(),
-            );
+            info!("SKIPPED: verify {datastore_name}:{backup_dir_name} (recently verified)");
             return Ok(true);
         }
     }
 
-    info!(
-        "verify {}:{}",
-        verify_worker.datastore.name(),
-        backup_dir.dir()
-    );
+    info!("verify {datastore_name}:{backup_dir_name}");
 
     let mut error_count = 0;
 
@@ -384,11 +374,8 @@ pub fn verify_backup_dir_with_lock(
 
         if let Err(err) = result {
             info!(
-                "verify {}:{}/{} failed: {}",
-                verify_worker.datastore.name(),
-                backup_dir.dir(),
-                info.filename,
-                err,
+                "verify {datastore_name}:{backup_dir_name}/{file_name} failed: {err}",
+                file_name = info.filename,
             );
             error_count += 1;
             verify_result = VerifyState::Failed;
@@ -406,11 +393,7 @@ pub fn verify_backup_dir_with_lock(
             manifest.unprotected["verify_state"] = verify_state;
         })
     } {
-        info!(
-            "verify {}:{} - manifest update error: {err}",
-            verify_worker.datastore.name(),
-            backup_dir.dir(),
-        );
+        info!("verify {datastore_name}:{backup_dir_name} - manifest update error: {err}");
         return Ok(false);
     }
 
