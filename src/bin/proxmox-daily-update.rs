@@ -109,7 +109,14 @@ async fn run(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
 
 fn main() {
     proxmox_backup::tools::setup_safe_path_env();
-    proxmox_log::init::journald_and_tasklog("PBS_LOG", proxmox_log::LevelFilter::INFO).expect("Failed to setup proxmox_log logger");
+
+    if let Err(err) = syslog::init(
+        syslog::Facility::LOG_DAEMON,
+        log::LevelFilter::Info,
+        Some("proxmox-daily-update"),
+    ) {
+        eprintln!("unable to initialize syslog - {err}");
+    }
 
     let mut rpcenv = CliEnvironment::new();
     rpcenv.set_auth_id(Some(String::from("root@pam")));
