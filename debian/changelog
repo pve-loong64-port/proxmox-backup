@@ -1,3 +1,44 @@
+rust-proxmox-backup (3.3.3-1) bookworm; urgency=medium
+
+  * api: datastore list: move checking if a datastore is mounted after we
+    ensured that the user may actually access it. While this had no effect
+    security wise, it could significantly increase the cost of this API
+    endpoint in big setups with many datastores and many tenants that each
+    have only access to one, or a small set, of datastores.
+
+  * Revert "fix #5710: api: backup: stat known chunks on backup finish" due to
+    a big performance impact relative to what this is protectign against. We
+    will work out a more efficient fix for this issue in the future.
+
+  * prune simulator: show backup entries that are kept also in the flat list
+    of backups, not just in the calendar view.
+
+  * docs: improve the description for the garbage collection's cut-off time
+
+  * pxar extract: correctly honor the overwrite flag
+
+  * api: datastore: add missing log context for prune to avoid a case where
+    the worker state being unknown after it finished.
+
+  * docs: add synopsis and basic docs for prune job configuration
+
+  * backup verification: handle manifest update errors as non-fatal to avoid
+    that the job fails, as we want to continue with verificating the rest to
+    ensure we uncover as much potential problems as possible.
+
+  * fix #4408: docs: add 'disaster recovery' section for tapes
+
+  * fix #6069: prune simulator: correctly handle schedules that mix both, a
+    range and a step size at once.
+
+  * client: pxar: fix a race condition where the backup upload stream can miss
+    an error from the create archive function, because the error state is only
+    set after the backup stream was already polled. This avoids a edge case
+    where a file-based backup was incorrectly marked as having succeeded while
+    there was a error.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 11 Feb 2025 20:24:27 +0100
+
 rust-proxmox-backup (3.3.2-2) bookworm; urgency=medium
 
   * file-restore: fix regression with the new blockdev method used to pass
