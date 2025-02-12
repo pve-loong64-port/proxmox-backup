@@ -41,7 +41,7 @@ pub fn do_verification_job(
                 None => Default::default(),
             };
 
-            let verify_worker = VerifyWorker::new(worker.clone(), datastore);
+            let verify_worker = VerifyWorker::new(worker.clone(), datastore)?;
             let result = verify_worker.verify_all_backups(
                 worker.upid(),
                 ns,

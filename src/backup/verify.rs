@@ -17,7 +17,7 @@ use pbs_api_types::{
 use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
-use pbs_datastore::{DataBlob, DataStore, StoreProgress};
+use pbs_datastore::{DataBlob, DataStore, DatastoreBackend, StoreProgress};
 
 use crate::tools::parallel_handler::ParallelHandler;
 
@@ -30,19 +30,25 @@ pub struct VerifyWorker {
     datastore: Arc<DataStore>,
     verified_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    backend: DatastoreBackend,
 }
 
 impl VerifyWorker {
     /// Creates a new VerifyWorker for a given task worker and datastore.
-    pub fn new(worker: Arc<dyn WorkerTaskContext>, datastore: Arc<DataStore>) -> Self {
-        Self {
+    pub fn new(
+        worker: Arc<dyn WorkerTaskContext>,
+        datastore: Arc<DataStore>,
+    ) -> Result<Self, Error> {
+        let backend = datastore.backend()?;
+        Ok(Self {
             worker,
             datastore,
             // start with 16k chunks == up to 64G data
             verified_chunks: Arc::new(Mutex::new(HashSet::with_capacity(16 * 1024))),
             // start with 64 chunks since we assume there are few corrupt ones
             corrupt_chunks: Arc::new(Mutex::new(HashSet::with_capacity(64))),
-        }
+            backend,
+        })
     }
 
     fn verify_blob(backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {

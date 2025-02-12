@@ -883,7 +883,7 @@ pub fn verify(
         auth_id.to_string(),
         to_stdout,
         move |worker| {
-            let verify_worker = VerifyWorker::new(worker.clone(), datastore);
+            let verify_worker = VerifyWorker::new(worker.clone(), datastore)?;
             let failed_dirs = if let Some(backup_dir) = backup_dir {
                 let mut res = Vec::new();
                 if !verify_worker.verify_backup_dir(

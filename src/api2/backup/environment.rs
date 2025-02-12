@@ -710,7 +710,7 @@ impl BackupEnvironment {
             move |worker| {
                 worker.log_message("Automatically verifying newly added snapshot");
 
-                let verify_worker = VerifyWorker::new(worker.clone(), datastore);
+                let verify_worker = VerifyWorker::new(worker.clone(), datastore)?;
                 if !verify_worker.verify_backup_dir_with_lock(
                     &backup_dir,
                     worker.upid().clone(),
