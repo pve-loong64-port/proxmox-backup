@@ -1145,7 +1145,7 @@ pub fn inititialize_gpt_disk(disk: &Disk, uuid: Option<&str>) -> Result<(), Erro
     Ok(())
 }
 
-/// Wipes all labels and the first 200 MiB of a disk/partition (or the whole if it is smaller).
+/// Wipes all labels, the first 200 MiB, and the last 4096 bytes of a disk/partition.
 /// If called with a partition, also sets the partition type to 0x83 'Linux filesystem'.
 pub fn wipe_blockdev(disk: &Disk) -> Result<(), Error> {
     let disk_path = match disk.device_path() {
@@ -1176,7 +1176,7 @@ pub fn wipe_blockdev(disk: &Disk) -> Result<(), Error> {
     let wipefs_output = proxmox_sys::command::run_command(wipefs_command, None)?;
     info!("wipefs output: {wipefs_output}");
 
-    zero_disk_start(disk)?;
+    zero_disk_start_and_end(disk)?;
 
     if is_partition {
         // set the partition type to 0x83 'Linux filesystem'
@@ -1186,7 +1186,7 @@ pub fn wipe_blockdev(disk: &Disk) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn zero_disk_start(disk: &Disk) -> Result<(), Error> {
+pub fn zero_disk_start_and_end(disk: &Disk) -> Result<(), Error> {
     let disk_path = match disk.device_path() {
         Some(path) => path,
         None => bail!("disk {:?} has no node in /dev", disk.syspath()),
@@ -1202,6 +1202,10 @@ pub fn zero_disk_start(disk: &Disk) -> Result<(), Error> {
     let zeroes = proxmox_io::boxed::zeroed(write_size as usize);
     file.write_all_at(&zeroes, 0)
         .with_context(|| "failed to wipe start of device {disk_path:?}")?;
+    if disk_size > write_size {
+        file.write_all_at(&zeroes[0..4096], disk_size - 4096)
+            .with_context(|| "failed to wipe end of device {disk_path:?}")?;
+    }
     Ok(())
 }
 
