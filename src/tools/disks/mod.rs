@@ -4,11 +4,11 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context as _, Error};
 use libc::dev_t;
 use once_cell::sync::OnceCell;
 
@@ -1176,31 +1176,32 @@ pub fn wipe_blockdev(disk: &Disk) -> Result<(), Error> {
     let wipefs_output = proxmox_sys::command::run_command(wipefs_command, None)?;
     info!("wipefs output: {wipefs_output}");
 
-    let size = disk.size().map(|size| size / 1024 / 1024)?;
-    let count = size.min(200);
-
-    let mut dd_command = std::process::Command::new("dd");
-    let mut of_path = OsString::from("of=");
-    of_path.push(disk_path);
-    let mut count_str = OsString::from("count=");
-    count_str.push(count.to_string());
-    let args = [
-        "if=/dev/zero".into(),
-        of_path,
-        "bs=1M".into(),
-        "conv=fdatasync".into(),
-        count_str,
-    ];
-    dd_command.args(args);
-
-    let dd_output = proxmox_sys::command::run_command(dd_command, None)?;
-    info!("dd output: {dd_output}");
+    zero_disk_start(disk)?;
 
     if is_partition {
         // set the partition type to 0x83 'Linux filesystem'
         change_parttype(disk, "8300")?;
     }
 
+    Ok(())
+}
+
+pub fn zero_disk_start(disk: &Disk) -> Result<(), Error> {
+    let disk_path = match disk.device_path() {
+        Some(path) => path,
+        None => bail!("disk {:?} has no node in /dev", disk.syspath()),
+    };
+
+    let disk_size = disk.size()?;
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_DSYNC)
+        .open(disk_path)
+        .with_context(|| "failed to open device {disk_path:?} for writing")?;
+    let write_size = disk_size.min(200 * 1024 * 1024);
+    let zeroes = proxmox_io::boxed::zeroed(write_size as usize);
+    file.write_all_at(&zeroes, 0)
+        .with_context(|| "failed to wipe start of device {disk_path:?}")?;
     Ok(())
 }
 
