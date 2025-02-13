@@ -353,6 +353,10 @@ impl ChunkStore {
         ProcessLocker::oldest_shared_lock(self.locker.clone().unwrap())
     }
 
+    pub fn mutex(&self) -> &std::sync::Mutex<()> {
+        &self.mutex
+    }
+
     pub fn sweep_unused_chunks(
         &self,
         oldest_writer: i64,

@@ -4,7 +4,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{bail, format_err, Context, Error};
 use http_body_util::BodyExt;
@@ -13,7 +13,7 @@ use pbs_tools::lru_cache::LruCache;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
-use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions, S3PathPrefix};
+use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions, S3ObjectKey, S3PathPrefix};
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
@@ -1210,6 +1210,7 @@ impl DataStore {
         chunk_lru_cache: &mut Option<LruCache<[u8; 32], ()>>,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
+        s3_client: Option<Arc<S3Client>>,
     ) -> Result<(), Error> {
         status.index_file_count += 1;
         status.index_data_bytes += index.index_bytes();
@@ -1232,21 +1233,41 @@ impl DataStore {
                 }
             }
 
-            if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
-                let hex = hex::encode(digest);
-                warn!(
-                    "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
-                );
+            match s3_client {
+                None => {
+                    // Filesystem backend
+                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                        let hex = hex::encode(digest);
+                        warn!(
+                            "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
+                        );
 
-                // touch any corresponding .bad files to keep them around, meaning if a chunk is
-                // rewritten correctly they will be removed automatically, as well as if no index
-                // file requires the chunk anymore (won't get to this loop then)
-                for i in 0..=9 {
-                    let bad_ext = format!("{}.bad", i);
-                    let mut bad_path = PathBuf::new();
-                    bad_path.push(self.chunk_path(digest).0);
-                    bad_path.set_extension(bad_ext);
-                    self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
+                        // touch any corresponding .bad files to keep them around, meaning if a chunk is
+                        // rewritten correctly they will be removed automatically, as well as if no index
+                        // file requires the chunk anymore (won't get to this loop then)
+                        for i in 0..=9 {
+                            let bad_ext = format!("{}.bad", i);
+                            let mut bad_path = PathBuf::new();
+                            bad_path.push(self.chunk_path(digest).0);
+                            bad_path.set_extension(bad_ext);
+                            self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
+                        }
+                    }
+                }
+                Some(ref _s3_client) => {
+                    // Update atime on local cache marker files.
+                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                        let (chunk_path, _digest) = self.chunk_path(digest);
+                        // Insert empty file as marker to tell GC phase2 that this is
+                        // a chunk still in-use, so to keep in the S3 object store.
+                        std::fs::File::options()
+                            .write(true)
+                            .create_new(true)
+                            .open(&chunk_path)
+                            .with_context(|| {
+                                format!("failed to create marker for chunk {}", hex::encode(digest))
+                            })?;
+                    }
                 }
             }
         }
@@ -1258,6 +1279,7 @@ impl DataStore {
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
         cache_capacity: usize,
+        s3_client: Option<Arc<S3Client>>,
     ) -> Result<(), Error> {
         // Iterate twice over the datastore to fetch index files, even if this comes with an
         // additional runtime cost:
@@ -1351,6 +1373,7 @@ impl DataStore {
                                 &mut chunk_lru_cache,
                                 status,
                                 worker,
+                                s3_client.as_ref().cloned(),
                             )?;
 
                             if !unprocessed_index_list.remove(&path) {
@@ -1385,7 +1408,14 @@ impl DataStore {
                     continue;
                 }
             };
-            self.index_mark_used_chunks(index, &path, &mut chunk_lru_cache, status, worker)?;
+            self.index_mark_used_chunks(
+                index,
+                &path,
+                &mut chunk_lru_cache,
+                status,
+                worker,
+                s3_client.as_ref().cloned(),
+            )?;
             warn!("Marked chunks for unexpected index file at '{path:?}'");
         }
         if strange_paths_count > 0 {
@@ -1484,18 +1514,104 @@ impl DataStore {
                 1024 * 1024
             };
 
+            let s3_client = match self.backend()? {
+                DatastoreBackend::Filesystem => None,
+                DatastoreBackend::S3(s3_client) => {
+                    proxmox_async::runtime::block_on(s3_client.head_bucket())
+                        .context("failed to reach bucket")?;
+                    Some(s3_client)
+                }
+            };
+
             info!("Start GC phase1 (mark used chunks)");
 
-            self.mark_used_chunks(&mut gc_status, worker, gc_cache_capacity)
-                .context("marking used chunks failed")?;
-
-            info!("Start GC phase2 (sweep unused chunks)");
-            self.inner.chunk_store.sweep_unused_chunks(
-                oldest_writer,
-                min_atime,
+            self.mark_used_chunks(
                 &mut gc_status,
                 worker,
-            )?;
+                gc_cache_capacity,
+                s3_client.as_ref().cloned(),
+            )
+            .context("marking used chunks failed")?;
+
+            info!("Start GC phase2 (sweep unused chunks)");
+
+            if let Some(ref s3_client) = s3_client {
+                let mut chunk_count = 0;
+                let prefix = S3PathPrefix::Some(".chunks/".to_string());
+                // Operates in batches of 1000 objects max per request
+                let mut list_bucket_result =
+                    proxmox_async::runtime::block_on(s3_client.list_objects_v2(&prefix, None))
+                        .context("failed to list chunk in s3 object store")?;
+
+                let mut delete_list = Vec::with_capacity(1000);
+                loop {
+                    let lock = self.inner.chunk_store.mutex().lock().unwrap();
+
+                    for content in list_bucket_result.contents {
+                        if self
+                            .mark_chunk_for_object_key(
+                                &content.key,
+                                content.size,
+                                min_atime,
+                                oldest_writer,
+                                &mut delete_list,
+                                &mut gc_status,
+                            )
+                            .with_context(|| {
+                                format!("failed to mark chunk for object key {}", content.key)
+                            })?
+                        {
+                            chunk_count += 1;
+                        }
+                    }
+
+                    if !delete_list.is_empty() {
+                        let delete_objects_result = proxmox_async::runtime::block_on(
+                            s3_client.delete_objects(&delete_list),
+                        )?;
+                        if let Some(_err) = delete_objects_result.error {
+                            bail!("failed to delete some objects");
+                        }
+                        delete_list.clear();
+                    }
+
+                    drop(lock);
+
+                    // Process next batch of chunks if there is more
+                    if list_bucket_result.is_truncated {
+                        list_bucket_result =
+                            proxmox_async::runtime::block_on(s3_client.list_objects_v2(
+                                &prefix,
+                                list_bucket_result.next_continuation_token.as_deref(),
+                            ))?;
+                        continue;
+                    }
+
+                    break;
+                }
+                info!("processed {chunk_count} total chunks");
+
+                // Phase 2 GC of Filesystem backed storage is phase 3 for S3 backed GC
+                info!("Start GC phase3 (sweep unused chunk markers)");
+
+                let mut tmp_gc_status = GarbageCollectionStatus {
+                    upid: Some(upid.to_string()),
+                    ..Default::default()
+                };
+                self.inner.chunk_store.sweep_unused_chunks(
+                    oldest_writer,
+                    min_atime,
+                    &mut tmp_gc_status,
+                    worker,
+                )?;
+            } else {
+                self.inner.chunk_store.sweep_unused_chunks(
+                    oldest_writer,
+                    min_atime,
+                    &mut gc_status,
+                    worker,
+                )?;
+            }
 
             if let Some(cache_stats) = &gc_status.cache_stats {
                 let total_cache_counts = cache_stats.hits + cache_stats.misses;
@@ -1580,6 +1696,90 @@ impl DataStore {
         }
 
         Ok(())
+    }
+
+    // Mark the chunk marker in the local cache store for the given object key as in use
+    // by updating it's atime.
+    // Returns Ok(true) if the chunk was updated and Ok(false) if the object was not a chunk.
+    fn mark_chunk_for_object_key(
+        &self,
+        object_key: &S3ObjectKey,
+        size: u64,
+        min_atime: i64,
+        oldest_writer: i64,
+        delete_list: &mut Vec<S3ObjectKey>,
+        gc_status: &mut GarbageCollectionStatus,
+    ) -> Result<bool, Error> {
+        let chunk_path = match self.chunk_path_from_object_key(&object_key) {
+            Some(path) => path,
+            None => return Ok(false),
+        };
+
+        // Check local markers (created or atime updated during phase1) and
+        // keep or delete chunk based on that.
+        let atime = match std::fs::metadata(&chunk_path) {
+            Ok(stat) => stat.accessed()?,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                // File not found, delete by setting atime to unix epoch
+                info!("Not found, mark for deletion: {object_key}");
+                SystemTime::UNIX_EPOCH
+            }
+            Err(err) => return Err(err.into()),
+        };
+        let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
+
+        let bad = chunk_path.as_path().ends_with(".bad");
+
+        if atime < min_atime {
+            delete_list.push(object_key.clone());
+            if bad {
+                gc_status.removed_bad += 1;
+            } else {
+                gc_status.removed_chunks += 1;
+            }
+            gc_status.removed_bytes += size;
+        } else if atime < oldest_writer {
+            if bad {
+                gc_status.still_bad += 1;
+            } else {
+                gc_status.pending_chunks += 1;
+            }
+            gc_status.pending_bytes += size;
+        } else {
+            if !bad {
+                gc_status.disk_chunks += 1;
+            }
+            gc_status.disk_bytes += size;
+        }
+
+        Ok(true)
+    }
+
+    // Check and generate a chunk path from given object key
+    fn chunk_path_from_object_key(&self, object_key: &S3ObjectKey) -> Option<PathBuf> {
+        // Check object is actually a chunk
+        let digest = match Path::new::<str>(object_key).file_name() {
+            Some(file_name) => file_name,
+            // should never be the case as objects will have a filename
+            None => return None,
+        };
+        let bytes = digest.as_bytes();
+        if bytes.len() != 64 && bytes.len() != 64 + ".0.bad".len() {
+            return None;
+        }
+        if !bytes.iter().take(64).all(u8::is_ascii_hexdigit) {
+            return None;
+        }
+
+        // Safe since contains valid ascii hexdigits only as checked above.
+        let digest_str = digest.to_string_lossy();
+        let hexdigit_prefix = unsafe { digest_str.get_unchecked(0..4) };
+        let mut chunk_path = self.base_path();
+        chunk_path.push(".chunks");
+        chunk_path.push(hexdigit_prefix);
+        chunk_path.push(digest);
+
+        Some(chunk_path)
     }
 
     pub fn try_shared_chunk_store_lock(&self) -> Result<ProcessLockSharedGuard, Error> {
