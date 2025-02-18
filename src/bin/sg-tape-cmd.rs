@@ -10,7 +10,6 @@ use pbs_tape::sg_tape::SgTape;
 use proxmox_backup::tape::encryption_keys::load_key;
 use serde_json::Value;
 
-use proxmox_log::init_cli_logger;
 use proxmox_router::{cli::*, RpcEnvironment};
 use proxmox_schema::api;
 use proxmox_uuid::Uuid;
@@ -125,7 +124,9 @@ fn set_encryption(
 }
 
 fn main() -> Result<(), Error> {
-    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO)?;
+    proxmox_log::Logger::from_env("PBS_LOG", proxmox_log::LevelFilter::INFO)
+        .stderr()
+        .init()?;
 
     // check if we are user root or backup
     let backup_uid = pbs_config::backup_user()?.uid;

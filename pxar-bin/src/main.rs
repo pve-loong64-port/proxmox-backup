@@ -22,7 +22,7 @@ use pbs_client::pxar::{
 use pxar::EntryKind;
 
 use proxmox_human_byte::HumanByte;
-use proxmox_log::{debug, enabled, error, init_cli_logger, Level};
+use proxmox_log::{debug, enabled, error, Level};
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
@@ -574,7 +574,10 @@ fn dump_archive(archive: String, payload_input: Option<String>) -> Result<(), Er
 }
 
 fn main() {
-    init_cli_logger("PXAR_LOG", proxmox_log::LevelFilter::INFO).expect("failed to initiate logger");
+    proxmox_log::Logger::from_env("PXAR_LOG", proxmox_log::LevelFilter::INFO)
+        .stderr()
+        .init()
+        .expect("failed to initiate logger");
 
     let cmd_def = CliCommandMap::new()
         .insert(

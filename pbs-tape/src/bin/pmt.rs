@@ -15,7 +15,6 @@
 use anyhow::{bail, Error};
 use serde_json::Value;
 
-use proxmox_log::init_cli_logger;
 use proxmox_router::cli::*;
 use proxmox_router::RpcEnvironment;
 use proxmox_schema::{api, ArraySchema, IntegerSchema, Schema, StringSchema};
@@ -800,7 +799,9 @@ fn options(
 }
 
 fn main() -> Result<(), Error> {
-    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO)?;
+    proxmox_log::Logger::from_env("PBS_LOG", proxmox_log::LevelFilter::INFO)
+        .stderr()
+        .init()?;
 
     let uid = nix::unistd::Uid::current();
 

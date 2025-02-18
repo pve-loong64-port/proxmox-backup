@@ -10,7 +10,6 @@ use serde_json::{json, Value};
 use tokio::io::AsyncWriteExt;
 
 use proxmox_compression::zstd::ZstdEncoder;
-use proxmox_log::init_cli_logger;
 use proxmox_router::cli::{
     complete_file_name, default_table_format_options, format_and_print_result_full,
     get_output_format, run_cli_command, CliCommand, CliCommandMap, CliEnvironment, ColumnConfig,
@@ -629,7 +628,11 @@ fn main() {
         true => proxmox_log::LevelFilter::DEBUG,
         false => proxmox_log::LevelFilter::INFO,
     };
-    init_cli_logger("PBS_LOG", loglevel).expect("failed to initiate logger");
+
+    proxmox_log::Logger::from_env("PBS_LOG", loglevel)
+        .stderr()
+        .init()
+        .expect("failed to initiate logger");
 
     let list_cmd_def = CliCommand::new(&API_METHOD_LIST)
         .arg_param(&["snapshot", "path"])

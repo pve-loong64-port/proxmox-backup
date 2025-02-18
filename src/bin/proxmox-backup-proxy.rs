@@ -16,7 +16,6 @@ use openssl::ssl::SslAcceptor;
 use serde_json::{json, Value};
 
 use proxmox_lang::try_block;
-use proxmox_log::init_logger;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::CreateOptions;
 use proxmox_sys::logrotate::LogRotate;
@@ -179,7 +178,10 @@ async fn get_index_future(env: RestEnvironment, parts: Parts) -> Response<Body> 
 }
 
 async fn run() -> Result<(), Error> {
-    init_logger("PBS_LOG", LevelFilter::INFO)?;
+    proxmox_log::Logger::from_env("PBS_LOG", LevelFilter::INFO)
+        .journald_on_no_workertask()
+        .tasklog_pbs()
+        .init()?;
 
     proxmox_backup::auth_helpers::setup_auth_context(false);
     proxmox_backup::server::notifications::init()?;

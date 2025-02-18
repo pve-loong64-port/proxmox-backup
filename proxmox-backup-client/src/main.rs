@@ -16,7 +16,6 @@ use xdg::BaseDirectories;
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
 use proxmox_async::blocking::TokioWriterAdapter;
 use proxmox_io::StdChannelWriter;
-use proxmox_log::init_cli_logger;
 use proxmox_router::{cli::*, ApiMethod, RpcEnvironment};
 use proxmox_schema::api;
 use proxmox_sys::fs::{file_get_json, image_size, replace_file, CreateOptions};
@@ -1969,7 +1968,10 @@ impl ReadAt for BufferedDynamicReadAt {
 
 fn main() {
     pbs_tools::setup_libc_malloc_opts();
-    init_cli_logger("PBS_LOG", proxmox_log::LevelFilter::INFO).expect("failed to initiate logger");
+    proxmox_log::Logger::from_env("PBS_LOG", proxmox_log::LevelFilter::INFO)
+        .stderr()
+        .init()
+        .expect("failed to initiate logger");
 
     let backup_cmd_def = CliCommand::new(&API_METHOD_CREATE_BACKUP)
         .arg_param(&["backupspec"])

@@ -8,7 +8,6 @@ use hyper::{Body, StatusCode};
 use tracing::level_filters::LevelFilter;
 
 use proxmox_lang::try_block;
-use proxmox_log::init_logger;
 use proxmox_rest_server::{ApiConfig, RestServer};
 use proxmox_router::RpcEnvironmentType;
 use proxmox_sys::fs::CreateOptions;
@@ -41,7 +40,10 @@ fn get_index() -> Pin<Box<dyn Future<Output = Response<Body>> + Send>> {
 }
 
 async fn run() -> Result<(), Error> {
-    init_logger("PBS_LOG", LevelFilter::INFO)?;
+    proxmox_log::Logger::from_env("PBS_LOG", LevelFilter::INFO)
+        .journald_on_no_workertask()
+        .tasklog_pbs()
+        .init()?;
 
     config::create_configdir()?;
 
