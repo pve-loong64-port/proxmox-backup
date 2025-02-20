@@ -169,6 +169,7 @@ the client. The format is:
 
     <archive-name>.<type>:<source-path>
 
+The ``archive-name`` must contain alphanumerics, hyphens and underscores only.
 Common types are ``.pxar`` for file archives and ``.img`` for block
 device images. To create a backup of a block device, run the following command:
 

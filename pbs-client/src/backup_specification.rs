@@ -7,10 +7,12 @@ const_regex! {
     BACKUPSPEC_REGEX = r"^([a-zA-Z0-9_-]+\.(pxar|img|conf|log)):(.+)$";
 }
 
-pub const BACKUP_SOURCE_SCHEMA: Schema =
-    StringSchema::new("Backup source specification ([<label>:<path>]).")
-        .format(&ApiStringFormat::Pattern(&BACKUPSPEC_REGEX))
-        .schema();
+pub const BACKUP_SOURCE_SCHEMA: Schema = StringSchema::new(
+    "Backup source specification ([<label>:<path>]), the specification \
+    'label' must contain alphanumerics, hyphens and underscores only.",
+)
+.format(&ApiStringFormat::Pattern(&BACKUPSPEC_REGEX))
+.schema();
 
 pub enum BackupSpecificationType {
     PXAR,
