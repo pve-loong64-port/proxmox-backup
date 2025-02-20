@@ -253,7 +253,8 @@ proxmox-rrd-api-types.workspace = true
 # Local path overrides
 # NOTE: You must run `cargo update` after changing this for it to take effect!
 [patch.crates-io]
-
+#pbs-api-types = { path = "../proxmox/pbs-api-types" }
+#proxmox-acme = { path = "../proxmox/proxmox-acme" }
 #proxmox-apt = { path = "../proxmox/proxmox-apt" }
 #proxmox-apt-api-types = { path = "../proxmox/proxmox-apt-api-types" }
 #proxmox-async = { path = "../proxmox/proxmox-async" }
@@ -289,7 +290,6 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-uuid = { path = "../proxmox/proxmox-uuid" }
 #proxmox-worker-task = { path = "../proxmox/proxmox-worker-task" }
 
-#proxmox-acme = { path = "../proxmox/proxmox-acme" }
 #pathpatterns = {path = "../pathpatterns" }
 #pxar = { path = "../pxar" }
 
