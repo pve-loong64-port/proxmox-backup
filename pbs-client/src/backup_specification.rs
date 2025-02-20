@@ -35,7 +35,7 @@ pub fn parse_backup_specification(value: &str) -> Result<BackupSpecification, Er
             "img" => BackupSpecificationType::IMAGE,
             "conf" => BackupSpecificationType::CONFIG,
             "log" => BackupSpecificationType::LOGFILE,
-            _ => bail!("unknown backup source type '{}'", extension),
+            _ => bail!("unknown backup source type '{extension}'"),
         };
         return Ok(BackupSpecification {
             archive_name,
@@ -44,7 +44,7 @@ pub fn parse_backup_specification(value: &str) -> Result<BackupSpecification, Er
         });
     }
 
-    bail!("unable to parse backup source specification '{}'", value);
+    bail!("unable to parse backup source specification '{value}'");
 }
 
 #[api]
