@@ -140,6 +140,8 @@ pub enum DeletableProperty {
     MaxDepth,
     /// Delete the 'ns' property
     Ns,
+    /// Delete the 'worker-threads' property
+    WorkerThreads,
 }
 
 #[api(
@@ -222,6 +224,9 @@ pub fn update_tape_backup_job(
                 DeletableProperty::Ns => {
                     data.setup.ns = None;
                 }
+                DeletableProperty::WorkerThreads => {
+                    data.setup.worker_threads = None;
+                }
             }
         }
     }
@@ -259,6 +264,9 @@ pub fn update_tape_backup_job(
     }
     if update.setup.max_depth.is_some() {
         data.setup.max_depth = update.setup.max_depth;
+    }
+    if update.setup.worker_threads.is_some() {
+        data.setup.worker_threads = update.setup.worker_threads;
     }
 
     let schedule_changed = data.schedule != update.schedule;

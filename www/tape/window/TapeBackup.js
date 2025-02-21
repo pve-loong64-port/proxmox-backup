@@ -119,6 +119,18 @@ Ext.define('PBS.TapeManagement.TapeBackupWindow', {
 		    renderer: Ext.String.htmlEncode,
 		},
 	    ],
+
+	    advancedColumn1: [
+		{
+		    xtype: 'proxmoxintegerfield',
+		    name: 'worker-threads',
+		    fieldLabel: gettext('# of Worker Threads'),
+		    emptyText: '1',
+		    skipEmptyText: true,
+		    minValue: 1,
+		    maxValue: 32,
+		},
+	    ],
 	},
     ],
 

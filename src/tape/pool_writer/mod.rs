@@ -56,6 +56,7 @@ pub struct PoolWriter {
     notification_mode: TapeNotificationMode,
     ns_magic: bool,
     used_tapes: HashSet<Uuid>,
+    read_threads: usize,
 }
 
 impl PoolWriter {
@@ -93,7 +94,13 @@ impl PoolWriter {
             notification_mode,
             ns_magic,
             used_tapes: HashSet::new(),
+            read_threads: 1,
         })
+    }
+
+    /// Set the read threads to use when writing a backup to tape
+    pub fn set_read_thread_count(&mut self, read_threads: usize) {
+        self.read_threads = read_threads;
     }
 
     pub fn pool(&mut self) -> &mut MediaPool {
@@ -541,7 +548,12 @@ impl PoolWriter {
         datastore: Arc<DataStore>,
         snapshot_reader: Arc<Mutex<SnapshotReader>>,
     ) -> Result<(std::thread::JoinHandle<()>, NewChunksIterator), Error> {
-        NewChunksIterator::spawn(datastore, snapshot_reader, Arc::clone(&self.catalog_set))
+        NewChunksIterator::spawn(
+            datastore,
+            snapshot_reader,
+            Arc::clone(&self.catalog_set),
+            self.read_threads,
+        )
     }
 
     pub(crate) fn catalog_version(&self) -> [u8; 8] {

@@ -387,6 +387,10 @@ fn backup_worker(
         ns_magic,
     )?;
 
+    if let Some(threads) = setup.worker_threads {
+        pool_writer.set_read_thread_count(threads as usize);
+    }
+
     let mut group_list = Vec::new();
     let namespaces = datastore.recursive_iter_backup_ns_ok(root_namespace, setup.max_depth)?;
     for ns in namespaces {

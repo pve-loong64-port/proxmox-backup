@@ -6,8 +6,9 @@ use anyhow::{format_err, Error};
 use pbs_datastore::{DataBlob, DataStore, SnapshotReader};
 
 use crate::tape::CatalogSet;
+use crate::tools::parallel_handler::ParallelHandler;
 
-/// Chunk iterator which use a separate thread to read chunks
+/// Chunk iterator which uses separate threads to read chunks
 ///
 /// The iterator skips duplicate chunks and chunks already in the
 /// catalog.
@@ -24,8 +25,11 @@ impl NewChunksIterator {
         datastore: Arc<DataStore>,
         snapshot_reader: Arc<Mutex<SnapshotReader>>,
         catalog_set: Arc<Mutex<CatalogSet>>,
+        read_threads: usize,
     ) -> Result<(std::thread::JoinHandle<()>, Self), Error> {
-        let (tx, rx) = std::sync::mpsc::sync_channel(3);
+        // set the buffer size of the channel queues to twice the number of threads or 3, whichever
+        // is greater, to reduce the chance of a reader thread (producer) being blocked.
+        let (tx, rx) = std::sync::mpsc::sync_channel((read_threads * 2).max(3));
 
         let reader_thread = std::thread::spawn(move || {
             let snapshot_reader = snapshot_reader.lock().unwrap();
@@ -35,35 +39,42 @@ impl NewChunksIterator {
             let datastore_name = snapshot_reader.datastore_name().to_string();
 
             let result: Result<(), Error> = proxmox_lang::try_block!({
-                let mut chunk_iter = snapshot_reader.chunk_iterator(move |digest| {
+                let chunk_iter = snapshot_reader.chunk_iterator(move |digest| {
                     catalog_set
                         .lock()
                         .unwrap()
                         .contains_chunk(&datastore_name, digest)
                 })?;
 
-                loop {
-                    let digest = match chunk_iter.next() {
-                        None => {
-                            let _ = tx.send(Ok(None)); // ignore send error
-                            break;
+                let reader_pool =
+                    ParallelHandler::new("tape backup chunk reader pool", read_threads, {
+                        let tx = tx.clone();
+                        move |digest| {
+                            let blob = datastore.load_chunk(&digest)?;
+
+                            tx.send(Ok(Some((digest, blob)))).map_err(|err| {
+                                format_err!("error sending result from reader thread: {err}")
+                            })?;
+
+                            Ok(())
                         }
-                        Some(digest) => digest?,
-                    };
+                    });
+
+                for digest in chunk_iter {
+                    let digest = digest?;
 
                     if chunk_index.contains(&digest) {
                         continue;
                     }
 
-                    let blob = datastore.load_chunk(&digest)?;
-                    //println!("LOAD CHUNK {}", hex::encode(&digest));
-                    if let Err(err) = tx.send(Ok(Some((digest, blob)))) {
-                        eprintln!("could not send chunk to reader thread: {err}");
-                        break;
-                    }
+                    reader_pool.send(digest)?;
 
                     chunk_index.insert(digest);
                 }
+
+                reader_pool.complete()?;
+
+                let _ = tx.send(Ok(None)); // ignore send error
 
                 Ok(())
             });

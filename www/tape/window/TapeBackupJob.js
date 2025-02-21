@@ -216,6 +216,20 @@ Ext.define('PBS.TapeManagement.BackupJobEdit', {
 			},
 		    },
 		],
+
+		advancedColumn1: [
+		    {
+			xtype: 'proxmoxintegerfield',
+			name: 'worker-threads',
+			fieldLabel: gettext('# of Worker Threads'),
+			emptyText: '1',
+			minValue: 1,
+			maxValue: 32,
+			cbind: {
+			    deleteEmpty: '{!isCreate}',
+			},
+		    },
+		],
 	    },
 	    {
 		xtype: 'inputpanel',
