@@ -73,9 +73,9 @@ pub fn get_all_metrics(start_time: i64) -> Result<Vec<MetricDataPoint>, Error> {
 
     let mut points = Vec::new();
 
-    for gen in cached_datapoints {
-        if gen.timestamp > start_time {
-            points.extend(gen.datapoints);
+    for generation in cached_datapoints {
+        if generation.timestamp > start_time {
+            points.extend(generation.datapoints);
         }
     }
 
