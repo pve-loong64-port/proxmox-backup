@@ -624,118 +624,118 @@ fn spawn_catalog_upload(
 }
 
 #[api(
-   input: {
-       properties: {
-           backupspec: {
-               type: Array,
-               description: "List of backup source specifications ([<label.ext>:<path>] ...), the \
-                    specifications 'label' must contain alphanumerics, hyphens and underscores only.",
-               items: {
-                   schema: BACKUP_SOURCE_SCHEMA,
-               }
-           },
-           repository: {
-               schema: REPO_URL_SCHEMA,
-               optional: true,
-           },
-           "include-dev": {
-               description: "Include mountpoints with same st_dev number (see ``man fstat``) as specified files.",
-               optional: true,
-               items: {
-                   type: String,
-                   description: "Path to file.",
-               }
-           },
-           "all-file-systems": {
-               type: Boolean,
-               description: "Include all mounted subdirectories.",
-               optional: true,
-               default: false,
-           },
-           keyfile: {
-               schema: KEYFILE_SCHEMA,
-               optional: true,
-           },
-           "keyfd": {
-               schema: KEYFD_SCHEMA,
-               optional: true,
-           },
-           "master-pubkey-file": {
-               schema: MASTER_PUBKEY_FILE_SCHEMA,
-               optional: true,
-           },
-           "master-pubkey-fd": {
-               schema: MASTER_PUBKEY_FD_SCHEMA,
-               optional: true,
-           },
-           "crypt-mode": {
-               type: CryptMode,
-               optional: true,
-           },
-           "skip-lost-and-found": {
-               type: Boolean,
-               description: "Skip lost+found directory.",
-               optional: true,
-               default: false,
-           },
-           "ns": {
-               schema: BACKUP_NAMESPACE_SCHEMA,
-               optional: true,
-           },
-           "backup-type": {
-               schema: BACKUP_TYPE_SCHEMA,
-               optional: true,
-           },
-           "backup-id": {
-               schema: BACKUP_ID_SCHEMA,
-               optional: true,
-           },
-           "backup-time": {
-               schema: BACKUP_TIME_SCHEMA,
-               optional: true,
-           },
-           "chunk-size": {
-               schema: CHUNK_SIZE_SCHEMA,
-               optional: true,
-           },
-           limit: {
-               type: ClientRateLimitConfig,
-               flatten: true,
-           },
-           "change-detection-mode": {
-               type: BackupDetectionMode,
-               optional: true,
-           },
-           "exclude": {
-               type: Array,
-               description: "List of paths or patterns for matching files to exclude.",
-               optional: true,
-               items: {
-                   type: String,
-                   description: "Path or match pattern.",
+    input: {
+        properties: {
+            backupspec: {
+                type: Array,
+                description: "List of backup source specifications ([<label.ext>:<path>] ...), the \
+                     specifications 'label' must contain alphanumerics, hyphens and underscores only.",
+                items: {
+                    schema: BACKUP_SOURCE_SCHEMA,
                 }
-           },
-           "entries-max": {
-               type: Integer,
-               description: "Max number of entries to hold in memory.",
-               optional: true,
-               default: pbs_client::pxar::ENCODER_MAX_ENTRIES as isize,
-           },
-           "dry-run": {
-               type: Boolean,
-               description: "Just show what backup would do, but do not upload anything.",
-               optional: true,
-               default: false,
-           },
-           "skip-e2big-xattr": {
-               type: Boolean,
-               description: "Ignore the E2BIG error when retrieving xattrs. This includes the file, but discards the metadata.",
-               optional: true,
-               default: false,
-           },
-       }
-   }
-)]
+            },
+            repository: {
+                schema: REPO_URL_SCHEMA,
+                optional: true,
+            },
+            "include-dev": {
+                description: "Include mountpoints with same st_dev number (see ``man fstat``) as specified files.",
+                optional: true,
+                items: {
+                    type: String,
+                    description: "Path to file.",
+                }
+            },
+            "all-file-systems": {
+                type: Boolean,
+                description: "Include all mounted subdirectories.",
+                optional: true,
+                default: false,
+            },
+            keyfile: {
+                schema: KEYFILE_SCHEMA,
+                optional: true,
+            },
+            "keyfd": {
+                schema: KEYFD_SCHEMA,
+                optional: true,
+            },
+            "master-pubkey-file": {
+                schema: MASTER_PUBKEY_FILE_SCHEMA,
+                optional: true,
+            },
+            "master-pubkey-fd": {
+                schema: MASTER_PUBKEY_FD_SCHEMA,
+                optional: true,
+            },
+            "crypt-mode": {
+                type: CryptMode,
+                optional: true,
+            },
+            "skip-lost-and-found": {
+                type: Boolean,
+                description: "Skip lost+found directory.",
+                optional: true,
+                default: false,
+            },
+            "ns": {
+                schema: BACKUP_NAMESPACE_SCHEMA,
+                optional: true,
+            },
+            "backup-type": {
+                schema: BACKUP_TYPE_SCHEMA,
+                optional: true,
+            },
+            "backup-id": {
+                schema: BACKUP_ID_SCHEMA,
+                optional: true,
+            },
+            "backup-time": {
+                schema: BACKUP_TIME_SCHEMA,
+                optional: true,
+            },
+            "chunk-size": {
+                schema: CHUNK_SIZE_SCHEMA,
+                optional: true,
+            },
+            limit: {
+                type: ClientRateLimitConfig,
+                flatten: true,
+            },
+            "change-detection-mode": {
+                type: BackupDetectionMode,
+                optional: true,
+            },
+            "exclude": {
+                type: Array,
+                description: "List of paths or patterns for matching files to exclude.",
+                optional: true,
+                items: {
+                    type: String,
+                    description: "Path or match pattern.",
+                 }
+            },
+            "entries-max": {
+                type: Integer,
+                description: "Max number of entries to hold in memory.",
+                optional: true,
+                default: pbs_client::pxar::ENCODER_MAX_ENTRIES as isize,
+            },
+            "dry-run": {
+                type: Boolean,
+                description: "Just show what backup would do, but do not upload anything.",
+                optional: true,
+                default: false,
+            },
+            "skip-e2big-xattr": {
+                type: Boolean,
+                description: "Ignore the E2BIG error when retrieving xattrs. This includes the file, but discards the metadata.",
+                optional: true,
+                default: false,
+            },
+        }
+    }
+ )]
 /// Create (host) backup.
 #[allow(clippy::too_many_arguments)]
 async fn create_backup(
