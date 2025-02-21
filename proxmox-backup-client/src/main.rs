@@ -628,8 +628,10 @@ fn spawn_catalog_upload(
         properties: {
             backupspec: {
                 type: Array,
-                description: "List of backup source specifications ([<label.ext>:<path>] ...), the \
-                     specifications 'label' must contain alphanumerics, hyphens and underscores only.",
+                description:
+                    "List of backup source specifications ([<label.ext>:<path>] ...), the \
+                    specifications 'label' must contain alphanumerics, hyphens and underscores \
+                    only.",
                 items: {
                     schema: BACKUP_SOURCE_SCHEMA,
                 }
@@ -639,7 +641,9 @@ fn spawn_catalog_upload(
                 optional: true,
             },
             "include-dev": {
-                description: "Include mountpoints with same st_dev number (see ``man fstat``) as specified files.",
+                description:
+                    "Include mountpoints with same st_dev number (see ``man fstat``) as specified \
+                    files.",
                 optional: true,
                 items: {
                     type: String,
@@ -729,7 +733,9 @@ fn spawn_catalog_upload(
             },
             "skip-e2big-xattr": {
                 type: Boolean,
-                description: "Ignore the E2BIG error when retrieving xattrs. This includes the file, but discards the metadata.",
+                description:
+                    "Ignore the E2BIG error when retrieving xattrs. This includes the file, but \
+                    discards the metadata.",
                 optional: true,
                 default: false,
             },
@@ -1566,7 +1572,10 @@ async fn restore(
     let (manifest, backup_index_data) = client.download_manifest().await?;
 
     if archive_name == *ENCRYPTED_KEY_BLOB_NAME && crypt_config.is_none() {
-        log::info!("Restoring encrypted key blob without original key - skipping manifest fingerprint check!")
+        log::info!(
+            "Restoring encrypted key blob without original key - skipping manifest fingerprint \
+            check!"
+        );
     } else {
         if manifest.signature.is_some() {
             if let Some(key) = &crypto.enc_key {
