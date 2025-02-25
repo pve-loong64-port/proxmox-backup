@@ -581,6 +581,20 @@ impl BackupEnvironment {
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
 
         let raw_data = blob.raw_data();
+        if let DatastoreBackend::S3(s3_client) = &self.backend {
+            let object_key = pbs_datastore::s3::object_key_from_path(
+                &self.backup_dir.relative_path(),
+                file_name,
+            )
+            .context("invalid blob object key")?;
+            let data = hyper::body::Bytes::copy_from_slice(raw_data);
+            proxmox_async::runtime::block_on(
+                s3_client.upload_replace_with_retry(object_key.clone(), data),
+            )
+            .context("failed to upload blob to s3 backend")?;
+            self.log(format!("Uploaded blob to object store: {object_key}"))
+        }
+
         replace_file(&path, raw_data, CreateOptions::new(), false)?;
 
         self.log(format!(
