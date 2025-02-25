@@ -18,6 +18,7 @@ use pbs_datastore::dynamic_index::DynamicIndexWriter;
 use pbs_datastore::fixed_index::FixedIndexWriter;
 use pbs_datastore::{DataBlob, DataStore, DatastoreBackend};
 use proxmox_rest_server::{formatter::*, WorkerTask};
+use proxmox_s3_client::S3Client;
 
 use crate::backup::VerifyWorker;
 
@@ -479,6 +480,16 @@ impl BackupEnvironment {
             );
         }
 
+        // For S3 backends, upload the index file to the object store after closing
+        if let DatastoreBackend::S3(s3_client) = &self.backend {
+            self.s3_upload_index(s3_client, &data.name)
+                .context("failed to upload dynamic index to s3 backend")?;
+            self.log(format!(
+                "Uploaded dynamic index file to s3 backend: {}",
+                data.name
+            ))
+        }
+
         self.log_upload_stat(
             &data.name,
             &csum,
@@ -551,6 +562,16 @@ impl BackupEnvironment {
                 "fixed writer '{}' close failed - got unexpected checksum",
                 data.name
             );
+        }
+
+        // For S3 backends, upload the index file to the object store after closing
+        if let DatastoreBackend::S3(s3_client) = &self.backend {
+            self.s3_upload_index(s3_client, &data.name)
+                .context("failed to upload fixed index to s3 backend")?;
+            self.log(format!(
+                "Uploaded fixed index file to object store: {}",
+                data.name
+            ))
         }
 
         self.log_upload_stat(
@@ -749,6 +770,21 @@ impl BackupEnvironment {
             true,
         )?;
 
+        Ok(())
+    }
+
+    fn s3_upload_index(&self, s3_client: &S3Client, name: &str) -> Result<(), Error> {
+        let object_key =
+            pbs_datastore::s3::object_key_from_path(&self.backup_dir.relative_path(), name)
+                .context("invalid index file object key")?;
+
+        let mut full_path = self.backup_dir.full_path();
+        full_path.push(name);
+        let data = std::fs::read(&full_path).context("failed to read index contents")?;
+        let contents = hyper::body::Bytes::from(data);
+        proxmox_async::runtime::block_on(
+            s3_client.upload_replace_with_retry(object_key, contents),
+        )?;
         Ok(())
     }
 }
