@@ -646,14 +646,6 @@ impl BackupEnvironment {
             bail!("backup does not contain valid files (file count == 0)");
         }
 
-        // check for valid manifest and store stats
-        let stats = serde_json::to_value(state.backup_stat)?;
-        self.backup_dir
-            .update_manifest(|manifest| {
-                manifest.unprotected["chunk_upload_stats"] = stats;
-            })
-            .map_err(|err| format_err!("unable to update manifest blob - {}", err))?;
-
         if let Some(base) = &self.last_backup {
             let path = base.backup_dir.full_path();
             if !path.exists() {
@@ -663,6 +655,14 @@ impl BackupEnvironment {
                 );
             }
         }
+
+        // check for valid manifest and store stats
+        let stats = serde_json::to_value(state.backup_stat)?;
+        self.backup_dir
+            .update_manifest(&self.backend, |manifest| {
+                manifest.unprotected["chunk_upload_stats"] = stats;
+            })
+            .map_err(|err| format_err!("unable to update manifest blob - {err}"))?;
 
         self.datastore.try_ensure_sync_level()?;
 

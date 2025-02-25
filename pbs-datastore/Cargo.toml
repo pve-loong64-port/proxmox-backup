@@ -13,6 +13,7 @@ crc32fast.workspace = true
 endian_trait.workspace = true
 futures.workspace = true
 hex = { workspace = true, features = [ "serde" ] }
+hyper.workspace = true
 libc.workspace = true
 log.workspace = true
 nix.workspace = true
@@ -29,8 +30,10 @@ zstd-safe.workspace = true
 pathpatterns.workspace = true
 pxar.workspace = true
 
+proxmox-async.workspace = true
 proxmox-base64.workspace = true
 proxmox-borrow.workspace = true
+proxmox-http.workspace = true
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true
 proxmox-lang.workspace=true

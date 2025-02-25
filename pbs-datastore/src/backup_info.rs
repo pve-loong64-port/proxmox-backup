@@ -19,7 +19,7 @@ use pbs_api_types::{
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
 use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
-use crate::{DataBlob, DataStore};
+use crate::{DataBlob, DataStore, DatastoreBackend};
 
 pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
 const PROTECTED_MARKER_FILENAME: &str = ".protected";
@@ -666,6 +666,7 @@ impl BackupDir {
     /// only use this method - anything else may break locking guarantees.
     pub fn update_manifest(
         &self,
+        backend: &DatastoreBackend,
         update_fn: impl FnOnce(&mut BackupManifest),
     ) -> Result<(), Error> {
         let _guard = self.lock_manifest()?;
@@ -677,6 +678,15 @@ impl BackupDir {
         let manifest = serde_json::to_string_pretty(&manifest)?;
         let blob = DataBlob::encode(manifest.as_bytes(), None, true)?;
         let raw_data = blob.raw_data();
+
+        if let DatastoreBackend::S3(s3_client) = backend {
+            let object_key =
+                super::s3::object_key_from_path(&self.relative_path(), MANIFEST_BLOB_NAME.as_ref())
+                    .context("invalid manifest object key")?;
+            let data = hyper::body::Bytes::copy_from_slice(raw_data);
+            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
+                .context("failed to update manifest on s3 backend")?;
+        }
 
         let mut path = self.full_path();
         path.push(MANIFEST_BLOB_NAME.as_ref());

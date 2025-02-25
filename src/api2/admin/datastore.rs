@@ -65,7 +65,7 @@ use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
     check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, BackupGroup,
-    DataStore, LocalChunkReader, StoreProgress,
+    DataStore, DatastoreBackend, LocalChunkReader, StoreProgress,
 };
 use pbs_tools::json::required_string_param;
 use proxmox_rest_server::{formatter, WorkerTask};
@@ -2086,6 +2086,16 @@ pub fn set_group_notes(
         &backup_group,
     )?;
 
+    if let DatastoreBackend::S3(s3_client) = datastore.backend()? {
+        let mut path = ns.path();
+        path.push(backup_group.to_string());
+        let object_key = pbs_datastore::s3::object_key_from_path(&path, "notes")
+            .context("invalid owner file object key")?;
+        let data = hyper::body::Bytes::copy_from_slice(notes.as_bytes());
+        let _is_duplicate =
+            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
+                .context("failed to set notes on s3 backend")?;
+    }
     let notes_path = datastore.group_notes_path(&ns, &backup_group);
     replace_file(notes_path, notes.as_bytes(), CreateOptions::new(), false)?;
 
@@ -2188,7 +2198,7 @@ pub fn set_notes(
     let backup_dir = datastore.backup_dir(ns, backup_dir)?;
 
     backup_dir
-        .update_manifest(|manifest| {
+        .update_manifest(&datastore.backend()?, |manifest| {
             manifest.unprotected["notes"] = notes.into();
         })
         .map_err(|err| format_err!("unable to update manifest blob - {}", err))?;

@@ -359,7 +359,7 @@ impl VerifyWorker {
 
         if let Err(err) = {
             let verify_state = serde_json::to_value(verify_state)?;
-            backup_dir.update_manifest(|manifest| {
+            backup_dir.update_manifest(&self.datastore.backend()?, |manifest| {
                 manifest.unprotected["verify_state"] = verify_state;
             })
         } {
