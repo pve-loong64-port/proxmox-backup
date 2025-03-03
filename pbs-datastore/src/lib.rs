@@ -204,6 +204,7 @@ pub use store_progress::StoreProgress;
 mod datastore;
 pub use datastore::{
     check_backup_owner, ensure_datastore_is_mounted, get_datastore_mount_status, DataStore,
+    DatastoreBackend,
 };
 
 mod hierarchy;

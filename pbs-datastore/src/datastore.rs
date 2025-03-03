@@ -12,6 +12,7 @@ use pbs_tools::lru_cache::LruCache;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
+use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions};
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
@@ -23,9 +24,11 @@ use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
-    DataStoreConfig, DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionCacheStats,
-    GarbageCollectionStatus, MaintenanceMode, MaintenanceType, Operation, UPID,
+    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
+    DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MaintenanceMode,
+    MaintenanceType, Operation, UPID,
 };
+use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::BackupLockGuard;
 
 use crate::backup_info::{BackupDir, BackupGroup, BackupInfo, OLD_LOCKING};
@@ -127,6 +130,7 @@ pub struct DataStoreImpl {
     chunk_order: ChunkOrder,
     last_digest: Option<[u8; 32]>,
     sync_level: DatastoreFSyncLevel,
+    backend_config: DatastoreBackendConfig,
 }
 
 impl DataStoreImpl {
@@ -141,6 +145,7 @@ impl DataStoreImpl {
             chunk_order: Default::default(),
             last_digest: None,
             sync_level: Default::default(),
+            backend_config: Default::default(),
         })
     }
 }
@@ -196,6 +201,15 @@ impl Drop for DataStore {
     }
 }
 
+#[derive(Clone)]
+/// Storage backend type for a datastore.
+pub enum DatastoreBackend {
+    /// Storage is located on local filesystem.
+    Filesystem,
+    /// Storage is located on S3 compatible object store.
+    S3(Arc<S3Client>),
+}
+
 impl DataStore {
     // This one just panics on everything
     #[doc(hidden)]
@@ -204,6 +218,36 @@ impl DataStore {
             inner: unsafe { DataStoreImpl::new_test() },
             operation: None,
         })
+    }
+
+    /// Get the backend for this datastore based on it's configuration
+    pub fn backend(&self) -> Result<DatastoreBackend, Error> {
+        let backend_type = match self.inner.backend_config.ty.unwrap_or_default() {
+            DatastoreBackendType::Filesystem => DatastoreBackend::Filesystem,
+            DatastoreBackendType::S3 => {
+                let s3_client_id = self
+                    .inner
+                    .backend_config
+                    .client
+                    .as_ref()
+                    .ok_or_else(|| format_err!("missing client for s3 backend"))?;
+                let bucket = self
+                    .inner
+                    .backend_config
+                    .bucket
+                    .clone()
+                    .ok_or_else(|| format_err!("missing bucket for s3 backend"))?;
+
+                let (config, _config_digest) = pbs_config::s3::config()?;
+                let config: S3ClientConfig = config.lookup(S3_CFG_TYPE_ID, s3_client_id)?;
+
+                let options = S3ClientOptions::from_config(config, bucket, self.name().to_owned());
+                let s3_client = S3Client::new(options)?;
+                DatastoreBackend::S3(Arc::new(s3_client))
+            }
+        };
+
+        Ok(backend_type)
     }
 
     pub fn lookup_datastore(
@@ -383,6 +427,11 @@ impl DataStore {
                 .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
         )?;
 
+        let backend_config: DatastoreBackendConfig = serde_json::from_value(
+            DatastoreBackendConfig::API_SCHEMA
+                .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
+        )?;
+
         Ok(DataStoreImpl {
             chunk_store,
             gc_mutex: Mutex::new(()),
@@ -391,6 +440,7 @@ impl DataStore {
             chunk_order: tuning.chunk_order.unwrap_or_default(),
             last_digest,
             sync_level: tuning.sync_level.unwrap_or_default(),
+            backend_config,
         })
     }
 
