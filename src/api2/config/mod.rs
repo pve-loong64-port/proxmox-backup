@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod notifications;
 pub mod prune;
 pub mod remote;
+pub mod s3;
 pub mod sync;
 pub mod tape_backup_job;
 pub mod tape_encryption_keys;
@@ -32,6 +33,7 @@ const SUBDIRS: SubdirMap = &sorted!([
     ("notifications", &notifications::ROUTER),
     ("prune", &prune::ROUTER),
     ("remote", &remote::ROUTER),
+    ("s3", &s3::ROUTER),
     ("sync", &sync::ROUTER),
     ("tape-backup-job", &tape_backup_job::ROUTER),
     ("tape-encryption-keys", &tape_encryption_keys::ROUTER),
