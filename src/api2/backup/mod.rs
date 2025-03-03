@@ -187,7 +187,8 @@ fn upgrade_to_backup_protocol(
             }
 
             // lock last snapshot to prevent forgetting/pruning it during backup
-            let guard = last.backup_dir
+            let guard = last
+                .backup_dir
                 .lock_shared()
                 .with_context(|| format!("while locking last snapshot during backup '{last:?}'"))?;
             Some(guard)
@@ -206,14 +207,14 @@ fn upgrade_to_backup_protocol(
             Some(worker_id),
             auth_id.to_string(),
             true,
-            move |worker| {
+            move |worker| async move {
                 let mut env = BackupEnvironment::new(
                     env_type,
                     auth_id,
                     worker.clone(),
                     datastore,
                     backup_dir,
-                );
+                )?;
 
                 env.debug = debug;
                 env.last_backup = last_backup;
@@ -247,74 +248,73 @@ fn upgrade_to_backup_protocol(
                         http.max_frame_size(4 * 1024 * 1024);
 
                         let env3 = env2.clone();
-                        http.serve_connection(conn, TowerToHyperService::new(service)).map(move |result| {
-                            match result {
-                                Err(err) => {
-                                    // Avoid  Transport endpoint is not connected (os error 107)
-                                    // fixme: find a better way to test for that error
-                                    if err.to_string().starts_with("connection error")
-                                        && env3.finished()
-                                    {
-                                        Ok(())
-                                    } else {
-                                        Err(Error::from(err))
+                        http.serve_connection(conn, TowerToHyperService::new(service))
+                            .map(move |result| {
+                                match result {
+                                    Err(err) => {
+                                        // Avoid  Transport endpoint is not connected (os error 107)
+                                        // fixme: find a better way to test for that error
+                                        if err.to_string().starts_with("connection error")
+                                            && env3.finished()
+                                        {
+                                            Ok(())
+                                        } else {
+                                            Err(Error::from(err))
+                                        }
                                     }
+                                    Ok(()) => Ok(()),
                                 }
-                                Ok(()) => Ok(()),
-                            }
-                        })
+                            })
                     });
                 let mut abort_future = abort_future.map(|_| Err(format_err!("task aborted")));
 
-                async move {
-                    // keep flock until task ends
-                    let _group_guard = _group_guard;
-                    let snap_guard = snap_guard;
-                    let _last_guard = _last_guard;
+                // keep flock until task ends
+                let _group_guard = _group_guard;
+                let snap_guard = snap_guard;
+                let _last_guard = _last_guard;
 
-                    let res = select! {
-                        req = req_fut => req,
-                        abrt = abort_future => abrt,
-                    };
-                    if benchmark {
-                        env.log("benchmark finished successfully");
-                        proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
-                        return Ok(());
+                let res = select! {
+                    req = req_fut => req,
+                    abrt = abort_future => abrt,
+                };
+                if benchmark {
+                    env.log("benchmark finished successfully");
+                    proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                    return Ok(());
+                }
+
+                let verify = |env: BackupEnvironment| {
+                    if let Err(err) = env.verify_after_complete(snap_guard) {
+                        env.log(format!(
+                            "backup finished, but starting the requested verify task failed: {}",
+                            err
+                        ));
                     }
+                };
 
-                    let verify = |env: BackupEnvironment| {
-                        if let Err(err) = env.verify_after_complete(snap_guard) {
-                            env.log(format!(
-                                "backup finished, but starting the requested verify task failed: {}",
-                                err
-                            ));
-                        }
-                    };
-
-                    match (res, env.ensure_finished()) {
-                        (Ok(_), Ok(())) => {
-                            env.log("backup finished successfully");
-                            verify(env);
-                            Ok(())
-                        }
-                        (Err(err), Ok(())) => {
-                            // ignore errors after finish
-                            env.log(format!("backup had errors but finished: {}", err));
-                            verify(env);
-                            Ok(())
-                        }
-                        (Ok(_), Err(err)) => {
-                            env.log(format!("backup ended and finish failed: {}", err));
-                            env.log("removing unfinished backup");
-                            proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
-                            Err(err)
-                        }
-                        (Err(err), Err(_)) => {
-                            env.log(format!("backup failed: {}", err));
-                            env.log("removing failed backup");
-                            proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
-                            Err(err)
-                        }
+                match (res, env.ensure_finished()) {
+                    (Ok(_), Ok(())) => {
+                        env.log("backup finished successfully");
+                        verify(env);
+                        Ok(())
+                    }
+                    (Err(err), Ok(())) => {
+                        // ignore errors after finish
+                        env.log(format!("backup had errors but finished: {}", err));
+                        verify(env);
+                        Ok(())
+                    }
+                    (Ok(_), Err(err)) => {
+                        env.log(format!("backup ended and finish failed: {}", err));
+                        env.log("removing unfinished backup");
+                        proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                        Err(err)
+                    }
+                    (Err(err), Err(_)) => {
+                        env.log(format!("backup failed: {}", err));
+                        env.log("removing failed backup");
+                        proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                        Err(err)
                     }
                 }
             },

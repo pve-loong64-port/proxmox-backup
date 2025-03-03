@@ -16,7 +16,7 @@ use pbs_api_types::Authid;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::dynamic_index::DynamicIndexWriter;
 use pbs_datastore::fixed_index::FixedIndexWriter;
-use pbs_datastore::{DataBlob, DataStore};
+use pbs_datastore::{DataBlob, DataStore, DatastoreBackend};
 use proxmox_rest_server::{formatter::*, WorkerTask};
 
 use crate::backup::VerifyWorker;
@@ -116,6 +116,7 @@ pub struct BackupEnvironment {
     pub datastore: Arc<DataStore>,
     pub backup_dir: BackupDir,
     pub last_backup: Option<BackupInfo>,
+    pub backend: DatastoreBackend,
     state: Arc<Mutex<SharedBackupState>>,
 }
 
@@ -126,7 +127,7 @@ impl BackupEnvironment {
         worker: Arc<WorkerTask>,
         datastore: Arc<DataStore>,
         backup_dir: BackupDir,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let state = SharedBackupState {
             finished: false,
             uid_counter: 0,
@@ -138,7 +139,8 @@ impl BackupEnvironment {
             backup_stat: UploadStatistic::new(),
         };
 
-        Self {
+        let backend = datastore.backend()?;
+        Ok(Self {
             result_attributes: json!({}),
             env_type,
             auth_id,
@@ -148,8 +150,9 @@ impl BackupEnvironment {
             formatter: JSON_FORMATTER,
             backup_dir,
             last_backup: None,
+            backend,
             state: Arc::new(Mutex::new(state)),
-        }
+        })
     }
 
     /// Register a Chunk with associated length.
