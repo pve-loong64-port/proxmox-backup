@@ -306,7 +306,9 @@ async fn pull_single_archive<'a>(
                 info!("skipping chunk sync for same datastore");
             } else {
                 let stats = pull_index_chunks(
-                    reader.chunk_reader(archive_info.crypt_mode),
+                    reader
+                        .chunk_reader(archive_info.crypt_mode)
+                        .context("failed to get chunk reader")?,
                     snapshot.datastore().clone(),
                     index,
                     downloaded_chunks,
@@ -326,7 +328,9 @@ async fn pull_single_archive<'a>(
                 info!("skipping chunk sync for same datastore");
             } else {
                 let stats = pull_index_chunks(
-                    reader.chunk_reader(archive_info.crypt_mode),
+                    reader
+                        .chunk_reader(archive_info.crypt_mode)
+                        .context("failed to get chunk reader")?,
                     snapshot.datastore().clone(),
                     index,
                     downloaded_chunks,

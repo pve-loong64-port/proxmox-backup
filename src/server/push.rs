@@ -890,7 +890,9 @@ pub(crate) async fn push_snapshot(
                             .await;
                     }
                     let index = DynamicIndexReader::open(&path)?;
-                    let chunk_reader = reader.chunk_reader(entry.chunk_crypt_mode());
+                    let chunk_reader = reader
+                        .chunk_reader(entry.chunk_crypt_mode())
+                        .context("failed to get chunk reader")?;
                     let sync_stats = push_index(
                         &archive_name,
                         index,
@@ -914,7 +916,9 @@ pub(crate) async fn push_snapshot(
                             .await;
                     }
                     let index = FixedIndexReader::open(&path)?;
-                    let chunk_reader = reader.chunk_reader(entry.chunk_crypt_mode());
+                    let chunk_reader = reader
+                        .chunk_reader(entry.chunk_crypt_mode())
+                        .context("failed to get chunk reader")?;
                     let size = index.index_bytes();
                     let sync_stats = push_index(
                         &archive_name,

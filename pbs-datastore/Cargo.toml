@@ -13,6 +13,7 @@ crc32fast.workspace = true
 endian_trait.workspace = true
 futures.workspace = true
 hex = { workspace = true, features = [ "serde" ] }
+http-body-util.workspace = true
 hyper.workspace = true
 libc.workspace = true
 log.workspace = true

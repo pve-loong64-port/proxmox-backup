@@ -3,17 +3,21 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{bail, Error};
+use http_body_util::BodyExt;
 
 use pbs_api_types::CryptMode;
 use pbs_tools::crypt_config::CryptConfig;
+use proxmox_s3_client::S3Client;
 
 use crate::data_blob::DataBlob;
+use crate::datastore::DatastoreBackend;
 use crate::read_chunk::{AsyncReadChunk, ReadChunk};
 use crate::DataStore;
 
 #[derive(Clone)]
 pub struct LocalChunkReader {
     store: Arc<DataStore>,
+    backend: DatastoreBackend,
     crypt_config: Option<Arc<CryptConfig>>,
     crypt_mode: CryptMode,
 }
@@ -23,12 +27,14 @@ impl LocalChunkReader {
         store: Arc<DataStore>,
         crypt_config: Option<Arc<CryptConfig>>,
         crypt_mode: CryptMode,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let backend = store.backend()?;
+        Ok(Self {
             store,
+            backend,
             crypt_config,
             crypt_mode,
-        }
+        })
     }
 
     fn ensure_crypt_mode(&self, chunk_mode: CryptMode) -> Result<(), Error> {
@@ -47,10 +53,26 @@ impl LocalChunkReader {
     }
 }
 
+async fn fetch(s3_client: Arc<S3Client>, digest: &[u8; 32]) -> Result<DataBlob, Error> {
+    let object_key = crate::s3::object_key_from_digest(digest)?;
+    if let Some(response) = s3_client.get_object(object_key).await? {
+        let bytes = response.content.collect().await?.to_bytes();
+        DataBlob::from_raw(bytes.to_vec())
+    } else {
+        bail!("no object with digest {}", hex::encode(digest));
+    }
+}
+
 impl ReadChunk for LocalChunkReader {
     fn read_raw_chunk(&self, digest: &[u8; 32]) -> Result<DataBlob, Error> {
-        let chunk = self.store.load_chunk(digest)?;
+        let chunk = match &self.backend {
+            DatastoreBackend::Filesystem => self.store.load_chunk(digest)?,
+            DatastoreBackend::S3(s3_client) => {
+                proxmox_async::runtime::block_on(fetch(Arc::clone(s3_client), digest))?
+            }
+        };
         self.ensure_crypt_mode(chunk.crypt_mode()?)?;
+
         Ok(chunk)
     }
 
@@ -69,11 +91,14 @@ impl AsyncReadChunk for LocalChunkReader {
         digest: &'a [u8; 32],
     ) -> Pin<Box<dyn Future<Output = Result<DataBlob, Error>> + Send + 'a>> {
         Box::pin(async move {
-            let (path, _) = self.store.chunk_path(digest);
-
-            let raw_data = tokio::fs::read(&path).await?;
-
-            let chunk = DataBlob::load_from_reader(&mut &raw_data[..])?;
+            let chunk = match &self.backend {
+                DatastoreBackend::Filesystem => {
+                    let (path, _) = self.store.chunk_path(digest);
+                    let raw_data = tokio::fs::read(&path).await?;
+                    DataBlob::load_from_reader(&mut &raw_data[..])?
+                }
+                DatastoreBackend::S3(s3_client) => fetch(Arc::clone(s3_client), digest).await?,
+            };
             self.ensure_crypt_mode(chunk.crypt_mode()?)?;
 
             Ok(chunk)

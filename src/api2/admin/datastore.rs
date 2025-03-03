@@ -1520,7 +1520,8 @@ pub fn download_file_decoded(
                 let (csum, size) = index.compute_csum();
                 manifest.verify_file(&file_name, &csum, size)?;
 
-                let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
+                let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None)
+                    .context("creating local chunk reader failed")?;
                 let reader = CachedChunkReader::new(chunk_reader, index, 1).seekable();
                 Body::wrap_stream(AsyncReaderStream::new(reader).map_err(move |err| {
                     eprintln!("error during streaming of '{:?}' - {}", path, err);
@@ -1535,7 +1536,8 @@ pub fn download_file_decoded(
                 let (csum, size) = index.compute_csum();
                 manifest.verify_file(&file_name, &csum, size)?;
 
-                let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
+                let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None)
+                    .context("creating local chunk reader failed")?;
                 let reader = CachedChunkReader::new(chunk_reader, index, 1).seekable();
                 Body::wrap_stream(
                     AsyncReaderStream::with_buffer_size(reader, 4 * 1024 * 1024).map_err(
@@ -1739,7 +1741,8 @@ pub async fn catalog(
             let (csum, size) = index.compute_csum();
             manifest.verify_file(&file_name, &csum, size)?;
 
-            let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
+            let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None)
+                .context("creating local chunk reader failed")?;
             let reader = BufferedDynamicReader::new(index, chunk_reader);
 
             let mut catalog_reader = CatalogReader::new(reader);
@@ -1808,7 +1811,8 @@ fn get_local_pxar_reader(
     let (csum, size) = index.compute_csum();
     manifest.verify_file(pxar_name, &csum, size)?;
 
-    let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None);
+    let chunk_reader = LocalChunkReader::new(datastore, None, CryptMode::None)
+        .context("creating local chunk reader failed")?;
     let reader = BufferedDynamicReader::new(index, chunk_reader);
     let archive_size = reader.archive_size();
 
