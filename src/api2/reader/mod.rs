@@ -3,6 +3,7 @@
 use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hex::FromHex;
+use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::header::{self, HeaderValue, CONNECTION, UPGRADE};
 use hyper::http::request::Parts;
@@ -27,8 +28,9 @@ use pbs_api_types::{
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::{DataStore, PROXMOX_BACKUP_READER_PROTOCOL_ID_V1};
+use pbs_datastore::{DataStore, DatastoreBackend, PROXMOX_BACKUP_READER_PROTOCOL_ID_V1};
 use pbs_tools::json::required_string_param;
+use proxmox_s3_client::S3Client;
 
 use crate::api2::backup::optional_ns_param;
 use crate::api2::helpers;
@@ -162,7 +164,7 @@ fn upgrade_to_backup_reader_protocol(
                     worker.clone(),
                     datastore,
                     backup_dir,
-                );
+                )?;
 
                 env.debug = debug;
 
@@ -323,17 +325,10 @@ fn download_chunk(
             ));
         }
 
-        let (path, _) = env.datastore.chunk_path(&digest);
-        let path2 = path.clone();
-
-        env.debug(format!("download chunk {:?}", path));
-
-        let data =
-            proxmox_async::runtime::block_in_place(|| std::fs::read(path)).map_err(move |err| {
-                http_err!(BAD_REQUEST, "reading file {:?} failed: {}", path2, err)
-            })?;
-
-        let body = Body::from(data);
+        let body = match &env.backend {
+            DatastoreBackend::Filesystem => load_from_filesystem(env, &digest)?,
+            DatastoreBackend::S3(s3_client) => fetch_from_object_store(s3_client, &digest).await?,
+        };
 
         // fixme: set other headers ?
         Ok(Response::builder()
@@ -343,6 +338,26 @@ fn download_chunk(
             .unwrap())
     }
     .boxed()
+}
+
+async fn fetch_from_object_store(s3_client: &S3Client, digest: &[u8; 32]) -> Result<Body, Error> {
+    let object_key = pbs_datastore::s3::object_key_from_digest(digest)?;
+    if let Some(response) = s3_client.get_object(object_key).await? {
+        let data = response.content.collect().await?.to_bytes();
+        return Ok(Body::from(data));
+    }
+    bail!("cannot find chunk with digest {}", hex::encode(digest));
+}
+
+fn load_from_filesystem(env: &ReaderEnvironment, digest: &[u8; 32]) -> Result<Body, Error> {
+    let (path, _) = env.datastore.chunk_path(digest);
+    let path2 = path.clone();
+
+    env.debug(format!("download chunk {path:?}"));
+
+    let data = proxmox_async::runtime::block_in_place(|| std::fs::read(path))
+        .map_err(move |err| http_err!(BAD_REQUEST, "reading file {path2:?} failed: {err}"))?;
+    Ok(Body::from(data))
 }
 
 /* this is too slow

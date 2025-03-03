@@ -1,13 +1,14 @@
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
+use anyhow::Error;
 use serde_json::{json, Value};
 
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 
 use pbs_api_types::Authid;
 use pbs_datastore::backup_info::BackupDir;
-use pbs_datastore::DataStore;
+use pbs_datastore::{DataStore, DatastoreBackend};
 use proxmox_rest_server::formatter::*;
 use proxmox_rest_server::WorkerTask;
 use tracing::info;
@@ -23,6 +24,7 @@ pub struct ReaderEnvironment {
     pub worker: Arc<WorkerTask>,
     pub datastore: Arc<DataStore>,
     pub backup_dir: BackupDir,
+    pub backend: DatastoreBackend,
     allowed_chunks: Arc<RwLock<HashSet<[u8; 32]>>>,
 }
 
@@ -33,8 +35,9 @@ impl ReaderEnvironment {
         worker: Arc<WorkerTask>,
         datastore: Arc<DataStore>,
         backup_dir: BackupDir,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let backend = datastore.backend()?;
+        Ok(Self {
             result_attributes: json!({}),
             env_type,
             auth_id,
@@ -43,8 +46,9 @@ impl ReaderEnvironment {
             debug: tracing::enabled!(tracing::Level::DEBUG),
             formatter: JSON_FORMATTER,
             backup_dir,
+            backend,
             allowed_chunks: Arc::new(RwLock::new(HashSet::new())),
-        }
+        })
     }
 
     pub fn log<S: AsRef<str>>(&self, msg: S) {
