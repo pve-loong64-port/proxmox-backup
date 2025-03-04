@@ -220,19 +220,16 @@ impl ChunkStore {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
 
-        const UTIME_NOW: i64 = (1 << 30) - 1;
-        const UTIME_OMIT: i64 = (1 << 30) - 2;
-
         let times: [libc::timespec; 2] = [
             // access time -> update to now
             libc::timespec {
                 tv_sec: 0,
-                tv_nsec: UTIME_NOW,
+                tv_nsec: libc::UTIME_NOW,
             },
             // modification time -> keep as is
             libc::timespec {
                 tv_sec: 0,
-                tv_nsec: UTIME_OMIT,
+                tv_nsec: libc::UTIME_OMIT,
             },
         ];
 
