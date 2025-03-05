@@ -40,9 +40,10 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
+use crate::local_datastore_lru_cache::S3Cacher;
 use crate::s3::S3_CONTENT_PREFIX;
 use crate::task_tracking::{self, update_active_operations};
-use crate::DataBlob;
+use crate::{DataBlob, LocalDatastoreLruCache};
 
 static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -139,6 +140,7 @@ pub struct DataStoreImpl {
     last_digest: Option<[u8; 32]>,
     sync_level: DatastoreFSyncLevel,
     backend_config: DatastoreBackendConfig,
+    lru_store_caching: Option<LocalDatastoreLruCache>,
 }
 
 impl DataStoreImpl {
@@ -154,6 +156,7 @@ impl DataStoreImpl {
             last_digest: None,
             sync_level: Default::default(),
             backend_config: Default::default(),
+            lru_store_caching: None,
         })
     }
 }
@@ -256,6 +259,39 @@ impl DataStore {
         };
 
         Ok(backend_type)
+    }
+
+    pub fn cache(&self) -> Option<&LocalDatastoreLruCache> {
+        self.inner.lru_store_caching.as_ref()
+    }
+
+    /// Check if the digest is present in the local datastore cache.
+    /// Always returns false if there is no cache configured for this datastore.
+    pub fn cache_contains(&self, digest: &[u8; 32]) -> bool {
+        if let Some(cache) = self.inner.lru_store_caching.as_ref() {
+            return cache.contains(digest);
+        }
+        false
+    }
+
+    /// Insert digest as most recently used on in the cache.
+    /// Returns with success if there is no cache configured for this datastore.
+    pub fn cache_insert(&self, digest: &[u8; 32], chunk: &DataBlob) -> Result<(), Error> {
+        if let Some(cache) = self.inner.lru_store_caching.as_ref() {
+            return cache.insert(digest, chunk);
+        }
+        Ok(())
+    }
+
+    /// Returns the cacher for datastores backed by S3 object stores.
+    /// This allows to fetch chunks to the local cache store on-demand.
+    pub fn cacher(&self) -> Result<Option<S3Cacher>, Error> {
+        self.backend().map(|backend| match backend {
+            DatastoreBackend::S3(s3_client) => {
+                Some(S3Cacher::new(s3_client, self.inner.chunk_store.clone()))
+            }
+            DatastoreBackend::Filesystem => None,
+        })
     }
 
     pub fn lookup_datastore(
@@ -440,6 +476,33 @@ impl DataStore {
                 .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
         )?;
 
+        let lru_store_caching = if DatastoreBackendType::S3 == backend_config.ty.unwrap_or_default()
+        {
+            let mut cache_capacity = 0;
+            if let Ok(fs_info) = proxmox_sys::fs::fs_info(&chunk_store.base_path()) {
+                cache_capacity = fs_info.available / (16 * 1024 * 1024);
+            }
+            if let Some(max_cache_size) = backend_config.max_cache_size {
+                info!(
+                    "Got requested max cache size {max_cache_size} for store {}",
+                    config.name
+                );
+                let max_cache_capacity = max_cache_size.as_u64() / (16 * 1024 * 1024);
+                cache_capacity = cache_capacity.min(max_cache_capacity);
+            }
+            let cache_capacity = usize::try_from(cache_capacity).unwrap_or_default();
+
+            info!(
+                "Using datastore cache with capacity {cache_capacity} for store {}",
+                config.name
+            );
+
+            let cache = LocalDatastoreLruCache::new(cache_capacity, chunk_store.clone());
+            Some(cache)
+        } else {
+            None
+        };
+
         Ok(DataStoreImpl {
             chunk_store,
             gc_mutex: Mutex::new(()),
@@ -449,6 +512,7 @@ impl DataStore {
             last_digest,
             sync_level: tuning.sync_level.unwrap_or_default(),
             backend_config,
+            lru_store_caching,
         })
     }
 
@@ -1710,7 +1774,7 @@ impl DataStore {
         delete_list: &mut Vec<S3ObjectKey>,
         gc_status: &mut GarbageCollectionStatus,
     ) -> Result<bool, Error> {
-        let chunk_path = match self.chunk_path_from_object_key(&object_key) {
+        let (chunk_path, digest) = match self.chunk_path_from_object_key(&object_key) {
             Some(path) => path,
             None => return Ok(false),
         };
@@ -1731,6 +1795,10 @@ impl DataStore {
         let bad = chunk_path.as_path().ends_with(".bad");
 
         if atime < min_atime {
+            if let Some(cache) = self.cache() {
+                // ignore errors, phase 3 will retry cleanup anyways
+                let _ = cache.remove(&digest);
+            }
             delete_list.push(object_key.clone());
             if bad {
                 gc_status.removed_bad += 1;
@@ -1756,7 +1824,7 @@ impl DataStore {
     }
 
     // Check and generate a chunk path from given object key
-    fn chunk_path_from_object_key(&self, object_key: &S3ObjectKey) -> Option<PathBuf> {
+    fn chunk_path_from_object_key(&self, object_key: &S3ObjectKey) -> Option<(PathBuf, [u8; 32])> {
         // Check object is actually a chunk
         let digest = match Path::new::<str>(object_key).file_name() {
             Some(file_name) => file_name,
@@ -1779,7 +1847,12 @@ impl DataStore {
         chunk_path.push(hexdigit_prefix);
         chunk_path.push(digest);
 
-        Some(chunk_path)
+        let mut digest_bytes = [0u8; 32];
+        let digest = digest.as_bytes();
+        // safe to unwrap as already checked above
+        hex::decode_to_slice(&digest[..64], &mut digest_bytes).unwrap();
+
+        Some((chunk_path, digest_bytes))
     }
 
     pub fn try_shared_chunk_store_lock(&self) -> Result<ProcessLockSharedGuard, Error> {

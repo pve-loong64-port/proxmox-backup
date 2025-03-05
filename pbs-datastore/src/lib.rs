@@ -217,3 +217,6 @@ pub use snapshot_reader::SnapshotReader;
 
 mod local_chunk_reader;
 pub use local_chunk_reader::LocalChunkReader;
+
+mod local_datastore_lru_cache;
+pub use local_datastore_lru_cache::LocalDatastoreLruCache;
