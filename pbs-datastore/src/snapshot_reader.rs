@@ -2,6 +2,7 @@ use std::fs::File;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::Path;
 use std::sync::Arc;
+use std::rc::Rc;
 
 use anyhow::{bail, Error};
 use nix::dir::Dir;
@@ -128,7 +129,7 @@ pub struct SnapshotChunkIterator<'a, F: Fn(&[u8; 32]) -> bool> {
     todo_list: Vec<String>,
     skip_fn: F,
     #[allow(clippy::type_complexity)]
-    current_index: Option<(Arc<Box<dyn IndexFile + Send>>, usize, Vec<(usize, u64)>)>,
+    current_index: Option<(Rc<Box<dyn IndexFile + Send>>, usize, Vec<(usize, u64)>)>,
 }
 
 impl<F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'_, F> {
@@ -158,7 +159,7 @@ impl<F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'_, F> {
                         let order =
                             datastore.get_chunks_in_order(&*index, &self.skip_fn, |_| Ok(()))?;
 
-                        self.current_index = Some((Arc::new(index), 0, order));
+                        self.current_index = Some((Rc::new(index), 0, order));
                     } else {
                         return Ok(None);
                     }
