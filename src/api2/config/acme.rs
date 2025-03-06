@@ -428,9 +428,13 @@ impl Serialize for ChallengeSchemaWrapper {
     }
 }
 
+struct CachedSchema {
+    schema: Arc<Vec<AcmeChallengeSchema>>,
+    cached_mtime: SystemTime,
+}
+
 fn get_cached_challenge_schemas() -> Result<ChallengeSchemaWrapper, Error> {
-    static CACHE: LazyLock<Mutex<Option<(Arc<Vec<AcmeChallengeSchema>>, SystemTime)>>> =
-        LazyLock::new(|| Mutex::new(None));
+    static CACHE: LazyLock<Mutex<Option<CachedSchema>>> = LazyLock::new(|| Mutex::new(None));
 
     // the actual loading code
     let mut last = CACHE.lock().unwrap();
@@ -438,10 +442,16 @@ fn get_cached_challenge_schemas() -> Result<ChallengeSchemaWrapper, Error> {
     let actual_mtime = fs::metadata(crate::config::acme::ACME_DNS_SCHEMA_FN)?.modified()?;
 
     let schema = match &*last {
-        Some((schema, cached_mtime)) if *cached_mtime >= actual_mtime => schema.clone(),
+        Some(CachedSchema {
+            schema,
+            cached_mtime,
+        }) if *cached_mtime >= actual_mtime => schema.clone(),
         _ => {
             let new_schema = Arc::new(crate::config::acme::load_dns_challenge_schema()?);
-            *last = Some((Arc::clone(&new_schema), actual_mtime));
+            *last = Some(CachedSchema {
+                schema: Arc::clone(&new_schema),
+                cached_mtime: actual_mtime,
+            });
             new_schema
         }
     };
