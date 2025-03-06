@@ -150,7 +150,7 @@ pub async fn datastore_status(
             if usage_list.len() >= 7 {
                 entry.estimated_full_date = match linear_regression(&time_list, &usage_list) {
                     Some((a, b)) if b != 0.0 => Some(((1.0 - a) / b).floor() as i64),
-                    Some((_, b)) if b == 0.0 => Some(0), // infinite estimate, set to past for gui to detect
+                    Some((_, 0.0)) => Some(0), // infinite estimate, set to past for gui to detect
                     _ => None,
                 };
             }
