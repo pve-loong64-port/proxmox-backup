@@ -871,6 +871,7 @@ impl Archiver {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn add_entry_to_archive<T: SeqWrite + Send>(
         &mut self,
         encoder: &mut Encoder<'_, T>,

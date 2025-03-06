@@ -195,6 +195,7 @@ pub async fn dir_or_last_from_group(
 
 type Catalog = CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>;
 
+#[allow(clippy::too_many_arguments)]
 async fn backup_directory<P: AsRef<Path>>(
     client: &BackupWriter,
     dir_path: P,
