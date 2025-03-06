@@ -848,7 +848,7 @@ pub(crate) async fn push_snapshot(
             let archive_name = BackupArchiveName::from_path(&entry.filename)?;
             match archive_name.archive_type() {
                 ArchiveType::Blob => {
-                    let file = std::fs::File::open(path.clone())?;
+                    let file = std::fs::File::open(&path)?;
                     let backup_stats = backup_writer
                         .upload_blob(file, archive_name.as_ref())
                         .await?;
