@@ -2556,7 +2556,7 @@ fn expect_maintanance_unmounting(
 
     if store_config
         .get_maintenance_mode()
-        .map_or(true, |m| m.ty != MaintenanceType::Unmount)
+        .is_none_or(|m| m.ty != MaintenanceType::Unmount)
     {
         bail!("maintenance mode is not 'Unmount'");
     }

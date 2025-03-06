@@ -830,6 +830,12 @@ pub struct DiskUsageQuery {
     partitions: bool,
 }
 
+impl Default for DiskUsageQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiskUsageQuery {
     pub const fn new() -> Self {
         Self {
