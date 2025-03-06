@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 
 use anyhow::{bail, Error};
 
@@ -98,8 +98,8 @@ const_regex! {
     OBJSET_REGEX = r"^objset-0x[a-fA-F0-9]+$";
 }
 
-pub static ZFS_DATASET_OBJSET_MAP: LazyLock<Arc<Mutex<HashMap<String, (String, String)>>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
+static ZFS_DATASET_OBJSET_MAP: LazyLock<Mutex<HashMap<String, (String, String)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // parses /proc/spl/kstat/zfs/POOL/objset-ID files
 // they have the following format:
