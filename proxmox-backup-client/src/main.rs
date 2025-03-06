@@ -193,13 +193,15 @@ pub async fn dir_or_last_from_group(
     }
 }
 
+type Catalog = CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>;
+
 async fn backup_directory<P: AsRef<Path>>(
     client: &BackupWriter,
     dir_path: P,
     archive_name: &BackupArchiveName,
     payload_target: Option<&BackupArchiveName>,
     chunk_size: Option<usize>,
-    catalog: Option<Arc<Mutex<CatalogWriter<TokioWriterAdapter<StdChannelWriter<Error>>>>>>,
+    catalog: Option<Arc<Mutex<Catalog>>>,
     pxar_create_options: pbs_client::pxar::PxarCreateOptions,
     upload_options: UploadOptions,
 ) -> Result<(BackupStats, Option<BackupStats>), Error> {

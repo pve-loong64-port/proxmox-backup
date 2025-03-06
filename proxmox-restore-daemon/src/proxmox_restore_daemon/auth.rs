@@ -39,17 +39,15 @@ pub fn read_ticket() -> Result<Arc<str>, Error> {
     Ok(ticket.into())
 }
 
-pub fn check_auth<'a>(
-    ticket: Arc<str>,
-    headers: &'a HeaderMap,
-    _method: &'a Method,
-) -> Pin<
+type AuthFn<'a> = Pin<
     Box<
         dyn Future<Output = Result<(String, Box<dyn UserInformation + Sync + Send>), AuthError>>
             + Send
             + 'a,
     >,
-> {
+>;
+
+pub fn check_auth<'a>(ticket: Arc<str>, headers: &'a HeaderMap, _method: &'a Method) -> AuthFn<'a> {
     Box::pin(async move {
         match headers.get(hyper::header::AUTHORIZATION) {
             Some(header) if header.to_str().unwrap_or("") == &*ticket => {
