@@ -298,8 +298,8 @@ will see that the probability of a collision in that scenario is:
 
 For context, in a lottery game of guessing 6 numbers out of 45, the chance to
 correctly guess all 6 numbers is only :math:`1.2277 * 10^{-7}`. This means the
-chance of a collision is about the same as winning 13 such lottery games *in a
-row*.
+chance of a collision is lower than winning 8 such lottery games *in a row*:
+:math:`(1.2277 * 10^{-7})^{8} = 5.1623 * 10^{-56}`.
 
 In conclusion, it is extremely unlikely that such a collision would occur by
 accident in a normal datastore.
