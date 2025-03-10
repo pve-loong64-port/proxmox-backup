@@ -970,7 +970,7 @@ impl DataStore {
         ListGroups::new(Arc::clone(self), ns)?.collect()
     }
 
-    pub fn list_images(&self) -> Result<Vec<PathBuf>, Error> {
+    fn list_images(&self) -> Result<Vec<PathBuf>, Error> {
         let base = self.base_path();
 
         let mut list = vec![];
