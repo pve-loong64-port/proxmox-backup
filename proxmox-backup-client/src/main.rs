@@ -827,40 +827,36 @@ async fn create_backup(
     let mut target_set = HashSet::new();
 
     for backupspec in backupspec_list {
-        let spec = parse_backup_specification(backupspec.as_str().unwrap())?;
-        let filename = &spec.config_string;
-        let target = &spec.archive_name;
+        let pbs_client::BackupSpecification {
+            archive_name: target,
+            config_string: filename,
+            spec_type,
+        } = parse_backup_specification(backupspec.as_str().unwrap())?;
 
-        if target_set.contains(target) {
+        if target_set.contains(&target) {
             bail!("got target twice: '{}'", target);
         }
-        target_set.insert(target.to_string());
+        target_set.insert(target.clone());
 
         use std::os::unix::fs::FileTypeExt;
 
-        let metadata = std::fs::metadata(filename)
+        let metadata = std::fs::metadata(&filename)
             .map_err(|err| format_err!("unable to access '{}' - {}", filename, err))?;
         let file_type = metadata.file_type();
 
-        match spec.spec_type {
+        match spec_type {
             BackupSpecificationType::PXAR => {
                 if !file_type.is_dir() {
                     bail!("got unexpected file type (expected directory)");
                 }
-                upload_list.push((
-                    BackupSpecificationType::PXAR,
-                    filename.to_owned(),
-                    target.to_owned(),
-                    "didx",
-                    0,
-                ));
+                upload_list.push((BackupSpecificationType::PXAR, filename, target, "didx", 0));
             }
             BackupSpecificationType::IMAGE => {
                 if !(file_type.is_file() || file_type.is_block_device()) {
                     bail!("got unexpected file type (expected file or block device)");
                 }
 
-                let size = image_size(&PathBuf::from(filename))?;
+                let size = image_size(&PathBuf::from(&filename))?;
 
                 if size == 0 {
                     bail!("got zero-sized file '{}'", filename);
@@ -868,8 +864,8 @@ async fn create_backup(
 
                 upload_list.push((
                     BackupSpecificationType::IMAGE,
-                    filename.to_owned(),
-                    target.to_owned(),
+                    filename,
+                    target,
                     "fidx",
                     size,
                 ));
@@ -880,8 +876,8 @@ async fn create_backup(
                 }
                 upload_list.push((
                     BackupSpecificationType::CONFIG,
-                    filename.to_owned(),
-                    target.to_owned(),
+                    filename,
+                    target,
                     "blob",
                     metadata.len(),
                 ));
@@ -892,8 +888,8 @@ async fn create_backup(
                 }
                 upload_list.push((
                     BackupSpecificationType::LOGFILE,
-                    filename.to_owned(),
-                    target.to_owned(),
+                    filename,
+                    target,
                     "blob",
                     metadata.len(),
                 ));
