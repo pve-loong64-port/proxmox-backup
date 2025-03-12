@@ -3,7 +3,7 @@
 //! This configuration module is based on [`SectionConfig`], and
 //! provides a type safe interface to store [`MediaPoolConfig`],
 //!
-//! [MediaPoolConfig]: crate::api2::types::MediaPoolConfig
+//! [MediaPoolConfig]: pbs_api_types::MediaPoolConfig
 //! [SectionConfig]: proxmox_section_config::SectionConfig
 
 use std::collections::HashMap;

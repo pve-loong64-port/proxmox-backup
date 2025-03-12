@@ -6,10 +6,10 @@
 //!
 //! Drive type [`VirtualTapeDrive`] is only useful for debugging.
 //!
-//! [LtoTapeDrive]: crate::api2::types::LtoTapeDrive
-//! [VirtualTapeDrive]: crate::api2::types::VirtualTapeDrive
-//! [ScsiTapeChanger]: crate::api2::types::ScsiTapeChanger
-//! [SectionConfig]: proxmox::api::section_config::SectionConfig
+//! [LtoTapeDrive]: pbs_api_types::LtoTapeDrive
+//! [VirtualTapeDrive]: pbs_api_types::VirtualTapeDrive
+//! [ScsiTapeChanger]: pbs_api_types::ScsiTapeChanger
+//! [SectionConfig]: proxmox_section_config::SectionConfig
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
