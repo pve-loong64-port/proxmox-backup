@@ -172,6 +172,10 @@ async fn pull_index_chunks<I: IndexFile>(
                     target2.insert_chunk(&chunk, &digest)?;
                 }
                 DatastoreBackend::S3(s3_client) => {
+                    if target2.cache_contains(&digest) {
+                        return Ok(());
+                    }
+                    target2.cache_insert(&digest, &chunk)?;
                     let data = chunk.raw_data().to_vec();
                     let upload_data = hyper::body::Bytes::from(data);
                     let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;

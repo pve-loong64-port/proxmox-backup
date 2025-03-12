@@ -2,7 +2,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context as AnyhowContext, Error};
 use futures::*;
 use hex::FromHex;
 use http_body_util::{BodyDataStream, BodyExt};
@@ -262,10 +262,40 @@ async fn upload_to_backend(
                 );
             }
 
+            // Avoid re-upload to S3 if the chunk is either present in the LRU cache or the chunk
+            // file exists on filesystem. The latter means that the chunk has been present in the
+            // past an was not cleaned up by garbage collection, so contained in the S3 object store.
+            if env.datastore.cache_contains(&digest) {
+                tracing::info!("Skip upload of cached chunk {}", hex::encode(digest));
+                return Ok((digest, size, encoded_size, true));
+            }
+            if let Ok(true) = env.datastore.cond_touch_chunk(&digest, false) {
+                tracing::info!(
+                    "Skip upload of already encountered chunk {}",
+                    hex::encode(digest)
+                );
+                return Ok((digest, size, encoded_size, true));
+            }
+
+            tracing::info!("Upload of new chunk {}", hex::encode(digest));
             let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
             let is_duplicate = s3_client
-                .upload_no_replace_with_retry(object_key, data)
-                .await?;
+                .upload_no_replace_with_retry(object_key, data.clone())
+                .await
+                .context("failed to upload chunk to s3 backend")?;
+
+            // Only insert the chunk into the cache after it has been successufuly uploaded.
+            // Although less performant than doing this in parallel, it is required for consisency
+            // since chunks are considered as present on the backend if the file exists in the local
+            // cache store.
+            let datastore = env.datastore.clone();
+            tracing::info!("Caching of chunk {}", hex::encode(digest));
+            let _ = tokio::task::spawn_blocking(move || {
+                let chunk = DataBlob::from_raw(data.to_vec())?;
+                datastore.cache_insert(&digest, &chunk)
+            })
+            .await?;
+
             Ok((digest, size, encoded_size, is_duplicate))
         }
     }
