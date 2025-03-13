@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use anyhow::{format_err, Error};
 use bytes::Bytes;
 use futures::{ready, Future};
-use h2::SendStream;
+use h2::legacy::SendStream;
 
 pub struct PipeToSendStream {
     body_tx: SendStream<Bytes>,

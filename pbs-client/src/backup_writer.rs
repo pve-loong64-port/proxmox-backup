@@ -56,7 +56,7 @@ pub struct UploadOptions {
 }
 
 struct ChunkUploadResponse {
-    future: h2::client::ResponseFuture,
+    future: h2::legacy::client::ResponseFuture,
     size: usize,
 }
 
@@ -143,7 +143,7 @@ impl BackupWriter {
         param: Option<Value>,
         content_type: &str,
         data: Vec<u8>,
-    ) -> Result<h2::client::ResponseFuture, Error> {
+    ) -> Result<h2::legacy::client::ResponseFuture, Error> {
         let request =
             H2Client::request_builder("localhost", method, path, param, Some(content_type))
                 .unwrap();
@@ -514,7 +514,7 @@ impl BackupWriter {
     }
 
     fn response_queue() -> (
-        mpsc::Sender<h2::client::ResponseFuture>,
+        mpsc::Sender<h2::legacy::client::ResponseFuture>,
         oneshot::Receiver<Result<(), Error>>,
     ) {
         let (verify_queue_tx, verify_queue_rx) = mpsc::channel(100);
@@ -537,7 +537,7 @@ impl BackupWriter {
         tokio::spawn(
             ReceiverStream::new(verify_queue_rx)
                 .map(Ok::<_, Error>)
-                .try_for_each(move |response: h2::client::ResponseFuture| {
+                .try_for_each(move |response: h2::legacy::client::ResponseFuture| {
                     response
                         .map_err(Error::from)
                         .and_then(H2Client::h2api_response)
