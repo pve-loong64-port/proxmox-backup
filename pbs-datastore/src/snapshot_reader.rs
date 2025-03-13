@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::Path;
-use std::sync::Arc;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{bail, Error};
 use nix::dir::Dir;
