@@ -239,14 +239,12 @@ fn upgrade_to_backup_protocol(
                     .and_then(move |conn| {
                         env2.debug("protocol upgrade done");
 
-                        let mut http = hyper::server::conn::Http::new()
-                            .with_executor(ExecInheritLogContext);
-                        http.http2_only(true);
+                        let mut http = hyper::server::conn::http2::Builder::new(ExecInheritLogContext);
                         // increase window size: todo - find optiomal size
                         let window_size = 32 * 1024 * 1024; // max = (1 << 31) - 2
-                        http.http2_initial_stream_window_size(window_size);
-                        http.http2_initial_connection_window_size(window_size);
-                        http.http2_max_frame_size(4 * 1024 * 1024);
+                        http.initial_stream_window_size(window_size);
+                        http.initial_connection_window_size(window_size);
+                        http.max_frame_size(4 * 1024 * 1024);
 
                         let env3 = env2.clone();
                         http.serve_connection(conn, service).map(move |result| {

@@ -7,7 +7,7 @@ use hyper::client::connect::{Connected, Connection};
 use hyper::client::Client;
 use hyper::http::Uri;
 use hyper::http::{Request, Response};
-use hyper::Body;
+use hyper::{body::HttpBody, Body};
 use pin_project_lite::pin_project;
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
@@ -179,8 +179,7 @@ impl VsockClient {
         if !status.is_success() {
             Self::api_response(resp).await.map(|_| ())?
         } else {
-            resp.into_body()
-                .map_err(Error::from)
+            futures::TryStreamExt::map_err(resp.into_body(), Error::from)
                 .try_fold(output, move |acc, chunk| async move {
                     acc.write_all(&chunk).await?;
                     Ok::<_, Error>(acc)
@@ -192,7 +191,7 @@ impl VsockClient {
 
     async fn api_response(response: Response<Body>) -> Result<Value, Error> {
         let status = response.status();
-        let data = hyper::body::to_bytes(response.into_body()).await?;
+        let data = HttpBody::collect(response.into_body()).await?.to_bytes();
 
         let text = String::from_utf8(data.to_vec()).unwrap();
         if status.is_success() {

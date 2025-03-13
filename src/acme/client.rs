@@ -6,7 +6,7 @@ use std::os::unix::fs::OpenOptionsExt;
 
 use anyhow::{bail, format_err};
 use bytes::Bytes;
-use hyper::{Body, Request};
+use hyper::{body::HttpBody, Body, Request};
 use nix::sys::stat::Mode;
 use serde::{Deserialize, Serialize};
 
@@ -508,9 +508,11 @@ impl AcmeClient {
         let (parts, body) = response.into_parts();
 
         let status = parts.status.as_u16();
-        let body = hyper::body::to_bytes(body)
+        let body = body
+            .collect()
             .await
-            .map_err(|err| Error::Custom(format!("failed to retrieve response body: {}", err)))?;
+            .map_err(|err| Error::Custom(format!("failed to retrieve response body: {}", err)))?
+            .to_bytes();
 
         let got_nonce = if let Some(new_nonce) = parts.headers.get(proxmox_acme::REPLAY_NONCE) {
             let new_nonce = new_nonce.to_str().map_err(|err| {

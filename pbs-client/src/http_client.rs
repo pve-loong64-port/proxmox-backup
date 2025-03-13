@@ -8,7 +8,7 @@ use hyper::client::{Client, HttpConnector};
 use hyper::http::header::HeaderValue;
 use hyper::http::Uri;
 use hyper::http::{Request, Response};
-use hyper::Body;
+use hyper::{body::HttpBody, Body};
 use openssl::{
     ssl::{SslConnector, SslMethod},
     x509::X509StoreContextRef,
@@ -706,8 +706,7 @@ impl HttpClient {
                 .map(|_| Err(format_err!("unknown error")))
                 .await?
         } else {
-            resp.into_body()
-                .map_err(Error::from)
+            futures::TryStreamExt::map_err(resp.into_body(), Error::from)
                 .try_fold(output, move |acc, chunk| async move {
                     acc.write_all(&chunk)?;
                     Ok::<_, Error>(acc)
@@ -844,7 +843,7 @@ impl HttpClient {
 
     async fn api_response(response: Response<Body>) -> Result<Value, Error> {
         let status = response.status();
-        let data = hyper::body::to_bytes(response.into_body()).await?;
+        let data = HttpBody::collect(response.into_body()).await?.to_bytes();
 
         let text = String::from_utf8(data.to_vec()).unwrap();
         if status.is_success() {
