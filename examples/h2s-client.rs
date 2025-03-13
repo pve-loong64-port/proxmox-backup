@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 // Simple H2 client to test H2 download speed using h2s-server.rs
 
 struct Process {
-    body: h2::legacy::RecvStream,
+    body: h2::RecvStream,
     trailers: bool,
     bytes: usize,
 }
@@ -50,7 +50,7 @@ impl Future for Process {
 }
 
 fn send_request(
-    mut client: h2::legacy::client::SendRequest<bytes::Bytes>,
+    mut client: h2::client::SendRequest<bytes::Bytes>,
 ) -> impl Future<Output = Result<usize, Error>> {
     println!("sending request");
 
@@ -94,7 +94,7 @@ async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| format_err!("connect failed - {}", err))?;
 
-    let (client, h2) = h2::legacy::client::Builder::new()
+    let (client, h2) = h2::client::Builder::new()
         .initial_connection_window_size(1024 * 1024 * 1024)
         .initial_window_size(1024 * 1024 * 1024)
         .max_frame_size(4 * 1024 * 1024)

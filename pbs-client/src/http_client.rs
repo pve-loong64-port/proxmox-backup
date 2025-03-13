@@ -863,7 +863,7 @@ impl HttpClient {
 
         let max_window_size = (1 << 31) - 2;
 
-        let (h2, connection) = h2::legacy::client::Builder::new()
+        let (h2, connection) = h2::client::Builder::new()
             .initial_connection_window_size(max_window_size)
             .initial_window_size(max_window_size)
             .max_frame_size(4 * 1024 * 1024)
@@ -1008,11 +1008,11 @@ impl Drop for HttpClient {
 
 #[derive(Clone)]
 pub struct H2Client {
-    h2: h2::legacy::client::SendRequest<bytes::Bytes>,
+    h2: h2::client::SendRequest<bytes::Bytes>,
 }
 
 impl H2Client {
-    pub fn new(h2: h2::legacy::client::SendRequest<bytes::Bytes>) -> Self {
+    pub fn new(h2: h2::client::SendRequest<bytes::Bytes>) -> Self {
         Self { h2 }
     }
 
@@ -1092,7 +1092,7 @@ impl H2Client {
         &self,
         request: Request<()>,
         data: Option<bytes::Bytes>,
-    ) -> impl Future<Output = Result<h2::legacy::client::ResponseFuture, Error>> {
+    ) -> impl Future<Output = Result<h2::client::ResponseFuture, Error>> {
         self.h2
             .clone()
             .ready()
@@ -1109,9 +1109,7 @@ impl H2Client {
             })
     }
 
-    pub async fn h2api_response(
-        response: Response<h2::legacy::RecvStream>,
-    ) -> Result<Value, Error> {
+    pub async fn h2api_response(response: Response<h2::RecvStream>) -> Result<Value, Error> {
         let status = response.status();
 
         let (_head, mut body) = response.into_parts();
