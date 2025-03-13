@@ -1,3 +1,17 @@
+rust-proxmox-backup (3.3.4-1) bookworm; urgency=medium
+
+  * fix #6185: client/docs: explicitly mention archive name restrictions
+
+  * docs: using-the-installer: adapt to raised root password length requirement
+
+  * disks: wipe: replace dd with write_all_at for zeroing disk
+
+  * fix #5946: disks: wipe: ensure GPT header backup is wiped
+
+  * docs: fix hash collision probability comparison
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 13 Mar 2025 13:04:05 +0100
+
 rust-proxmox-backup (3.3.3-1) bookworm; urgency=medium
 
   * api: datastore list: move checking if a datastore is mounted after we
