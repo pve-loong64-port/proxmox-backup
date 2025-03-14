@@ -8,6 +8,19 @@ use tokio::net::{TcpListener, TcpStream};
 
 use pbs_buildcfg::configdir;
 
+#[derive(Clone, Copy)]
+struct H2SExecutor;
+
+impl<Fut> hyper::rt::Executor<Fut> for H2SExecutor
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send,
+{
+    fn execute(&self, fut: Fut) {
+        tokio::spawn(fut);
+    }
+}
+
 fn main() -> Result<(), Error> {
     proxmox_async::runtime::main(run())
 }
@@ -50,12 +63,11 @@ async fn handle_connection(socket: TcpStream, acceptor: Arc<SslAcceptor>) -> Res
 
     stream.as_mut().accept().await?;
 
-    let mut http = hyper::server::conn::Http::new();
-    http.http2_only(true);
+    let mut http = hyper::server::conn::http2::Builder::new(H2SExecutor);
     // increase window size: todo - find optiomal size
     let max_window_size = (1 << 31) - 2;
-    http.http2_initial_stream_window_size(max_window_size);
-    http.http2_initial_connection_window_size(max_window_size);
+    http.initial_stream_window_size(max_window_size);
+    http.initial_connection_window_size(max_window_size);
 
     let service = hyper::service::service_fn(|_req: Request<Body>| {
         println!("Got request");
