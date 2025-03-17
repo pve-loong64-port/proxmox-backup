@@ -87,6 +87,29 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V: Clone + Send + 'static> AsyncL
 
         result
     }
+
+    /// Insert an item as the most recently used one into the cache, calling the removed callback
+    /// on the evicted cache item, if any.
+    pub fn insert<F>(&self, key: K, value: V, removed: F) -> Result<(), Error>
+    where
+        F: Fn(K) -> Result<(), Error>,
+    {
+        let mut maps = self.maps.lock().unwrap();
+        maps.0.insert(key, value.clone(), removed)?;
+        Ok(())
+    }
+
+    /// Check if the item exists and if so, mark it as the most recently uses one.
+    pub fn contains(&self, key: K) -> bool {
+        let mut maps = self.maps.lock().unwrap();
+        maps.0.get_mut(key).is_some()
+    }
+
+    /// Remove the item from the cache.
+    pub fn remove(&self, key: K) {
+        let mut maps = self.maps.lock().unwrap();
+        maps.0.remove(key);
+    }
 }
 
 #[cfg(test)]
