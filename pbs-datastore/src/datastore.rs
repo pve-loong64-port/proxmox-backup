@@ -1222,7 +1222,7 @@ impl DataStore {
 
             // Avoid multiple expensive atime updates by utimensat
             if let Some(chunk_lru_cache) = chunk_lru_cache {
-                if chunk_lru_cache.insert(*digest, ()) {
+                if chunk_lru_cache.insert(*digest, (), |_| Ok(()))? {
                     if let Some(cache_stats) = status.cache_stats.as_mut() {
                         cache_stats.hits += 1;
                     }

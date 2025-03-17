@@ -42,7 +42,16 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V: Clone + Send + 'static> AsyncL
     /// Access an item either via the cache or by calling cacher.fetch. A return value of Ok(None)
     /// means the item requested has no representation, Err(_) means a call to fetch() failed,
     /// regardless of whether it was initiated by this call or a previous one.
-    pub async fn access(&self, key: K, cacher: &dyn AsyncCacher<K, V>) -> Result<Option<V>, Error> {
+    /// Calls the removed callback on  the evicted item, if any.
+    pub async fn access<F>(
+        &self,
+        key: K,
+        cacher: &dyn AsyncCacher<K, V>,
+        removed: F,
+    ) -> Result<Option<V>, Error>
+    where
+        F: Fn(K) -> Result<(), Error>,
+    {
         let (owner, result_fut) = {
             // check if already requested
             let mut maps = self.maps.lock().unwrap();
@@ -71,7 +80,7 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V: Clone + Send + 'static> AsyncL
             // this call was the one initiating the request, put into LRU and remove from map
             let mut maps = self.maps.lock().unwrap();
             if let Ok(Some(ref value)) = result {
-                maps.0.insert(key, value.clone());
+                maps.0.insert(key, value.clone(), removed)?;
             }
             maps.1.remove(&key);
         }
@@ -106,15 +115,15 @@ mod test {
             let cache: AsyncLruCache<i32, String> = AsyncLruCache::new(2);
 
             assert_eq!(
-                cache.access(10, &cacher).await.unwrap(),
+                cache.access(10, &cacher, |_| Ok(())).await.unwrap(),
                 Some("x10".to_string())
             );
             assert_eq!(
-                cache.access(20, &cacher).await.unwrap(),
+                cache.access(20, &cacher, |_| Ok(())).await.unwrap(),
                 Some("x20".to_string())
             );
             assert_eq!(
-                cache.access(30, &cacher).await.unwrap(),
+                cache.access(30, &cacher, |_| Ok(())).await.unwrap(),
                 Some("x30".to_string())
             );
 
@@ -123,14 +132,14 @@ mod test {
                 tokio::spawn(async move {
                     let cacher = TestAsyncCacher { prefix: "y" };
                     assert_eq!(
-                        c.access(40, &cacher).await.unwrap(),
+                        c.access(40, &cacher, |_| Ok(())).await.unwrap(),
                         Some("y40".to_string())
                     );
                 });
             }
 
             assert_eq!(
-                cache.access(20, &cacher).await.unwrap(),
+                cache.access(20, &cacher, |_| Ok(())).await.unwrap(),
                 Some("x20".to_string())
             );
         });

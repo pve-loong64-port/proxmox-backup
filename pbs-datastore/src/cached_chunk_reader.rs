@@ -81,7 +81,11 @@ impl<I: IndexFile, R: AsyncReadChunk + Send + Sync + 'static> CachedChunkReader<
                 let info = self.index.chunk_info(chunk.0).unwrap();
 
                 // will never be None, see AsyncChunkCacher
-                let data = self.cache.access(info.digest, &self.cacher).await?.unwrap();
+                let data = self
+                    .cache
+                    .access(info.digest, &self.cacher, |_| Ok(()))
+                    .await?
+                    .unwrap();
 
                 let want_bytes = ((info.range.end - cur_offset) as usize).min(size - read);
                 let slice = &mut buf[read..(read + want_bytes)];

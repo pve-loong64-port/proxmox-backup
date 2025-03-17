@@ -599,6 +599,7 @@ impl<S: ReadChunk> BufferedDynamicReader<S> {
                     store: &mut self.store,
                     index: &self.index,
                 },
+                |_| Ok(()),
             )?
             .ok_or_else(|| format_err!("chunk not found by cacher"))?;
 
