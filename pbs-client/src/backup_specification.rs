@@ -8,8 +8,9 @@ const_regex! {
 }
 
 pub const BACKUP_SOURCE_SCHEMA: Schema = StringSchema::new(
-    "Backup source specification ([<label>:<path>]), the specification \
-    'label' must contain alphanumerics, hyphens and underscores only.",
+    "Backup source specification ([<archive-name>.<type>:<source-path>]), the \
+    'archive-name' must contain alphanumerics, hyphens and underscores only. \
+    The 'type' must be either 'pxar', 'img', 'conf' or 'log'.",
 )
 .format(&ApiStringFormat::Pattern(&BACKUPSPEC_REGEX))
 .schema();

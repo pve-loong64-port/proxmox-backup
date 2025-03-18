@@ -631,9 +631,10 @@ fn spawn_catalog_upload(
             backupspec: {
                 type: Array,
                 description:
-                    "List of backup source specifications ([<label.ext>:<path>] ...), the \
-                    specifications 'label' must contain alphanumerics, hyphens and underscores \
-                    only.",
+                    "List of backup source specifications:\
+                    \n\n[<archive-name>.<type>:<source-path>] ...\n\n\
+                    The 'archive-name' must only contain alphanumerics, hyphens and underscores \
+                    while the 'type' must be either 'pxar', 'img', 'conf' or 'log'.",
                 items: {
                     schema: BACKUP_SOURCE_SCHEMA,
                 }
