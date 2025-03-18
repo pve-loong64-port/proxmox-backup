@@ -73,9 +73,16 @@ Ext.define('PBS.window.SyncJobEdit', {
 
 	init: function() {
 	    let view = this.getView();
-	    if (view.syncDirectionPush && view.datastore !== undefined) {
-		let localNs = view.down('pbsNamespaceSelector[name=ns]').getValue();
-		view.down('pbsGroupFilter').setLocalNamespace(view.datastore, localNs);
+	    // Cannot use cbind to hide rate limit field depending on sync direction,
+	    // set it in init as workaround.
+	    if (view.syncDirectionPush) {
+		view.down('pmxBandwidthField[name=rate-in]').setHidden(true);
+		if (view.datastore !== undefined) {
+		    let localNs = view.down('pbsNamespaceSelector[name=ns]').getValue();
+		    view.down('pbsGroupFilter').setLocalNamespace(view.datastore, localNs);
+		}
+	    } else {
+		view.down('pmxBandwidthField[name=rate-out]').setHidden(true);
 	    }
 	},
     },
@@ -88,6 +95,15 @@ Ext.define('PBS.window.SyncJobEdit', {
 	    values.location = 'remote';
 	}
 	me.callParent([values]);
+    },
+
+    getVisibleRateLimitField: function() {
+	let me = this;
+	if (me.syncDirectionPush) {
+	    return me.down('field[name=rate-out]');
+	} else {
+	    return me.down('field[name=rate-in]');
+	}
     },
 
     items: {
@@ -106,6 +122,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 		    }
 		    if (!me.isCreate) {
 			PBS.Utils.delete_if_default(values, 'rate-in');
+			PBS.Utils.delete_if_default(values, 'rate-out');
 			PBS.Utils.delete_if_default(values, 'remote');
 			if (typeof values.delete === 'string') {
 			    values.delete = values.delete.split(',');
@@ -190,7 +207,17 @@ Ext.define('PBS.window.SyncJobEdit', {
 			fieldLabel: gettext('Rate Limit'),
 			emptyText: gettext('Unlimited'),
 			submitAutoScaledSizeUnit: true,
-			// NOTE: handle deleteEmpty in onGetValues due to bandwidth field having a cbind too
+			// NOTE: handle deleteEmpty in onGetValues due to bandwidth field having a cbind too,
+			// further hide rate limit field depending on sync direction in controller init.
+		    },
+		    {
+			xtype: 'pmxBandwidthField',
+			name: 'rate-out',
+			fieldLabel: gettext('Rate Limit'),
+			emptyText: gettext('Unlimited'),
+			submitAutoScaledSizeUnit: true,
+			// NOTE: handle deleteEmpty in onGetValues due to bandwidth field having a cbind too,
+			// further hide rate limit field depending on sync direction in controller init.
 		    },
 		],
 
@@ -222,7 +249,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 				let me = this;
 				let form = me.up('pbsSyncJobEdit');
 				let nsField = form.down('field[name=remote-ns]');
-				let rateLimitField = form.down('field[name=rate-in]');
+				let rateLimitField = form.getVisibleRateLimitField();
 				let remoteField = form.down('field[name=remote]');
 				let storeField = form.down('field[name=remote-store]');
 
@@ -264,7 +291,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 				let me = this;
 				let remoteStoreField = me.up('pbsSyncJobEdit').down('field[name=remote-store]');
 				remoteStoreField.setRemote(value);
-				let rateLimitField = me.up('pbsSyncJobEdit').down('field[name=rate-in]');
+				let rateLimitField = me.up('pbsSyncJobEdit').getVisibleRateLimitField();
 				rateLimitField.setDisabled(!value);
 				if (!value) {
 				    rateLimitField.setValue(null);
