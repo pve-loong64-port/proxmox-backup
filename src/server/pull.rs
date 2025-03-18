@@ -338,7 +338,16 @@ async fn pull_snapshot<'a>(
     snapshot: &'a pbs_datastore::BackupDir,
     downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt: bool,
+    is_new: bool,
 ) -> Result<SyncStats, Error> {
+    if is_new {
+        info!("sync snapshot {}", snapshot.dir());
+    } else if corrupt {
+        info!("re-sync snapshot {} due to corruption", snapshot.dir());
+    } else {
+        info!("re-sync snapshot {}", snapshot.dir());
+    }
+
     let mut sync_stats = SyncStats::default();
     let mut manifest_name = snapshot.full_path();
     manifest_name.push(MANIFEST_BLOB_NAME.as_ref());
@@ -456,11 +465,11 @@ async fn pull_snapshot_from<'a>(
         .datastore()
         .create_locked_backup_dir(snapshot.backup_ns(), snapshot.as_ref())?;
 
-    let sync_stats = if is_new {
-        info!("sync snapshot {}", snapshot.dir());
+    let result = pull_snapshot(reader, snapshot, downloaded_chunks, corrupt, is_new).await;
 
-        // this snapshot is new, so it can never be corrupt
-        match pull_snapshot(reader, snapshot, downloaded_chunks, false).await {
+    if is_new {
+        // Cleanup directory on error if snapshot was not present before
+        match result {
             Err(err) => {
                 if let Err(cleanup_err) = snapshot.datastore().remove_backup_dir(
                     snapshot.backup_ns(),
@@ -471,21 +480,11 @@ async fn pull_snapshot_from<'a>(
                 }
                 return Err(err);
             }
-            Ok(sync_stats) => {
-                info!("sync snapshot {} done", snapshot.dir());
-                sync_stats
-            }
+            Ok(_) => info!("sync snapshot {} done", snapshot.dir()),
         }
-    } else {
-        if corrupt {
-            info!("re-sync snapshot {} due to corruption", snapshot.dir());
-        } else {
-            info!("re-sync snapshot {}", snapshot.dir());
-        }
-        pull_snapshot(reader, snapshot, downloaded_chunks, corrupt).await?
-    };
+    }
 
-    Ok(sync_stats)
+    result
 }
 
 /// Pulls a group according to `params`.
