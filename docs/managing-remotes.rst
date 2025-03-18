@@ -227,12 +227,15 @@ Bandwidth Limit
 
 Syncing a datastore to an archive can produce a lot of traffic and impact other
 users of the network. In order to avoid network or storage congestion, you can
-limit the bandwidth of the sync job by setting the ``rate-in`` option either in
-the web interface or using the ``proxmox-backup-manager`` command-line tool:
+limit the bandwidth of a sync job in pull direction by setting the ``rate-in``
+option either in the web interface or using the ``proxmox-backup-manager``
+command-line tool:
 
 .. code-block:: console
 
     # proxmox-backup-manager sync-job update ID --rate-in 20MiB
+
+For sync jobs in push direction use the ``rate-out`` option instead.
 
 Sync Direction Push
 ^^^^^^^^^^^^^^^^^^^
