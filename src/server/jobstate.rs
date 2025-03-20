@@ -87,7 +87,7 @@ pub fn create_jobstate_dir() -> Result<(), Error> {
         .owner(backup_user.uid)
         .group(backup_user.gid);
 
-    create_path(JOB_STATE_BASEDIR, Some(opts.clone()), Some(opts))
+    create_path(JOB_STATE_BASEDIR, Some(opts), Some(opts))
         .map_err(|err: Error| format_err!("unable to create job state dir - {err}"))?;
 
     Ok(())

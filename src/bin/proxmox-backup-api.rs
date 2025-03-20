@@ -88,21 +88,21 @@ async fn run() -> Result<(), Error> {
         .default_api2_handler(&proxmox_backup::api2::ROUTER)
         .enable_access_log(
             pbs_buildcfg::API_ACCESS_LOG_FN,
-            Some(dir_opts.clone()),
-            Some(file_opts.clone()),
+            Some(dir_opts),
+            Some(file_opts),
             &mut command_sock,
         )?
         .enable_auth_log(
             pbs_buildcfg::API_AUTH_LOG_FN,
-            Some(dir_opts.clone()),
-            Some(file_opts.clone()),
+            Some(dir_opts),
+            Some(file_opts),
             &mut command_sock,
         )?;
 
     let rest_server = RestServer::new(config);
     proxmox_rest_server::init_worker_tasks(
         pbs_buildcfg::PROXMOX_BACKUP_LOG_DIR_M!().into(),
-        file_opts.clone(),
+        file_opts,
     )?;
 
     // http server future:

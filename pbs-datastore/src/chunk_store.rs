@@ -109,7 +109,7 @@ impl ChunkStore {
 
         let default_options = CreateOptions::new();
 
-        match create_path(&base, Some(default_options), Some(options.clone())) {
+        match create_path(&base, Some(default_options), Some(options)) {
             Err(err) => bail!("unable to create chunk store '{name}' at {base:?} - {err}"),
             Ok(res) => {
                 if !res {
@@ -118,13 +118,13 @@ impl ChunkStore {
             }
         }
 
-        if let Err(err) = create_dir(&chunk_dir, options.clone()) {
+        if let Err(err) = create_dir(&chunk_dir, options) {
             bail!("unable to create chunk store '{name}' subdir {chunk_dir:?} - {err}");
         }
 
         // create lock file with correct owner/group
         let lockfile_path = Self::lockfile_path(&base);
-        proxmox_sys::fs::replace_file(lockfile_path, b"", options.clone(), false)?;
+        proxmox_sys::fs::replace_file(lockfile_path, b"", options, false)?;
 
         // create 64*1024 subdirs
         let mut last_percentage = 0;
@@ -132,7 +132,7 @@ impl ChunkStore {
         for i in 0..64 * 1024 {
             let mut l1path = chunk_dir.clone();
             l1path.push(format!("{:04x}", i));
-            if let Err(err) = create_dir(&l1path, options.clone()) {
+            if let Err(err) = create_dir(&l1path, options) {
                 bail!(
                     "unable to create chunk store '{}' subdir {:?} - {}",
                     name,

@@ -2416,20 +2416,12 @@ fn setup_mounted_device(datastore: &DataStoreConfig, tmp_mount_path: &str) -> Re
         .owner(backup_user.uid)
         .group(backup_user.gid);
 
-    proxmox_sys::fs::create_path(
-        &mount_point,
-        Some(default_options.clone()),
-        Some(options.clone()),
-    )
-    .map_err(|e| format_err!("creating mountpoint '{mount_point}' failed: {e}"))?;
+    proxmox_sys::fs::create_path(&mount_point, Some(default_options), Some(options))
+        .map_err(|e| format_err!("creating mountpoint '{mount_point}' failed: {e}"))?;
 
     // can't be created before it is mounted, so we have to do it here
-    proxmox_sys::fs::create_path(
-        &full_store_path,
-        Some(default_options.clone()),
-        Some(options.clone()),
-    )
-    .map_err(|e| format_err!("creating datastore path '{full_store_path}' failed: {e}"))?;
+    proxmox_sys::fs::create_path(&full_store_path, Some(default_options), Some(options))
+        .map_err(|e| format_err!("creating datastore path '{full_store_path}' failed: {e}"))?;
 
     info!(
         "bind mount '{}'({}) to '{}'",
@@ -2468,8 +2460,8 @@ pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
         let default_options = proxmox_sys::fs::CreateOptions::new();
         proxmox_sys::fs::create_path(
             &tmp_mount_path,
-            Some(default_options.clone()),
-            Some(default_options.clone()),
+            Some(default_options),
+            Some(default_options),
         )?;
 
         info!("temporarily mounting '{uuid}' to '{}'", tmp_mount_path);

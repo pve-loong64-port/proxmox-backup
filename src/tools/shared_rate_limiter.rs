@@ -80,7 +80,7 @@ impl SharedRateLimiter {
             .owner(user.uid)
             .group(user.gid);
 
-        create_path(&path, Some(dir_opts.clone()), Some(dir_opts))?;
+        create_path(&path, Some(dir_opts), Some(dir_opts))?;
 
         path.push(name);
 

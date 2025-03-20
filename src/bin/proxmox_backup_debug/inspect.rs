@@ -409,8 +409,8 @@ fn inspect_device(device: String, param: Value) -> Result<(), Error> {
     let default_options = proxmox_sys::fs::CreateOptions::new();
     proxmox_sys::fs::create_path(
         &tmp_mount_path,
-        Some(default_options.clone()),
-        Some(default_options.clone()),
+        Some(default_options),
+        Some(default_options),
     )?;
     let mut mount_cmd = std::process::Command::new("mount");
     mount_cmd.arg(device.clone());

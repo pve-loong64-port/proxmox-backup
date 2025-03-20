@@ -223,14 +223,14 @@ async fn run() -> Result<(), Error> {
     config = config
         .enable_access_log(
             pbs_buildcfg::API_ACCESS_LOG_FN,
-            Some(dir_opts.clone()),
-            Some(file_opts.clone()),
+            Some(dir_opts),
+            Some(file_opts),
             &mut command_sock,
         )?
         .enable_auth_log(
             pbs_buildcfg::API_AUTH_LOG_FN,
-            Some(dir_opts.clone()),
-            Some(file_opts.clone()),
+            Some(dir_opts),
+            Some(file_opts),
             &mut command_sock,
         )?;
 
@@ -238,7 +238,7 @@ async fn run() -> Result<(), Error> {
     let redirector = Redirector::new();
     proxmox_rest_server::init_worker_tasks(
         pbs_buildcfg::PROXMOX_BACKUP_LOG_DIR_M!().into(),
-        file_opts.clone(),
+        file_opts,
     )?;
 
     //openssl req -x509 -newkey rsa:4096 -keyout /etc/proxmox-backup/proxy.key -out /etc/proxmox-backup/proxy.pem -nodes
@@ -752,7 +752,7 @@ async fn schedule_task_log_rotate() {
                     true,
                     Some(max_files),
                     max_days,
-                    Some(options.clone()),
+                    Some(options),
                 )?;
 
                 if has_rotated {
@@ -768,7 +768,7 @@ async fn schedule_task_log_rotate() {
                     pbs_buildcfg::API_ACCESS_LOG_FN,
                     true,
                     Some(max_files),
-                    Some(options.clone()),
+                    Some(options),
                 )?;
 
                 if logrotate.rotate(max_size)? {

@@ -47,7 +47,7 @@ fn open_lock_file(name: &str) -> Result<(std::fs::File, CreateOptions), Error> {
     let timeout = std::time::Duration::new(10, 0);
 
     Ok((
-        open_file_locked(lock_path, timeout, true, options.clone())?,
+        open_file_locked(lock_path, timeout, true, options)?,
         options,
     ))
 }
