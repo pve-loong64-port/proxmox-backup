@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Error};
 use hex::FromHex;
 use serde_json::Value;
 use tracing::warn;
@@ -70,6 +70,29 @@ pub fn list_datastores(
     Ok(list.into_iter().filter(filter_by_privs).collect())
 }
 
+struct UnmountGuard {
+    path: Option<PathBuf>,
+}
+
+impl UnmountGuard {
+    fn new(path: Option<PathBuf>) -> Self {
+        UnmountGuard { path }
+    }
+    fn disable(mut self) {
+        self.path = None;
+    }
+}
+
+impl Drop for UnmountGuard {
+    fn drop(&mut self) {
+        if let Some(path) = &self.path {
+            if let Err(e) = unmount_by_mountpoint(path) {
+                warn!("could not unmount device: {e}");
+            }
+        }
+    }
+}
+
 pub(crate) fn do_create_datastore(
     _lock: BackupLockGuard,
     mut config: SectionConfigData,
@@ -87,59 +110,50 @@ pub(crate) fn do_create_datastore(
         param_bail!("path", err);
     }
 
-    let need_unmount = datastore.backing_device.is_some();
-    if need_unmount {
-        do_mount_device(datastore.clone())?;
-    };
-
     let tuning: DatastoreTuning = serde_json::from_value(
         DatastoreTuning::API_SCHEMA
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
 
-    let res = if reuse_datastore {
-        ChunkStore::verify_chunkstore(&path)
+    let unmount_guard = if datastore.backing_device.is_some() {
+        do_mount_device(datastore.clone())?;
+        UnmountGuard::new(Some(path.clone()))
     } else {
-        let mut is_empty = true;
+        UnmountGuard::new(None)
+    };
+
+    if reuse_datastore {
+        ChunkStore::verify_chunkstore(&path)?;
+    } else {
         if let Ok(dir) = std::fs::read_dir(&path) {
             for file in dir {
                 let name = file?.file_name();
                 let name = name.to_str();
                 if !name.is_some_and(|name| name.starts_with('.') || name == "lost+found") {
-                    is_empty = false;
-                    break;
+                    bail!("datastore path not empty");
                 }
             }
         }
-        if is_empty {
-            let backup_user = pbs_config::backup_user()?;
-            ChunkStore::create(
-                &datastore.name,
-                path.clone(),
-                backup_user.uid,
-                backup_user.gid,
-                tuning.sync_level.unwrap_or_default(),
-            )
-            .map(|_| ())
-        } else {
-            Err(format_err!("datastore path not empty"))
-        }
+        let backup_user = pbs_config::backup_user()?;
+        ChunkStore::create(
+            &datastore.name,
+            path.clone(),
+            backup_user.uid,
+            backup_user.gid,
+            tuning.sync_level.unwrap_or_default(),
+        )
+        .map(|_| ())?;
     };
-
-    if res.is_err() {
-        if need_unmount {
-            if let Err(e) = unmount_by_mountpoint(&path) {
-                warn!("could not unmount device: {e}");
-            }
-        }
-        return res;
-    }
 
     config.set_data(&datastore.name, "datastore", &datastore)?;
 
     pbs_config::datastore::save_config(&config)?;
 
-    jobstate::create_state_file("garbage_collection", &datastore.name)
+    jobstate::create_state_file("garbage_collection", &datastore.name)?;
+
+    unmount_guard.disable();
+
+    Ok(())
 }
 
 #[api(
