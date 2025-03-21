@@ -457,8 +457,9 @@ Ext.define('PBS.Utils', {
 	Proxmox.Schema.overrideAuthDomains({
 	    pbs: {
 		name: 'Proxmox Backup authentication server',
+		ipanel: 'pmxAuthSimplePanel',
 		add: false,
-		edit: false,
+		edit: true,
 		pwchange: true,
 		sync: false,
 		useTypeInUrl: false,
