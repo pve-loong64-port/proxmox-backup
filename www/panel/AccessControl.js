@@ -43,6 +43,7 @@ Ext.define('PBS.AccessControlPanel', {
 	    title: gettext('Realms'),
 	    itemId: 'domains',
 	    iconCls: 'fa fa-address-book-o',
+	    showDefaultRealm: true,
 	},
     ],
 
