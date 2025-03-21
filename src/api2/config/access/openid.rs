@@ -149,6 +149,8 @@ pub enum DeletableProperty {
     ClientKey,
     /// Delete the comment property.
     Comment,
+    /// Delete the default property.
+    Default,
     /// Delete the autocreate property
     Autocreate,
     /// Delete the scopes property
@@ -216,6 +218,9 @@ pub fn update_openid_realm(
                 }
                 DeletableProperty::Comment => {
                     config.comment = None;
+                }
+                DeletableProperty::Default => {
+                    config.default = None;
                 }
                 DeletableProperty::Autocreate => {
                     config.autocreate = None;

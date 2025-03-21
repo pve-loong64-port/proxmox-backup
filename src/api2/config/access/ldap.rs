@@ -171,6 +171,8 @@ pub enum DeletableProperty {
     Port,
     /// Comment
     Comment,
+    /// Is default realm
+    Default,
     /// Verify server certificate
     Verify,
     /// Mode (ldap, ldap+starttls or ldaps),
@@ -251,6 +253,9 @@ pub fn update_ldap_realm(
                 }
                 DeletableProperty::Comment => {
                     config.comment = None;
+                }
+                DeletableProperty::Default => {
+                    config.default = None;
                 }
                 DeletableProperty::Port => {
                     config.port = None;
