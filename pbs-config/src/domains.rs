@@ -8,16 +8,33 @@ use proxmox_schema::{ApiType, ObjectSchema};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
-use pbs_api_types::{AdRealmConfig, LdapRealmConfig, OpenIdRealmConfig, REALM_ID_SCHEMA};
+use pbs_api_types::{
+    AdRealmConfig, LdapRealmConfig, OpenIdRealmConfig, PamRealmConfig, PbsRealmConfig,
+    REALM_ID_SCHEMA,
+};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
+    const PAM_SCHEMA: &ObjectSchema = PamRealmConfig::API_SCHEMA.unwrap_object_schema();
+    const PBS_SCHEMA: &ObjectSchema = PbsRealmConfig::API_SCHEMA.unwrap_object_schema();
     const AD_SCHEMA: &ObjectSchema = AdRealmConfig::API_SCHEMA.unwrap_object_schema();
     const LDAP_SCHEMA: &ObjectSchema = LdapRealmConfig::API_SCHEMA.unwrap_object_schema();
     const OPENID_SCHEMA: &ObjectSchema = OpenIdRealmConfig::API_SCHEMA.unwrap_object_schema();
 
     let mut config = SectionConfig::new(&REALM_ID_SCHEMA);
+
+    config.register_plugin(SectionConfigPlugin::new(
+        "pam".to_owned(),
+        Some("realm".to_owned()),
+        PAM_SCHEMA,
+    ));
+
+    config.register_plugin(SectionConfigPlugin::new(
+        "pbs".to_owned(),
+        Some("realm".to_owned()),
+        PBS_SCHEMA,
+    ));
 
     let plugin = SectionConfigPlugin::new(
         "openid".to_string(),
@@ -78,7 +95,7 @@ pub fn unset_default_realm(config: &mut SectionConfigData) -> Result<(), Error> 
 
 /// Check if a realm with the given name exists
 pub fn exists(domains: &SectionConfigData, realm: &str) -> bool {
-    realm == "pbs" || realm == "pam" || domains.sections.contains_key(realm)
+    domains.sections.contains_key(realm)
 }
 
 // shell completion helper

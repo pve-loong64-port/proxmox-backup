@@ -48,6 +48,7 @@ async fn run() -> Result<(), Error> {
     config::create_configdir()?;
 
     config::update_self_signed_cert(false)?;
+    config::update_default_realms()?;
 
     proxmox_backup::server::create_run_dir()?;
     proxmox_backup::server::create_state_dir()?;

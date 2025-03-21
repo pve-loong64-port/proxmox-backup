@@ -29,19 +29,6 @@ use crate::server::jobstate::Job;
 /// Authentication domain/realm index.
 fn list_domains(rpcenv: &mut dyn RpcEnvironment) -> Result<Vec<BasicRealmInfo>, Error> {
     let mut list = Vec::new();
-
-    list.push(serde_json::from_value(json!({
-        "realm": "pam",
-        "type": "pam",
-        "comment": "Linux PAM standard authentication",
-        "default": Some(true),
-    }))?);
-    list.push(serde_json::from_value(json!({
-        "realm": "pbs",
-        "type": "pbs",
-        "comment": "Proxmox Backup authentication server",
-    }))?);
-
     let (config, digest) = pbs_config::domains::config()?;
 
     for (_, (section_type, v)) in config.sections.iter() {

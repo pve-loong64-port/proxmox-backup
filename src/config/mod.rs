@@ -12,6 +12,7 @@ use std::path::Path;
 
 use proxmox_lang::try_block;
 
+use pbs_api_types::{PamRealmConfig, PbsRealmConfig};
 use pbs_buildcfg::{self, configdir};
 
 pub mod acme;
@@ -193,4 +194,28 @@ pub(crate) fn set_proxy_certificate(cert_pem: &[u8], key_pem: &[u8]) -> Result<(
         .map_err(|err| format_err!("error writing certificate file - {}", err))?;
 
     Ok(())
+}
+
+pub fn update_default_realms() -> Result<(), Error> {
+    let _lock = pbs_config::domains::lock_config()?;
+    let (mut domains, _) = pbs_config::domains::config()?;
+
+    if !pbs_config::domains::exists(&domains, "pam") {
+        domains.set_data(
+            "pam",
+            "pam",
+            PamRealmConfig {
+                // Setting it as default here is safe, because if we perform this
+                // migration, the user had not had any chance to set a custom default anyway.
+                default: Some(true),
+                ..Default::default()
+            },
+        )?;
+    }
+
+    if !pbs_config::domains::exists(&domains, "pbs") {
+        domains.set_data("pbs", "pbs", PbsRealmConfig::default())?;
+    }
+
+    pbs_config::domains::save_config(&domains)
 }
