@@ -78,6 +78,7 @@ impl UnmountGuard {
     fn new(path: Option<PathBuf>) -> Self {
         UnmountGuard { path }
     }
+
     fn disable(mut self) {
         self.path = None;
     }
