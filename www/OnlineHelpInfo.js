@@ -479,6 +479,14 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/user-management.html#user-tfa-lockout",
     "title": "Limits and Lockout of Two-Factor Authentication"
   },
+  "user-realms-pam": {
+    "link": "/docs/user-management.html#user-realms-pam",
+    "title": "Linux PAM"
+  },
+  "user-realms-pbs": {
+    "link": "/docs/user-management.html#user-realms-pbs",
+    "title": "Proxmox Backup authentication server"
+  },
   "user-realms-ldap": {
     "link": "/docs/user-management.html#user-realms-ldap",
     "title": "LDAP"

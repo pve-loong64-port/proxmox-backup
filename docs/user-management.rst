@@ -16,8 +16,8 @@ User Configuration
 choose the realm when you add a new user. Possible realms are:
 
 :pam: Linux PAM standard authentication. Use this if you want to
-      authenticate as a Linux system user (users need to exist on the
-      system).
+      authenticate as a Linux system user. The users needs to already exist on
+      the host system.
 
 :pbs: Proxmox Backup Server realm. This type stores hashed passwords in
       ``/etc/proxmox-backup/shadow.json``.
@@ -598,6 +598,32 @@ list view in the web UI, or using the command line:
 
 Authentication Realms
 ---------------------
+
+.. _user_realms_pam:
+
+Linux PAM
+~~~~~~~~~
+
+Linux PAM is a framework for system-wide user authentication. These users are
+created on the host system with commands such as ``adduser``.
+
+If PAM users exist on the host system, corresponding entries can be added to
+Proxmox Backup Server, to allow these users to log in via their system username
+and password.
+
+.. _user_realms_pbs:
+
+Proxmox Backup authentication server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is a Unix-like password store, which stores hashed passwords in
+``/etc/proxmox-backup/shadow.json``. Passwords are hashed using the SHA-256
+hashing algorithm.
+
+This is the most convenient realm for small-scale (or even mid-scale)
+installations, where users do not need access to anything outside of Proxmox
+Backup Server. In this case, users are fully managed by Proxmox Backup Server
+and are able to change their own passwords via the GUI.
 
 .. _user_realms_ldap:
 

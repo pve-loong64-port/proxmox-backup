@@ -458,6 +458,7 @@ Ext.define('PBS.Utils', {
 	    pbs: {
 		name: 'Proxmox Backup authentication server',
 		ipanel: 'pmxAuthSimplePanel',
+		onlineHelp: 'user-realms-pbs',
 		add: false,
 		edit: true,
 		pwchange: true,
