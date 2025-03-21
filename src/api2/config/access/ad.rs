@@ -91,6 +91,10 @@ pub async fn create_ad_realm(
         auth_helpers::store_ldap_bind_password(&config.realm, &password, &domain_config_lock)?;
     }
 
+    if let Some(true) = config.default {
+        domains::unset_default_realm(&mut domains)?;
+    }
+
     domains.set_data(&config.realm, "ad", &config)?;
 
     domains::save_config(&domains)?;
@@ -276,6 +280,13 @@ pub async fn update_ad_realm(
         } else {
             config.comment = Some(comment);
         }
+    }
+
+    if let Some(true) = update.default {
+        domains::unset_default_realm(&mut domains)?;
+        config.default = Some(true);
+    } else {
+        config.default = None;
     }
 
     if let Some(mode) = update.mode {

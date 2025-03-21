@@ -65,6 +65,10 @@ pub fn create_openid_realm(config: OpenIdRealmConfig) -> Result<(), Error> {
         param_bail!("realm", "realm '{}' already exists.", config.realm);
     }
 
+    if let Some(true) = config.default {
+        domains::unset_default_realm(&mut domains)?;
+    }
+
     domains.set_data(&config.realm, "openid", &config)?;
 
     domains::save_config(&domains)?;
@@ -245,6 +249,13 @@ pub fn update_openid_realm(
         } else {
             config.comment = Some(comment);
         }
+    }
+
+    if let Some(true) = update.default {
+        domains::unset_default_realm(&mut domains)?;
+        config.default = Some(true);
+    } else {
+        config.default = None;
     }
 
     if let Some(issuer_url) = update.issuer_url {
