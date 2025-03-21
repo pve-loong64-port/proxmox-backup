@@ -6,11 +6,13 @@ pub mod ad;
 pub mod ldap;
 pub mod openid;
 pub mod pam;
+pub mod pbs;
 pub mod tfa;
 
 #[sortable]
 const SUBDIRS: SubdirMap = &sorted!([
     ("pam", &pam::ROUTER),
+    ("pbs", &pbs::ROUTER),
     ("ad", &ad::ROUTER),
     ("ldap", &ldap::ROUTER),
     ("openid", &openid::ROUTER),
