@@ -40,7 +40,6 @@ Ext.define('PBS.AccessControlPanel', {
 	{
 	    xtype: 'pmxAuthView',
 	    baseUrl: '/config/access',
-	    useTypeInUrl: true,
 	    title: gettext('Realms'),
 	    itemId: 'domains',
 	    iconCls: 'fa fa-address-book-o',

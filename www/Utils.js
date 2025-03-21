@@ -461,6 +461,7 @@ Ext.define('PBS.Utils', {
 		edit: false,
 		pwchange: true,
 		sync: false,
+		useTypeInUrl: false,
 	    },
 	});
 
