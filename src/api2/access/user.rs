@@ -515,6 +515,15 @@ pub fn generate_token(
     }))
 }
 
+#[api()]
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+/// The set of properties that can be deleted from a token.
+pub enum DeletableTokenProperty {
+    /// Delete the comment property.
+    Comment,
+}
+
 #[api(
     protected: true,
     input: {
@@ -537,6 +546,14 @@ pub fn generate_token(
                 schema: EXPIRE_USER_SCHEMA,
                 optional: true,
             },
+            delete: {
+                description: "List of properties to delete.",
+                type: Array,
+                optional: true,
+                items: {
+                    type: DeletableTokenProperty,
+                }
+            },
             digest: {
                 optional: true,
                 schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
@@ -557,6 +574,7 @@ pub fn update_token(
     comment: Option<String>,
     enable: Option<bool>,
     expire: Option<i64>,
+    delete: Option<Vec<DeletableTokenProperty>>,
     digest: Option<String>,
 ) -> Result<(), Error> {
     let _lock = pbs_config::user::lock_config()?;
@@ -572,6 +590,14 @@ pub fn update_token(
     let tokenid_string = tokenid.to_string();
 
     let mut data: ApiToken = config.lookup("token", &tokenid_string)?;
+
+    if let Some(delete) = delete {
+        for delete_prop in delete {
+            match delete_prop {
+                DeletableTokenProperty::Comment => data.comment = None,
+            }
+        }
+    }
 
     if let Some(comment) = comment {
         let comment = comment.trim().to_string();
