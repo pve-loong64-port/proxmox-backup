@@ -7,7 +7,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hyper::http::request::Parts;
 use hyper::{header, Body, Response, StatusCode};
@@ -2347,10 +2347,9 @@ pub async fn set_backup_owner(
         let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
 
         let backup_group = datastore.backup_group(ns, backup_group);
+        let owner = backup_group.get_owner()?;
 
         if owner_check_required {
-            let owner = backup_group.get_owner()?;
-
             let allowed = match (owner.is_token(), new_owner.is_token()) {
                 (true, true) => {
                     // API token to API token, owned by same user
@@ -2395,6 +2394,14 @@ pub async fn set_backup_owner(
                 },
                 new_owner
             );
+        }
+
+        let _guard = backup_group
+            .lock()
+            .with_context(|| format!("while setting the owner of group '{backup_group:?}'"))?;
+
+        if owner != backup_group.get_owner()? {
+            bail!("{owner} does not own this group anymore");
         }
 
         backup_group.set_owner(&new_owner, true)?;
