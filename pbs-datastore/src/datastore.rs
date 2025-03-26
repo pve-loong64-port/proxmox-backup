@@ -25,7 +25,7 @@ use pbs_api_types::{
 };
 use pbs_config::BackupLockGuard;
 
-use crate::backup_info::{BackupDir, BackupGroup};
+use crate::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use crate::chunk_store::ChunkStore;
 use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
@@ -964,10 +964,15 @@ impl DataStore {
         ListGroups::new(Arc::clone(self), ns)?.collect()
     }
 
-    fn list_images(&self) -> Result<Vec<PathBuf>, Error> {
+    /// Lookup all index files to be found in the datastore without taking any logical iteration
+    /// into account.
+    /// The filesystem is walked recursevly to detect index files based on their archive type based
+    /// on the filename. This however excludes the chunks folder, hidden files and does not follow
+    /// symlinks.
+    fn list_index_files(&self) -> Result<HashSet<PathBuf>, Error> {
         let base = self.base_path();
 
-        let mut list = vec![];
+        let mut list = HashSet::new();
 
         use walkdir::WalkDir;
 
@@ -1015,7 +1020,7 @@ impl DataStore {
                 if archive_type == ArchiveType::FixedIndex
                     || archive_type == ArchiveType::DynamicIndex
                 {
-                    list.push(path);
+                    list.insert(path);
                 }
             }
         }
@@ -1101,44 +1106,75 @@ impl DataStore {
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
     ) -> Result<(), Error> {
-        let image_list = self.list_images()?;
-        let image_count = image_list.len();
+        // Iterate twice over the datastore to fetch index files, even if this comes with an
+        // additional runtime cost:
+        // - First iteration to find all index files, no matter if they are in a location expected
+        //   by the datastore's hierarchy
+        // - Iterate using the datastore's helpers, so the namespaces, groups and snapshots are
+        //   looked up given the expected hierarchy and iterator logic
+        //
+        // By this it is assured that all index files are used, even if they would not have been
+        // seen by the regular logic and the user is informed by the garbage collection run about
+        // the detected index files not following the iterators logic.
 
+        let mut unprocessed_index_list = self.list_index_files()?;
+        let index_count = unprocessed_index_list.len();
+
+        let mut processed_index_files = 0;
         let mut last_percentage: usize = 0;
 
-        let mut strange_paths_count: u64 = 0;
+        let arc_self = Arc::new(self.clone());
+        for namespace in arc_self
+            .recursive_iter_backup_ns(BackupNamespace::root())
+            .context("creating namespace iterator failed")?
+        {
+            let namespace = namespace.context("iterating namespaces failed")?;
+            for group in arc_self.iter_backup_groups(namespace)? {
+                let group = group.context("iterating backup groups failed")?;
+                let mut snapshots = group.list_backups().context("listing snapshots failed")?;
+                // Sort by snapshot timestamp to iterate over consecutive snapshots for each image.
+                BackupInfo::sort_list(&mut snapshots, true);
+                for snapshot in snapshots {
+                    for file in snapshot.files {
+                        worker.check_abort()?;
+                        worker.fail_on_shutdown()?;
 
-        for (i, img) in image_list.into_iter().enumerate() {
-            worker.check_abort()?;
-            worker.fail_on_shutdown()?;
+                        let mut path = snapshot.backup_dir.full_path();
+                        path.push(file);
 
-            if let Some(backup_dir_path) = img.parent() {
-                let backup_dir_path = backup_dir_path.strip_prefix(self.base_path())?;
-                if let Some(backup_dir_str) = backup_dir_path.to_str() {
-                    if pbs_api_types::parse_ns_and_snapshot(backup_dir_str).is_err() {
-                        strange_paths_count += 1;
+                        let index = match self.open_index_reader(&path)? {
+                            Some(index) => index,
+                            None => continue,
+                        };
+                        self.index_mark_used_chunks(index, &path, status, worker)?;
+
+                        unprocessed_index_list.remove(&path);
+
+                        let percentage = (processed_index_files + 1) * 100 / index_count;
+                        if percentage > last_percentage {
+                            info!(
+                                "marked {percentage}% ({} of {index_count} index files)",
+                                processed_index_files + 1,
+                            );
+                            last_percentage = percentage;
+                        }
+                        processed_index_files += 1;
                     }
                 }
             }
-
-            if let Some(index) = self.open_index_reader(&img)? {
-                self.index_mark_used_chunks(index, &img, status, worker)?;
-            }
-
-            let percentage = (i + 1) * 100 / image_count;
-            if percentage > last_percentage {
-                info!(
-                    "marked {percentage}% ({} of {image_count} index files)",
-                    i + 1,
-                );
-                last_percentage = percentage;
-            }
         }
 
+        let strange_paths_count = unprocessed_index_list.len();
         if strange_paths_count > 0 {
-            info!(
-                "found (and marked) {strange_paths_count} index files outside of expected directory scheme"
-            );
+            warn!("found {strange_paths_count} index files outside of expected directory scheme");
+        }
+        for path in unprocessed_index_list {
+            let index = match self.open_index_reader(&path)? {
+                Some(index) => index,
+                None => continue,
+            };
+            self.index_mark_used_chunks(index, &path, status, worker)?;
+            warn!("Marked chunks for unexpected index file at '{path:?}'");
         }
 
         Ok(())
