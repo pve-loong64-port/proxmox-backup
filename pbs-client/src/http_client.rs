@@ -3,14 +3,17 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use anyhow::{bail, format_err, Error};
+use bytes::Bytes;
 use futures::*;
-#[cfg(not(target_feature = "crt-static"))]
-use hyper::client::connect::dns::GaiResolver;
-use hyper::client::{Client, HttpConnector};
+use http_body_util::{BodyDataStream, BodyExt};
+use hyper::body::Incoming;
 use hyper::http::header::HeaderValue;
 use hyper::http::Uri;
 use hyper::http::{Request, Response};
-use hyper::{body::HttpBody, Body};
+#[cfg(not(target_feature = "crt-static"))]
+use hyper_util::client::legacy::connect::dns::GaiResolver;
+use hyper_util::client::legacy::{connect::HttpConnector, Client};
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use openssl::{
     ssl::{SslConnector, SslMethod},
     x509::X509StoreContextRef,
@@ -26,6 +29,7 @@ use proxmox_sys::linux::tty;
 use proxmox_async::broadcast_future::BroadcastFuture;
 use proxmox_http::client::HttpsConnector;
 use proxmox_http::uri::{build_authority, json_object_to_query};
+use proxmox_http::Body;
 use proxmox_http::{ProxyConfig, RateLimiter};
 use proxmox_log::{error, info, warn};
 
@@ -204,7 +208,7 @@ impl Default for HttpClientOptions {
 
 /// HTTP(S) API client
 pub struct HttpClient {
-    client: Client<HttpsConnector<DnsResolver>>,
+    client: Client<HttpsConnector<DnsResolver>, Body>,
     server: String,
     port: u16,
     fingerprint: Arc<Mutex<Option<String>>>,
@@ -469,7 +473,7 @@ impl HttpClient {
             https.set_proxy(config);
         }
 
-        let client = Client::builder()
+        let client = Client::builder(TokioExecutor::new())
             //.http2_initial_stream_window_size( (1 << 31) - 2)
             //.http2_initial_connection_window_size( (1 << 31) - 2)
             .build::<_, Body>(https);
@@ -779,7 +783,7 @@ impl HttpClient {
                 .map(|_| Err(format_err!("unknown error")))
                 .await?
         } else {
-            futures::TryStreamExt::map_err(resp.into_body(), Error::from)
+            futures::TryStreamExt::map_err(BodyDataStream::new(resp.into_body()), Error::from)
                 .try_fold(output, move |acc, chunk| async move {
                     acc.write_all(&chunk)?;
                     Ok::<_, Error>(acc)
@@ -859,7 +863,7 @@ impl HttpClient {
             bail!("unknown error");
         }
 
-        let upgraded = hyper::upgrade::on(resp).await?;
+        let upgraded = TokioIo::new(hyper::upgrade::on(resp).await?);
 
         let max_window_size = (1 << 31) - 2;
 
@@ -887,7 +891,7 @@ impl HttpClient {
     }
 
     async fn credentials(
-        client: Client<HttpsConnector<DnsResolver>>,
+        client: Client<HttpsConnector<DnsResolver>, Body>,
         server: String,
         port: u16,
         username: Userid,
@@ -914,9 +918,9 @@ impl HttpClient {
         Ok(auth)
     }
 
-    async fn api_response(response: Response<Body>) -> Result<Value, Error> {
+    async fn api_response(response: Response<Incoming>) -> Result<Value, Error> {
         let status = response.status();
-        let data = HttpBody::collect(response.into_body()).await?.to_bytes();
+        let data = response.into_body().collect().await?.to_bytes();
 
         let text = String::from_utf8(data.to_vec()).unwrap();
         if status.is_success() {
@@ -932,7 +936,7 @@ impl HttpClient {
     }
 
     async fn api_request(
-        client: Client<HttpsConnector<DnsResolver>>,
+        client: Client<HttpsConnector<DnsResolver>, Body>,
         req: Request<Body>,
     ) -> Result<Value, Error> {
         Self::api_response(
@@ -967,7 +971,7 @@ impl HttpClient {
                     .uri(url)
                     .header("User-Agent", "proxmox-backup-client/1.0")
                     .header(hyper::header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(data.to_string()))?;
+                    .body(data.to_string().into())?;
                 Ok(request)
             } else {
                 let query = json_object_to_query(data)?;
@@ -1008,11 +1012,11 @@ impl Drop for HttpClient {
 
 #[derive(Clone)]
 pub struct H2Client {
-    h2: h2::client::SendRequest<bytes::Bytes>,
+    h2: h2::client::SendRequest<Bytes>,
 }
 
 impl H2Client {
-    pub fn new(h2: h2::client::SendRequest<bytes::Bytes>) -> Self {
+    pub fn new(h2: h2::client::SendRequest<Bytes>) -> Self {
         Self { h2 }
     }
 

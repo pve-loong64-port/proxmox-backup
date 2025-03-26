@@ -128,7 +128,9 @@ h2 = { version = "0.4", features = [ "stream" ] }
 handlebars = "3.0"
 hex = "0.4.3"
 hickory-resolver = { version = "0.24.1", default-features = false, features = [ "system-config", "tokio-runtime" ] }
-hyper = { version = "0.14", features = [ "backports", "deprecated", "full" ] }
+http-body-util = "0.1"
+hyper-util = "0.1"
+hyper = { version = "1", features = [ "full" ] }
 libc = "0.2"
 log = "0.4.17"
 nix = "0.26.1"
@@ -173,7 +175,9 @@ endian_trait.workspace = true
 futures.workspace = true
 h2.workspace = true
 hex.workspace = true
+http-body-util.workspace = true
 hyper.workspace = true
+hyper-util = { workspace = true, features = ["server", "server-auto", "server-graceful"] }
 libc.workspace = true
 log.workspace = true
 nix.workspace = true
@@ -209,7 +213,7 @@ proxmox-auth-api = { workspace = true, features = [ "api", "pam-authenticator" ]
 proxmox-compression.workspace = true
 proxmox-config-digest.workspace = true
 proxmox-daemon.workspace = true
-proxmox-http = { workspace = true, features = [ "client-trait", "proxmox-async", "rate-limited-stream" ] } # pbs-client doesn't use these
+proxmox-http = { workspace = true, features = [ "body", "client-trait", "proxmox-async", "rate-limited-stream" ] } # pbs-client doesn't use these
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true
 proxmox-lang.workspace = true
