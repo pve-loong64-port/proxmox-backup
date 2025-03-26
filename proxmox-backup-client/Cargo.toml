@@ -24,6 +24,7 @@ pxar.workspace = true
 
 proxmox-async.workspace = true
 proxmox-human-byte.workspace = true
+proxmox-http = { workspace = true, features = [ "body" ] }
 proxmox-log.workspace = true
 proxmox-io.workspace = true
 proxmox-router = { workspace = true, features = [ "cli" ] }

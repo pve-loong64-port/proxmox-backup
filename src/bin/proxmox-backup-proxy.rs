@@ -7,7 +7,8 @@ use futures::*;
 use hyper::header;
 use hyper::http::request::Parts;
 use hyper::http::Response;
-use hyper::{Body, StatusCode};
+use hyper::StatusCode;
+use hyper_util::server::graceful::GracefulShutdown;
 use tracing::level_filters::LevelFilter;
 use tracing::{info, warn};
 use url::form_urlencoded;
@@ -15,6 +16,7 @@ use url::form_urlencoded;
 use openssl::ssl::SslAcceptor;
 use serde_json::{json, Value};
 
+use proxmox_http::Body;
 use proxmox_lang::try_block;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::CreateOptions;
@@ -289,27 +291,71 @@ async fn run() -> Result<(), Error> {
     let server = proxmox_daemon::server::create_daemon(
         ([0, 0, 0, 0, 0, 0, 0, 0], 8007).into(),
         move |listener| {
-            let (secure_connections, insecure_connections) =
+            let (mut secure_connections, mut insecure_connections) =
                 connections.accept_tls_optional(listener, acceptor);
 
             Ok(async {
                 proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
 
-                let secure_server = hyper::Server::builder(secure_connections)
-                    .serve(rest_server)
-                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
-                    .map_err(Error::from);
+                let secure_server = async move {
+                    let graceful = Arc::new(GracefulShutdown::new());
+                    loop {
+                        let graceful2 = Arc::clone(&graceful);
+                        tokio::select! {
+                            Some(conn) = secure_connections.next() => {
+                                match conn {
+                                    Ok(conn) => {
+                                        let api_service = rest_server.api_service(&conn)?;
+                                        tokio::spawn(async move {
+                                            api_service.serve(conn, Some(graceful2)).await
+                                        });
+                                    },
+                                    Err(err) => { log::warn!("Failed to accept insecure connection: {err:?}"); }
+                                }
+                            },
+                            _shutdown = proxmox_daemon::shutdown_future() => {
+                                break;
+                            }
+                        }
+                    }
+                    if let Some(shutdown) = Arc::into_inner(graceful) {
+                        shutdown.shutdown().await
+                    }
+                    Ok::<(), Error>(())
+                };
 
-                let insecure_server = hyper::Server::builder(insecure_connections)
-                    .serve(redirector)
-                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
-                    .map_err(Error::from);
+                let insecure_server = async move {
+                    let graceful = Arc::new(GracefulShutdown::new());
+                    loop {
+                        let graceful2 = Arc::clone(&graceful);
+                        tokio::select! {
+                            Some(conn) = insecure_connections.next() => {
+                                match conn {
+                                    Ok(conn) => {
+                                        let redirect_service = redirector.redirect_service();
+                                        tokio::spawn(async move {
+                                            redirect_service.serve(conn, Some(graceful2)).await
+                                        });
+                                    },
+                                    Err(err) => { log::warn!("Failed to accept insecure connection: {err:?}"); }
+                                }
+                            },
+                            _shutdown = proxmox_daemon::shutdown_future() => {
+                                break;
+                            }
+                        }
+                    }
+                    if let Some(shutdown) = Arc::into_inner(graceful) {
+                        shutdown.shutdown().await
+                    }
+                    Ok::<(), Error>(())
+                };
 
                 let (secure_res, insecure_res) =
                     try_join!(tokio::spawn(secure_server), tokio::spawn(insecure_server))
                         .context("failed to complete REST server task")?;
 
-                let results = [secure_res, insecure_res];
+                let results: [Result<(), Error>; 2] = [secure_res, insecure_res];
 
                 if results.iter().any(Result::is_err) {
                     let cat_errors = results
@@ -321,7 +367,7 @@ async fn run() -> Result<(), Error> {
                     bail!(cat_errors);
                 }
 
-                Ok(())
+                Ok::<(), Error>(())
             })
         },
         Some(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN),

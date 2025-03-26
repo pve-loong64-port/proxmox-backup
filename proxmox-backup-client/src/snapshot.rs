@@ -271,7 +271,7 @@ async fn upload_log(param: Value) -> Result<Value, Error> {
     );
 
     let args = snapshot_args(&backup_ns, &snapshot)?;
-    let body = hyper::Body::from(raw_data);
+    let body = proxmox_http::Body::from(raw_data);
 
     client
         .upload("application/octet-stream", body, &path, Some(args))

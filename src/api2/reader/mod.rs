@@ -3,12 +3,15 @@
 use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hex::FromHex;
+use hyper::body::Incoming;
 use hyper::header::{self, HeaderValue, CONNECTION, UPGRADE};
 use hyper::http::request::Parts;
-use hyper::{Body, Request, Response, StatusCode};
+use hyper::{Request, Response, StatusCode};
+use hyper_util::service::TowerToHyperService;
 use serde::Deserialize;
 use serde_json::Value;
 
+use proxmox_http::Body;
 use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{
     http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
@@ -67,7 +70,7 @@ pub const API_METHOD_UPGRADE_BACKUP: ApiMethod = ApiMethod::new(
 
 fn upgrade_to_backup_reader_protocol(
     parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -187,7 +190,7 @@ fn upgrade_to_backup_reader_protocol(
                     http.initial_connection_window_size(window_size);
                     http.max_frame_size(4 * 1024 * 1024);
 
-                    http.serve_connection(conn, service)
+                    http.serve_connection(conn, TowerToHyperService::new(service))
                         .map_err(Error::from)
                         .await
                 };
@@ -241,7 +244,7 @@ pub const API_METHOD_DOWNLOAD_FILE: ApiMethod = ApiMethod::new(
 
 fn download_file(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -297,7 +300,7 @@ pub const API_METHOD_DOWNLOAD_CHUNK: ApiMethod = ApiMethod::new(
 
 fn download_chunk(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -345,7 +348,7 @@ fn download_chunk(
 /* this is too slow
 fn download_chunk_old(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -390,7 +393,7 @@ pub const API_METHOD_SPEEDTEST: ApiMethod = ApiMethod::new(
 
 fn speedtest(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     _param: Value,
     _info: &ApiMethod,
     _rpcenv: Box<dyn RpcEnvironment>,

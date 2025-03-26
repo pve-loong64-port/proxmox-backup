@@ -5,10 +5,11 @@ use std::os::unix::io::AsRawFd;
 
 use anyhow::{bail, format_err, Error};
 use futures::future::{FutureExt, TryFutureExt};
-use hyper::body::Body;
+use hyper::body::Incoming;
 use hyper::http::request::Parts;
 use hyper::upgrade::Upgraded;
 use hyper::Request;
+use hyper_util::rt::TokioIo;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
@@ -267,7 +268,7 @@ pub const API_METHOD_WEBSOCKET: ApiMethod = ApiMethod::new(
 
 fn upgrade_to_websocket(
     parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -306,7 +307,7 @@ fn upgrade_to_websocket(
             };
 
             let local = tokio::net::TcpStream::connect(format!("localhost:{}", port)).await?;
-            ws.serve_connection(conn, local).await
+            ws.serve_connection(TokioIo::new(conn), local).await
         });
 
         Ok(response)

@@ -5,11 +5,13 @@ use futures::*;
 use hex::FromHex;
 use hyper::header::{HeaderValue, CONNECTION, UPGRADE};
 use hyper::http::request::Parts;
-use hyper::{Body, Request, Response, StatusCode};
+use hyper::{body::Incoming, Request, Response, StatusCode};
+use hyper_util::service::TowerToHyperService;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tracing::warn;
 
+use proxmox_http::Body;
 use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{http_err, list_subdirs_api_method};
 use proxmox_router::{
@@ -69,7 +71,7 @@ pub(crate) fn optional_ns_param(param: &Value) -> Result<BackupNamespace, Error>
 
 fn upgrade_to_backup_protocol(
     parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -244,7 +246,7 @@ fn upgrade_to_backup_protocol(
                         http.max_frame_size(4 * 1024 * 1024);
 
                         let env3 = env2.clone();
-                        http.serve_connection(conn, service).map(move |result| {
+                        http.serve_connection(conn, TowerToHyperService::new(service)).map(move |result| {
                             match result {
                                 Err(err) => {
                                     // Avoid  Transport endpoint is not connected (os error 107)
@@ -821,7 +823,7 @@ pub const API_METHOD_DOWNLOAD_PREVIOUS: ApiMethod = ApiMethod::new(
 
 fn download_previous(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,

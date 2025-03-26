@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::Error;
 use futures::stream::TryStreamExt;
-use hyper::{header, Body, Response, StatusCode};
+use hyper::{header, Response, StatusCode};
 
+use proxmox_http::Body;
 use proxmox_router::http_bail;
 
 pub async fn create_download_response(path: PathBuf) -> Result<Response<Body>, Error> {

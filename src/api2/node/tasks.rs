@@ -3,9 +3,10 @@ use std::io::{BufRead, BufReader};
 
 use anyhow::{bail, Error};
 use futures::FutureExt;
+use hyper::body::Incoming;
 use hyper::http::request::Parts;
 use hyper::http::{header, Response, StatusCode};
-use hyper::Body;
+use proxmox_http::Body;
 use serde_json::{json, Value};
 
 use proxmox_async::stream::AsyncReaderStream;
@@ -321,7 +322,7 @@ pub const API_METHOD_READ_TASK_LOG: ApiMethod = ApiMethod::new(
 );
 fn read_task_log(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -404,7 +405,7 @@ fn read_task_log(
         Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(json.to_string()))
+            .body(json.to_string().into())
             .unwrap())
     }
     .boxed()

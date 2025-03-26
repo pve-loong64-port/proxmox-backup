@@ -9,8 +9,10 @@ use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context, Error};
 use futures::*;
+use http_body_util::BodyExt;
 use hyper::http::request::Parts;
-use hyper::{header, Body, Response, StatusCode};
+use hyper::{body::Incoming, header, Response, StatusCode};
+use proxmox_http::Body;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_stream::wrappers::ReceiverStream;
@@ -1381,7 +1383,7 @@ pub const API_METHOD_DOWNLOAD_FILE: ApiMethod = ApiMethod::new(
 
 pub fn download_file(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -1466,7 +1468,7 @@ pub const API_METHOD_DOWNLOAD_FILE_DECODED: ApiMethod = ApiMethod::new(
 
 pub fn download_file_decoded(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -1592,7 +1594,7 @@ pub const API_METHOD_UPLOAD_BACKUP_LOG: ApiMethod = ApiMethod::new(
 
 pub fn upload_backup_log(
     _parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -1630,13 +1632,7 @@ pub fn upload_backup_log(
             file_name = file_name.deref(),
         );
 
-        let data = req_body
-            .map_err(Error::from)
-            .try_fold(Vec::new(), |mut acc, chunk| {
-                acc.extend_from_slice(&chunk);
-                future::ok::<_, Error>(acc)
-            })
-            .await?;
+        let data = req_body.collect().await.map_err(Error::from)?.to_bytes();
 
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
@@ -1809,7 +1805,7 @@ fn get_local_pxar_reader(
 
 pub fn pxar_file_download(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,

@@ -6,8 +6,10 @@ use std::os::unix::fs::OpenOptionsExt;
 
 use anyhow::{bail, format_err};
 use bytes::Bytes;
-use hyper::{body::HttpBody, Body, Request};
+use http_body_util::BodyExt;
+use hyper::Request;
 use nix::sys::stat::Mode;
+use proxmox_http::Body;
 use serde::{Deserialize, Serialize};
 
 use proxmox_acme::account::AccountCreator;
@@ -618,7 +620,7 @@ impl AcmeClient {
             response.json()?,
         ));
 
-        Ok((directory.as_ref().unwrap(), nonce.as_deref()))
+        Ok((directory.as_mut().unwrap(), nonce.as_deref()))
     }
 
     /// Like `get_directory`, but if the directory provides no nonce, also performs a `HEAD`

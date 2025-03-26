@@ -5,8 +5,9 @@ use std::task::{Context, Poll};
 use anyhow::{bail, format_err, Error};
 use futures::*;
 use hex::FromHex;
+use http_body_util::{BodyDataStream, BodyExt};
+use hyper::body::Incoming;
 use hyper::http::request::Parts;
-use hyper::Body;
 use serde_json::{json, Value};
 
 use proxmox_router::{ApiHandler, ApiMethod, ApiResponseFuture, RpcEnvironment};
@@ -21,7 +22,7 @@ use pbs_tools::json::{required_integer_param, required_string_param};
 use super::environment::*;
 
 pub struct UploadChunk {
-    stream: Body,
+    stream: BodyDataStream<Incoming>,
     store: Arc<DataStore>,
     digest: [u8; 32],
     size: u32,
@@ -31,7 +32,7 @@ pub struct UploadChunk {
 
 impl UploadChunk {
     pub fn new(
-        stream: Body,
+        stream: BodyDataStream<Incoming>,
         store: Arc<DataStore>,
         digest: [u8; 32],
         size: u32,
@@ -146,7 +147,7 @@ pub const API_METHOD_UPLOAD_FIXED_CHUNK: ApiMethod = ApiMethod::new(
 
 fn upload_fixed_chunk(
     _parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -161,8 +162,14 @@ fn upload_fixed_chunk(
 
         let env: &BackupEnvironment = rpcenv.as_ref();
 
-        let (digest, size, compressed_size, is_duplicate) =
-            UploadChunk::new(req_body, env.datastore.clone(), digest, size, encoded_size).await?;
+        let (digest, size, compressed_size, is_duplicate) = UploadChunk::new(
+            BodyDataStream::new(req_body),
+            env.datastore.clone(),
+            digest,
+            size,
+            encoded_size,
+        )
+        .await?;
 
         env.register_fixed_chunk(wid, digest, size, compressed_size, is_duplicate)?;
         let digest_str = hex::encode(digest);
@@ -215,7 +222,7 @@ pub const API_METHOD_UPLOAD_DYNAMIC_CHUNK: ApiMethod = ApiMethod::new(
 
 fn upload_dynamic_chunk(
     _parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -230,8 +237,14 @@ fn upload_dynamic_chunk(
 
         let env: &BackupEnvironment = rpcenv.as_ref();
 
-        let (digest, size, compressed_size, is_duplicate) =
-            UploadChunk::new(req_body, env.datastore.clone(), digest, size, encoded_size).await?;
+        let (digest, size, compressed_size, is_duplicate) = UploadChunk::new(
+            BodyDataStream::new(req_body),
+            env.datastore.clone(),
+            digest,
+            size,
+            encoded_size,
+        )
+        .await?;
 
         env.register_dynamic_chunk(wid, digest, size, compressed_size, is_duplicate)?;
         let digest_str = hex::encode(digest);
@@ -250,13 +263,13 @@ pub const API_METHOD_UPLOAD_SPEEDTEST: ApiMethod = ApiMethod::new(
 
 fn upload_speedtest(
     _parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     _param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
 ) -> ApiResponseFuture {
     async move {
-        let result = req_body
+        let result = BodyDataStream::new(req_body)
             .map_err(Error::from)
             .try_fold(0, |size: usize, chunk| {
                 let sum = size + chunk.len();
@@ -303,7 +316,7 @@ pub const API_METHOD_UPLOAD_BLOB: ApiMethod = ApiMethod::new(
 
 fn upload_blob(
     _parts: Parts,
-    req_body: Body,
+    req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     rpcenv: Box<dyn RpcEnvironment>,
@@ -318,13 +331,7 @@ fn upload_blob(
             bail!("wrong blob file extension: '{}'", file_name);
         }
 
-        let data = req_body
-            .map_err(Error::from)
-            .try_fold(Vec::new(), |mut acc, chunk| {
-                acc.extend_from_slice(&chunk);
-                future::ok::<_, Error>(acc)
-            })
-            .await?;
+        let data = req_body.collect().await.map_err(Error::from)?.to_bytes();
 
         if encoded_size != data.len() {
             bail!(
@@ -334,7 +341,7 @@ fn upload_blob(
             );
         }
 
-        env.add_blob(&file_name, data)?;
+        env.add_blob(&file_name, data.to_vec())?;
 
         Ok(env.format_response(Ok(Value::Null)))
     }

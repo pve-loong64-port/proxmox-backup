@@ -1,12 +1,15 @@
 use std::future::Future;
 use std::pin::{pin, Pin};
+use std::sync::Arc;
 
 use anyhow::{bail, Error};
-use futures::*;
 use hyper::http::Response;
-use hyper::{Body, StatusCode};
+use hyper::StatusCode;
+use hyper_util::server::graceful::GracefulShutdown;
+use tokio::net::TcpListener;
 use tracing::level_filters::LevelFilter;
 
+use proxmox_http::Body;
 use proxmox_lang::try_block;
 use proxmox_rest_server::{ApiConfig, RestServer};
 use proxmox_router::RpcEnvironmentType;
@@ -34,7 +37,7 @@ fn get_index() -> Pin<Box<dyn Future<Output = Response<Body>> + Send>> {
         Response::builder()
             .status(StatusCode::OK)
             .header(hyper::header::CONTENT_TYPE, "text/html")
-            .body(index.into())
+            .body(index.to_string().into())
             .unwrap()
     })
 }
@@ -109,17 +112,28 @@ async fn run() -> Result<(), Error> {
     // http server future:
     let server = proxmox_daemon::server::create_daemon(
         ([127, 0, 0, 1], 82).into(),
-        move |listener| {
-            let incoming = hyper::server::conn::AddrIncoming::from_listener(listener)?;
-
-            Ok(async {
+        move |listener: TcpListener| {
+            Ok(async move {
                 proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
-
-                hyper::Server::builder(incoming)
-                    .serve(rest_server)
-                    .with_graceful_shutdown(proxmox_daemon::shutdown_future())
-                    .map_err(Error::from)
-                    .await
+                let graceful = Arc::new(GracefulShutdown::new());
+                loop {
+                    let graceful2 = Arc::clone(&graceful);
+                    tokio::select! {
+                        incoming = listener.accept() => {
+                            let (conn, _) = incoming?;
+                            let api_service = rest_server.api_service(&conn)?;
+                            tokio::spawn(async move { api_service.serve(conn, Some(graceful2)).await });
+                        },
+                        _shutdown = proxmox_daemon::shutdown_future() => {
+                            break;
+                        },
+                    }
+                }
+                if let Some(shutdown) = Arc::into_inner(graceful) {
+                    log::info!("shutting down..");
+                    shutdown.shutdown().await
+                }
+                Ok(())
             })
         },
         Some(pbs_buildcfg::PROXMOX_BACKUP_API_PID_FN),

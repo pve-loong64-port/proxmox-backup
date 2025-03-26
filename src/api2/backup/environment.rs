@@ -8,6 +8,7 @@ use tracing::info;
 use ::serde::Serialize;
 use serde_json::{json, Value};
 
+use proxmox_http::Body;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::{replace_file, CreateOptions};
 
@@ -20,7 +21,7 @@ use proxmox_rest_server::{formatter::*, WorkerTask};
 
 use crate::backup::verify_backup_dir_with_lock;
 
-use hyper::{Body, Response};
+use hyper::Response;
 
 #[derive(Copy, Clone, Serialize)]
 struct UploadStatistic {
