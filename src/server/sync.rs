@@ -10,6 +10,7 @@ use std::time::Duration;
 use anyhow::{bail, format_err, Context, Error};
 use futures::{future::FutureExt, select};
 use hyper::http::StatusCode;
+use proxmox_sys::fs::DirLockGuard;
 use serde_json::json;
 use tracing::{info, warn};
 
@@ -105,7 +106,7 @@ pub(crate) struct RemoteSourceReader {
 }
 
 pub(crate) struct LocalSourceReader {
-    pub(crate) _dir_lock: Arc<Mutex<proxmox_sys::fs::DirLockGuard>>,
+    pub(crate) _dir_lock: Arc<Mutex<DirLockGuard>>,
     pub(crate) path: PathBuf,
     pub(crate) datastore: Arc<DataStore>,
 }
@@ -478,13 +479,11 @@ impl SyncSource for LocalSource {
         dir: &BackupDir,
     ) -> Result<Arc<dyn SyncSourceReader>, Error> {
         let dir = self.store.backup_dir(ns.clone(), dir.clone())?;
-        let dir_lock = proxmox_sys::fs::lock_dir_noblock_shared(
-            &dir.full_path(),
-            "snapshot",
-            "locked by another operation",
-        )?;
+        let guard = dir
+            .lock()
+            .with_context(|| format!("while reading snapshot '{dir:?}' for a sync job"))?;
         Ok(Arc::new(LocalSourceReader {
-            _dir_lock: Arc::new(Mutex::new(dir_lock)),
+            _dir_lock: Arc::new(Mutex::new(guard)),
             path: dir.full_path(),
             datastore: dir.datastore().clone(),
         }))

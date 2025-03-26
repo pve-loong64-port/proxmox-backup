@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use nix::dir::Dir;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -8,7 +8,7 @@ use ::serde::Serialize;
 use serde_json::{json, Value};
 
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
-use proxmox_sys::fs::{lock_dir_noblock_shared, replace_file, CreateOptions};
+use proxmox_sys::fs::{replace_file, CreateOptions};
 
 use pbs_api_types::Authid;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
@@ -645,12 +645,12 @@ impl BackupEnvironment {
 
         // Downgrade to shared lock, the backup itself is finished
         drop(excl_snap_lock);
-        let snap_lock = lock_dir_noblock_shared(
-            &self.backup_dir.full_path(),
-            "snapshot",
-            "snapshot is already locked by another operation",
-        )?;
-
+        let snap_lock = self.backup_dir.lock_shared().with_context(|| {
+            format!(
+                "while trying to verify snapshot '{:?}' after completion",
+                self.backup_dir
+            )
+        })?;
         let worker_id = format!(
             "{}:{}/{}/{:08X}",
             self.datastore.name(),

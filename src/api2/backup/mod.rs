@@ -1,6 +1,6 @@
 //! Backup protocol (HTTP2 upgrade)
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hex::FromHex;
 use hyper::header::{HeaderValue, CONNECTION, UPGRADE};
@@ -17,7 +17,6 @@ use proxmox_router::{
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupNamespace, BackupType, Operation, VerifyState,
@@ -186,12 +185,10 @@ fn upgrade_to_backup_protocol(
             }
 
             // lock last snapshot to prevent forgetting/pruning it during backup
-            let full_path = last.backup_dir.full_path();
-            Some(lock_dir_noblock_shared(
-                &full_path,
-                "snapshot",
-                "base snapshot is already locked by another operation",
-            )?)
+            let guard = last.backup_dir
+                .lock_shared()
+                .with_context(|| format!("while locking last snapshot during backup '{last:?}'"))?;
+            Some(guard)
         } else {
             None
         };

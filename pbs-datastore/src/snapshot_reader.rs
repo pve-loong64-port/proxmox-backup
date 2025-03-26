@@ -4,10 +4,8 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use anyhow::{bail, Error};
+use anyhow::{bail, Context, Error};
 use nix::dir::Dir;
-
-use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, BackupNamespace, Operation, CLIENT_LOG_BLOB_NAME,
@@ -48,8 +46,9 @@ impl SnapshotReader {
             bail!("snapshot {} does not exist!", snapshot.dir());
         }
 
-        let locked_dir =
-            lock_dir_noblock_shared(&snapshot_path, "snapshot", "locked by another operation")?;
+        let locked_dir = snapshot
+            .lock_shared()
+            .with_context(|| format!("while trying to read snapshot '{snapshot:?}'"))?;
 
         let datastore_name = datastore.name().to_string();
         let manifest = match snapshot.load_manifest() {

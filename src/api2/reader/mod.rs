@@ -1,6 +1,6 @@
 //! Backup reader/restore protocol (HTTP2 upgrade)
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use futures::*;
 use hex::FromHex;
 use hyper::header::{self, HeaderValue, CONNECTION, UPGRADE};
@@ -16,7 +16,6 @@ use proxmox_router::{
 };
 use proxmox_schema::{BooleanSchema, ObjectSchema};
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::fs::lock_dir_noblock_shared;
 
 use pbs_api_types::{
     ArchiveType, Authid, Operation, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA,
@@ -129,11 +128,9 @@ fn upgrade_to_backup_reader_protocol(
             bail!("snapshot {} does not exist.", backup_dir.dir());
         }
 
-        let _guard = lock_dir_noblock_shared(
-            &backup_dir.full_path(),
-            "snapshot",
-            "locked by another operation",
-        )?;
+        let _guard = backup_dir
+            .lock_shared()
+            .with_context(|| format!("while reading snapshot '{backup_dir:?}'"))?;
 
         let path = datastore.base_path();
 

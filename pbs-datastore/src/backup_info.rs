@@ -3,9 +3,11 @@ use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 
-use proxmox_sys::fs::{lock_dir_noblock, replace_file, CreateOptions};
+use proxmox_sys::fs::{
+    lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions, DirLockGuard,
+};
 
 use pbs_api_types::{
     Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, VerifyState,
@@ -199,9 +201,10 @@ impl BackupGroup {
     /// Returns `BackupGroupDeleteStats`, containing the number of deleted snapshots
     /// and number of protected snaphsots, which therefore were not removed.
     pub fn destroy(&self) -> Result<BackupGroupDeleteStats, Error> {
+        let _guard = self
+            .lock()
+            .with_context(|| format!("while destroying group '{self:?}'"))?;
         let path = self.full_group_path();
-        let _guard =
-            proxmox_sys::fs::lock_dir_noblock(&path, "backup group", "possible running backup")?;
 
         log::info!("removing backup group {:?}", path);
         let mut delete_stats = BackupGroupDeleteStats::default();
@@ -236,6 +239,15 @@ impl BackupGroup {
     pub fn set_owner(&self, auth_id: &Authid, force: bool) -> Result<(), Error> {
         self.store
             .set_owner(&self.ns, self.as_ref(), auth_id, force)
+    }
+
+    /// Lock a group exclusively
+    pub fn lock(&self) -> Result<DirLockGuard, Error> {
+        lock_dir_noblock(
+            &self.full_group_path(),
+            "backup group",
+            "possible running backup",
+        )
     }
 }
 
@@ -442,15 +454,33 @@ impl BackupDir {
             .map_err(|err| format_err!("unable to acquire manifest lock {:?} - {}", &path, err))
     }
 
+    /// Lock this snapshot exclusively
+    pub fn lock(&self) -> Result<DirLockGuard, Error> {
+        lock_dir_noblock(
+            &self.full_path(),
+            "snapshot",
+            "backup is running or snapshot is in use",
+        )
+    }
+
+    /// Acquire a shared lock on this snapshot
+    pub fn lock_shared(&self) -> Result<DirLockGuard, Error> {
+        lock_dir_noblock_shared(
+            &self.full_path(),
+            "snapshot",
+            "backup is running or snapshot is in use, could not acquire shared lock",
+        )
+    }
+
     /// Destroy the whole snapshot, bails if it's protected
     ///
     /// Setting `force` to true skips locking and thus ignores if the backup is currently in use.
     pub fn destroy(&self, force: bool) -> Result<(), Error> {
-        let full_path = self.full_path();
-
         let (_guard, _manifest_guard);
         if !force {
-            _guard = lock_dir_noblock(&full_path, "snapshot", "possibly running or in use")?;
+            _guard = self
+                .lock()
+                .with_context(|| format!("while destroying snapshot '{self:?}'"))?;
             _manifest_guard = self.lock_manifest()?;
         }
 
@@ -458,6 +488,7 @@ impl BackupDir {
             bail!("cannot remove protected snapshot"); // use special error type?
         }
 
+        let full_path = self.full_path();
         log::info!("removing backup snapshot {:?}", full_path);
         std::fs::remove_dir_all(&full_path).map_err(|err| {
             format_err!("removing backup snapshot {:?} failed - {}", full_path, err,)

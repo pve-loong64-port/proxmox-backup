@@ -5,7 +5,7 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use nix::unistd::{unlinkat, UnlinkatFlags};
 use tracing::{info, warn};
 
@@ -13,8 +13,8 @@ use proxmox_human_byte::HumanByte;
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
+use proxmox_sys::fs::DirLockGuard;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
-use proxmox_sys::fs::{lock_dir_noblock, DirLockGuard};
 use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_worker_task::WorkerTaskContext;
@@ -774,41 +774,35 @@ impl DataStore {
     ///
     /// This also acquires an exclusive lock on the directory and returns the lock guard.
     pub fn create_locked_backup_group(
-        &self,
+        self: &Arc<Self>,
         ns: &BackupNamespace,
         backup_group: &pbs_api_types::BackupGroup,
         auth_id: &Authid,
     ) -> Result<(Authid, DirLockGuard), Error> {
-        // create intermediate path first:
-        let mut full_path = self.base_path();
-        for ns in ns.components() {
-            full_path.push("ns");
-            full_path.push(ns);
-        }
-        full_path.push(backup_group.ty.as_str());
-        std::fs::create_dir_all(&full_path)?;
+        let backup_group = self.backup_group(ns.clone(), backup_group.clone());
 
-        full_path.push(&backup_group.id);
+        // create intermediate path first
+        let full_path = backup_group.full_group_path();
 
-        // create the last component now
+        std::fs::create_dir_all(full_path.parent().ok_or_else(|| {
+            format_err!("could not construct parent path for group {backup_group:?}")
+        })?)?;
+
+        // now create the group, this allows us to check whether it existed before
         match std::fs::create_dir(&full_path) {
             Ok(_) => {
-                let guard = lock_dir_noblock(
-                    &full_path,
-                    "backup group",
-                    "another backup is already running",
-                )?;
-                self.set_owner(ns, backup_group, auth_id, false)?;
-                let owner = self.get_owner(ns, backup_group)?; // just to be sure
+                let guard = backup_group.lock().with_context(|| {
+                    format!("while creating new locked backup group '{backup_group:?}'")
+                })?;
+                self.set_owner(ns, backup_group.group(), auth_id, false)?;
+                let owner = self.get_owner(ns, backup_group.group())?; // just to be sure
                 Ok((owner, guard))
             }
             Err(ref err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                let guard = lock_dir_noblock(
-                    &full_path,
-                    "backup group",
-                    "another backup is already running",
-                )?;
-                let owner = self.get_owner(ns, backup_group)?; // just to be sure
+                let guard = backup_group.lock().with_context(|| {
+                    format!("while creating locked backup group '{backup_group:?}'")
+                })?;
+                let owner = self.get_owner(ns, backup_group.group())?; // just to be sure
                 Ok((owner, guard))
             }
             Err(err) => bail!("unable to create backup group {:?} - {}", full_path, err),
@@ -819,29 +813,25 @@ impl DataStore {
     ///
     /// The BackupGroup directory needs to exist.
     pub fn create_locked_backup_dir(
-        &self,
+        self: &Arc<Self>,
         ns: &BackupNamespace,
         backup_dir: &pbs_api_types::BackupDir,
     ) -> Result<(PathBuf, bool, DirLockGuard), Error> {
-        let full_path = self.snapshot_path(ns, backup_dir);
-        let relative_path = full_path.strip_prefix(self.base_path()).map_err(|err| {
-            format_err!(
-                "failed to produce correct path for backup {backup_dir} in namespace {ns}: {err}"
-            )
-        })?;
+        let backup_dir = self.backup_dir(ns.clone(), backup_dir.clone())?;
+        let relative_path = backup_dir.relative_path();
 
-        let lock = || {
-            lock_dir_noblock(
-                &full_path,
-                "snapshot",
-                "internal error - tried creating snapshot that's already in use",
-            )
-        };
-
-        match std::fs::create_dir(&full_path) {
-            Ok(_) => Ok((relative_path.to_owned(), true, lock()?)),
+        match std::fs::create_dir(backup_dir.full_path()) {
+            Ok(_) => {
+                let guard = backup_dir.lock().with_context(|| {
+                    format!("while creating new locked snapshot '{backup_dir:?}'")
+                })?;
+                Ok((relative_path, true, guard))
+            }
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                Ok((relative_path.to_owned(), false, lock()?))
+                let guard = backup_dir
+                    .lock()
+                    .with_context(|| format!("while creating locked snapshot '{backup_dir:?}'"))?;
+                Ok((relative_path, false, guard))
             }
             Err(e) => Err(e.into()),
         }
@@ -1305,7 +1295,9 @@ impl DataStore {
             bail!("snapshot {} does not exist!", backup_dir.dir());
         }
 
-        let _guard = lock_dir_noblock(&full_path, "snapshot", "possibly running or in use")?;
+        let _guard = backup_dir.lock().with_context(|| {
+            format!("while updating the protection status of snapshot '{backup_dir:?}'")
+        })?;
 
         let protected_path = backup_dir.protected_file();
         if protection {
