@@ -133,7 +133,7 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V> LruCache<K, V> {
 
     /// Insert or update an entry identified by `key` with the given `value`.
     /// This entry is placed as the most recently used node at the head.
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: V) -> bool {
         match self.map.entry(key) {
             Entry::Occupied(mut o) => {
                 // Node present, update value
@@ -142,6 +142,7 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V> LruCache<K, V> {
                 let mut node = unsafe { Box::from_raw(node_ptr) };
                 node.value = value;
                 let _node_ptr = Box::into_raw(node);
+                true
             }
             Entry::Vacant(v) => {
                 // Node not present, insert a new one
@@ -159,6 +160,7 @@ impl<K: std::cmp::Eq + std::hash::Hash + Copy, V> LruCache<K, V> {
                 if self.map.len() > self.capacity {
                     self.pop_tail();
                 }
+                false
             }
         }
     }
