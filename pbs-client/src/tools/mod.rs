@@ -85,7 +85,7 @@ fn get_credential(cred_name: &str) -> std::io::Result<Option<Vec<u8>>> {
 /// BASE_NAME_CMD => read the secret from specified command first line of output on stdout
 ///
 /// Only return the first line of data (without CRLF).
-pub fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
+fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
     let firstline = |data: String| -> String {
         match data.lines().next() {
             Some(line) => line.to_string(),
