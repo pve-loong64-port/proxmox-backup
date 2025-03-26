@@ -1,25 +1,15 @@
 use std::sync::Arc;
 
 use anyhow::{format_err, Error};
-use futures::*;
-use hyper::{Body, Request, Response};
+use bytes::Bytes;
+use futures::{future, FutureExt, TryFutureExt};
+use http_body_util::Full;
+use hyper::{body::Incoming, Request, Response};
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tokio::net::{TcpListener, TcpStream};
 
 use pbs_buildcfg::configdir;
-
-#[derive(Clone, Copy)]
-struct H2SExecutor;
-
-impl<Fut> hyper::rt::Executor<Fut> for H2SExecutor
-where
-    Fut: Future + Send + 'static,
-    Fut::Output: Send,
-{
-    fn execute(&self, fut: Fut) {
-        tokio::spawn(fut);
-    }
-}
 
 fn main() -> Result<(), Error> {
     proxmox_async::runtime::main(run())
@@ -63,16 +53,16 @@ async fn handle_connection(socket: TcpStream, acceptor: Arc<SslAcceptor>) -> Res
 
     stream.as_mut().accept().await?;
 
-    let mut http = hyper::server::conn::http2::Builder::new(H2SExecutor);
+    let mut http = hyper::server::conn::http2::Builder::new(TokioExecutor::new());
     // increase window size: todo - find optiomal size
     let max_window_size = (1 << 31) - 2;
     http.initial_stream_window_size(max_window_size);
     http.initial_connection_window_size(max_window_size);
 
-    let service = hyper::service::service_fn(|_req: Request<Body>| {
+    let service = hyper::service::service_fn(|_req: Request<Incoming>| {
         println!("Got request");
         let buffer = vec![65u8; 4 * 1024 * 1024]; // nonsense [A,A,A,A...]
-        let body = Body::from(buffer);
+        let body = Full::<Bytes>::from(buffer);
 
         let response = Response::builder()
             .status(hyper::http::StatusCode::OK)
@@ -85,7 +75,7 @@ async fn handle_connection(socket: TcpStream, acceptor: Arc<SslAcceptor>) -> Res
         future::ok::<_, Error>(response)
     });
 
-    http.serve_connection(stream, service)
+    http.serve_connection(TokioIo::new(stream), service)
         .map_err(Error::from)
         .await?;
 
