@@ -1,22 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, format_err, Context, Error};
 use hex::FromHex;
 use serde_json::Value;
 use tracing::{info, warn};
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
+use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions};
 use proxmox_schema::{api, param_bail, ApiType};
 use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreNotify, DatastoreTuning, KeepOptions,
-    MaintenanceMode, PruneJobConfig, PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
-    UPID_SCHEMA,
+    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendConfig, DatastoreBackendType,
+    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, PruneJobConfig,
+    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
+    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
+use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
@@ -115,6 +117,34 @@ pub(crate) fn do_create_datastore(
         DatastoreTuning::API_SCHEMA
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
+
+    if let Some(ref backend_config) = datastore.backend {
+        let backend_config: DatastoreBackendConfig = backend_config.parse()?;
+        match backend_config.ty.unwrap_or_default() {
+            DatastoreBackendType::Filesystem => (),
+            DatastoreBackendType::S3 => {
+                let s3_client_id = backend_config
+                    .client
+                    .as_ref()
+                    .ok_or_else(|| format_err!("missing required client"))?;
+                let bucket = backend_config
+                    .bucket
+                    .clone()
+                    .ok_or_else(|| format_err!("missing required bucket"))?;
+                let (config, _config_digest) =
+                    pbs_config::s3::config().context("failed to get s3 config")?;
+                let config: S3ClientConfig = config
+                    .lookup(S3_CFG_TYPE_ID, s3_client_id)
+                    .with_context(|| format!("no '{s3_client_id}' in config"))?;
+                let options =
+                    S3ClientOptions::from_config(config, bucket, datastore.name.to_owned());
+                let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+                // Fine to block since this runs in worker task
+                proxmox_async::runtime::block_on(s3_client.head_bucket())
+                    .context("failed to access bucket")?;
+            }
+        }
+    }
 
     let unmount_guard = if datastore.backing_device.is_some() {
         do_mount_device(datastore.clone())?;
