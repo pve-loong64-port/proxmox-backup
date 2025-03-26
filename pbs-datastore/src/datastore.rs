@@ -1023,10 +1023,47 @@ impl DataStore {
         Ok(list)
     }
 
+    // Similar to open index, but ignore index files with blob or unknown archive type.
+    // Further, do not fail if file vanished.
+    fn open_index_reader(&self, absolute_path: &Path) -> Result<Option<Box<dyn IndexFile>>, Error> {
+        let archive_type = match ArchiveType::from_path(absolute_path) {
+            Ok(archive_type) => archive_type,
+            // ignore archives with unknown archive type
+            Err(_) => return Ok(None),
+        };
+
+        if absolute_path.is_relative() {
+            bail!("expected absolute path, got '{absolute_path:?}'");
+        }
+
+        let file = match std::fs::File::open(absolute_path) {
+            Ok(file) => file,
+            // ignore vanished files
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(err) => {
+                return Err(Error::from(err).context(format!("can't open file '{absolute_path:?}'")))
+            }
+        };
+
+        match archive_type {
+            ArchiveType::FixedIndex => {
+                let reader = FixedIndexReader::new(file)
+                    .with_context(|| format!("can't open fixed index '{absolute_path:?}'"))?;
+                Ok(Some(Box::new(reader)))
+            }
+            ArchiveType::DynamicIndex => {
+                let reader = DynamicIndexReader::new(file)
+                    .with_context(|| format!("can't open dynamic index '{absolute_path:?}'"))?;
+                Ok(Some(Box::new(reader)))
+            }
+            ArchiveType::Blob => Ok(None),
+        }
+    }
+
     // mark chunks  used by ``index`` as used
-    fn index_mark_used_chunks<I: IndexFile>(
+    fn index_mark_used_chunks(
         &self,
-        index: I,
+        index: Box<dyn IndexFile>,
         file_name: &Path, // only used for error reporting
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
@@ -1084,24 +1121,8 @@ impl DataStore {
                 }
             }
 
-            match std::fs::File::open(&img) {
-                Ok(file) => {
-                    if let Ok(archive_type) = ArchiveType::from_path(&img) {
-                        if archive_type == ArchiveType::FixedIndex {
-                            let index = FixedIndexReader::new(file).map_err(|e| {
-                                format_err!("can't read index '{}' - {}", img.to_string_lossy(), e)
-                            })?;
-                            self.index_mark_used_chunks(index, &img, status, worker)?;
-                        } else if archive_type == ArchiveType::DynamicIndex {
-                            let index = DynamicIndexReader::new(file).map_err(|e| {
-                                format_err!("can't read index '{}' - {}", img.to_string_lossy(), e)
-                            })?;
-                            self.index_mark_used_chunks(index, &img, status, worker)?;
-                        }
-                    }
-                }
-                Err(err) if err.kind() == io::ErrorKind::NotFound => (), // ignore vanished files
-                Err(err) => bail!("can't open index {} - {}", img.to_string_lossy(), err),
+            if let Some(index) = self.open_index_reader(&img)? {
+                self.index_mark_used_chunks(index, &img, status, worker)?;
             }
 
             let percentage = (i + 1) * 100 / image_count;
@@ -1167,7 +1188,8 @@ impl DataStore {
 
             info!("Start GC phase1 (mark used chunks)");
 
-            self.mark_used_chunks(&mut gc_status, worker)?;
+            self.mark_used_chunks(&mut gc_status, worker)
+                .context("marking used chunks failed")?;
 
             info!("Start GC phase2 (sweep unused chunks)");
             self.inner.chunk_store.sweep_unused_chunks(
