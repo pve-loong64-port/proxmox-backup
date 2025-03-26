@@ -469,25 +469,41 @@ impl BackupDir {
     /// Returns the filename to lock a manifest
     ///
     /// Also creates the basedir. The lockfile is located in
-    /// '/run/proxmox-backup/locks/{datastore}/[ns/{ns}/]+{type}/{id}/{timestamp}.index.json.lck'
-    fn manifest_lock_path(&self) -> Result<PathBuf, Error> {
-        let mut path = PathBuf::from(&format!("/run/proxmox-backup/locks/{}", self.store.name()));
-        path.push(self.relative_path());
+    /// `${DATASTORE_LOCKS_DIR}/${datastore name}/${lock_file_path_helper(rpath)}.index.json.lck`
+    /// where rpath is the relative path of the snapshot.
+    fn manifest_lock_path(&self) -> PathBuf {
+        let path = Path::new(DATASTORE_LOCKS_DIR).join(self.store.name());
 
-        std::fs::create_dir_all(&path)?;
-        let ts = self.backup_time_string();
-        path.push(format!("{ts}{MANIFEST_LOCK_NAME}"));
+        let rpath = Path::new(self.dir.group.ty.as_str())
+            .join(&self.dir.group.id)
+            .join(&self.backup_time_string)
+            .join(MANIFEST_LOCK_NAME);
 
-        Ok(path)
+        path.join(lock_file_path_helper(&self.ns, rpath))
     }
 
     /// Locks the manifest of a snapshot, for example, to update or delete it.
     pub(crate) fn lock_manifest(&self) -> Result<BackupLockGuard, Error> {
-        let path = self.manifest_lock_path()?;
+        let path = if *OLD_LOCKING {
+            // old manifest lock path
+            let path = Path::new(DATASTORE_LOCKS_DIR)
+                .join(self.store.name())
+                .join(self.relative_path());
 
-        // actions locking the manifest should be relatively short, only wait a few seconds
-        open_backup_lockfile(&path, Some(std::time::Duration::from_secs(5)), true)
-            .map_err(|err| format_err!("unable to acquire manifest lock {:?} - {}", &path, err))
+            std::fs::create_dir_all(&path)?;
+
+            path.join(format!("{}{MANIFEST_LOCK_NAME}", self.backup_time_string()))
+        } else {
+            self.manifest_lock_path()
+        };
+
+        lock_helper(self.store.name(), &path, |p| {
+            // update_manifest should never take a long time, so if
+            // someone else has the lock we can simply block a bit
+            // and should get it soon
+            open_backup_lockfile(p, Some(Duration::from_secs(5)), true)
+                .with_context(|| format_err!("unable to acquire manifest lock {p:?}"))
+        })
     }
 
     /// Returns a file name for locking a snapshot.
@@ -562,10 +578,7 @@ impl BackupDir {
         })?;
 
         // remove no longer needed lock files
-        if let Ok(path) = self.manifest_lock_path() {
-            let _ = std::fs::remove_file(path); // ignore errors
-        }
-
+        let _ = std::fs::remove_file(self.manifest_lock_path()); // ignore errors
         let _ = std::fs::remove_file(self.lock_path()); // ignore errors
 
         Ok(())
