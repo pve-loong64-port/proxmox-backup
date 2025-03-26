@@ -7,6 +7,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{bail, format_err, Context, Error};
 use nix::unistd::{unlinkat, UnlinkatFlags};
+use pbs_tools::lru_cache::LruCache;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
@@ -1070,6 +1071,7 @@ impl DataStore {
         &self,
         index: Box<dyn IndexFile>,
         file_name: &Path, // only used for error reporting
+        chunk_lru_cache: &mut LruCache<[u8; 32], ()>,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
     ) -> Result<(), Error> {
@@ -1080,6 +1082,12 @@ impl DataStore {
             worker.check_abort()?;
             worker.fail_on_shutdown()?;
             let digest = index.index_digest(pos).unwrap();
+
+            // Avoid multiple expensive atime updates by utimensat
+            if chunk_lru_cache.insert(*digest, ()) {
+                continue;
+            }
+
             if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
                 let hex = hex::encode(digest);
                 warn!(
@@ -1120,6 +1128,7 @@ impl DataStore {
         let mut unprocessed_index_list = self.list_index_files()?;
         let index_count = unprocessed_index_list.len();
 
+        let mut chunk_lru_cache = LruCache::new(1024 * 1024);
         let mut processed_index_files = 0;
         let mut last_percentage: usize = 0;
 
@@ -1146,7 +1155,13 @@ impl DataStore {
                             Some(index) => index,
                             None => continue,
                         };
-                        self.index_mark_used_chunks(index, &path, status, worker)?;
+                        self.index_mark_used_chunks(
+                            index,
+                            &path,
+                            &mut chunk_lru_cache,
+                            status,
+                            worker,
+                        )?;
 
                         unprocessed_index_list.remove(&path);
 
@@ -1173,7 +1188,7 @@ impl DataStore {
                 Some(index) => index,
                 None => continue,
             };
-            self.index_mark_used_chunks(index, &path, status, worker)?;
+            self.index_mark_used_chunks(index, &path, &mut chunk_lru_cache, status, worker)?;
             warn!("Marked chunks for unexpected index file at '{path:?}'");
         }
 
