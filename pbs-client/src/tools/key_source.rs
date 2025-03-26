@@ -345,8 +345,8 @@ pub(crate) unsafe fn set_test_default_master_pubkey(value: Result<Option<Vec<u8>
 pub fn get_encryption_key_password() -> Result<Vec<u8>, Error> {
     // fixme: implement other input methods
 
-    if let Some(password) = super::get_secret_from_env("PBS_ENCRYPTION_PASSWORD")? {
-        return Ok(password.as_bytes().to_vec());
+    if let Some(password) = super::get_encryption_password()? {
+        return Ok(password);
     }
 
     // If we're on a TTY, query the user for a password

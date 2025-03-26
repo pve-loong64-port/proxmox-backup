@@ -28,6 +28,16 @@ pub mod key_source;
 
 const ENV_VAR_PBS_FINGERPRINT: &str = "PBS_FINGERPRINT";
 const ENV_VAR_PBS_PASSWORD: &str = "PBS_PASSWORD";
+const ENV_VAR_PBS_ENCRYPTION_PASSWORD: &str = "PBS_ENCRYPTION_PASSWORD";
+
+/// Directory with system [credential]s. See systemd-creds(1).
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+const ENV_VAR_CREDENTIALS_DIRECTORY: &str = "CREDENTIALS_DIRECTORY";
+/// Credential name of the encryption password.
+const CRED_PBS_ENCRYPTION_PASSWORD: &str = "proxmox-backup-client.encryption-password";
+/// Credential name of the the password.
+const CRED_PBS_PASSWORD: &str = "proxmox-backup-client.password";
 
 pub const REPO_URL_SCHEMA: Schema = StringSchema::new("Repository URL.")
     .format(&BACKUP_REPO_URL)
@@ -39,6 +49,30 @@ pub const CHUNK_SIZE_SCHEMA: Schema = IntegerSchema::new("Chunk size in KB. Must
     .maximum(4096)
     .default(4096)
     .schema();
+
+/// Retrieves a secret stored in a [credential] provided by systemd.
+///
+/// Returns `Ok(None)` if the credential does not exist.
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+fn get_credential(cred_name: &str) -> std::io::Result<Option<Vec<u8>>> {
+    let Some(creds_dir) = std::env::var_os(ENV_VAR_CREDENTIALS_DIRECTORY) else {
+        return Ok(None);
+    };
+    let path = std::path::Path::new(&creds_dir).join(cred_name);
+
+    proxmox_log::debug!("attempting to use credential {cred_name} from {creds_dir:?}",);
+    // We read the whole contents without a BufRead. As per systemd-creds(1):
+    // Credentials are limited-size binary or textual objects.
+    match std::fs::read(&path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            proxmox_log::debug!("no {cred_name} credential found in {creds_dir:?}");
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
 
 /// Helper to read a secret through a environment variable (ENV).
 ///
@@ -118,6 +152,48 @@ pub fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
     Ok(None)
 }
 
+/// Gets the backup server's password.
+///
+/// Looks for a password in the `PBS_PASSWORD` environment variable, if there
+/// isn't one it reads the `proxmox-backup-client.password` [credential].
+///
+/// Returns `Ok(None)` if neither the environment variable or credentials are
+/// present.
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+pub fn get_password() -> Result<Option<String>, Error> {
+    if let Some(password) = get_secret_from_env(ENV_VAR_PBS_PASSWORD)? {
+        Ok(Some(password))
+    } else if let Some(password) = get_credential(CRED_PBS_PASSWORD)? {
+        String::from_utf8(password)
+            .map(Option::Some)
+            .map_err(|_err| format_err!("non-utf8 password credential"))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Gets an encryption password.
+///
+///
+/// Looks for a password in the `PBS_ENCRYPTION_PASSWORD` environment variable,
+/// if there isn't one it reads the `proxmox-backup-client.encryption-password`
+/// [credential].
+///
+/// Returns `Ok(None)` if neither the environment variable or credentials are
+/// present.
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+pub fn get_encryption_password() -> Result<Option<Vec<u8>>, Error> {
+    if let Some(password) = get_secret_from_env(ENV_VAR_PBS_ENCRYPTION_PASSWORD)? {
+        Ok(Some(password.into_bytes()))
+    } else if let Some(password) = get_credential(CRED_PBS_ENCRYPTION_PASSWORD)? {
+        Ok(Some(password))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn get_default_repository() -> Option<String> {
     std::env::var("PBS_REPOSITORY").ok()
 }
@@ -181,7 +257,7 @@ fn connect_do(
 ) -> Result<HttpClient, Error> {
     let fingerprint = std::env::var(ENV_VAR_PBS_FINGERPRINT).ok();
 
-    let password = get_secret_from_env(ENV_VAR_PBS_PASSWORD)?;
+    let password = get_password()?;
     let options = HttpClientOptions::new_interactive(password, fingerprint).rate_limit(rate_limit);
 
     HttpClient::new(server, port, auth_id, options)
@@ -190,7 +266,7 @@ fn connect_do(
 /// like get, but simply ignore errors and return Null instead
 pub async fn try_get(repo: &BackupRepository, url: &str) -> Value {
     let fingerprint = std::env::var(ENV_VAR_PBS_FINGERPRINT).ok();
-    let password = get_secret_from_env(ENV_VAR_PBS_PASSWORD).unwrap_or(None);
+    let password = get_password().unwrap_or(None);
 
     // ticket cache, but no questions asked
     let options = HttpClientOptions::new_interactive(password, fingerprint).interactive(false);
