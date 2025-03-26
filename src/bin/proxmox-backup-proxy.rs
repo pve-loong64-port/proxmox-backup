@@ -543,7 +543,7 @@ async fn schedule_datastore_garbage_collection() {
             Some(event_str),
             false,
         ) {
-            eprintln!("unable to start garbage collection job on datastore {store} - {err}");
+            eprintln!("unable to start garbage collection job on datastore {store} - {err:#}");
         }
     }
 }

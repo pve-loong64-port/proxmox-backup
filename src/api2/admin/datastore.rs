@@ -1218,11 +1218,7 @@ pub fn start_garbage_collection(
     let upid_str =
         crate::server::do_garbage_collection_job(job, datastore, &auth_id, None, to_stdout)
             .map_err(|err| {
-                format_err!(
-                    "unable to start garbage collection job on datastore {} - {}",
-                    store,
-                    err
-                )
+                format_err!("unable to start garbage collection job on datastore {store} - {err:#}")
             })?;
 
     Ok(json!(upid_str))
