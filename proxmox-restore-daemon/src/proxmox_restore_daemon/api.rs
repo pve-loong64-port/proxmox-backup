@@ -6,14 +6,16 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Error};
 use futures::FutureExt;
+use hyper::body::Incoming;
 use hyper::http::request::Parts;
-use hyper::{header, Body, Response, StatusCode};
+use hyper::{header, Response, StatusCode};
 use log::error;
 use serde_json::Value;
 use tokio::sync::Semaphore;
 
 use pathpatterns::{MatchEntry, MatchPattern, MatchType, Pattern};
 use proxmox_compression::{tar::tar_directory, zip::zip_directory, zstd::ZstdEncoder};
+use proxmox_http::Body;
 use proxmox_router::{
     list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router,
     RpcEnvironment, SubdirMap,
@@ -264,7 +266,7 @@ pub const API_METHOD_EXTRACT: ApiMethod = ApiMethod::new(
 
 fn extract(
     _parts: Parts,
-    _req_body: Body,
+    _req_body: Incoming,
     param: Value,
     _info: &ApiMethod,
     _rpcenv: Box<dyn RpcEnvironment>,

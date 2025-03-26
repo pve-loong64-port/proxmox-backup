@@ -9,6 +9,9 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{bail, format_err, Error};
+use futures::StreamExt;
+use hyper_util::rt::TokioIo;
+use hyper_util::service::TowerToHyperService;
 use log::{error, info};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -114,14 +117,23 @@ async fn run() -> Result<(), Error> {
 
     let vsock_fd = get_vsock_fd()?;
     let connections = accept_vsock_connections(vsock_fd);
-    let receiver_stream = ReceiverStream::new(connections);
-    let acceptor = hyper::server::accept::from_stream(receiver_stream);
+    let mut receiver_stream = ReceiverStream::new(connections);
 
     let hyper_future = async move {
-        hyper::Server::builder(acceptor)
-            .serve(rest_server)
-            .await
-            .map_err(|err| format_err!("hyper finished with error: {}", err))
+        while let Some(conn) = receiver_stream.next().await {
+            let conn = conn?;
+
+            let api_service = TowerToHyperService::new(rest_server.api_service(&conn)?);
+
+            let conn = hyper::server::conn::http1::Builder::new()
+                .serve_connection(TokioIo::new(conn), api_service);
+
+            tokio::spawn(async move {
+                conn.await
+                    .map_err(|err| format_err!("hyper finished with error: {}", err))
+            });
+        }
+        Ok(())
     };
 
     tokio::try_join!(init_future, hyper_future)?;

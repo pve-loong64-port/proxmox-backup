@@ -12,6 +12,7 @@ base64.workspace = true
 env_logger.workspace = true
 futures.workspace = true
 hyper.workspace = true
+hyper-util = { workspace = true, features = [ "service" ] }
 libc.workspace = true
 log.workspace = true
 nix.workspace = true
@@ -26,6 +27,7 @@ pxar.workspace = true
 
 proxmox-async.workspace = true
 proxmox-compression.workspace = true
+proxmox-http.workspace = true
 proxmox-rest-server.workspace = true
 proxmox-router = { workspace = true, features = [ "cli", "server" ] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }

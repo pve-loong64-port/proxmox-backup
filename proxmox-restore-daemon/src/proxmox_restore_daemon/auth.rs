@@ -7,8 +7,9 @@ use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
 use hyper::http::HeaderMap;
-use hyper::{Body, Method, Response, StatusCode};
+use hyper::{Method, Response, StatusCode};
 
+use proxmox_http::Body;
 use proxmox_router::UserInformation;
 
 use proxmox_rest_server::AuthError;
@@ -69,7 +70,7 @@ pub fn get_index() -> Pin<Box<dyn Future<Output = hyper::http::Response<Body>> +
         Response::builder()
             .status(StatusCode::OK)
             .header(hyper::header::CONTENT_TYPE, "text/html")
-            .body(index.into())
+            .body(index.to_owned().into())
             .unwrap()
     })
 }
