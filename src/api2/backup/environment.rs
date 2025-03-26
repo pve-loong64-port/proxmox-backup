@@ -1,5 +1,6 @@
 use anyhow::{bail, format_err, Context, Error};
-use nix::dir::Dir;
+use pbs_config::BackupLockGuard;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tracing::info;
@@ -635,7 +636,7 @@ impl BackupEnvironment {
     /// If verify-new is set on the datastore, this will run a new verify task
     /// for the backup. If not, this will return and also drop the passed lock
     /// immediately.
-    pub fn verify_after_complete(&self, excl_snap_lock: Dir) -> Result<(), Error> {
+    pub fn verify_after_complete(&self, excl_snap_lock: BackupLockGuard) -> Result<(), Error> {
         self.ensure_finished()?;
 
         if !self.datastore.verify_new() {

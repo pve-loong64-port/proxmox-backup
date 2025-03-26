@@ -22,6 +22,8 @@ ifneq ("$(wildcard .repoid)","")
 endif
 
 %:
+	@echo "fix locking version in postinst"
+	false
 	dh $@ --with=bash-completion
 
 override_dh_auto_configure:

@@ -80,6 +80,11 @@ EOF
 				update_sync_job "$prev_job"
 			fi
 		fi
+
+		if dpkg --compare-versions "$2" 'lt' '3.3.4~'; then
+			# ensure old locking is used by the daemon until a reboot happened
+			touch "/run/proxmox-backup/old-locking"
+		fi
 	fi
     ;;
 

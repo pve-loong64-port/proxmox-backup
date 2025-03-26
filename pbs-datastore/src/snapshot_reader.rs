@@ -6,6 +6,9 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Error};
 use nix::dir::Dir;
+use nix::fcntl::OFlag;
+use nix::sys::stat::Mode;
+use pbs_config::BackupLockGuard;
 
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, BackupNamespace, Operation, CLIENT_LOG_BLOB_NAME,
@@ -26,6 +29,10 @@ pub struct SnapshotReader {
     datastore_name: String,
     file_list: Vec<String>,
     locked_dir: Dir,
+
+    // while this is never read, the lock needs to be kept until the
+    // reader is dropped to ensure valid locking semantics
+    _lock: BackupLockGuard,
 }
 
 impl SnapshotReader {
@@ -46,9 +53,12 @@ impl SnapshotReader {
             bail!("snapshot {} does not exist!", snapshot.dir());
         }
 
-        let locked_dir = snapshot
+        let lock = snapshot
             .lock_shared()
             .with_context(|| format!("while trying to read snapshot '{snapshot:?}'"))?;
+
+        let locked_dir = Dir::open(&snapshot_path, OFlag::O_RDONLY, Mode::empty())
+            .with_context(|| format!("unable to open snapshot directory {snapshot_path:?}"))?;
 
         let datastore_name = datastore.name().to_string();
         let manifest = match snapshot.load_manifest() {
@@ -79,6 +89,7 @@ impl SnapshotReader {
             datastore_name,
             file_list,
             locked_dir,
+            _lock: lock,
         })
     }
 

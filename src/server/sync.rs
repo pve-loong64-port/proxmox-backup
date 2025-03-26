@@ -10,7 +10,7 @@ use std::time::Duration;
 use anyhow::{bail, format_err, Context, Error};
 use futures::{future::FutureExt, select};
 use hyper::http::StatusCode;
-use proxmox_sys::fs::DirLockGuard;
+use pbs_config::BackupLockGuard;
 use serde_json::json;
 use tracing::{info, warn};
 
@@ -106,7 +106,7 @@ pub(crate) struct RemoteSourceReader {
 }
 
 pub(crate) struct LocalSourceReader {
-    pub(crate) _dir_lock: Arc<Mutex<DirLockGuard>>,
+    pub(crate) _dir_lock: Arc<Mutex<BackupLockGuard>>,
     pub(crate) path: PathBuf,
     pub(crate) datastore: Arc<DataStore>,
 }

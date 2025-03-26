@@ -22,6 +22,8 @@ pub use config_version_cache::ConfigVersionCache;
 
 use anyhow::{format_err, Error};
 use nix::unistd::{Gid, Group, Uid, User};
+use proxmox_sys::fs::DirLockGuard;
+use std::os::unix::prelude::AsRawFd;
 
 pub use pbs_buildcfg::{BACKUP_GROUP_NAME, BACKUP_USER_NAME};
 
@@ -46,13 +48,34 @@ pub fn backup_group() -> Result<nix::unistd::Group, Error> {
 }
 
 pub struct BackupLockGuard {
-    _file: Option<std::fs::File>,
+    file: Option<std::fs::File>,
+    // TODO: Remove `_legacy_dir` with PBS 5
+    _legacy_dir: Option<DirLockGuard>,
+}
+
+impl AsRawFd for BackupLockGuard {
+    fn as_raw_fd(&self) -> i32 {
+        self.file.as_ref().map_or(-1, |f| f.as_raw_fd())
+    }
+}
+
+// TODO: Remove with PBS 5
+impl From<DirLockGuard> for BackupLockGuard {
+    fn from(value: DirLockGuard) -> Self {
+        Self {
+            file: None,
+            _legacy_dir: Some(value),
+        }
+    }
 }
 
 #[doc(hidden)]
 /// Note: do not use for production code, this is only intended for tests
 pub unsafe fn create_mocked_lock() -> BackupLockGuard {
-    BackupLockGuard { _file: None }
+    BackupLockGuard {
+        file: None,
+        _legacy_dir: None,
+    }
 }
 
 /// Open or create a lock file owned by user "backup" and lock it.
@@ -76,7 +99,10 @@ pub fn open_backup_lockfile<P: AsRef<std::path::Path>>(
     let timeout = timeout.unwrap_or(std::time::Duration::new(10, 0));
 
     let file = proxmox_sys::fs::open_file_locked(&path, timeout, exclusive, options)?;
-    Ok(BackupLockGuard { _file: Some(file) })
+    Ok(BackupLockGuard {
+        file: Some(file),
+        _legacy_dir: None,
+    })
 }
 
 /// Atomically write data to file owned by "root:backup" with permission "0640"

@@ -13,7 +13,6 @@ use proxmox_human_byte::HumanByte;
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
-use proxmox_sys::fs::DirLockGuard;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
@@ -24,6 +23,7 @@ use pbs_api_types::{
     DataStoreConfig, DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionStatus,
     MaintenanceMode, MaintenanceType, Operation, UPID,
 };
+use pbs_config::BackupLockGuard;
 
 use crate::backup_info::{BackupDir, BackupGroup};
 use crate::chunk_store::ChunkStore;
@@ -778,7 +778,7 @@ impl DataStore {
         ns: &BackupNamespace,
         backup_group: &pbs_api_types::BackupGroup,
         auth_id: &Authid,
-    ) -> Result<(Authid, DirLockGuard), Error> {
+    ) -> Result<(Authid, BackupLockGuard), Error> {
         let backup_group = self.backup_group(ns.clone(), backup_group.clone());
 
         // create intermediate path first
@@ -816,7 +816,7 @@ impl DataStore {
         self: &Arc<Self>,
         ns: &BackupNamespace,
         backup_dir: &pbs_api_types::BackupDir,
-    ) -> Result<(PathBuf, bool, DirLockGuard), Error> {
+    ) -> Result<(PathBuf, bool, BackupLockGuard), Error> {
         let backup_dir = self.backup_dir(ns.clone(), backup_dir.clone())?;
         let relative_path = backup_dir.relative_path();
 

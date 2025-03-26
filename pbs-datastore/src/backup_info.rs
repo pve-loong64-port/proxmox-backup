@@ -1,13 +1,15 @@
 use std::fmt;
-use std::os::unix::io::RawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::prelude::OsStrExt;
+use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
 
-use proxmox_sys::fs::{
-    lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions, DirLockGuard,
-};
+use proxmox_sys::fs::{lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions};
+use proxmox_systemd::escape_unit;
 
 use pbs_api_types::{
     Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, VerifyState,
@@ -17,6 +19,18 @@ use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
 use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
 use crate::{DataBlob, DataStore};
+
+pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
+
+// TODO: Remove with PBS 5
+// Note: The `expect()` call here will only happen if we can neither confirm nor deny the existence
+// of the file. this should only happen if a user messes with the `/run/proxmox-backup` directory.
+// if that happens, a lot more should fail as we rely on the existence of the directory throughout
+// the code. so just panic with a reasonable message.
+static OLD_LOCKING: LazyLock<bool> = LazyLock::new(|| {
+    std::fs::exists("/run/proxmox-backup/old-locking")
+        .expect("cannot read `/run/proxmox-backup`, please check permissions")
+});
 
 /// BackupGroup is a directory containing a list of BackupDir
 #[derive(Clone)]
@@ -225,6 +239,7 @@ impl BackupGroup {
             delete_stats.increment_removed_groups();
         }
 
+        let _ = std::fs::remove_file(self.lock_path());
         Ok(delete_stats)
     }
 
@@ -241,13 +256,34 @@ impl BackupGroup {
             .set_owner(&self.ns, self.as_ref(), auth_id, force)
     }
 
-    /// Lock a group exclusively
-    pub fn lock(&self) -> Result<DirLockGuard, Error> {
-        lock_dir_noblock(
-            &self.full_group_path(),
-            "backup group",
-            "possible running backup",
-        )
+    /// Returns a file name for locking a group.
+    ///
+    /// The lock file will be located in:
+    /// `${DATASTORE_LOCKS_DIR}/${datastore name}/${lock_file_path_helper(rpath)}`
+    /// where `rpath` is the relative path of the group.
+    fn lock_path(&self) -> PathBuf {
+        let path = Path::new(DATASTORE_LOCKS_DIR).join(self.store.name());
+
+        let rpath = Path::new(self.group.ty.as_str()).join(&self.group.id);
+
+        path.join(lock_file_path_helper(&self.ns, rpath))
+    }
+
+    /// Locks a group exclusively.
+    pub fn lock(&self) -> Result<BackupLockGuard, Error> {
+        if *OLD_LOCKING {
+            lock_dir_noblock(
+                &self.full_group_path(),
+                "backup group",
+                "possible runing backup, group is in use",
+            )
+            .map(BackupLockGuard::from)
+        } else {
+            lock_helper(self.store.name(), &self.lock_path(), |p| {
+                open_backup_lockfile(p, Some(Duration::from_secs(0)), true)
+                    .with_context(|| format!("unable to acquire backup group lock {p:?}"))
+            })
+        }
     }
 }
 
@@ -454,22 +490,53 @@ impl BackupDir {
             .map_err(|err| format_err!("unable to acquire manifest lock {:?} - {}", &path, err))
     }
 
-    /// Lock this snapshot exclusively
-    pub fn lock(&self) -> Result<DirLockGuard, Error> {
-        lock_dir_noblock(
-            &self.full_path(),
-            "snapshot",
-            "backup is running or snapshot is in use",
-        )
+    /// Returns a file name for locking a snapshot.
+    ///
+    /// The lock file will be located in:
+    /// `${DATASTORE_LOCKS_DIR}/${datastore name}/${lock_file_path_helper(rpath)}`
+    /// where `rpath` is the relative path of the snapshot.
+    fn lock_path(&self) -> PathBuf {
+        let path = Path::new(DATASTORE_LOCKS_DIR).join(self.store.name());
+
+        let rpath = Path::new(self.dir.group.ty.as_str())
+            .join(&self.dir.group.id)
+            .join(&self.backup_time_string);
+
+        path.join(lock_file_path_helper(&self.ns, rpath))
     }
 
-    /// Acquire a shared lock on this snapshot
-    pub fn lock_shared(&self) -> Result<DirLockGuard, Error> {
-        lock_dir_noblock_shared(
-            &self.full_path(),
-            "snapshot",
-            "backup is running or snapshot is in use, could not acquire shared lock",
-        )
+    /// Locks a snapshot exclusively.
+    pub fn lock(&self) -> Result<BackupLockGuard, Error> {
+        if *OLD_LOCKING {
+            lock_dir_noblock(
+                &self.full_path(),
+                "snapshot",
+                "backup is running or snapshot is in use",
+            )
+            .map(BackupLockGuard::from)
+        } else {
+            lock_helper(self.store.name(), &self.lock_path(), |p| {
+                open_backup_lockfile(p, Some(Duration::from_secs(0)), true)
+                    .with_context(|| format!("unable to acquire snapshot lock {p:?}"))
+            })
+        }
+    }
+
+    /// Acquires a shared lock on a snapshot.
+    pub fn lock_shared(&self) -> Result<BackupLockGuard, Error> {
+        if *OLD_LOCKING {
+            lock_dir_noblock_shared(
+                &self.full_path(),
+                "snapshot",
+                "backup is running or snapshot is in use, could not acquire shared lock",
+            )
+            .map(BackupLockGuard::from)
+        } else {
+            lock_helper(self.store.name(), &self.lock_path(), |p| {
+                open_backup_lockfile(p, Some(Duration::from_secs(0)), false)
+                    .with_context(|| format!("unable to acquire shared snapshot lock {p:?}"))
+            })
+        }
     }
 
     /// Destroy the whole snapshot, bails if it's protected
@@ -494,10 +561,12 @@ impl BackupDir {
             format_err!("removing backup snapshot {:?} failed - {}", full_path, err,)
         })?;
 
-        // the manifest doesn't exist anymore, no need to keep the lock (already done by guard?)
+        // remove no longer needed lock files
         if let Ok(path) = self.manifest_lock_path() {
             let _ = std::fs::remove_file(path); // ignore errors
         }
+
+        let _ = std::fs::remove_file(self.lock_path()); // ignore errors
 
         Ok(())
     }
@@ -691,4 +760,76 @@ fn list_backup_files<P: ?Sized + nix::NixPath>(
     })?;
 
     Ok(files)
+}
+
+/// Creates a path to a lock file depending on the relative path of an object (snapshot, group,
+/// manifest) in a datastore. First all namespaces will be concatenated with a colon (ns-folder).
+/// Then the actual file name will depend on the length of the relative path without namespaces. If
+/// it is shorter than 255 characters in its unit encoded form, than the unit encoded form will be
+/// used directly. If not, the file name will consist of the first 80 character, the last 80
+/// characters and the hash of the unit encoded relative path without namespaces. It will also be
+/// placed into a "hashed" subfolder in the namespace folder.
+///
+/// Examples:
+///
+/// - vm-100
+/// - vm-100-2022\x2d05\x2d02T08\x3a11\x3a33Z
+/// - ns1:ns2:ns3:ns4:ns5:ns6:ns7/vm-100-2022\x2d05\x2d02T08\x3a11\x3a33Z
+///
+/// A "hashed" lock file would look like this:
+/// - ns1:ns2:ns3/hashed/$first_eighty...$last_eighty-$hash
+fn lock_file_path_helper(ns: &BackupNamespace, path: PathBuf) -> PathBuf {
+    let to_return = PathBuf::from(
+        ns.components()
+            .map(String::from)
+            .reduce(|acc, n| format!("{acc}:{n}"))
+            .unwrap_or_default(),
+    );
+
+    let path_bytes = path.as_os_str().as_bytes();
+
+    let enc = escape_unit(path_bytes, true);
+
+    if enc.len() < 255 {
+        return to_return.join(enc);
+    }
+
+    let to_return = to_return.join("hashed");
+
+    let first_eigthy = &enc[..80];
+    let last_eighty = &enc[enc.len() - 80..];
+    let hash = hex::encode(openssl::sha::sha256(path_bytes));
+
+    to_return.join(format!("{first_eigthy}...{last_eighty}-{hash}"))
+}
+
+/// Helps implement the double stat'ing procedure. It avoids certain race conditions upon lock
+/// deletion.
+///
+/// It also creates the base directory for lock files.
+fn lock_helper<F>(
+    store_name: &str,
+    path: &std::path::Path,
+    lock_fn: F,
+) -> Result<BackupLockGuard, Error>
+where
+    F: Fn(&std::path::Path) -> Result<BackupLockGuard, Error>,
+{
+    let mut lock_dir = Path::new(DATASTORE_LOCKS_DIR).join(store_name);
+
+    if let Some(parent) = path.parent() {
+        lock_dir = lock_dir.join(parent);
+    };
+
+    std::fs::create_dir_all(&lock_dir)?;
+
+    let lock = lock_fn(path)?;
+
+    let inode = nix::sys::stat::fstat(lock.as_raw_fd())?.st_ino;
+
+    if nix::sys::stat::stat(path).map_or(true, |st| inode != st.st_ino) {
+        bail!("could not acquire lock, another thread modified the lock file");
+    }
+
+    Ok(lock)
 }

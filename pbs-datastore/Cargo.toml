@@ -35,6 +35,7 @@ proxmox-lang.workspace=true
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-serde = { workspace = true, features = [ "serde_json" ] }
 proxmox-sys.workspace = true
+proxmox-systemd.workspace = true
 proxmox-time.workspace = true
 proxmox-uuid.workspace = true
 proxmox-worker-task.workspace = true

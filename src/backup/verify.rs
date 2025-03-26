@@ -1,10 +1,10 @@
+use pbs_config::BackupLockGuard;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::{bail, Error};
-use proxmox_sys::fs::DirLockGuard;
 use tracing::{error, info, warn};
 
 use proxmox_worker_task::WorkerTaskContext;
@@ -330,7 +330,7 @@ pub fn verify_backup_dir_with_lock(
     backup_dir: &BackupDir,
     upid: UPID,
     filter: Option<&dyn Fn(&BackupManifest) -> bool>,
-    _snap_lock: DirLockGuard,
+    _snap_lock: BackupLockGuard,
 ) -> Result<bool, Error> {
     let datastore_name = verify_worker.datastore.name();
     let backup_dir_name = backup_dir.dir();
