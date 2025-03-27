@@ -232,15 +232,32 @@ impl BackupGroup {
             delete_stats.increment_removed_snapshots();
         }
 
-        if delete_stats.all_removed() {
-            std::fs::remove_dir_all(&path).map_err(|err| {
-                format_err!("removing group directory {:?} failed - {}", path, err)
-            })?;
+        // Note: make sure the old locking mechanism isn't used as `remove_dir_all` is not safe in
+        // that case
+        if delete_stats.all_removed() && !*OLD_LOCKING {
+            self.remove_group_dir()?;
             delete_stats.increment_removed_groups();
         }
 
-        let _ = std::fs::remove_file(self.lock_path());
         Ok(delete_stats)
+    }
+
+    /// Helper function, assumes that no more snapshots are present in the group.
+    fn remove_group_dir(&self) -> Result<(), Error> {
+        let owner_path = self.store.owner_path(&self.ns, &self.group);
+
+        std::fs::remove_file(&owner_path).map_err(|err| {
+            format_err!("removing the owner file '{owner_path:?}' failed - {err}")
+        })?;
+
+        let path = self.full_group_path();
+
+        std::fs::remove_dir(&path)
+            .map_err(|err| format_err!("removing group directory {path:?} failed - {err}"))?;
+
+        let _ = std::fs::remove_file(self.lock_path());
+
+        Ok(())
     }
 
     /// Returns the backup owner.
@@ -580,6 +597,15 @@ impl BackupDir {
         // remove no longer needed lock files
         let _ = std::fs::remove_file(self.manifest_lock_path()); // ignore errors
         let _ = std::fs::remove_file(self.lock_path()); // ignore errors
+
+        let group = BackupGroup::from(self);
+        let _guard = group.lock().with_context(|| {
+            format!("while checking if group '{group:?}' is empty during snapshot destruction")
+        })?;
+
+        if group.list_backups()?.is_empty() && !*OLD_LOCKING {
+            group.remove_group_dir()?;
+        }
 
         Ok(())
     }

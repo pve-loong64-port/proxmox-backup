@@ -706,7 +706,11 @@ impl DataStore {
     }
 
     /// Return the path of the 'owner' file.
-    fn owner_path(&self, ns: &BackupNamespace, group: &pbs_api_types::BackupGroup) -> PathBuf {
+    pub(super) fn owner_path(
+        &self,
+        ns: &BackupNamespace,
+        group: &pbs_api_types::BackupGroup,
+    ) -> PathBuf {
         self.group_path(ns, group).join("owner")
     }
 
