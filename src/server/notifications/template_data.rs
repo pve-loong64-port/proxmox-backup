@@ -314,3 +314,31 @@ pub struct TapeLoadTemplateData {
     /// The label of the tape.
     pub tape_label: String,
 }
+
+/// Template data for the verify-ok template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct VerifyOkTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+}
+
+/// Template data for the verify-err template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct VerifyErrTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+    /// The list of snapshots that failed to verify.
+    pub failed_snapshot_list: Vec<String>,
+}

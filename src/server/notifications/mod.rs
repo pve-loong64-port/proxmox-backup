@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use anyhow::Error;
 use const_format::concatcp;
 use nix::unistd::Uid;
-use serde_json::json;
 
 use proxmox_notify::context::pbs::PBS_CONTEXT;
 use proxmox_schema::ApiType;
@@ -27,6 +26,7 @@ use template_data::{
     AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
     PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData, SyncErrTemplateData,
     SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData, TapeLoadTemplateData,
+    VerifyErrTemplateData, VerifyOkTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -206,25 +206,6 @@ pub fn send_verify_status(
     job: VerificationJobConfig,
     result: &Result<Vec<String>, Error>,
 ) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
-    let mut data = json!({
-        "job": job,
-        "fqdn": fqdn,
-        "port": port,
-    });
-
-    let (template, severity) = match result {
-        Ok(errors) if errors.is_empty() => ("verify-ok", Severity::Info),
-        Ok(errors) => {
-            data["errors"] = json!(errors);
-            ("verify-err", Severity::Error)
-        }
-        Err(_) => {
-            // aborted job - do not send any notification
-            return Ok(());
-        }
-    };
-
     let metadata = HashMap::from([
         ("job-id".into(), job.id.clone()),
         ("datastore".into(), job.store.clone()),
@@ -232,7 +213,39 @@ pub fn send_verify_status(
         ("type".into(), "verify".into()),
     ]);
 
-    let notification = Notification::from_template(severity, template, data, metadata);
+    let notification = match result {
+        Err(_) => {
+            // aborted job - do not send any notification
+            return Ok(());
+        }
+        Ok(errors) if errors.is_empty() => {
+            let template_data = VerifyOkTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: job.id.clone(),
+            };
+            Notification::from_template(
+                Severity::Info,
+                "verify-ok",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+        Ok(errors) => {
+            let template_data = VerifyErrTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: job.id.clone(),
+                failed_snapshot_list: errors.clone(),
+            };
+            Notification::from_template(
+                Severity::Error,
+                "verify-err",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+    };
 
     let (email, notify, mode) = lookup_datastore_notify_settings(&job.store);
     match mode {
@@ -507,24 +520,6 @@ pub fn send_load_media_notification(
     }
 
     Ok(())
-}
-
-fn get_server_url() -> (String, usize) {
-    // user will surely request that they can change this
-
-    let nodename = proxmox_sys::nodename();
-    let mut fqdn = nodename.to_owned();
-
-    if let Ok(resolv_conf) = crate::api2::node::dns::read_etc_resolv_conf() {
-        if let Some(search) = resolv_conf["search"].as_str() {
-            fqdn.push('.');
-            fqdn.push_str(search);
-        }
-    }
-
-    let port = 8007;
-
-    (fqdn, port)
 }
 
 pub fn send_updates_available(updates: &[&APTUpdateInfo]) -> Result<(), Error> {

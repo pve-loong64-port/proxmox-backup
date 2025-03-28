@@ -1,14 +1,14 @@
 
-Job ID:    {{job.id}}
-Datastore: {{job.store}}
+Job ID:    {{job-id}}
+Datastore: {{datastore}}
 
 Verification failed on these snapshots/groups:
 
-{{#each errors}}
+{{#each failed-snapshot-list}}
     {{this~}}
 {{/each}}
 
 
 Please visit the web interface for further details:
 
-<https://{{fqdn}}:{{port}}/#pbsServerAdministration:tasks>
+<{{base-url}}/#pbsServerAdministration:tasks>
