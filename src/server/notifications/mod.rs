@@ -26,7 +26,7 @@ mod template_data;
 use template_data::{
     AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
     PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData, SyncErrTemplateData,
-    SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData,
+    SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData, TapeLoadTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -470,21 +470,28 @@ pub fn send_load_media_notification(
     label_text: &str,
     reason: Option<String>,
 ) -> Result<(), Error> {
-    let device_type = if changer { "changer" } else { "drive" };
-
-    let data = json!({
-        "device-type": device_type,
-        "device": device,
-        "label-text": label_text,
-        "reason": reason,
-        "is-changer": changer,
-    });
-
     let metadata = HashMap::from([
         ("hostname".into(), proxmox_sys::nodename().into()),
         ("type".into(), "tape-load".into()),
     ]);
-    let notification = Notification::from_template(Severity::Notice, "tape-load", data, metadata);
+
+    let device_type = if changer { "changer" } else { "drive" };
+
+    let template_data = TapeLoadTemplateData {
+        common: CommonData::new(),
+        load_reason: reason,
+        tape_drive: device.into(),
+        drive_type: device_type.into(),
+        drive_is_changer: changer,
+        tape_label: label_text.into(),
+    };
+
+    let notification = Notification::from_template(
+        Severity::Notice,
+        "tape-load",
+        serde_json::to_value(template_data)?,
+        metadata,
+    );
 
     match mode {
         TapeNotificationMode::LegacySendmail { notify_user } => {

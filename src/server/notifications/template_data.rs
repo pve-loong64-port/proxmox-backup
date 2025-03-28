@@ -295,3 +295,22 @@ pub struct TapeBackupErrTemplateData {
     /// The error that happend during the backup job.
     pub error: String,
 }
+
+/// Template data for the tape-load template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TapeLoadTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The reason why the tape must be loaded.
+    pub load_reason: Option<String>,
+    /// The tape drive.
+    pub tape_drive: String,
+    /// The type of the drive (changer/drive)
+    pub drive_type: String,
+    /// The drive is a tape changer.
+    pub drive_is_changer: bool,
+    /// The label of the tape.
+    pub tape_label: String,
+}
