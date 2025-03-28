@@ -63,7 +63,6 @@ usr/share/proxmox-backup/templates/default/tape-backup-ok-body.txt.hbs
 usr/share/proxmox-backup/templates/default/tape-backup-ok-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/tape-load-body.txt.hbs
 usr/share/proxmox-backup/templates/default/tape-load-subject.txt.hbs
-usr/share/proxmox-backup/templates/default/test-body.html.hbs
 usr/share/proxmox-backup/templates/default/test-body.txt.hbs
 usr/share/proxmox-backup/templates/default/test-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/verify-err-body.txt.hbs
