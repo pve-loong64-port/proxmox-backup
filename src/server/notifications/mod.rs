@@ -23,7 +23,10 @@ const SPOOL_DIR: &str = concatcp!(pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR, "/noti
 
 mod template_data;
 
-use template_data::{AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData};
+use template_data::{
+    AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
+    PackageUpdatesTemplateData,
+};
 
 /// Initialize the notification system by setting context in proxmox_notify
 pub fn init() -> Result<(), Error> {
@@ -464,23 +467,21 @@ fn get_server_url() -> (String, usize) {
 }
 
 pub fn send_updates_available(updates: &[&APTUpdateInfo]) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
     let hostname = proxmox_sys::nodename().to_string();
-
-    let data = json!({
-        "fqdn": fqdn,
-        "hostname": &hostname,
-        "port": port,
-        "updates": updates,
-    });
 
     let metadata = HashMap::from([
         ("hostname".into(), hostname),
         ("type".into(), "package-updates".into()),
     ]);
 
-    let notification =
-        Notification::from_template(Severity::Info, "package-updates", data, metadata);
+    let template_data = PackageUpdatesTemplateData::new(updates);
+
+    let notification = Notification::from_template(
+        Severity::Info,
+        "package-updates",
+        serde_json::to_value(template_data)?,
+        metadata,
+    );
 
     send_notification(notification)?;
     Ok(())

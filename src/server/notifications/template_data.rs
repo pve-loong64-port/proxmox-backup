@@ -1,4 +1,4 @@
-use pbs_api_types::GarbageCollectionStatus;
+use pbs_api_types::{APTUpdateInfo, GarbageCollectionStatus};
 use serde::Serialize;
 
 // NOTE: For some of these types, the `XyzOkTemplateData` and `XyzErrTemplateData`
@@ -143,4 +143,43 @@ pub struct AcmeErrTemplateData {
     pub common: CommonData,
     /// The error that occured when trying to request the certificate.
     pub error: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+/// A single package which can be upgraded.
+pub struct UpgradablePackage {
+    /// The name of the package.
+    package_name: String,
+    /// The new version which can be installed.
+    available_version: String,
+    /// The currently installed version.
+    installed_version: String,
+}
+
+/// Template data for the package-updates template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PackageUpdatesTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    pub available_updates: Vec<UpgradablePackage>,
+}
+
+impl PackageUpdatesTemplateData {
+    /// Create new a new instance.
+    pub fn new(updates: &[&APTUpdateInfo]) -> Self {
+        Self {
+            common: CommonData::new(),
+            available_updates: updates
+                .iter()
+                .map(|info| UpgradablePackage {
+                    package_name: info.package.clone(),
+                    available_version: info.version.clone(),
+                    installed_version: info.old_version.clone(),
+                })
+                .collect(),
+        }
+    }
 }
