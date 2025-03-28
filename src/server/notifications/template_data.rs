@@ -211,3 +211,39 @@ pub struct PruneErrTemplateData {
     /// The error that occured during the prune job.
     pub error: String,
 }
+
+/// Template data for the sync-ok template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct SyncOkTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+    /// The remote.
+    pub remote: Option<String>,
+    /// The remote datastore we synced to/from.
+    pub remote_datastore: String,
+}
+
+/// Template data for the sync-err template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct SyncErrTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+    /// The remote.
+    pub remote: Option<String>,
+    /// The remote datastore we synced to/from.
+    pub remote_datastore: String,
+    /// The error that occurred during the sync job.
+    pub error: String,
+}

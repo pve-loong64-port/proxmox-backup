@@ -25,7 +25,8 @@ mod template_data;
 
 use template_data::{
     AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
-    PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData,
+    PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData, SyncErrTemplateData,
+    SyncOkTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -320,21 +321,6 @@ pub fn send_prune_status(
 }
 
 pub fn send_sync_status(job: &SyncJobConfig, result: &Result<(), Error>) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
-    let mut data = json!({
-        "job": job,
-        "fqdn": fqdn,
-        "port": port,
-    });
-
-    let (template, severity) = match result {
-        Ok(()) => ("sync-ok", Severity::Info),
-        Err(err) => {
-            data["error"] = err.to_string().into();
-            ("sync-err", Severity::Error)
-        }
-    };
-
     let metadata = HashMap::from([
         ("job-id".into(), job.id.clone()),
         ("datastore".into(), job.store.clone()),
@@ -342,7 +328,39 @@ pub fn send_sync_status(job: &SyncJobConfig, result: &Result<(), Error>) -> Resu
         ("type".into(), "sync".into()),
     ]);
 
-    let notification = Notification::from_template(severity, template, data, metadata);
+    let notification = match result {
+        Ok(()) => {
+            let template_data = SyncOkTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: job.id.clone(),
+                remote: job.remote.clone(),
+                remote_datastore: job.remote_store.clone(),
+            };
+            Notification::from_template(
+                Severity::Info,
+                "sync-ok",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+        Err(err) => {
+            let template_data = SyncErrTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: job.id.clone(),
+                remote: job.remote.clone(),
+                remote_datastore: job.remote_store.clone(),
+                error: format!("{err:#}"),
+            };
+            Notification::from_template(
+                Severity::Error,
+                "sync-err",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+    };
 
     let (email, notify, mode) = lookup_datastore_notify_settings(&job.store);
     match mode {
