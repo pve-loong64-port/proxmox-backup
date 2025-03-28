@@ -133,3 +133,14 @@ impl GcErrTemplateData {
         }
     }
 }
+
+/// Template data for the acme-err template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct AcmeErrTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The error that occured when trying to request the certificate.
+    pub error: String,
+}

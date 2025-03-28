@@ -23,7 +23,7 @@ const SPOOL_DIR: &str = concatcp!(pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR, "/noti
 
 mod template_data;
 
-use template_data::{GcErrTemplateData, GcOkTemplateData};
+use template_data::{AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData};
 
 /// Initialize the notification system by setting context in proxmox_notify
 pub fn init() -> Result<(), Error> {
@@ -489,24 +489,26 @@ pub fn send_updates_available(updates: &[&APTUpdateInfo]) -> Result<(), Error> {
 /// send email on certificate renewal failure.
 pub fn send_certificate_renewal_mail(result: &Result<(), Error>) -> Result<(), Error> {
     let error: String = match result {
-        Err(e) => e.to_string(),
+        Err(e) => format!("{e:#}"),
         _ => return Ok(()),
     };
-
-    let (fqdn, port) = get_server_url();
-
-    let data = json!({
-        "fqdn": fqdn,
-        "port": port,
-        "error": error,
-    });
 
     let metadata = HashMap::from([
         ("hostname".into(), proxmox_sys::nodename().into()),
         ("type".into(), "acme".into()),
     ]);
 
-    let notification = Notification::from_template(Severity::Info, "acme-err", data, metadata);
+    let template_data = AcmeErrTemplateData {
+        common: CommonData::new(),
+        error,
+    };
+
+    let notification = Notification::from_template(
+        Severity::Info,
+        "acme-err",
+        serde_json::to_value(template_data)?,
+        metadata,
+    );
 
     send_notification(notification)?;
     Ok(())
