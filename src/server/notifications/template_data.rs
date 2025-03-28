@@ -183,3 +183,31 @@ impl PackageUpdatesTemplateData {
         }
     }
 }
+
+/// Template data for the prune-ok template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PruneOkTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+}
+
+/// Template data for the prune-err template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PruneErrTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The ID of the job.
+    pub job_id: String,
+    /// The error that occured during the prune job.
+    pub error: String,
+}

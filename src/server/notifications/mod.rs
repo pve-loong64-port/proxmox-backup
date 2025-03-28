@@ -25,7 +25,7 @@ mod template_data;
 
 use template_data::{
     AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
-    PackageUpdatesTemplateData,
+    PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -259,22 +259,6 @@ pub fn send_prune_status(
     jobname: &str,
     result: &Result<(), Error>,
 ) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
-    let mut data = json!({
-        "jobname": jobname,
-        "store": store,
-        "fqdn": fqdn,
-        "port": port,
-    });
-
-    let (template, severity) = match result {
-        Ok(()) => ("prune-ok", Severity::Info),
-        Err(err) => {
-            data["error"] = err.to_string().into();
-            ("prune-err", Severity::Error)
-        }
-    };
-
     let metadata = HashMap::from([
         ("job-id".into(), jobname.to_string()),
         ("datastore".into(), store.into()),
@@ -282,7 +266,37 @@ pub fn send_prune_status(
         ("type".into(), "prune".into()),
     ]);
 
-    let notification = Notification::from_template(severity, template, data, metadata);
+    let notification = match result {
+        Ok(()) => {
+            let template_data = PruneOkTemplateData {
+                common: CommonData::new(),
+                datastore: store.to_string(),
+                job_id: jobname.to_string(),
+            };
+
+            Notification::from_template(
+                Severity::Info,
+                "prune-ok",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+        Err(err) => {
+            let template_data = PruneErrTemplateData {
+                common: CommonData::new(),
+                datastore: store.to_string(),
+                job_id: jobname.to_string(),
+                error: format!("{err:#}"),
+            };
+
+            Notification::from_template(
+                Severity::Error,
+                "prune-err",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+    };
 
     let (email, notify, mode) = lookup_datastore_notify_settings(store);
     match mode {
