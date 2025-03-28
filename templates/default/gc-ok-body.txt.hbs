@@ -1,17 +1,17 @@
 Datastore:            {{datastore}}
-Task ID:              {{status.upid}}
-Index file count:     {{status.index-file-count}}
+Task ID:              {{upid}}
+Index file count:     {{index-file-count}}
 
-Removed garbage:      {{human-bytes status.removed-bytes}}
-Removed chunks:       {{status.removed-chunks}}
-Removed bad chunks:   {{status.removed-bad}}
+Removed garbage:      {{human-bytes removed-bytes}}
+Removed chunks:       {{removed-chunks}}
+Removed bad chunks:   {{removed-bad}}
 
-Leftover bad chunks:  {{status.still-bad}}
-Pending removals:     {{human-bytes status.pending-bytes}} (in {{status.pending-chunks}} chunks)
+Leftover bad chunks:  {{still-bad}}
+Pending removals:     {{human-bytes pending-bytes}} (in {{pending-chunks}} chunks)
 
-Original Data usage:  {{human-bytes status.index-data-bytes}}
-On-Disk usage:        {{human-bytes status.disk-bytes}} ({{relative-percentage status.disk-bytes status.index-data-bytes}})
-On-Disk chunks:       {{status.disk-chunks}}
+Original Data usage:  {{human-bytes index-data-bytes}}
+On-Disk usage:        {{human-bytes disk-bytes}} ({{relative-percentage disk-bytes index-data-bytes}})
+On-Disk chunks:       {{disk-chunks}}
 
 Deduplication Factor: {{deduplication-factor}}
 
@@ -20,4 +20,4 @@ Garbage collection successful.
 
 Please visit the web interface for further details:
 
-<https://{{fqdn}}:{{port}}/#DataStore-{{datastore}}>
+<{{base-url}}/#DataStore-{{datastore}}>

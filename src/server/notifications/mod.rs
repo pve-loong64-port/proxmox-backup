@@ -21,6 +21,10 @@ use proxmox_notify::{Endpoint, Notification, Severity};
 
 const SPOOL_DIR: &str = concatcp!(pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR, "/notifications");
 
+mod template_data;
+
+use template_data::{GcErrTemplateData, GcOkTemplateData};
+
 /// Initialize the notification system by setting context in proxmox_notify
 pub fn init() -> Result<(), Error> {
     proxmox_notify::context::set_context(&PBS_CONTEXT);
@@ -146,38 +150,32 @@ pub fn send_gc_status(
     status: &GarbageCollectionStatus,
     result: &Result<(), Error>,
 ) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
-    let mut data = json!({
-        "datastore": datastore,
-        "fqdn": fqdn,
-        "port": port,
-    });
-
-    let (severity, template) = match result {
-        Ok(()) => {
-            let deduplication_factor = if status.disk_bytes > 0 {
-                (status.index_data_bytes as f64) / (status.disk_bytes as f64)
-            } else {
-                1.0
-            };
-
-            data["status"] = json!(status);
-            data["deduplication-factor"] = format!("{:.2}", deduplication_factor).into();
-
-            (Severity::Info, "gc-ok")
-        }
-        Err(err) => {
-            data["error"] = err.to_string().into();
-            (Severity::Error, "gc-err")
-        }
-    };
     let metadata = HashMap::from([
         ("datastore".into(), datastore.into()),
         ("hostname".into(), proxmox_sys::nodename().into()),
         ("type".into(), "gc".into()),
     ]);
 
-    let notification = Notification::from_template(severity, template, data, metadata);
+    let notification = match result {
+        Ok(()) => {
+            let template_data = GcOkTemplateData::new(datastore.to_string(), status);
+            Notification::from_template(
+                Severity::Info,
+                "gc-ok",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+        Err(err) => {
+            let template_data = GcErrTemplateData::new(datastore.to_string(), format!("{err:#}"));
+            Notification::from_template(
+                Severity::Error,
+                "gc-err",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+    };
 
     let (email, notify, mode) = lookup_datastore_notify_settings(datastore);
     match mode {
