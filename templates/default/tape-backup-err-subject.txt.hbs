@@ -1,5 +1,5 @@
-{{#if id~}}
-Tape Backup '{{ id }}' datastore '{{ job.store }}' failed
+{{#if job-id~}}
+Tape Backup '{{job-id}}' datastore '{{datastore}}' failed
 {{else~}}
-Tape Backup datastore '{{ job.store }}' failed
+Tape Backup datastore '{{datastore}}' failed
 {{/if}}

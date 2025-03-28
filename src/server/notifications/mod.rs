@@ -26,7 +26,7 @@ mod template_data;
 use template_data::{
     AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
     PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData, SyncErrTemplateData,
-    SyncOkTemplateData,
+    SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -389,26 +389,6 @@ pub fn send_tape_backup_status(
     result: &Result<(), Error>,
     summary: TapeBackupJobSummary,
 ) -> Result<(), Error> {
-    let (fqdn, port) = get_server_url();
-    let duration: proxmox_time::TimeSpan = summary.duration.into();
-    let mut data = json!({
-        "job": job,
-        "fqdn": fqdn,
-        "port": port,
-        "id": id,
-        "snapshot-list": summary.snapshot_list,
-        "used-tapes": summary.used_tapes,
-        "job-duration": duration.to_string(),
-    });
-
-    let (template, severity) = match result {
-        Ok(()) => ("tape-backup-ok", Severity::Info),
-        Err(err) => {
-            data["error"] = err.to_string().into();
-            ("tape-backup-err", Severity::Error)
-        }
-    };
-
     let mut metadata = HashMap::from([
         ("datastore".into(), job.store.clone()),
         ("media-pool".into(), job.pool.clone()),
@@ -420,7 +400,49 @@ pub fn send_tape_backup_status(
         metadata.insert("job-id".into(), id.into());
     }
 
-    let notification = Notification::from_template(severity, template, data, metadata);
+    let duration = summary.duration.as_secs();
+
+    let notification = match result {
+        Ok(()) => {
+            let template_data = TapeBackupOkTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: id.map(|id| id.into()),
+                job_duration: duration,
+                tape_pool: job.pool.clone(),
+                tape_drive: job.drive.clone(),
+                used_tapes_list: summary.used_tapes.unwrap_or_default(),
+                snapshot_list: summary.snapshot_list,
+            };
+
+            Notification::from_template(
+                Severity::Info,
+                "tape-backup-ok",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+        Err(err) => {
+            let template_data = TapeBackupErrTemplateData {
+                common: CommonData::new(),
+                datastore: job.store.clone(),
+                job_id: id.map(|id| id.into()),
+                job_duration: duration,
+                tape_pool: job.pool.clone(),
+                tape_drive: job.drive.clone(),
+                used_tapes_list: summary.used_tapes.unwrap_or_default(),
+                snapshot_list: summary.snapshot_list,
+                error: format!("{err:#}"),
+            };
+
+            Notification::from_template(
+                Severity::Error,
+                "tape-backup-err",
+                serde_json::to_value(template_data)?,
+                metadata,
+            )
+        }
+    };
 
     let mode = TapeNotificationMode::from(job);
 

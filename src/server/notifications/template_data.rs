@@ -247,3 +247,51 @@ pub struct SyncErrTemplateData {
     /// The error that occurred during the sync job.
     pub error: String,
 }
+
+/// Template data for the tape-backup-ok template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TapeBackupOkTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore that was backed up.
+    pub datastore: String,
+    /// The optional job id for this tape backup job.
+    pub job_id: Option<String>,
+    /// The total duration of the backup job in seconds.
+    pub job_duration: u64,
+    /// The tape pool.
+    pub tape_pool: String,
+    /// The name of the tape drive.
+    pub tape_drive: String,
+    /// The list of tapes which were used in this backup job.
+    pub used_tapes_list: Vec<String>,
+    /// The list of snapshots which were backed up.
+    pub snapshot_list: Vec<String>,
+}
+
+/// Template data for the tape-backup-err template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TapeBackupErrTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore that was backed up.
+    pub datastore: String,
+    /// The optional job id for this tape backup job.
+    pub job_id: Option<String>,
+    /// The total duration of the backup job in seconds.
+    pub job_duration: u64,
+    /// The tape pool.
+    pub tape_pool: String,
+    /// The name of the tape drive.
+    pub tape_drive: String,
+    /// The list of tapes which were used in this backup job.
+    pub used_tapes_list: Vec<String>,
+    /// The list of snapshots which were backed up.
+    pub snapshot_list: Vec<String>,
+    /// The error that happend during the backup job.
+    pub error: String,
+}

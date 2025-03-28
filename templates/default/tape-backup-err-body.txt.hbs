@@ -1,20 +1,20 @@
-{{#if id ~}}
-Job ID:     {{id}}
+{{#if job-id~}}
+Job ID:     {{job-id}}
 {{/if~}}
-Datastore:  {{job.store}}
-Tape Pool:  {{job.pool}}
-Tape Drive: {{job.drive}}
+Datastore:  {{datastore}}
+Tape Pool:  {{tape-pool}}
+Tape Drive: {{tape-drive}}
 
-{{#if snapshot-list ~}}
+{{#if snapshot-list~}}
 Snapshots included:
 
 {{#each snapshot-list~}}
 {{this}}
 {{/each~}}
 {{/if}}
-{{#if used-tapes }}
+{{#if used-tapes-list}}
 Used Tapes:
-{{#each used-tapes~}}
+{{#each used-tapes-list~}}
 {{this}}
 {{/each~}}
 {{/if}}
@@ -23,4 +23,4 @@ Tape Backup failed: {{error}}
 
 Please visit the web interface for further details:
 
-<https://{{fqdn}}:{{port}}/#pbsServerAdministration:tasks>
+<{{base-url}}/#pbsServerAdministration:tasks>
