@@ -53,6 +53,7 @@ pub const API_METHOD_UPGRADE_BACKUP: ApiMethod = ApiMethod::new(
             ("backup-time", false, &BACKUP_TIME_SCHEMA),
             ("debug", true, &BooleanSchema::new("Enable verbose debug logging.").schema()),
             ("benchmark", true, &BooleanSchema::new("Job is a benchmark (do not keep data).").schema()),
+            ("no-cache", true, &BooleanSchema::new("Disable local datastore cache for network storages").schema()),
         ]),
     )
 ).access(
@@ -79,6 +80,7 @@ fn upgrade_to_backup_protocol(
     async move {
         let debug = param["debug"].as_bool().unwrap_or(false);
         let benchmark = param["benchmark"].as_bool().unwrap_or(false);
+        let no_cache = param["no-cache"].as_bool().unwrap_or(false);
 
         let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
@@ -214,6 +216,7 @@ fn upgrade_to_backup_protocol(
                     worker.clone(),
                     datastore,
                     backup_dir,
+                    no_cache,
                 )?;
 
                 env.debug = debug;

@@ -77,6 +77,8 @@ pub struct BackupWriterOptions<'a> {
     pub debug: bool,
     /// Start benchmark
     pub benchmark: bool,
+    /// Skip datastore cache
+    pub no_cache: bool,
 }
 
 impl BackupWriter {
@@ -100,6 +102,7 @@ impl BackupWriter {
             "store": writer_options.datastore,
             "debug": writer_options.debug,
             "benchmark": writer_options.benchmark,
+            "no-cache": writer_options.no_cache,
         });
 
         if !writer_options.ns.is_root() {

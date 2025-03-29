@@ -26,6 +26,7 @@ async fn upload_speed() -> Result<f64, Error> {
             crypt_config: None,
             debug: false,
             benchmark: true,
+            no_cache: false,
         },
     )
     .await?;

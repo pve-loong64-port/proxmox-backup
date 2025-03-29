@@ -742,6 +742,12 @@ fn spawn_catalog_upload(
                 optional: true,
                 default: false,
             },
+            "no-cache": {
+                type: Boolean,
+                description: "Bypass local datastore cache for network storages.",
+                optional: true,
+                default: false,
+            },
         }
     }
  )]
@@ -754,6 +760,7 @@ async fn create_backup(
     change_detection_mode: Option<BackupDetectionMode>,
     dry_run: bool,
     skip_e2big_xattr: bool,
+    no_cache: bool,
     limit: ClientRateLimitConfig,
     _info: &ApiMethod,
     _rpcenv: &mut dyn RpcEnvironment,
@@ -961,6 +968,7 @@ async fn create_backup(
             crypt_config: crypt_config.clone(),
             debug: true,
             benchmark: false,
+            no_cache,
         },
     )
     .await?;

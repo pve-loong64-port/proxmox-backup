@@ -831,6 +831,7 @@ pub(crate) async fn push_snapshot(
             crypt_config: None,
             debug: false,
             benchmark: false,
+            no_cache: false,
         },
     )
     .await?;

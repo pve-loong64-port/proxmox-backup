@@ -112,6 +112,7 @@ pub struct BackupEnvironment {
     result_attributes: Value,
     auth_id: Authid,
     pub debug: bool,
+    pub no_cache: bool,
     pub formatter: &'static dyn OutputFormatter,
     pub worker: Arc<WorkerTask>,
     pub datastore: Arc<DataStore>,
@@ -128,6 +129,7 @@ impl BackupEnvironment {
         worker: Arc<WorkerTask>,
         datastore: Arc<DataStore>,
         backup_dir: BackupDir,
+        no_cache: bool,
     ) -> Result<Self, Error> {
         let state = SharedBackupState {
             finished: false,
@@ -148,6 +150,7 @@ impl BackupEnvironment {
             worker,
             datastore,
             debug: tracing::enabled!(tracing::Level::DEBUG),
+            no_cache,
             formatter: JSON_FORMATTER,
             backup_dir,
             last_backup: None,

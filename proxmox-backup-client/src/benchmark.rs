@@ -237,6 +237,7 @@ async fn test_upload_speed(
             crypt_config: crypt_config.clone(),
             debug: false,
             benchmark: true,
+            no_cache: true,
         },
     )
     .await?;

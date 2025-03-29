@@ -262,6 +262,15 @@ async fn upload_to_backend(
                 );
             }
 
+            if env.no_cache {
+                let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
+                let is_duplicate = s3_client
+                    .upload_no_replace_with_retry(object_key, data)
+                    .await
+                    .context("failed to upload chunk to s3 backend")?;
+                return Ok((digest, size, encoded_size, is_duplicate));
+            }
+
             // Avoid re-upload to S3 if the chunk is either present in the LRU cache or the chunk
             // file exists on filesystem. The latter means that the chunk has been present in the
             // past an was not cleaned up by garbage collection, so contained in the S3 object store.
