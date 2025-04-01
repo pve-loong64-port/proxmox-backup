@@ -12,7 +12,7 @@ use pbs_tools::lru_cache::LruCache;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
-use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions};
+use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions, S3PathPrefix};
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
@@ -39,13 +39,17 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
+use crate::s3::S3_CONTENT_PREFIX;
 use crate::task_tracking::{self, update_active_operations};
 use crate::DataBlob;
 
 static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-const GROUP_NOTES_FILE_NAME: &str = "notes";
+/// Filename to store backup group notes
+pub const GROUP_NOTES_FILE_NAME: &str = "notes";
+/// Filename to store backup group owner
+pub const GROUP_OWNER_FILE_NAME: &str = "owner";
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 
 /// checks if auth_id is owner, or, if owner is a token, if
@@ -654,7 +658,9 @@ impl DataStore {
         let mut stats = BackupGroupDeleteStats::default();
 
         for group in self.iter_backup_groups(ns.to_owned())? {
-            let delete_stats = group?.destroy()?;
+            let group = group?;
+            let backend = self.backend()?;
+            let delete_stats = group.destroy(&backend)?;
             stats.add(&delete_stats);
             removed_all_groups = removed_all_groups && delete_stats.all_removed();
         }
@@ -688,12 +694,32 @@ impl DataStore {
         let store = self.name();
         let mut removed_all_requested = true;
         let mut stats = BackupGroupDeleteStats::default();
+        let backend = self.backend()?;
+
         if delete_groups {
             log::info!("removing whole namespace recursively below {store}:/{ns}",);
             for ns in self.recursive_iter_backup_ns(ns.to_owned())? {
                 let (removed_ns_groups, delete_stats) = self.remove_namespace_groups(&ns?)?;
                 stats.add(&delete_stats);
                 removed_all_requested = removed_all_requested && removed_ns_groups;
+            }
+
+            if let DatastoreBackend::S3(s3_client) = &backend {
+                let ns_dir = ns.path();
+                let ns_prefix = ns_dir
+                    .to_str()
+                    .ok_or_else(|| format_err!("invalid namespace path prefix"))?;
+                let prefix = format!("{S3_CONTENT_PREFIX}/{ns_prefix}");
+                let delete_objects_error = proxmox_async::runtime::block_on(
+                    s3_client.delete_objects_by_prefix_with_suffix_filter(
+                        &S3PathPrefix::Some(prefix),
+                        PROTECTED_MARKER_FILENAME,
+                        &[GROUP_OWNER_FILE_NAME, GROUP_NOTES_FILE_NAME],
+                    ),
+                )?;
+                if delete_objects_error {
+                    bail!("deleting objects failed");
+                }
             }
         } else {
             log::info!("pruning empty namespace recursively below {store}:/{ns}");
@@ -730,6 +756,14 @@ impl DataStore {
                         log::warn!("failed to remove namespace {ns} - {err}")
                     }
                 }
+                if let DatastoreBackend::S3(s3_client) = &backend {
+                    // Only remove the namespace marker, if it was empty,
+                    // than this is the same as the namespace being removed.
+                    let object_key =
+                        crate::s3::object_key_from_path(&ns.path(), NAMESPACE_MARKER_FILENAME)
+                            .context("invalid namespace marker object key")?;
+                    proxmox_async::runtime::block_on(s3_client.delete_object(object_key))?;
+                }
             }
         }
 
@@ -747,7 +781,7 @@ impl DataStore {
     ) -> Result<BackupGroupDeleteStats, Error> {
         let backup_group = self.backup_group(ns.clone(), backup_group.clone());
 
-        backup_group.destroy()
+        backup_group.destroy(&self.backend()?)
     }
 
     /// Remove a backup directory including all content
@@ -759,7 +793,7 @@ impl DataStore {
     ) -> Result<(), Error> {
         let backup_dir = self.backup_dir(ns.clone(), backup_dir.clone())?;
 
-        backup_dir.destroy(force)
+        backup_dir.destroy(force, &self.backend()?)
     }
 
     /// Returns the time of the last successful backup
@@ -787,7 +821,7 @@ impl DataStore {
         ns: &BackupNamespace,
         group: &pbs_api_types::BackupGroup,
     ) -> PathBuf {
-        self.group_path(ns, group).join("owner")
+        self.group_path(ns, group).join(GROUP_OWNER_FILE_NAME)
     }
 
     /// Returns the backup owner.

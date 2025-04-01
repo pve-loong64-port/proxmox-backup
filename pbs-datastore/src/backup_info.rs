@@ -9,6 +9,7 @@ use std::time::Duration;
 use anyhow::{bail, format_err, Context, Error};
 use const_format::concatcp;
 
+use proxmox_s3_client::S3PathPrefix;
 use proxmox_sys::fs::{lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions};
 use proxmox_systemd::escape_unit;
 
@@ -18,7 +19,9 @@ use pbs_api_types::{
 };
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
+use crate::datastore::{GROUP_NOTES_FILE_NAME, GROUP_OWNER_FILE_NAME};
 use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
+use crate::s3::S3_CONTENT_PREFIX;
 use crate::{DataBlob, DataStore, DatastoreBackend};
 
 pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
@@ -218,7 +221,7 @@ impl BackupGroup {
     ///
     /// Returns `BackupGroupDeleteStats`, containing the number of deleted snapshots
     /// and number of protected snaphsots, which therefore were not removed.
-    pub fn destroy(&self) -> Result<BackupGroupDeleteStats, Error> {
+    pub fn destroy(&self, backend: &DatastoreBackend) -> Result<BackupGroupDeleteStats, Error> {
         let _guard = self
             .lock()
             .with_context(|| format!("while destroying group '{self:?}'"))?;
@@ -232,8 +235,28 @@ impl BackupGroup {
                 delete_stats.increment_protected_snapshots();
                 continue;
             }
-            snap.destroy(false)?;
+            // also for S3 cleanup local only, the actual S3 objects will be removed below,
+            // reducing the number of required API calls.
+            snap.destroy(false, &DatastoreBackend::Filesystem)?;
             delete_stats.increment_removed_snapshots();
+        }
+
+        if let DatastoreBackend::S3(s3_client) = backend {
+            let path = self.relative_group_path();
+            let group_prefix = path
+                .to_str()
+                .ok_or_else(|| format_err!("invalid group path prefix"))?;
+            let prefix = format!("{S3_CONTENT_PREFIX}/{group_prefix}");
+            let delete_objects_error = proxmox_async::runtime::block_on(
+                s3_client.delete_objects_by_prefix_with_suffix_filter(
+                    &S3PathPrefix::Some(prefix),
+                    PROTECTED_MARKER_FILENAME,
+                    &[GROUP_OWNER_FILE_NAME, GROUP_NOTES_FILE_NAME],
+                ),
+            )?;
+            if delete_objects_error {
+                bail!("deleting objects failed");
+            }
         }
 
         // Note: make sure the old locking mechanism isn't used as `remove_dir_all` is not safe in
@@ -588,7 +611,7 @@ impl BackupDir {
     /// Destroy the whole snapshot, bails if it's protected
     ///
     /// Setting `force` to true skips locking and thus ignores if the backup is currently in use.
-    pub fn destroy(&self, force: bool) -> Result<(), Error> {
+    pub fn destroy(&self, force: bool, backend: &DatastoreBackend) -> Result<(), Error> {
         let (_guard, _manifest_guard);
         if !force {
             _guard = self
@@ -599,6 +622,20 @@ impl BackupDir {
 
         if self.is_protected() {
             bail!("cannot remove protected snapshot"); // use special error type?
+        }
+
+        if let DatastoreBackend::S3(s3_client) = backend {
+            let path = self.relative_path();
+            let snapshot_prefix = path
+                .to_str()
+                .ok_or_else(|| format_err!("invalid snapshot path"))?;
+            let prefix = format!("{S3_CONTENT_PREFIX}/{snapshot_prefix}");
+            let delete_objects_error = proxmox_async::runtime::block_on(
+                s3_client.delete_objects_by_prefix(&S3PathPrefix::Some(prefix)),
+            )?;
+            if delete_objects_error {
+                bail!("deleting objects failed");
+            }
         }
 
         let full_path = self.full_path();
@@ -630,6 +667,12 @@ impl BackupDir {
         // do to rectify the situation.
         if guard.is_ok() && group.list_backups()?.is_empty() && !*OLD_LOCKING {
             group.remove_group_dir()?;
+            if let DatastoreBackend::S3(s3_client) = backend {
+                let object_key =
+                    super::s3::object_key_from_path(&group.relative_group_path(), "owner")
+                        .context("invalid owner file object key")?;
+                proxmox_async::runtime::block_on(s3_client.delete_object(object_key))?;
+            }
         } else if let Err(err) = guard {
             log::debug!("{err:#}");
         }
