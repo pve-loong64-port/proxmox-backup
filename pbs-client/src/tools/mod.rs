@@ -39,6 +39,8 @@ const ENV_VAR_CREDENTIALS_DIRECTORY: &str = "CREDENTIALS_DIRECTORY";
 const CRED_PBS_ENCRYPTION_PASSWORD: &str = "proxmox-backup-client.encryption-password";
 /// Credential name of the the password.
 const CRED_PBS_PASSWORD: &str = "proxmox-backup-client.password";
+/// Credential name of the the repository.
+const CRED_PBS_REPOSITORY: &str = "proxmox-backup-client.repository";
 
 pub const REPO_URL_SCHEMA: Schema = StringSchema::new("Repository URL.")
     .format(&BACKUP_REPO_URL)
@@ -204,7 +206,11 @@ pub fn get_encryption_password() -> Result<Option<String>, Error> {
 }
 
 pub fn get_default_repository() -> Option<String> {
-    std::env::var(ENV_VAR_PBS_REPOSITORY).ok()
+    get_secret_impl(ENV_VAR_PBS_REPOSITORY, CRED_PBS_REPOSITORY)
+        .inspect_err(|err| {
+            proxmox_log::error!("could not read default repository: {err:#}");
+        })
+        .unwrap_or_default()
 }
 
 pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
