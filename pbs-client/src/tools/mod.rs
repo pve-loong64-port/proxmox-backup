@@ -41,6 +41,8 @@ const CRED_PBS_ENCRYPTION_PASSWORD: &str = "proxmox-backup-client.encryption-pas
 const CRED_PBS_PASSWORD: &str = "proxmox-backup-client.password";
 /// Credential name of the the repository.
 const CRED_PBS_REPOSITORY: &str = "proxmox-backup-client.repository";
+/// Credential name of the the fingerprint.
+const CRED_PBS_FINGERPRINT: &str = "proxmox-backup-client.fingerprint";
 
 pub const REPO_URL_SCHEMA: Schema = StringSchema::new("Repository URL.")
     .format(&BACKUP_REPO_URL)
@@ -213,6 +215,24 @@ pub fn get_default_repository() -> Option<String> {
         .unwrap_or_default()
 }
 
+/// Gets the repository fingerprint.
+///
+/// Looks for the fingerprint in the `PBS_FINGERPRINT` environment variable, if
+/// there isn't one it reads the `proxmox-backup-client.fingerprint`
+/// [credential].
+///
+/// Returns `None` if neither the environment variable or the credential are
+/// present.
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+pub fn get_fingerprint() -> Option<String> {
+    get_secret_impl(ENV_VAR_PBS_FINGERPRINT, CRED_PBS_FINGERPRINT)
+        .inspect_err(|err| {
+            proxmox_log::error!("could not read fingerprint: {err:#}");
+        })
+        .unwrap_or_default()
+}
+
 pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
     if let Some(url) = param
         .as_object_mut()
@@ -270,7 +290,7 @@ fn connect_do(
     auth_id: &Authid,
     rate_limit: RateLimitConfig,
 ) -> Result<HttpClient, Error> {
-    let fingerprint = std::env::var(ENV_VAR_PBS_FINGERPRINT).ok();
+    let fingerprint = get_fingerprint();
 
     let password = get_password()?;
     let options = HttpClientOptions::new_interactive(password, fingerprint).rate_limit(rate_limit);
@@ -280,7 +300,7 @@ fn connect_do(
 
 /// like get, but simply ignore errors and return Null instead
 pub async fn try_get(repo: &BackupRepository, url: &str) -> Value {
-    let fingerprint = std::env::var(ENV_VAR_PBS_FINGERPRINT).ok();
+    let fingerprint = get_fingerprint();
     let password = get_password().unwrap_or(None);
 
     // ticket cache, but no questions asked
