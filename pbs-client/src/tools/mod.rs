@@ -182,15 +182,7 @@ fn get_secret_impl(env_variable: &str, credential_name: &str) -> Result<Option<S
 ///
 /// [credential]: https://systemd.io/CREDENTIALS/
 pub fn get_password() -> Result<Option<String>, Error> {
-    if let Some(password) = get_secret_from_env(ENV_VAR_PBS_PASSWORD)? {
-        Ok(Some(password))
-    } else if let Some(password) = get_credential(CRED_PBS_PASSWORD)? {
-        String::from_utf8(password)
-            .map(Option::Some)
-            .map_err(|_err| format_err!("non-utf8 password credential"))
-    } else {
-        Ok(None)
-    }
+    get_secret_impl(ENV_VAR_PBS_PASSWORD, CRED_PBS_PASSWORD)
 }
 
 /// Gets an encryption password.
