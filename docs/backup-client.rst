@@ -44,6 +44,9 @@ user\@pbs!token@host:store       ``user@pbs!token`` host:8007          store
 [ff80::51]:1234:mydatastore      ``root@pam``       [ff80::51]:1234    mydatastore
 ================================ ================== ================== ===========
 
+
+.. _environment-variables:
+
 Environment Variables
 ---------------------
 
@@ -88,6 +91,43 @@ Environment Variables
    convenience, Proxmox Backup Server only uses the first line as password, so
    you can add arbitrary comments after the first newline.
 
+
+System and Service Credentials
+------------------------------
+
+Some of the :ref:`environment variables <environment-variables>` above can be
+set using `system and service credentials <https://systemd.io/CREDENTIALS/>`_
+instead.
+
+============================ ==============================================
+Environment Variable         Credential Name Equivalent
+============================ ==============================================
+``PBS_REPOSITORY``           ``proxmox-backup-client.repository``
+``PBS_PASSWORD``             ``proxmox-backup-client.password``
+``PBS_ENCRYPTION_PASSWORD``  ``proxmox-backup-client.encryption-password``
+``PBS_FINGERPRINT``          ``proxmox-backup-client.fingerprint``
+============================ ==============================================
+
+For example, the repository password can be stored in an encrypted file as
+follows:
+
+.. code-block:: console
+
+  # systemd-ask-password -n | systemd-creds encrypt --name=proxmox-backup-client.password - my-api-token.cred
+
+The credential can then be reused inside of unit files or in a transient scope
+unit as follows:
+
+.. code-block:: console
+
+  # systemd-run --pipe --wait \
+      --property=LoadCredentialEncrypted=proxmox-backup-client.password:/full/path/to/my-api-token.cred \
+      --property=SetCredential=proxmox-backup-client.repository:'my_default_repository' \
+      proxmox-backup-client ...
+
+Additionally, system credentials (e.g. passed down from the hypervisor to a
+virtual machine via SMBIOS type 11) can be loaded on a service via
+`LoadCredential=` as described in the manual page ``systemd.exec(5)``.
 
 Output Format
 -------------
