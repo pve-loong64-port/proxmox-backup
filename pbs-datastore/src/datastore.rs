@@ -44,6 +44,7 @@ static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 const GROUP_NOTES_FILE_NAME: &str = "notes";
+const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
@@ -608,6 +609,15 @@ impl DataStore {
 
         // construct ns before mkdir to enforce max-depth and name validity
         let ns = BackupNamespace::from_parent_ns(parent, name)?;
+
+        if let DatastoreBackend::S3(s3_client) = self.backend()? {
+            let object_key = crate::s3::object_key_from_path(&ns.path(), NAMESPACE_MARKER_FILENAME)
+                .context("invalid namespace marker object key")?;
+            let _is_duplicate = proxmox_async::runtime::block_on(
+                s3_client.upload_no_replace_with_retry(object_key, hyper::body::Bytes::from("")),
+            )
+            .context("failed to create namespace on s3 backend")?;
+        }
 
         let mut ns_full_path = self.base_path();
         ns_full_path.push(ns.path());
