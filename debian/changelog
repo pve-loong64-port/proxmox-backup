@@ -1,3 +1,62 @@
+rust-proxmox-backup (3.3.5-1) bookworm; urgency=medium
+
+  * api: config: use guard for unmounting on failed datastore creation
+
+  * client: align description for backup specification to docs, using
+    `archive-name` and `type` over `label` and `ext`.
+
+  * client: read credentials from CREDENTIALS_DIRECTORY environment variable
+    following the "System and Service Credentials" specification. This allows
+    users to use native systemd capabilities for credential management if the
+    proxmox-backup-client is used in systemd units or, e.g., through a wrapper
+    like systemd-run.
+
+  * fix #3935: datastore/api/backup: move datastore locking to '/run' to avoid
+    that lock-files can block deleting backup groups or snapshots on the
+    datastore and to decouple locking from the underlying datastore
+    file-system.
+
+  * api: fix race when changing the owner of a backup-group.
+
+  * fix #3336: datastore: remove group if the last snapshot is removed to
+    avoid confusing situations where the group directory still exists and
+    blocks re-creating a group with another owner even though the empty group
+    was not visible in the web UI.
+
+  * notifications: clean-up and add dedicated types for all templates as to
+    allow declaring that interface stable in preparation for allowing
+    overriding them in the future (not included in this release).
+
+  * tape: introduce a tape backup job worker-thread option for restores.
+    Depending on the underlying storage using more threads can dramatically
+    improve the restore speed. Especially fast storage with low penalty for
+    random access, like flash-storage (SSDs) can profit from using more
+    worker threads. But on file systems backed by spinning disks (HDDs) the
+    performance can even degrade with more threads. This is why for now the
+    default is left at a single thread and the admin needs to tune this for
+    their storage.
+
+  * garbage collection: generate index file list via datastore iterators in a
+    structured manner.
+
+  * fix #5331: garbage collection: avoid multiple chunk atime updates by
+    keeping track of the recently marked chunks in phase 1 of garbage to avoid
+    multiple atime updates via relatively expensive utimensat (touch) calls.
+    Use a LRU cache with size 32 MiB for tracking already processed chunks,
+    this fully covers backup groups referencing up to 4 TiB of actual chunks
+    and even bigger ones can still benefit from the cache. On some real-world
+    benchmarks of a datastore with 1.5 million chunks, and original data
+    usage of 120 TiB and a referenced data usage of 2.7 TiB (high
+    deduplication count due to long-term history) we measured 21.1 times less
+    file updates (31.6 million) and a 6.1 times reduction in total GC runtime
+    (155.4 s to 22.8 s) on a ZFS RAID 10 system consisting of spinning HDDs
+    and a special device mirror backed by datacenter SSDs.
+
+  * logging helper: use new builder initializer – not functional change
+    intended.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 02 Apr 2025 19:42:38 +0200
+
 rust-proxmox-backup (3.3.4-1) bookworm; urgency=medium
 
   * fix #6185: client/docs: explicitly mention archive name restrictions
