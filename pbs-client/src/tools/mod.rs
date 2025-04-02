@@ -29,6 +29,7 @@ pub mod key_source;
 const ENV_VAR_PBS_FINGERPRINT: &str = "PBS_FINGERPRINT";
 const ENV_VAR_PBS_PASSWORD: &str = "PBS_PASSWORD";
 const ENV_VAR_PBS_ENCRYPTION_PASSWORD: &str = "PBS_ENCRYPTION_PASSWORD";
+const ENV_VAR_PBS_REPOSITORY: &str = "PBS_REPOSITORY";
 
 /// Directory with system [credential]s. See systemd-creds(1).
 ///
@@ -195,7 +196,7 @@ pub fn get_encryption_password() -> Result<Option<Vec<u8>>, Error> {
 }
 
 pub fn get_default_repository() -> Option<String> {
-    std::env::var("PBS_REPOSITORY").ok()
+    std::env::var(ENV_VAR_PBS_REPOSITORY).ok()
 }
 
 pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
