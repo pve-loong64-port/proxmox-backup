@@ -196,14 +196,11 @@ pub fn get_password() -> Result<Option<String>, Error> {
 /// present.
 ///
 /// [credential]: https://systemd.io/CREDENTIALS/
-pub fn get_encryption_password() -> Result<Option<Vec<u8>>, Error> {
-    if let Some(password) = get_secret_from_env(ENV_VAR_PBS_ENCRYPTION_PASSWORD)? {
-        Ok(Some(password.into_bytes()))
-    } else if let Some(password) = get_credential(CRED_PBS_ENCRYPTION_PASSWORD)? {
-        Ok(Some(password))
-    } else {
-        Ok(None)
-    }
+pub fn get_encryption_password() -> Result<Option<String>, Error> {
+    get_secret_impl(
+        ENV_VAR_PBS_ENCRYPTION_PASSWORD,
+        CRED_PBS_ENCRYPTION_PASSWORD,
+    )
 }
 
 pub fn get_default_repository() -> Option<String> {

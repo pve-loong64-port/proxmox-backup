@@ -346,7 +346,7 @@ pub fn get_encryption_key_password() -> Result<Vec<u8>, Error> {
     // fixme: implement other input methods
 
     if let Some(password) = super::get_encryption_password()? {
-        return Ok(password);
+        return Ok(password.into_bytes());
     }
 
     // If we're on a TTY, query the user for a password
