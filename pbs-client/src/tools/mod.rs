@@ -153,6 +153,25 @@ fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
     Ok(None)
 }
 
+/// Gets a secret or value from the environment.
+///
+/// Checks for an environment variable named `env_variable`, and if missing, it
+/// checks for a system [credential] named `credential_name`. Assumes the secret
+/// is UTF-8 encoded.
+///
+/// [credential]: https://systemd.io/CREDENTIALS/
+fn get_secret_impl(env_variable: &str, credential_name: &str) -> Result<Option<String>, Error> {
+    if let Some(password) = get_secret_from_env(env_variable)? {
+        Ok(Some(password))
+    } else if let Some(password) = get_credential(credential_name)? {
+        String::from_utf8(password)
+            .map(Option::Some)
+            .map_err(|_err| format_err!("credential {credential_name} is not utf8 encoded"))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Gets the backup server's password.
 ///
 /// Looks for a password in the `PBS_PASSWORD` environment variable, if there
