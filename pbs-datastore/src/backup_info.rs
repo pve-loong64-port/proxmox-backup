@@ -599,12 +599,26 @@ impl BackupDir {
         let _ = std::fs::remove_file(self.lock_path()); // ignore errors
 
         let group = BackupGroup::from(self);
-        let _guard = group.lock().with_context(|| {
+        let guard = group.lock().with_context(|| {
             format!("while checking if group '{group:?}' is empty during snapshot destruction")
-        })?;
+        });
 
-        if group.list_backups()?.is_empty() && !*OLD_LOCKING {
+        // Only remove the group if all of the following is true:
+        //
+        // - we can lock it: if we can't lock the group, it is still in use (either by another
+        //   backup process or a parent caller (who needs to take care that empty groups are
+        //   removed themselves).
+        // - it is now empty: if the group isn't empty, removing it will fail (to avoid removing
+        //   backups that might still be used).
+        // - the new locking mechanism is used: if the old mechanism is used, a group removal here
+        //   could lead to a race condition.
+        //
+        // Do not error out, as we have already removed the snapshot, there is nothing a user could
+        // do to rectify the situation.
+        if guard.is_ok() && group.list_backups()?.is_empty() && !*OLD_LOCKING {
             group.remove_group_dir()?;
+        } else if let Err(err) = guard {
+            log::debug!("{err:#}");
         }
 
         Ok(())
