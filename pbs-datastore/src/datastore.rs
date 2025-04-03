@@ -26,7 +26,7 @@ use pbs_api_types::{
 };
 use pbs_config::BackupLockGuard;
 
-use crate::backup_info::{BackupDir, BackupGroup, BackupInfo};
+use crate::backup_info::{BackupDir, BackupGroup, BackupInfo, OLD_LOCKING};
 use crate::chunk_store::ChunkStore;
 use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
@@ -1630,5 +1630,9 @@ impl DataStore {
         }
 
         Ok(())
+    }
+
+    pub fn old_locking(&self) -> bool {
+        *OLD_LOCKING
     }
 }

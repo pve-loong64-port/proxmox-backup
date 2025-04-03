@@ -167,7 +167,14 @@ pub fn delete_namespace(
     let (removed_all, stats) = datastore.remove_namespace_recursive(&ns, delete_groups)?;
     if !removed_all {
         let err_msg = if delete_groups {
-            "group only partially deleted due to protected snapshots"
+            if datastore.old_locking() {
+                "could not remove empty group directoriess due to old locking mechanism.\n\
+                If you are an admin, please reboot PBS or ensure no old backup job is running \
+                anymore, then remove the file '/run/proxmox-backup/old-locking', and reload all \
+                PBS daemons"
+            } else {
+                "group only partially deleted due to protected snapshots"
+            }
         } else {
             "only partially deleted due to existing groups but `delete-groups` not true"
         };

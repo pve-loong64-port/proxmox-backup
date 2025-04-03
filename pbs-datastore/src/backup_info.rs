@@ -27,7 +27,7 @@ pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
 // of the file. this should only happen if a user messes with the `/run/proxmox-backup` directory.
 // if that happens, a lot more should fail as we rely on the existence of the directory throughout
 // the code. so just panic with a reasonable message.
-static OLD_LOCKING: LazyLock<bool> = LazyLock::new(|| {
+pub(crate) static OLD_LOCKING: LazyLock<bool> = LazyLock::new(|| {
     std::fs::exists("/run/proxmox-backup/old-locking")
         .expect("cannot read `/run/proxmox-backup`, please check permissions")
 });

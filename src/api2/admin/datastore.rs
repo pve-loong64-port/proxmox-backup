@@ -313,13 +313,23 @@ pub async fn delete_group(
         )?;
 
         let delete_stats = datastore.remove_backup_group(&ns, &group)?;
-        if !delete_stats.all_removed() {
-            if error_on_protected {
-                bail!("group only partially deleted due to protected snapshots");
-            } else {
-                warn!("group only partially deleted due to protected snapshots");
-            }
+
+        let error_msg = if datastore.old_locking() {
+            "could not remove empty groups directories due to old locking mechanism.\n\
+            If you are an admin, please reboot PBS or ensure no old backup job is running anymore, \
+            then remove the file '/run/proxmox-backup/old-locking', and reload all PBS daemons"
+        } else if !delete_stats.all_removed() {
+            "group only partially deleted due to protected snapshots"
+        } else {
+            return Ok(delete_stats);
+        };
+
+        if error_on_protected {
+            bail!(error_msg);
+        } else {
+            warn!(error_msg);
         }
+
         Ok(delete_stats)
     })
     .await?
