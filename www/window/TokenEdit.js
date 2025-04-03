@@ -68,8 +68,10 @@ Ext.define('PBS.window.TokenEdit', {
 	    {
 		xtype: 'proxmoxtextfield',
 		name: 'comment',
-		deleteEmpty: true,
 		fieldLabel: gettext('Comment'),
+		cbind: {
+		    deleteEmpty: "{!isCreate}"
+		},
 	    },
 	],
     },
