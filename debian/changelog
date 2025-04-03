@@ -1,3 +1,20 @@
+rust-proxmox-backup (3.3.6-1) bookworm; urgency=medium
+
+  * datastore: ignore group locking errors when removing snapshots, they
+    normally happen only due to old-locking, and the underlying snapshot is
+    deleted in any case at this point, so it's no help to confuse the user.
+
+  * api: datastore: add error message on failed removal due to old locking and
+    tell any admin what they can do to switch to the new locking.
+
+  * ui: only add delete parameter on token edit, not when creating tokens.
+
+  * pbs-client: allow reading fingerprint from system credential.
+
+  * docs: client: add section about system credentials integration.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 03 Apr 2025 17:57:02 +0200
+
 rust-proxmox-backup (3.3.5-1) bookworm; urgency=medium
 
   * api: config: use guard for unmounting on failed datastore creation
