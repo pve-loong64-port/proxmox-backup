@@ -10,7 +10,8 @@ use pbs_api_types::{
     Authid, BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_PRUNE, PRIV_REMOTE_READ, REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA,
-    RESYNC_CORRUPT_SCHEMA, TRANSFER_LAST_SCHEMA,
+    RESYNC_CORRUPT_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA,
+    TRANSFER_LAST_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
 use proxmox_rest_server::WorkerTask;
@@ -87,6 +88,8 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
             sync_job.group_filter.clone(),
             sync_job.limit.clone(),
             sync_job.transfer_last,
+            sync_job.encrypted_only,
+            sync_job.verified_only,
             sync_job.resync_corrupt,
         )
     }
@@ -133,6 +136,14 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
                 schema: TRANSFER_LAST_SCHEMA,
                 optional: true,
             },
+            "encrypted-only": {
+                schema: SYNC_ENCRYPTED_ONLY_SCHEMA,
+                optional: true,
+            },
+            "verified-only": {
+                schema: SYNC_VERIFIED_ONLY_SCHEMA,
+                optional: true,
+            },
             "resync-corrupt": {
                 schema: RESYNC_CORRUPT_SCHEMA,
                 optional: true,
@@ -161,6 +172,8 @@ async fn pull(
     group_filter: Option<Vec<GroupFilter>>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
+    encrypted_only: Option<bool>,
+    verified_only: Option<bool>,
     resync_corrupt: Option<bool>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
@@ -199,6 +212,8 @@ async fn pull(
         group_filter,
         limit,
         transfer_last,
+        encrypted_only,
+        verified_only,
         resync_corrupt,
     )?;
 

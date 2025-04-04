@@ -671,6 +671,8 @@ pub fn do_sync_job(
                             sync_job.remove_vanished,
                             sync_job.max_depth,
                             sync_job.group_filter.clone(),
+                            sync_job.encrypted_only,
+                            sync_job.verified_only,
                             sync_job.limit.clone(),
                             sync_job.transfer_last,
                         )

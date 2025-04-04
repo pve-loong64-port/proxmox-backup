@@ -5,7 +5,8 @@ use pbs_api_types::{
     Authid, BackupNamespace, GroupFilter, RateLimitConfig, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE,
-    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, TRANSFER_LAST_SCHEMA,
+    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA,
+    SYNC_VERIFIED_ONLY_SCHEMA, TRANSFER_LAST_SCHEMA,
 };
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment};
@@ -91,6 +92,14 @@ fn check_push_privs(
                 schema: GROUP_FILTER_LIST_SCHEMA,
                 optional: true,
             },
+            "encrypted-only": {
+                schema: SYNC_ENCRYPTED_ONLY_SCHEMA,
+                optional: true,
+            },
+            "verified-only": {
+                schema: SYNC_VERIFIED_ONLY_SCHEMA,
+                optional: true,
+            },
             limit: {
                 type: RateLimitConfig,
                 flatten: true,
@@ -120,6 +129,8 @@ async fn push(
     remove_vanished: Option<bool>,
     max_depth: Option<usize>,
     group_filter: Option<Vec<GroupFilter>>,
+    encrypted_only: Option<bool>,
+    verified_only: Option<bool>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
     rpcenv: &mut dyn RpcEnvironment,
@@ -149,6 +160,8 @@ async fn push(
         remove_vanished,
         max_depth,
         group_filter,
+        encrypted_only,
+        verified_only,
         limit,
         transfer_last,
     )

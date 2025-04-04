@@ -55,6 +55,10 @@ pub(crate) struct PullParameters {
     group_filter: Vec<GroupFilter>,
     /// How many snapshots should be transferred at most (taking the newest N snapshots)
     transfer_last: Option<usize>,
+    /// Only sync encrypted backup snapshots
+    encrypted_only: bool,
+    /// Only sync verified backup snapshots
+    verified_only: bool,
     /// Whether to re-sync corrupted snapshots
     resync_corrupt: bool,
 }
@@ -74,6 +78,8 @@ impl PullParameters {
         group_filter: Option<Vec<GroupFilter>>,
         limit: RateLimitConfig,
         transfer_last: Option<usize>,
+        encrypted_only: Option<bool>,
+        verified_only: Option<bool>,
         resync_corrupt: Option<bool>,
     ) -> Result<Self, Error> {
         if let Some(max_depth) = max_depth {
@@ -82,6 +88,8 @@ impl PullParameters {
         };
         let remove_vanished = remove_vanished.unwrap_or(false);
         let resync_corrupt = resync_corrupt.unwrap_or(false);
+        let encrypted_only = encrypted_only.unwrap_or(false);
+        let verified_only = verified_only.unwrap_or(false);
 
         let source: Arc<dyn SyncSource> = if let Some(remote) = remote {
             let (remote_config, _digest) = pbs_config::remote::config()?;
@@ -120,6 +128,8 @@ impl PullParameters {
             max_depth,
             group_filter,
             transfer_last,
+            encrypted_only,
+            verified_only,
             resync_corrupt,
         })
     }

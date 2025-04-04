@@ -73,6 +73,10 @@ pub(crate) struct PushParameters {
     max_depth: Option<usize>,
     /// Filters for reducing the push scope
     group_filter: Vec<GroupFilter>,
+    /// Synchronize only encrypted backup snapshots
+    encrypted_only: bool,
+    /// Synchronize only verified backup snapshots
+    verified_only: bool,
     /// How many snapshots should be transferred at most (taking the newest N snapshots)
     transfer_last: Option<usize>,
 }
@@ -90,6 +94,8 @@ impl PushParameters {
         remove_vanished: Option<bool>,
         max_depth: Option<usize>,
         group_filter: Option<Vec<GroupFilter>>,
+        encrypted_only: Option<bool>,
+        verified_only: Option<bool>,
         limit: RateLimitConfig,
         transfer_last: Option<usize>,
     ) -> Result<Self, Error> {
@@ -98,6 +104,8 @@ impl PushParameters {
             remote_ns.check_max_depth(max_depth)?;
         };
         let remove_vanished = remove_vanished.unwrap_or(false);
+        let encrypted_only = encrypted_only.unwrap_or(false);
+        let verified_only = verified_only.unwrap_or(false);
         let store = DataStore::lookup_datastore(store, Some(Operation::Read))?;
 
         if !store.namespace_exists(&ns) {
@@ -149,6 +157,8 @@ impl PushParameters {
             remove_vanished,
             max_depth,
             group_filter,
+            encrypted_only,
+            verified_only,
             transfer_last,
         })
     }

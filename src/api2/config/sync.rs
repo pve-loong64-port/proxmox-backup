@@ -335,6 +335,10 @@ pub enum DeletableProperty {
     MaxDepth,
     /// Delete the transfer_last property,
     TransferLast,
+    /// Delete the encrypted_only property,
+    EncryptedOnly,
+    /// Delete the verified_only property,
+    VerifiedOnly,
     /// Delete the sync_direction property,
     SyncDirection,
 }
@@ -448,6 +452,12 @@ pub fn update_sync_job(
                 DeletableProperty::TransferLast => {
                     data.transfer_last = None;
                 }
+                DeletableProperty::EncryptedOnly => {
+                    data.encrypted_only = None;
+                }
+                DeletableProperty::VerifiedOnly => {
+                    data.verified_only = None;
+                }
                 DeletableProperty::SyncDirection => {
                     data.sync_direction = None;
                 }
@@ -490,6 +500,12 @@ pub fn update_sync_job(
     }
     if let Some(resync_corrupt) = update.resync_corrupt {
         data.resync_corrupt = Some(resync_corrupt);
+    }
+    if let Some(encrypted_only) = update.encrypted_only {
+        data.encrypted_only = Some(encrypted_only);
+    }
+    if let Some(verified_only) = update.verified_only {
+        data.verified_only = Some(verified_only);
     }
     if let Some(sync_direction) = update.sync_direction {
         data.sync_direction = Some(sync_direction);
@@ -665,6 +681,8 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         schedule: None,
         limit: pbs_api_types::RateLimitConfig::default(), // no limit
         transfer_last: None,
+        encrypted_only: None,
+        verified_only: None,
         sync_direction: None, // use default
     };
 
