@@ -495,8 +495,7 @@ pub fn generate_token(
         );
     }
 
-    let secret = format!("{:x}", proxmox_uuid::Uuid::generate());
-    token_shadow::set_secret(&tokenid, &secret)?;
+    let secret = token_shadow::generate_and_set_secret(&tokenid)?;
 
     let token = ApiToken {
         tokenid,

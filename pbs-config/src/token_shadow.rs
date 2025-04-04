@@ -61,8 +61,16 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     }
 }
 
+/// Generates a new secret for the given tokenid / API token, sets it then returns it.
+/// The secret is stored as salted hash.
+pub fn generate_and_set_secret(tokenid: &Authid) -> Result<String, Error> {
+    let secret = format!("{:x}", proxmox_uuid::Uuid::generate());
+    set_secret(tokenid, &secret)?;
+    Ok(secret)
+}
+
 /// Adds a new entry for the given tokenid / API token secret. The secret is stored as salted hash.
-pub fn set_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
+fn set_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     if !tokenid.is_token() {
         bail!("not an API token ID");
     }

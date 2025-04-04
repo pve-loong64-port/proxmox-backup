@@ -24,6 +24,7 @@ proxmox-section-config.workspace = true
 proxmox-shared-memory.workspace = true
 proxmox-sys = { workspace = true, features = [ "acl", "crypt", "timer" ] }
 proxmox-time.workspace = true
+proxmox-uuid.workspace = true
 
 pbs-api-types.workspace = true
 pbs-buildcfg.workspace = true
