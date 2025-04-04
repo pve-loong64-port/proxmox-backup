@@ -400,6 +400,30 @@ Ext.define('PBS.window.SyncJobEdit', {
 			value: false,
 		    },
 		],
+		advancedColumn2: [
+		    {
+			fieldLabel: gettext('Encrypted snapshots only'),
+			xtype: 'proxmoxcheckbox',
+			name: 'encrypted-only',
+			autoEl: {
+			    tag: 'div',
+			    'data-qtip': gettext('Sync only encrypted backup snapshots, exclude others.'),
+			},
+			uncheckedValue: false,
+			value: false,
+		    },
+		    {
+			fieldLabel: gettext('Verified snapshots only'),
+			xtype: 'proxmoxcheckbox',
+			name: 'verified-only',
+			autoEl: {
+			    tag: 'div',
+			    'data-qtip': gettext('Sync only verified backup snapshots, exclude others.'),
+			},
+			uncheckedValue: false,
+			value: false,
+		    },
+		],
 	    },
 	    {
 		xtype: 'inputpanel',
