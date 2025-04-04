@@ -451,6 +451,13 @@ There are some tuning related options for the datastore that are more advanced:
   during phase 2 of garbage collection (given no older writers). If the
   ``atime`` of the chunk is outside the range, it will be removed.
 
+* ``gc-cache-capacity``: Datastore GC least recently used cache capacity:
+  Allows to control the cache capacity used to keep track of chunks for which
+  the access time has already been updated during phase 1 of garbage collection.
+  This avoids multiple updates and increases GC runtime performance. Higher
+  values can reduce GC runtime at the cost of increase memory usage, setting the
+  value to 0 disables caching.
+
 If you want to set multiple tuning options simultaneously, you can separate them
 with a comma, like this:
 

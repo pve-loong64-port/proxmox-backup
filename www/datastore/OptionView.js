@@ -301,7 +301,7 @@ Ext.define('PBS.Datastore.Options', {
 			    fieldLabel: gettext('GC cache capacity'),
 			    emptyText: Proxmox.Utils.defaultText,
 			    minValue: 0,
-			    maxValue: 8192 * 1024,
+			    maxValue: 8 * 1024 * 1024,
 			    deleteEmpty: true,
 			    step: 1024,
 			},
