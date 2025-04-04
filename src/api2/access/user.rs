@@ -353,6 +353,7 @@ pub async fn update_user(
 pub fn delete_user(userid: Userid, digest: Option<String>) -> Result<(), Error> {
     let _lock = pbs_config::user::lock_config()?;
     let _tfa_lock = crate::config::tfa::write_lock()?;
+    let _acl_lock = pbs_config::acl::lock_config()?;
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
 
@@ -379,6 +380,22 @@ pub fn delete_user(userid: Userid, digest: Option<String>) -> Result<(), Error> 
     }) {
         eprintln!("error updating TFA config after deleting user {userid:?} {err}",);
     }
+
+    let user_tokens: Vec<ApiToken> = config
+        .convert_to_typed_array::<ApiToken>("token")?
+        .into_iter()
+        .filter(|token| token.tokenid.user().eq(&userid))
+        .collect();
+
+    let (mut acl_tree, _digest) = pbs_config::acl::config()?;
+    for token in user_tokens {
+        if let Some(name) = token.tokenid.tokenname() {
+            do_delete_token(name.to_owned(), &userid, &mut config, &mut acl_tree)?;
+        }
+    }
+
+    pbs_config::user::save_config(&config)?;
+    pbs_config::acl::save_config(&acl_tree)?;
 
     Ok(())
 }
