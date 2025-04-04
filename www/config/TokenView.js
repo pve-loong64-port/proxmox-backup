@@ -100,6 +100,25 @@ Ext.define('PBS.config.TokenView', {
 	    }).show();
 	},
 
+	regenerateToken: function(_button, _event, record) {
+	    let tokenid = record.data.tokenid;
+	    let user = PBS.Utils.extractTokenUser(tokenid);
+	    let tokenname = PBS.Utils.extractTokenName(tokenid);
+	    Proxmox.Utils.API2Request({
+	        method: 'PUT',
+	        url: `/access/users/${user}/token/${tokenname}`,
+	        params: { 'regenerate': true },
+	        success: function(res, opt) {
+		    Ext.create("PBS.window.TokenShow", {
+			autoShow: true,
+			tokenid: tokenid,
+			secret: res.result.data.secret,
+		    });
+	        },
+	        failure: res => Ext.Msg.alert(gettext("Error"), res.htmlStatus),
+	    });
+	},
+
 	showPermissions: function() {
 	    let me = this;
 	    let view = me.getView();
@@ -173,6 +192,16 @@ Ext.define('PBS.config.TokenView', {
 	    text: gettext('Show Permissions'),
 	    handler: 'showPermissions',
 	    disabled: true,
+	},
+	{
+	    xtype: 'proxmoxButton',
+	    text: gettext('Regenerate'),
+	    handler: 'regenerateToken',
+	    dangerous: true,
+	    confirmMsg: rec => Ext.String.format(
+		gettext("Regenerate the secret of the API token '{0}'? All current use-sites will loose access!"),
+		rec.data.tokenid,
+	    ),
 	},
     ],
 
