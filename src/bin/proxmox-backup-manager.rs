@@ -13,8 +13,9 @@ use pbs_api_types::percent_encoding::percent_encode_component;
 use pbs_api_types::{
     BackupNamespace, GroupFilter, RateLimitConfig, SyncDirection, SyncJobConfig, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA,
-    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA, TRANSFER_LAST_SCHEMA,
-    UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA,
+    SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA, TRANSFER_LAST_SCHEMA, UPID_SCHEMA,
+    VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::{display_task_log, view_task_result};
 use pbs_config::sync;
@@ -307,6 +308,8 @@ async fn sync_datastore(
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
     resync_corrupt: Option<bool>,
+    encrypted_only: Option<bool>,
+    verified_only: Option<bool>,
     param: Value,
     sync_direction: SyncDirection,
 ) -> Result<Value, Error> {
@@ -345,6 +348,14 @@ async fn sync_datastore(
 
     if let Some(resync) = resync_corrupt {
         args["resync-corrupt"] = Value::from(resync);
+    }
+
+    if let Some(encrypted_only) = encrypted_only {
+        args["encrypted-only"] = Value::from(encrypted_only);
+    }
+
+    if let Some(verified_only) = verified_only {
+        args["verified-only"] = Value::from(verified_only);
     }
 
     let mut limit_json = json!(limit);
@@ -413,6 +424,14 @@ async fn sync_datastore(
                 schema: RESYNC_CORRUPT_SCHEMA,
                 optional: true,
             },
+            "encrypted-only": {
+                schema: SYNC_ENCRYPTED_ONLY_SCHEMA,
+                optional: true,
+            },
+            "verified-only": {
+                schema: SYNC_VERIFIED_ONLY_SCHEMA,
+                optional: true,
+            },
         }
    }
 )]
@@ -430,6 +449,8 @@ async fn pull_datastore(
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
     resync_corrupt: Option<bool>,
+    encrypted_only: Option<bool>,
+    verified_only: Option<bool>,
     param: Value,
 ) -> Result<Value, Error> {
     sync_datastore(
@@ -444,6 +465,8 @@ async fn pull_datastore(
         limit,
         transfer_last,
         resync_corrupt,
+        encrypted_only,
+        verified_only,
         param,
         SyncDirection::Pull,
     )
@@ -494,6 +517,14 @@ async fn pull_datastore(
                 schema: TRANSFER_LAST_SCHEMA,
                 optional: true,
             },
+            "encrypted-only": {
+                schema: SYNC_ENCRYPTED_ONLY_SCHEMA,
+                optional: true,
+            },
+            "verified-only": {
+                schema: SYNC_VERIFIED_ONLY_SCHEMA,
+                optional: true,
+            },
         }
    }
 )]
@@ -510,6 +541,8 @@ async fn push_datastore(
     group_filter: Option<Vec<GroupFilter>>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
+    encrypted_only: Option<bool>,
+    verified_only: Option<bool>,
     param: Value,
 ) -> Result<Value, Error> {
     sync_datastore(
@@ -524,6 +557,8 @@ async fn push_datastore(
         limit,
         transfer_last,
         None,
+        encrypted_only,
+        verified_only,
         param,
         SyncDirection::Push,
     )
