@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_schema::api;
+use proxmox_section_config::SectionConfigData;
 use proxmox_tfa::api::TfaConfig;
 
 use pbs_api_types::{
@@ -15,9 +16,7 @@ use pbs_api_types::{
     EXPIRE_USER_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY,
     PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, SINGLE_LINE_COMMENT_SCHEMA,
 };
-use pbs_config::token_shadow;
-
-use pbs_config::CachedUserInfo;
+use pbs_config::{acl::AclTree, token_shadow, CachedUserInfo};
 
 fn new_user_with_tokens(user: User, tfa: &TfaConfig) -> UserWithTokens {
     UserWithTokens {
@@ -651,29 +650,41 @@ pub fn delete_token(
     token_name: Tokenname,
     digest: Option<String>,
 ) -> Result<(), Error> {
-    let _lock = pbs_config::user::lock_config()?;
+    let _acl_lock = pbs_config::acl::lock_config()?;
+    let _user_lock = pbs_config::user::lock_config()?;
 
-    let (mut config, expected_digest) = pbs_config::user::config()?;
+    let (mut user_config, expected_digest) = pbs_config::user::config()?;
 
     if let Some(ref digest) = digest {
         let digest = <[u8; 32]>::from_hex(digest)?;
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
+    let (mut acl_config, _digest) = pbs_config::acl::config()?;
+    do_delete_token(token_name, &userid, &mut user_config, &mut acl_config)?;
+
+    pbs_config::user::save_config(&user_config)?;
+    pbs_config::acl::save_config(&acl_config)?;
+    Ok(())
+}
+
+fn do_delete_token(
+    token_name: Tokenname,
+    userid: &Userid,
+    user_config: &mut SectionConfigData,
+    acl_config: &mut AclTree,
+) -> Result<(), Error> {
     let tokenid = Authid::from((userid.clone(), Some(token_name.clone())));
     let tokenid_string = tokenid.to_string();
-
-    if config.sections.remove(&tokenid_string).is_none() {
+    if user_config.sections.remove(&tokenid_string).is_none() {
         bail!(
             "token '{}' of user '{}' does not exist.",
             token_name.as_str(),
             userid
         );
     }
-
     token_shadow::delete_secret(&tokenid)?;
-
-    pbs_config::user::save_config(&config)?;
+    acl_config.delete_authid(&tokenid);
 
     Ok(())
 }
