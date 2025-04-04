@@ -858,6 +858,10 @@ Ext.define('PBS.Utils', {
 	gc_atime_cutoff = gc_atime_cutoff ?? '1445';
 	options.push(`${gettext('GC Access Time Cutoff')}: ${gc_atime_cutoff}m`);
 
+	let gc_cache_capacity = tuning['gc-cache-capacity'];
+	delete tuning['gc-cache-capacity'];
+	options.push(`${gettext('GC cache capacity')}: ${gc_cache_capacity ?? Proxmox.Utils.defaultText}`);
+
 	for (const [k, v] of Object.entries(tuning)) {
 	    options.push(`${k}: ${v}`);
 	}
