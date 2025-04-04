@@ -14,7 +14,8 @@ use proxmox_tfa::api::TfaConfig;
 use pbs_api_types::{
     ApiToken, Authid, Tokenname, User, UserUpdater, UserWithTokens, Userid, ENABLE_USER_SCHEMA,
     EXPIRE_USER_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY,
-    PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, SINGLE_LINE_COMMENT_SCHEMA,
+    PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, REGENERATE_TOKEN_SCHEMA,
+    SINGLE_LINE_COMMENT_SCHEMA,
 };
 use pbs_config::{acl::AclTree, token_shadow, CachedUserInfo};
 
@@ -561,6 +562,10 @@ pub enum DeletableTokenProperty {
                 schema: EXPIRE_USER_SCHEMA,
                 optional: true,
             },
+            regenerate: {
+                schema: REGENERATE_TOKEN_SCHEMA,
+                optional: true,
+            },
             delete: {
                 description: "List of properties to delete.",
                 type: Array,
@@ -572,6 +577,16 @@ pub enum DeletableTokenProperty {
             digest: {
                 optional: true,
                 schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
+            },
+        },
+    },
+        returns: {
+        description: "Regenerated secret, if regenerate is set.",
+        properties: {
+            secret: {
+                type: String,
+                optional: true,
+                description: "The new API token secret",
             },
         },
     },
@@ -589,9 +604,10 @@ pub fn update_token(
     comment: Option<String>,
     enable: Option<bool>,
     expire: Option<i64>,
+    regenerate: Option<bool>,
     delete: Option<Vec<DeletableTokenProperty>>,
     digest: Option<String>,
-) -> Result<(), Error> {
+) -> Result<Value, Error> {
     let _lock = pbs_config::user::lock_config()?;
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
@@ -631,11 +647,21 @@ pub fn update_token(
         data.expire = if expire > 0 { Some(expire) } else { None };
     }
 
+    let new_secret = if regenerate.unwrap_or_default() {
+        Some(token_shadow::generate_and_set_secret(&tokenid)?)
+    } else {
+        None
+    };
+
     config.set_data(&tokenid_string, "token", &data)?;
 
     pbs_config::user::save_config(&config)?;
 
-    Ok(())
+    if let Some(secret) = new_secret {
+        Ok(json!({"secret": secret}))
+    } else {
+        Ok(Value::Null)
+    }
 }
 
 #[api(
