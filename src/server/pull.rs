@@ -28,8 +28,8 @@ use pbs_datastore::{check_backup_owner, DataStore, StoreProgress};
 use pbs_tools::sha::sha256;
 
 use super::sync::{
-    check_namespace_depth_limit, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
-    SkipReason, SyncSource, SyncSourceReader, SyncStats,
+    check_namespace_depth_limit, ignore_not_verified_or_encrypted, LocalSource, RemoteSource,
+    RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::tools::parallel_handler::ParallelHandler;
@@ -344,6 +344,7 @@ async fn pull_single_archive<'a>(
 ///   -- if not, pull it from the remote
 /// - Download log if not already existing
 async fn pull_snapshot<'a>(
+    params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
@@ -401,6 +402,22 @@ async fn pull_snapshot<'a>(
     }
 
     let manifest = BackupManifest::try_from(tmp_manifest_blob)?;
+
+    if ignore_not_verified_or_encrypted(
+        &manifest,
+        snapshot.dir(),
+        params.verified_only,
+        params.encrypted_only,
+    ) {
+        if is_new {
+            let path = snapshot.full_path();
+            // safe to remove as locked by caller
+            std::fs::remove_dir_all(&path).map_err(|err| {
+                format_err!("removing temporary backup snapshot {path:?} failed - {err}")
+            })?;
+        }
+        return Ok(sync_stats);
+    }
 
     for item in manifest.files() {
         let mut path = snapshot.full_path();
@@ -466,6 +483,7 @@ async fn pull_snapshot<'a>(
 /// The `reader` is configured to read from the source backup directory, while the
 /// `snapshot` is pointing to the local datastore and target namespace.
 async fn pull_snapshot_from<'a>(
+    params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
@@ -475,7 +493,7 @@ async fn pull_snapshot_from<'a>(
         .datastore()
         .create_locked_backup_dir(snapshot.backup_ns(), snapshot.as_ref())?;
 
-    let result = pull_snapshot(reader, snapshot, downloaded_chunks, corrupt, is_new).await;
+    let result = pull_snapshot(params, reader, snapshot, downloaded_chunks, corrupt, is_new).await;
 
     if is_new {
         // Cleanup directory on error if snapshot was not present before
@@ -621,8 +639,14 @@ async fn pull_group(
             .source
             .reader(source_namespace, &from_snapshot)
             .await?;
-        let result =
-            pull_snapshot_from(reader, &to_snapshot, downloaded_chunks.clone(), corrupt).await;
+        let result = pull_snapshot_from(
+            params,
+            reader,
+            &to_snapshot,
+            downloaded_chunks.clone(),
+            corrupt,
+        )
+        .await;
 
         progress.done_snapshots = pos as u64 + 1;
         info!("percentage done: {progress}");

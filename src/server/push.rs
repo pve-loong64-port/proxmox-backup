@@ -26,8 +26,8 @@ use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, StoreProgress};
 
 use super::sync::{
-    check_namespace_depth_limit, LocalSource, RemovedVanishedStats, SkipInfo, SkipReason,
-    SyncSource, SyncStats,
+    check_namespace_depth_limit, ignore_not_verified_or_encrypted, LocalSource,
+    RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncStats,
 };
 use crate::api2::config::remote;
 
@@ -809,6 +809,15 @@ pub(crate) async fn push_snapshot(
             return Ok(stats);
         }
     };
+
+    if ignore_not_verified_or_encrypted(
+        &source_manifest,
+        snapshot,
+        params.verified_only,
+        params.encrypted_only,
+    ) {
+        return Ok(stats);
+    }
 
     // Writer instance locks the snapshot on the remote side
     let backup_writer = BackupWriter::start(

@@ -20,13 +20,13 @@ use proxmox_router::HttpError;
 
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
-    SyncDirection, SyncJobConfig, CLIENT_LOG_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_READ,
+    SyncDirection, SyncJobConfig, VerifyState, CLIENT_LOG_BLOB_NAME, MAX_NAMESPACE_DEPTH,
+    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{DataStore, ListNamespacesRecursive, LocalChunkReader};
+use pbs_datastore::{BackupManifest, DataStore, ListNamespacesRecursive, LocalChunkReader};
 
 use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
@@ -731,4 +731,35 @@ pub fn do_sync_job(
     )?;
 
     Ok(upid_str)
+}
+
+pub(super) fn ignore_not_verified_or_encrypted(
+    manifest: &BackupManifest,
+    snapshot: &BackupDir,
+    verified_only: bool,
+    encrypted_only: bool,
+) -> bool {
+    if verified_only {
+        match manifest.verify_state() {
+            Ok(Some(verify_state)) if verify_state.state == VerifyState::Ok => (),
+            _ => {
+                info!("Snapshot {snapshot} not verified but verified-only set, snapshot skipped");
+                return true;
+            }
+        }
+    }
+
+    if encrypted_only {
+        // Consider only encrypted if all files in the manifest are marked as encrypted
+        if !manifest
+            .files()
+            .iter()
+            .all(|file| file.chunk_crypt_mode() == CryptMode::Encrypt)
+        {
+            info!("Snapshot {snapshot} not encrypted but encrypted-only set, snapshot skipped");
+            return true;
+        }
+    }
+
+    false
 }
