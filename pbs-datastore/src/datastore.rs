@@ -1115,6 +1115,7 @@ impl DataStore {
         &self,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
+        cache_capacity: usize,
     ) -> Result<(), Error> {
         // Iterate twice over the datastore to fetch index files, even if this comes with an
         // additional runtime cost:
@@ -1130,7 +1131,7 @@ impl DataStore {
         let mut unprocessed_index_list = self.list_index_files()?;
         let index_count = unprocessed_index_list.len();
 
-        let mut chunk_lru_cache = LruCache::new(1024 * 1024);
+        let mut chunk_lru_cache = LruCache::new(cache_capacity);
         let mut processed_index_files = 0;
         let mut last_percentage: usize = 0;
 
@@ -1274,9 +1275,20 @@ impl DataStore {
                 );
             }
 
+            let tuning: DatastoreTuning = serde_json::from_value(
+                DatastoreTuning::API_SCHEMA
+                    .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
+            )?;
+            let gc_cache_capacity = if let Some(capacity) = tuning.gc_cache_capacity {
+                info!("Using chunk digest cache capacity of {capacity}.");
+                capacity
+            } else {
+                1024 * 1024
+            };
+
             info!("Start GC phase1 (mark used chunks)");
 
-            self.mark_used_chunks(&mut gc_status, worker)
+            self.mark_used_chunks(&mut gc_status, worker, gc_cache_capacity)
                 .context("marking used chunks failed")?;
 
             info!("Start GC phase2 (sweep unused chunks)");
