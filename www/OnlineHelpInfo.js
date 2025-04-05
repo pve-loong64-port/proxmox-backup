@@ -7,6 +7,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/backup-client.html#client-repository",
     "title": "Backup Repository Locations"
   },
+  "environment-variables": {
+    "link": "/docs/backup-client.html#environment-variables",
+    "title": "Environment Variables"
+  },
   "client-creating-backups": {
     "link": "/docs/backup-client.html#client-creating-backups",
     "title": "Creating Backups"
@@ -18,6 +22,10 @@ const proxmoxOnlineHelpInfo = {
   "client-encryption": {
     "link": "/docs/backup-client.html#client-encryption",
     "title": "Encryption"
+  },
+  "client-restoring-data": {
+    "link": "/docs/backup-client.html#client-restoring-data",
+    "title": "Restoring Data"
   },
   "changing-backup-owner": {
     "link": "/docs/backup-client.html#changing-backup-owner",
@@ -87,9 +95,45 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/system-requirements.html#minimum-system-requirements",
     "title": "Minimum Server Requirements, for Evaluation"
   },
-  "installation-media": {
-    "link": "/docs/installation-media.html#installation-media",
-    "title": "Installation Media"
+  "installation-medium": {
+    "link": "/docs/installation-media.html#installation-medium",
+    "title": "Installation Medium"
+  },
+  "install-pbs": {
+    "link": "/docs/installation.html#install-pbs",
+    "title": "Server Installation"
+  },
+  "using-the-installer": {
+    "link": "/docs/using-the-installer.html#using-the-installer",
+    "title": "Install `Proxmox Backup`_ Server using the Installer"
+  },
+  "advanced-lvm-options": {
+    "link": "/docs/using-the-installer.html#advanced-lvm-options",
+    "title": "Advanced LVM Configuration Options"
+  },
+  "advanced-zfs-options": {
+    "link": "/docs/using-the-installer.html#advanced-zfs-options",
+    "title": "Advanced ZFS Configuration Options"
+  },
+  "nomodeset-kernel-param": {
+    "link": "/docs/using-the-installer.html#nomodeset-kernel-param",
+    "title": "Adding the ``nomodeset`` Kernel Parameter"
+  },
+  "install-pbs-unattended": {
+    "link": "/docs/installation.html#install-pbs-unattended",
+    "title": "Install `Proxmox Backup`_ Server Unattended"
+  },
+  "install-pbs-on-debian": {
+    "link": "/docs/installation.html#install-pbs-on-debian",
+    "title": "Install `Proxmox Backup`_ Server on Debian"
+  },
+  "install-pbs-on-pve": {
+    "link": "/docs/installation.html#install-pbs-on-pve",
+    "title": "Install Proxmox Backup Server on `Proxmox VE`_"
+  },
+  "install-pbc": {
+    "link": "/docs/installation.html#install-pbc",
+    "title": "Client Installation"
   },
   "sysadmin-package-repositories": {
     "link": "/docs/installation.html#sysadmin-package-repositories",
@@ -107,25 +151,13 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/installation.html#package-repositories-client-only",
     "title": "Proxmox Backup Client-only Repository"
   },
+  "package-repositories-client-only-apt": {
+    "link": "/docs/installation.html#package-repositories-client-only-apt",
+    "title": "APT-based Proxmox Backup Client Repository"
+  },
   "node-options-http-proxy": {
     "link": "/docs/installation.html#node-options-http-proxy",
     "title": "Repository Access Behind HTTP Proxy"
-  },
-  "using-the-installer": {
-    "link": "/docs/using-the-installer.html#using-the-installer",
-    "title": "Install `Proxmox Backup`_ Server using the Installer"
-  },
-  "advanced-lvm-options": {
-    "link": "/docs/using-the-installer.html#advanced-lvm-options",
-    "title": "Advanced LVM Configuration Options"
-  },
-  "advanced-zfs-options": {
-    "link": "/docs/using-the-installer.html#advanced-zfs-options",
-    "title": "Advanced ZFS Configuration Options"
-  },
-  "nomodeset-kernel-param": {
-    "link": "/docs/using-the-installer.html#nomodeset-kernel-param",
-    "title": "Adding the ``nomodeset`` Kernel Parameter"
   },
   "get-help": {
     "link": "/docs/introduction.html#get-help",
@@ -403,6 +435,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/tape-backup.html#tape-backup",
     "title": "Tape Backup"
   },
+  "tape-supported-hardware": {
+    "link": "/docs/tape-backup.html#tape-supported-hardware",
+    "title": "Supported Hardware"
+  },
   "tape-changer-config": {
     "link": "/docs/tape-backup.html#tape-changer-config",
     "title": "Tape changers"
@@ -418,6 +454,10 @@ const proxmoxOnlineHelpInfo = {
   "tape-backup-job-config": {
     "link": "/docs/tape-backup.html#tape-backup-job-config",
     "title": "Tape Backup Jobs"
+  },
+  "tape-key-management": {
+    "link": "/docs/tape-backup.html#tape-key-management",
+    "title": "Encryption Key Management"
   },
   "tape-restore-encryption-key": {
     "link": "/docs/tape-backup.html#tape-restore-encryption-key",
