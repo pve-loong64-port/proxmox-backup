@@ -4,6 +4,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
 use nix::unistd::{unlinkat, UnlinkatFlags};
@@ -17,6 +18,7 @@ use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
+use proxmox_time::TimeSpan;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
@@ -1240,6 +1242,7 @@ impl DataStore {
                 DatastoreTuning::API_SCHEMA
                     .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
             )?;
+
             if tuning.gc_atime_safety_check.unwrap_or(true) {
                 self.inner
                     .chunk_store
@@ -1248,6 +1251,27 @@ impl DataStore {
                 info!("Access time update check successful, proceeding with GC.");
             } else {
                 info!("Access time update check disabled by datastore tuning options.");
+            };
+
+            // Fallback to default 24h 5m if not set
+            let cutoff = tuning
+                .gc_atime_cutoff
+                .map(|cutoff| cutoff * 60)
+                .unwrap_or(3600 * 24 + 300);
+
+            let mut min_atime = phase1_start_time - cutoff as i64;
+            info!(
+                "Using access time cutoff {}, minimum access time is {}",
+                TimeSpan::from(Duration::from_secs(cutoff as u64)),
+                proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
+            );
+            if oldest_writer < min_atime {
+                min_atime = oldest_writer - 300; // account for 5 min safety gap
+                info!(
+                    "Oldest backup writer started at {}, extending minimum access time to {}",
+                    TimeSpan::from(Duration::from_secs(oldest_writer as u64)),
+                    proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
+                );
             }
 
             info!("Start GC phase1 (mark used chunks)");
@@ -1258,7 +1282,7 @@ impl DataStore {
             info!("Start GC phase2 (sweep unused chunks)");
             self.inner.chunk_store.sweep_unused_chunks(
                 oldest_writer,
-                phase1_start_time,
+                min_atime,
                 &mut gc_status,
                 worker,
             )?;

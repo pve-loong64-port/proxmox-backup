@@ -356,7 +356,7 @@ impl ChunkStore {
     pub fn sweep_unused_chunks(
         &self,
         oldest_writer: i64,
-        phase1_start_time: i64,
+        min_atime: i64,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
     ) -> Result<(), Error> {
@@ -365,14 +365,6 @@ impl ChunkStore {
 
         use nix::sys::stat::fstatat;
         use nix::unistd::{unlinkat, UnlinkatFlags};
-
-        let mut min_atime = phase1_start_time - 3600 * 24; // at least 24h (see mount option relatime)
-
-        if oldest_writer < min_atime {
-            min_atime = oldest_writer;
-        }
-
-        min_atime -= 300; // add 5 mins gap for safety
 
         let mut last_percentage = 0;
         let mut chunk_count = 0;
