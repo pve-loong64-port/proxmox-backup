@@ -189,19 +189,20 @@ Ext.define('PBS.config.TokenView', {
 	'-',
 	{
 	    xtype: 'proxmoxButton',
-	    text: gettext('Show Permissions'),
-	    handler: 'showPermissions',
-	    disabled: true,
-	},
-	{
-	    xtype: 'proxmoxButton',
-	    text: gettext('Regenerate'),
+	    text: gettext('Regenerate Secret'),
 	    handler: 'regenerateToken',
 	    dangerous: true,
 	    confirmMsg: rec => Ext.String.format(
 		gettext("Regenerate the secret of the API token '{0}'? All current use-sites will loose access!"),
 		rec.data.tokenid,
 	    ),
+	},
+	'-',
+	{
+	    xtype: 'proxmoxButton',
+	    text: gettext('Show Permissions'),
+	    handler: 'showPermissions',
+	    disabled: true,
 	},
     ],
 
