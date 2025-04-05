@@ -284,6 +284,17 @@ Ext.define('PBS.Datastore.Options', {
 			    defaultValue: 1,
 			    deleteDefaultValue: true,
 			},
+			{
+			    xtype: 'proxmoxintegerfield',
+			    name: 'gc-atime-cutoff',
+			    emptyText: gettext('1445 (24 hours 5 minutes)'),
+			    fieldLabel: gettext('GC atime Cutoff'),
+			    autoEl: {
+				tag: 'div',
+				'data-qtip': gettext('Cutoff for atime in minutes'),
+			    },
+			    deleteEmpty: true,
+			},
 		    ],
 		},
 	    },

@@ -850,6 +850,11 @@ Ext.define('PBS.Utils', {
 	delete tuning['gc-atime-safety-check'];
 	options.push(`${gettext('GC Access Time Safety Check')}: ${gc_atime_safety_check ?? true}`);
 
+	let gc_atime_cutoff = tuning['gc-atime-cutoff'];
+	delete tuning['gc-atime-cutoff'];
+	gc_atime_cutoff = gc_atime_cutoff ?? '1445';
+	options.push(`${gettext('GC Access Time Cutoff')}: ${gc_atime_cutoff}m`);
+
 	for (const [k, v] of Object.entries(tuning)) {
 	    options.push(`${k}: ${v}`);
 	}
