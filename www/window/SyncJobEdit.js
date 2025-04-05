@@ -96,8 +96,8 @@ Ext.define('PBS.window.SyncJobEdit', {
 	border: 0,
 	items: [
 	    {
-		title: 'Options',
 		xtype: 'inputpanel',
+		title: 'Options',
 		onGetValues: function(values) {
 		    let me = this;
 
@@ -175,9 +175,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Sync Schedule'),
 			xtype: 'pbsCalendarEvent',
 			name: 'schedule',
+			fieldLabel: gettext('Sync Schedule'),
 			emptyText: gettext('none (disabled)'),
 			cbind: {
 			    deleteEmpty: '{!isCreate}',
@@ -252,10 +252,10 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
+			xtype: 'pbsRemoteSelector',
 			cbind: {
 			    fieldLabel: '{syncRemoteLabel}',
 			},
-			xtype: 'pbsRemoteSelector',
 			allowBlank: false,
 			name: 'remote',
 			skipEmptyText: true,
@@ -339,9 +339,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Remove Vanished'),
 			xtype: 'proxmoxcheckbox',
 			name: 'remove-vanished',
+			fieldLabel: gettext('Remove Vanished'),
 			autoEl: {
 			    tag: 'div',
 			    'data-qtip': gettext('Remove snapshots from sync target datastore if they vanished from source datastore?'),
@@ -364,9 +364,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 		advancedColumn1: [
 		    {
 			xtype: 'pmxDisplayEditField',
+			name: 'id',
 			fieldLabel: gettext('Job ID'),
 			emptyText: gettext('Autogenerate'),
-			name: 'id',
 			allowBlank: true,
 			regex: PBS.Utils.SAFE_ID_RE,
 			cbind: {
@@ -374,9 +374,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Transfer Last'),
 			xtype: 'pbsPruneKeepInput',
 			name: 'transfer-last',
+			fieldLabel: gettext('Transfer Last'),
 			emptyText: gettext('all'),
 			autoEl: {
 			    tag: 'div',
@@ -387,8 +387,8 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Re-sync Corrupt'),
 			xtype: 'proxmoxcheckbox',
+			fieldLabel: gettext('Re-sync Corrupt'),
 			name: 'resync-corrupt',
 			autoEl: {
 			    tag: 'div',
