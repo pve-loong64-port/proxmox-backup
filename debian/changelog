@@ -1,3 +1,45 @@
+rust-proxmox-backup (3.3.7-1) bookworm; urgency=medium
+
+  * fix #5982: garbage collection: add a check to ensure that the underlying
+    file system supports and honors file access time (atime) updates.
+    The check is performed once on datastore creation and on start of every
+    garbage collection (GC) task, just to be sure. It can be disabled in the
+    datastore tuning options.
+
+  * garbage collection: support setting a custom access time cutoff,
+    overriding the default of one day and five minutes.
+
+  * ui: expose flag for GC access time support safety check and the access
+    time cutoff override in datastore tuning options.
+
+  * docs: describe rationale for new GC access time update check setting and
+    the access time cutoff check in tuning options.
+
+  * access control: add support to mark a specific authentication realm as
+    default selected realm for the login user interface.
+
+  * fix #4382: api: access control: remove permissions of token on deletion.
+
+  * fix #3887: api: access control: allow users to regenerate the secret of an
+    API token without changing any existing ACLs.
+
+  * fix #6072: sync jobs: support flags to limit sync to only encrypted and/or
+    verified snapshots.
+
+  * ui: datastore tuning options: expose overriding GC cache capacity so that
+    admins can either restrict the peak memory usage during GC or allow GC to
+    use more memory to reduce file system IO even for huge (multiple TiB)
+    referenced data in backup groups.
+
+  * ui: datastore tuning options: increase width and rework labels to provide
+    a tiny bit more context about what these options are.
+
+  * ui: sync job: increase edit window width to 720px to make it less cramped.
+
+  * ui: sync job: small field label casing consistency fixes.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 05 Apr 2025 17:54:31 +0200
+
 rust-proxmox-backup (3.3.6-1) bookworm; urgency=medium
 
   * datastore: ignore group locking errors when removing snapshots, they
