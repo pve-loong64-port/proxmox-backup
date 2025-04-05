@@ -503,10 +503,16 @@ impl ChunkStore {
             .parent()
             .ok_or_else(|| format_err!("unable to get chunk dir"))?;
 
+        let mut create_options = CreateOptions::new();
+        if nix::unistd::Uid::effective().is_root() {
+            let uid = pbs_config::backup_user()?.uid;
+            let gid = pbs_config::backup_group()?.gid;
+            create_options = create_options.owner(uid).group(gid);
+        }
         proxmox_sys::fs::replace_file(
             &chunk_path,
             raw_data,
-            CreateOptions::new(),
+            create_options,
             self.sync_level == DatastoreFSyncLevel::File,
         )
         .map_err(|err| {
