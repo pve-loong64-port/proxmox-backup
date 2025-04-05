@@ -846,6 +846,10 @@ Ext.define('PBS.Utils', {
 	sync = PBS.Utils.tuningOptions['sync-level'][sync ?? '__default__'];
 	options.push(`${gettext('Sync Level')}: ${sync}`);
 
+	let gc_atime_safety_check = tuning['gc-atime-safety-check'];
+	delete tuning['gc-atime-safety-check'];
+	options.push(`${gettext('GC Access Time Safety Check')}: ${gc_atime_safety_check ?? true}`);
+
 	for (const [k, v] of Object.entries(tuning)) {
 	    options.push(`${k}: ${v}`);
 	}
