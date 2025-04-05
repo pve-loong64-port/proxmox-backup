@@ -435,9 +435,16 @@ There are some tuning related options for the datastore that are more advanced:
 
   This can be set with:
 
-.. code-block:: console
+  .. code-block:: console
 
-  # proxmox-backup-manager datastore update <storename> --tuning 'sync-level=filesystem'
+    # proxmox-backup-manager datastore update <storename> --tuning 'sync-level=filesystem'
+
+* ``gc-atime-safety-check``: Datastore GC atime update safety check:
+  You can explicitly `enable` or `disable` the atime update safety check
+  performed on datastore creation and garbage collection. This checks if atime
+  updates are handled as expected by garbage collection and therefore avoids the
+  risk of data loss by unexpected filesystem behavior. It is recommended to set
+  this to enabled, which is also the default value.
 
 If you want to set multiple tuning options simultaneously, you can separate them
 with a comma, like this:
