@@ -446,6 +446,11 @@ There are some tuning related options for the datastore that are more advanced:
   risk of data loss by unexpected filesystem behavior. It is recommended to set
   this to enabled, which is also the default value.
 
+* ``gc-atime-cutoff``: Datastore GC atime cutoff for chunk cleanup:
+  This allows to set the cutoff for which a chunk is still considered in-use
+  during phase 2 of garbage collection (given no older writers). If the
+  ``atime`` of the chunk is outside the range, it will be removed.
+
 If you want to set multiple tuning options simultaneously, you can separate them
 with a comma, like this:
 
