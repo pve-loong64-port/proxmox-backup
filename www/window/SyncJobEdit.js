@@ -12,6 +12,7 @@ Ext.define('PBS.window.SyncJobEdit', {
     subject: gettext('Sync Job - Pull Direction'),
 
     bodyPadding: 0,
+    width: 720,
 
     fieldDefaults: { labelWidth: 120 },
     defaultFocus: 'proxmoxtextfield[name=comment]',
