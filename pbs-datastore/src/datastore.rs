@@ -1236,6 +1236,19 @@ impl DataStore {
                 upid: Some(upid.to_string()),
                 ..Default::default()
             };
+            let tuning: DatastoreTuning = serde_json::from_value(
+                DatastoreTuning::API_SCHEMA
+                    .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
+            )?;
+            if tuning.gc_atime_safety_check.unwrap_or(true) {
+                self.inner
+                    .chunk_store
+                    .check_fs_atime_updates(true)
+                    .context("atime safety check failed")?;
+                info!("Access time update check successful, proceeding with GC.");
+            } else {
+                info!("Access time update check disabled by datastore tuning options.");
+            }
 
             info!("Start GC phase1 (mark used chunks)");
 

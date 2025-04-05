@@ -1,9 +1,11 @@
+use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use anyhow::{bail, format_err, Error};
-use tracing::info;
+use anyhow::{bail, format_err, Context, Error};
+use tracing::{info, warn};
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
 use proxmox_io::ReadExt;
@@ -13,6 +15,7 @@ use proxmox_sys::process_locker::{
 };
 use proxmox_worker_task::WorkerTaskContext;
 
+use crate::data_blob::DataChunkBuilder;
 use crate::file_formats::{
     COMPRESSED_BLOB_MAGIC_1_0, ENCRYPTED_BLOB_MAGIC_1_0, UNCOMPRESSED_BLOB_MAGIC_1_0,
 };
@@ -177,7 +180,7 @@ impl ChunkStore {
     /// Note that this must be used with care, as it's dangerous to create two instances on the
     /// same base path, as closing the underlying ProcessLocker drops all locks from this process
     /// on the lockfile (even if separate FDs)
-    pub(crate) fn open<P: Into<PathBuf>>(
+    pub fn open<P: Into<PathBuf>>(
         name: &str,
         base: P,
         sync_level: DatastoreFSyncLevel,
@@ -437,6 +440,69 @@ impl ChunkStore {
                 }
             }
             drop(lock);
+        }
+
+        Ok(())
+    }
+
+    /// Check if atime updates are honored by the filesystem backing the chunk store.
+    ///
+    /// Checks if the atime is always updated by utimensat taking into consideration the Linux
+    /// kernel timestamp granularity.
+    /// If `retry_on_file_changed` is set to true, the check is performed again on the changed file
+    /// if a file change while testing is detected by differences in bith time or inode number.
+    /// Uses a 4 MiB fixed size, compressed but unencrypted chunk to test. The chunk is inserted in
+    /// the chunk store if not yet present.
+    /// Returns with error if the check could not be performed.
+    pub fn check_fs_atime_updates(&self, retry_on_file_changed: bool) -> Result<(), Error> {
+        let (zero_chunk, digest) = DataChunkBuilder::build_zero_chunk(None, 4096 * 1024, true)?;
+        let (pre_existing, _) = self.insert_chunk(&zero_chunk, &digest)?;
+        let (path, _digest) = self.chunk_path(&digest);
+
+        // Take into account timestamp update granularity in the kernel
+        // Blocking the thread is fine here since this runs in a worker.
+        std::thread::sleep(Duration::from_secs(1));
+
+        let metadata_before = std::fs::metadata(&path).context(format!(
+            "failed to get metadata for {path:?} before atime update"
+        ))?;
+
+        // Second atime update if chunk pre-existed, insert_chunk already updates pre-existing ones
+        self.cond_touch_path(&path, true)?;
+
+        let metadata_now = std::fs::metadata(&path).context(format!(
+            "failed to get metadata for {path:?} after atime update"
+        ))?;
+
+        // Check for the unlikely case that the file changed in-between the
+        // two metadata calls, try to check once again on changed file
+        if metadata_before.ino() != metadata_now.ino() {
+            if retry_on_file_changed {
+                return self.check_fs_atime_updates(false);
+            }
+            bail!("chunk {path:?} changed twice during access time safety check, cannot proceed.");
+        }
+
+        if metadata_before.accessed()? >= metadata_now.accessed()? {
+            let chunk_info_str = if pre_existing {
+                "pre-existing"
+            } else {
+                "newly inserted"
+            };
+            warn!("Chunk metadata was not correctly updated during access time safety check:");
+            info!(
+                "Timestamps before update: accessed {:?}, modified {:?}, created {:?}",
+                metadata_before.accessed().ok(),
+                metadata_before.modified().ok(),
+                metadata_before.created().ok(),
+            );
+            info!(
+                "Timestamps after update: accessed {:?}, modified {:?}, created {:?}",
+                metadata_now.accessed().ok(),
+                metadata_now.modified().ok(),
+                metadata_now.created().ok(),
+            );
+            bail!("access time safety check using {chunk_info_str} chunk failed, aborting GC!");
         }
 
         Ok(())

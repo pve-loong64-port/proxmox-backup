@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Error};
+use anyhow::{bail, Context, Error};
 use hex::FromHex;
 use serde_json::Value;
-use tracing::warn;
+use tracing::{info, warn};
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::{api, param_bail, ApiType};
@@ -123,8 +123,16 @@ pub(crate) fn do_create_datastore(
         UnmountGuard::new(None)
     };
 
-    if reuse_datastore {
-        ChunkStore::verify_chunkstore(&path)?;
+    let chunk_store = if reuse_datastore {
+        ChunkStore::verify_chunkstore(&path).and_then(|_| {
+            // Must be the only instance accessing and locking the chunk store,
+            // dropping will close all other locks from this process on the lockfile as well.
+            ChunkStore::open(
+                &datastore.name,
+                &path,
+                tuning.sync_level.unwrap_or_default(),
+            )
+        })?
     } else {
         if let Ok(dir) = std::fs::read_dir(&path) {
             for file in dir {
@@ -142,9 +150,17 @@ pub(crate) fn do_create_datastore(
             backup_user.uid,
             backup_user.gid,
             tuning.sync_level.unwrap_or_default(),
-        )
-        .map(|_| ())?;
+        )?
     };
+
+    if tuning.gc_atime_safety_check.unwrap_or(true) {
+        chunk_store
+            .check_fs_atime_updates(true)
+            .context("access time safety check failed")?;
+        info!("Access time update check successful.");
+    } else {
+        info!("Access time update check skipped.");
+    }
 
     config.set_data(&datastore.name, "datastore", &datastore)?;
 
