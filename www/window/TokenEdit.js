@@ -70,7 +70,7 @@ Ext.define('PBS.window.TokenEdit', {
 		name: 'comment',
 		fieldLabel: gettext('Comment'),
 		cbind: {
-		    deleteEmpty: "{!isCreate}"
+		    deleteEmpty: "{!isCreate}",
 		},
 	    },
 	],
