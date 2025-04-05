@@ -851,12 +851,12 @@ Ext.define('PBS.Utils', {
 
 	let gc_atime_safety_check = tuning['gc-atime-safety-check'];
 	delete tuning['gc-atime-safety-check'];
-	options.push(`${gettext('GC Access Time Safety Check')}: ${gc_atime_safety_check ?? true}`);
+	options.push(`${gettext('GC Access-Time Support Check')}: ${gc_atime_safety_check ?? true}`);
 
 	let gc_atime_cutoff = tuning['gc-atime-cutoff'];
 	delete tuning['gc-atime-cutoff'];
 	gc_atime_cutoff = gc_atime_cutoff ?? '1445';
-	options.push(`${gettext('GC Access Time Cutoff')}: ${gc_atime_cutoff}m`);
+	options.push(`${gettext('GC Access-Time Cutoff')}: ${gc_atime_cutoff}m`);
 
 	let gc_cache_capacity = tuning['gc-cache-capacity'];
 	delete tuning['gc-cache-capacity'];

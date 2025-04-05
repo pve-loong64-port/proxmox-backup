@@ -236,7 +236,7 @@ Ext.define('PBS.Datastore.Options', {
 		xtype: 'proxmoxWindowEdit',
 		title: gettext('Tuning Options'),
 		onlineHelp: 'datastore_tuning_options',
-		width: 350,
+		width: 500,
 		items: {
 		    xtype: 'inputpanel',
 		    onGetValues: function(values) {
@@ -258,7 +258,8 @@ Ext.define('PBS.Datastore.Options', {
 			{
 			    xtype: 'proxmoxKVComboBox',
 			    name: 'chunk-order',
-			    fieldLabel: gettext('Chunk Order'),
+			    fieldLabel: gettext('Chunk Iteration Order'),
+			    labelWidth: 200,
 			    comboItems: Object.entries(PBS.Utils.tuningOptions['chunk-order']),
 			    deleteEmpty: true,
 			    value: '__default__',
@@ -266,7 +267,8 @@ Ext.define('PBS.Datastore.Options', {
 			{
 			    xtype: 'proxmoxKVComboBox',
 			    name: 'sync-level',
-			    fieldLabel: gettext('Sync Level'),
+			    fieldLabel: gettext('Data Sync Level'),
+			    labelWidth: 200,
 			    comboItems: Object.entries(PBS.Utils.tuningOptions['sync-level']),
 			    deleteEmpty: true,
 			    value: '__default__',
@@ -274,7 +276,8 @@ Ext.define('PBS.Datastore.Options', {
 			{
 			    xtype: 'proxmoxcheckbox',
 			    name: 'gc-atime-safety-check',
-			    fieldLabel: gettext('GC atime Check'),
+			    fieldLabel: gettext('GC Access-Time Support Check'),
+			    labelWidth: 200,
 			    autoEl: {
 				tag: 'div',
 				'data-qtip': gettext('Ensure underlying storage honors access time updates'),
@@ -287,19 +290,17 @@ Ext.define('PBS.Datastore.Options', {
 			{
 			    xtype: 'proxmoxintegerfield',
 			    name: 'gc-atime-cutoff',
+			    fieldLabel: gettext('GC Access-Time Cutoff (minutes)'),
+			    labelWidth: 200,
 			    emptyText: gettext('1445 (24 hours 5 minutes)'),
-			    fieldLabel: gettext('GC atime Cutoff'),
-			    autoEl: {
-				tag: 'div',
-				'data-qtip': gettext('Cutoff for atime in minutes'),
-			    },
 			    deleteEmpty: true,
 			},
 			{
 			    xtype: 'proxmoxintegerfield',
 			    name: 'gc-cache-capacity',
-			    fieldLabel: gettext('GC cache capacity'),
-			    emptyText: Proxmox.Utils.defaultText,
+			    fieldLabel: gettext('GC Cache Capacity (# chunks)'),
+			    labelWidth: 200,
+			    emptyText: gettext('1048576 (0 disables chache)'),
 			    minValue: 0,
 			    maxValue: 8 * 1024 * 1024,
 			    deleteEmpty: true,
