@@ -90,7 +90,7 @@ proxmox-tfa = { version = "5", features = [ "api", "api-types" ] }
 proxmox-time = "2"
 proxmox-uuid = { version = "1", features = [ "serde" ] }
 proxmox-worker-task = "0.1"
-pbs-api-types = "0.2.1"
+pbs-api-types = "0.2.2"
 
 # other proxmox crates
 pathpatterns = "0.3"
