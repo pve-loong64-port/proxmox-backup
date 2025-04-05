@@ -338,7 +338,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Remove vanished'),
+			fieldLabel: gettext('Remove Vanished'),
 			xtype: 'proxmoxcheckbox',
 			name: 'remove-vanished',
 			autoEl: {
@@ -386,7 +386,7 @@ Ext.define('PBS.window.SyncJobEdit', {
 			},
 		    },
 		    {
-			fieldLabel: gettext('Re-sync corrupt snapshots'),
+			fieldLabel: gettext('Re-sync Corrupt'),
 			xtype: 'proxmoxcheckbox',
 			name: 'resync-corrupt',
 			autoEl: {
@@ -402,9 +402,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 		],
 		advancedColumn2: [
 		    {
-			fieldLabel: gettext('Encrypted snapshots only'),
 			xtype: 'proxmoxcheckbox',
 			name: 'encrypted-only',
+			fieldLabel: gettext('Encrypted Only'),
 			autoEl: {
 			    tag: 'div',
 			    'data-qtip': gettext('Sync only encrypted backup snapshots, exclude others.'),
@@ -413,9 +413,9 @@ Ext.define('PBS.window.SyncJobEdit', {
 			value: false,
 		    },
 		    {
-			fieldLabel: gettext('Verified snapshots only'),
 			xtype: 'proxmoxcheckbox',
 			name: 'verified-only',
+			fieldLabel: gettext('Verified Only'),
 			autoEl: {
 			    tag: 'div',
 			    'data-qtip': gettext('Sync only verified backup snapshots, exclude others.'),
