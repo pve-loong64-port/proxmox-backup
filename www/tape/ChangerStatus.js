@@ -597,7 +597,8 @@ Ext.define('PBS.TapeManagement.ChangerStatus', {
 		if (!use_cache) {
 		    Proxmox.Utils.setErrorMask(view);
 		}
-		Proxmox.Utils.setErrorMask(me.lookup('content'), response.result.message.toString());
+		let msg = Ext.htmlEncode(response.result.message.toString());
+		Proxmox.Utils.setErrorMask(me.lookup('content'), msg);
 	    }
 
 	    me.scheduleReload(5000);

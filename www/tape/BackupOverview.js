@@ -116,7 +116,7 @@ Ext.define('PBS.TapeManagement.BackupOverview', {
 
 		Proxmox.Utils.setErrorMask(view, false);
 	    } catch (error) {
-		Proxmox.Utils.setErrorMask(view, error.toString());
+		Proxmox.Utils.setErrorMask(view, Ext.htmlEncode(error.toString()));
 	    }
 	},
 
