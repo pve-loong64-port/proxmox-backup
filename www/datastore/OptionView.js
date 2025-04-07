@@ -300,7 +300,7 @@ Ext.define('PBS.Datastore.Options', {
 			    name: 'gc-cache-capacity',
 			    fieldLabel: gettext('GC Cache Capacity (# chunks)'),
 			    labelWidth: 200,
-			    emptyText: gettext('1048576 (0 disables chache)'),
+			    emptyText: gettext('1048576 (0 disables cache)'),
 			    minValue: 0,
 			    maxValue: 8 * 1024 * 1024,
 			    deleteEmpty: true,
