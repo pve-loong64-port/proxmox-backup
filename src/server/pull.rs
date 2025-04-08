@@ -969,7 +969,7 @@ pub(crate) async fn pull_ns(
             match pull_group(params, namespace, &group, &mut progress).await {
                 Ok(stats) => sync_stats.add(stats),
                 Err(err) => {
-                    info!("sync group {} failed - {err}", &group);
+                    info!("sync group {} failed - {err:#}", &group);
                     errors = true; // do not stop here, instead continue
                 }
             }
