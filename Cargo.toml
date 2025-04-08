@@ -71,7 +71,7 @@ proxmox-ldap = "0.2.1"
 proxmox-metrics = "0.3.1"
 proxmox-notify = "0.5.1"
 proxmox-openid = "0.10.0"
-proxmox-rest-server = { version = "0.8.5", features = [ "templates" ] }
+proxmox-rest-server = { version = "0.8.9", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "3.0.0", default-features = false }
 proxmox-rrd = "0.4"
