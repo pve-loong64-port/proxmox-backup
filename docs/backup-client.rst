@@ -44,6 +44,11 @@ user\@pbs!token@host:store       ``user@pbs!token`` host:8007          store
 [ff80::51]:1234:mydatastore      ``root@pam``       [ff80::51]:1234    mydatastore
 ================================ ================== ================== ===========
 
+.. Note:: If you are using the statically linked binary of proxmox backup client
+   name resolution will not be performed via the mechanisms provided by libc,
+   but uses a resolver written purely in the Rust programming language.
+   Therefore, features and modules provided by Name Service Switch cannot be
+   used.
 
 .. _environment-variables:
 
