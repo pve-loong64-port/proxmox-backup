@@ -208,7 +208,7 @@ Description: Proxmox Backup Client tools
 Package: proxmox-backup-client-static
 Architecture: any
 Depends: qrencode, ${misc:Depends},
-Conflicts: proxmox-backup-client
+Conflicts: proxmox-backup-client,
 Description: Proxmox Backup Client tools (statically linked)
  This package contains the Proxmox Backup client, which provides a
  simple command line tool to create and restore backups.

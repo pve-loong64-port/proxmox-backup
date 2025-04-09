@@ -34,13 +34,13 @@ usr/share/man/man5/media-pool.cfg.5
 usr/share/man/man5/notifications-priv.cfg.5
 usr/share/man/man5/notifications.cfg.5
 usr/share/man/man5/proxmox-backup.node.cfg.5
+usr/share/man/man5/prune.cfg.5
 usr/share/man/man5/remote.cfg.5
 usr/share/man/man5/sync.cfg.5
 usr/share/man/man5/tape-job.cfg.5
 usr/share/man/man5/tape.cfg.5
 usr/share/man/man5/user.cfg.5
 usr/share/man/man5/verification.cfg.5
-usr/share/man/man5/prune.cfg.5
 usr/share/proxmox-backup/templates/default/acme-err-body.txt.hbs
 usr/share/proxmox-backup/templates/default/acme-err-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/gc-err-body.txt.hbs
