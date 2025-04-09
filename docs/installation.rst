@@ -138,7 +138,26 @@ you need to run:
   # apt update
   # apt install proxmox-backup-client
 
-.. note:: The client-only repository should be usable by most recent Debian and
-   Ubuntu derivatives.
+Install Statically Linked Proxmox Backup Client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Proxmox provides a statically linked build of the Proxmox backup client that
+should run on any modern x86-64 Linux system.
+
+It is currently available as a Debian package. After configuring the
+:ref:`package_repositories_client_only_apt`, you need to run:
+
+.. code-block:: console
+
+  # apt update
+  # apt install proxmox-backup-client-static
+
+This package conflicts with the `proxmox-backup-client` package, as both
+provide the client as an executable in the `/usr/bin/proxmox-backup-client`
+path.
+
+You can copy this executable to other, e.g. non-Debian based Linux systems.
+
+For details on using the Proxmox Backup Client, see :ref:`client_usage`.
 
 .. include:: package-repositories.rst
