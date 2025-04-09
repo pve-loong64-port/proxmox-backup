@@ -1,8 +1,10 @@
 include /usr/share/dpkg/default.mk
+include /usr/share/rustc/architecture.mk
 include defines.mk
 
 PACKAGE := proxmox-backup
 ARCH := $(DEB_BUILD_ARCH)
+export DEB_HOST_RUST_TYPE
 
 SUBDIRS := etc www docs templates
 
@@ -37,9 +39,10 @@ SUBCRATES != cargo metadata --no-deps --format-version=1 \
 	| sed -e "s!.*$$PWD/!!g" -e 's/\#.*$$//g' -e 's/)$$//g'
 
 ifeq ($(BUILD_MODE), release)
-CARGO_BUILD_ARGS += --release
+CARGO_BUILD_ARGS += --release --target $(DEB_HOST_RUST_TYPE)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/release
 else
+CARGO_BUILD_ARGS += --target $(DEB_HOST_RUST_TYPE)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/debug
 endif
 
