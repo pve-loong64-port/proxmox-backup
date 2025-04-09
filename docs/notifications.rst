@@ -362,3 +362,23 @@ type via the ``notify`` option.
 
 The ``notify-user`` and ``notify`` options are ignored if ``notification-mode``
 is set to ``notification-system``.
+
+Overriding Notification Templates
+---------------------------------
+
+Proxmox Backup Server uses Handlebars templates to render notifications. The
+original templates provided by Proxmox Backup Server are stored in
+``/usr/share/proxmox-backup/templates/default/``.
+
+Notification templates can be overridden by providing a custom template file in
+the override directory at
+``/etc/proxmox-backup/notification-templates/default/``. When rendering a
+notification of a given type, Proxmox Backup Server will first attempt to load
+a template from the override directory. If this one does not exist or fails to
+render, the original template will be used.
+
+The template files follow the naming convention of
+``<type>-<body|subject>.txt.hbs``. For instance, the file
+``gc-err-body.txt.hbs`` contains the template for rendering notifications for
+garbage collection errors, while ``package-updates-subject.txt.hbs`` is used to
+render the subject line of notifications for available package updates.
