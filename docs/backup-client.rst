@@ -1,3 +1,5 @@
+.. _client_usage:
+
 Backup Client Usage
 ===================
 
