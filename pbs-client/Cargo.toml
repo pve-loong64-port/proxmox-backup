@@ -27,6 +27,7 @@ tokio = { workspace = true, features = [ "fs", "signal" ] }
 tokio-stream.workspace = true
 tower-service.workspace = true
 xdg.workspace = true
+hickory-resolver.workspace = true
 
 pathpatterns.workspace = true
 

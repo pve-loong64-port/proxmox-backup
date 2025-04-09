@@ -4,6 +4,8 @@ use std::time::Duration;
 
 use anyhow::{bail, format_err, Error};
 use futures::*;
+#[cfg(not(target_feature = "crt-static"))]
+use hyper::client::connect::dns::GaiResolver;
 use hyper::client::{Client, HttpConnector};
 use hyper::http::header::HeaderValue;
 use hyper::http::Uri;
@@ -32,6 +34,74 @@ use pbs_api_types::{Authid, RateLimitConfig, Userid};
 
 use super::pipe_to_stream::PipeToSendStream;
 use super::PROXMOX_BACKUP_TCP_KEEPALIVE_TIME;
+
+#[cfg(not(target_feature = "crt-static"))]
+type DnsResolver = GaiResolver;
+
+#[cfg(target_feature = "crt-static")]
+type DnsResolver = resolver::HickoryDnsResolver;
+
+#[cfg(target_feature = "crt-static")]
+mod resolver {
+    use std::net::SocketAddr;
+    use std::pin::Pin;
+    use std::sync::Arc;
+    use std::task::{Context, Poll};
+
+    use futures::Future;
+    use hickory_resolver::error::ResolveError;
+    use hickory_resolver::lookup_ip::LookupIpIntoIter;
+    use hickory_resolver::TokioAsyncResolver;
+    use hyper::client::connect::dns::Name;
+    use tower_service::Service;
+
+    pub(crate) struct SocketAddrIter {
+        inner: LookupIpIntoIter,
+    }
+
+    impl Iterator for SocketAddrIter {
+        type Item = SocketAddr;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.inner.next().map(|ip_addr| SocketAddr::new(ip_addr, 0))
+        }
+    }
+
+    #[derive(Clone)]
+    pub(crate) struct HickoryDnsResolver {
+        inner: Arc<TokioAsyncResolver>,
+    }
+
+    impl HickoryDnsResolver {
+        pub(crate) fn new() -> Self {
+            Self {
+                inner: Arc::new(TokioAsyncResolver::tokio_from_system_conf().unwrap()),
+            }
+        }
+    }
+
+    impl Service<Name> for HickoryDnsResolver {
+        type Response = SocketAddrIter;
+        type Error = ResolveError;
+        type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+        fn poll_ready(&mut self, _ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, name: Name) -> Self::Future {
+            let inner = self.inner.clone();
+            Box::pin(async move {
+                inner
+                    .lookup_ip(name.as_str())
+                    .await
+                    .map(|r| SocketAddrIter {
+                        inner: r.into_iter(),
+                    })
+            })
+        }
+    }
+}
 
 /// Timeout used for several HTTP operations that are expected to finish quickly but may block in
 /// certain error conditions. Keep it generous, to avoid false-positive under high load.
@@ -134,7 +204,7 @@ impl Default for HttpClientOptions {
 
 /// HTTP(S) API client
 pub struct HttpClient {
-    client: Client<HttpsConnector>,
+    client: Client<HttpsConnector<DnsResolver>>,
     server: String,
     port: u16,
     fingerprint: Arc<Mutex<Option<String>>>,
@@ -365,7 +435,8 @@ impl HttpClient {
             ssl_connector_builder.set_verify(openssl::ssl::SslVerifyMode::NONE);
         }
 
-        let mut httpc = HttpConnector::new();
+        let resolver = DnsResolver::new();
+        let mut httpc = HttpConnector::new_with_resolver(resolver);
         httpc.set_nodelay(true); // important for h2 download performance!
         httpc.enforce_http(false); // we want https...
 
@@ -526,7 +597,9 @@ impl HttpClient {
             _options: options,
         })
     }
+}
 
+impl HttpClient {
     /// Login
     ///
     /// Login is done on demand, so this is only required if you need
@@ -814,7 +887,7 @@ impl HttpClient {
     }
 
     async fn credentials(
-        client: Client<HttpsConnector>,
+        client: Client<HttpsConnector<DnsResolver>>,
         server: String,
         port: u16,
         username: Userid,
@@ -859,7 +932,7 @@ impl HttpClient {
     }
 
     async fn api_request(
-        client: Client<HttpsConnector>,
+        client: Client<HttpsConnector<DnsResolver>>,
         req: Request<Body>,
     ) -> Result<Value, Error> {
         Self::api_response(
