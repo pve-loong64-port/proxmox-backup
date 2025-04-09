@@ -48,7 +48,7 @@ The sendmail notification target uses the ``sendmail`` binary to send emails to
 a list of configured users or email addresses. If a user is selected as a
 recipient, the email address configured in user's settings will be used. For
 the ``root@pam`` user, this is the email address entered during installation. A
-user's email address can be configured in ``Configuration -> Access Control ->
+user's email address can be configured in ``Configuration → Access Control →
 User Management``. If a user has no associated email address, no email will be
 sent.
 
