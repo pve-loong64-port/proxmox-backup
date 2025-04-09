@@ -72,6 +72,10 @@ either start it manually from the GUI or provide it with a schedule (see
 Backup snapshots, groups and namespaces which are no longer available on the
 **Remote** datastore can be removed from the local datastore as well by setting
 the ``remove-vanished`` option for the sync job.
+Setting the ``verified-only`` or ``encrypted-only`` flags allows to limit the
+sync jobs to backup snapshots which have been verified or encrypted,
+respectively. This is particularly of interest when sending backups to a less
+trusted remote backup server.
 
 .. code-block:: console
 
