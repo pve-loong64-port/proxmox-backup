@@ -38,12 +38,16 @@ SUBCRATES != cargo metadata --no-deps --format-version=1 \
 	| grep "$$PWD/" \
 	| sed -e "s!.*$$PWD/!!g" -e 's/\#.*$$//g' -e 's/)$$//g'
 
+STATIC_TARGET_DIR := target/static-build
+
 ifeq ($(BUILD_MODE), release)
 CARGO_BUILD_ARGS += --release --target $(DEB_HOST_RUST_TYPE)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/release
+STATIC_COMPILEDIR := $(STATIC_TARGET_DIR)/$(DEB_HOST_RUST_TYPE)/release
 else
 CARGO_BUILD_ARGS += --target $(DEB_HOST_RUST_TYPE)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/debug
+STATIC_COMPILEDIR := $(STATIC_TARGET_DIR)/$(DEB_HOST_RUST_TYPE)/debug
 endif
 
 ifeq ($(valgrind), yes)
@@ -55,6 +59,9 @@ CARGO ?= cargo
 COMPILED_BINS := \
 	$(addprefix $(COMPILEDIR)/,$(USR_BIN) $(USR_SBIN) $(SERVICE_BIN) $(RESTORE_BIN))
 
+STATIC_BIN := \
+	$(addprefix $(STATIC_COMPILEDIR)/,proxmox-backup-client-static)
+
 export DEB_VERSION DEB_VERSION_UPSTREAM
 
 SERVER_DEB=$(PACKAGE)-server_$(DEB_VERSION)_$(ARCH).deb
@@ -63,10 +70,12 @@ CLIENT_DEB=$(PACKAGE)-client_$(DEB_VERSION)_$(ARCH).deb
 CLIENT_DBG_DEB=$(PACKAGE)-client-dbgsym_$(DEB_VERSION)_$(ARCH).deb
 RESTORE_DEB=proxmox-backup-file-restore_$(DEB_VERSION)_$(ARCH).deb
 RESTORE_DBG_DEB=proxmox-backup-file-restore-dbgsym_$(DEB_VERSION)_$(ARCH).deb
+STATIC_CLIENT_DEB=$(PACKAGE)-client-static_$(DEB_VERSION)_$(ARCH).deb
+STATIC_CLIENT_DBG_DEB=$(PACKAGE)-client-static-dbgsym_$(DEB_VERSION)_$(ARCH).deb
 DOC_DEB=$(PACKAGE)-docs_$(DEB_VERSION)_all.deb
 
 DEBS=$(SERVER_DEB) $(SERVER_DBG_DEB) $(CLIENT_DEB) $(CLIENT_DBG_DEB) \
-     $(RESTORE_DEB) $(RESTORE_DBG_DEB)
+     $(RESTORE_DEB) $(RESTORE_DBG_DEB) $(STATIC_CLIENT_DEB) $(STATIC_CLIENT_DBG_DEB)
 
 DSC = rust-$(PACKAGE)_$(DEB_VERSION).dsc
 
@@ -74,7 +83,7 @@ DESTDIR=
 
 tests ?= --workspace
 
-all: $(SUBDIRS)
+all: proxmox-backup-client-static $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
@@ -198,7 +207,7 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-
 lint:
 	cargo clippy -- -A clippy::all -D clippy::correctness
 
-install: $(COMPILED_BINS)
+install: $(COMPILED_BINS) $(STATIC_BIN)
 	install -dm755 $(DESTDIR)$(BINDIR)
 	install -dm755 $(DESTDIR)$(ZSH_COMPL_DEST)
 	$(foreach i,$(USR_BIN), \
@@ -217,16 +226,29 @@ install: $(COMPILED_BINS)
 	install -m4755 -o root -g root $(COMPILEDIR)/sg-tape-cmd $(DESTDIR)$(LIBEXECDIR)/proxmox-backup/sg-tape-cmd
 	$(foreach i,$(SERVICE_BIN), \
 	    install -m755 $(COMPILEDIR)/$(i) $(DESTDIR)$(LIBEXECDIR)/proxmox-backup/ ;)
+	install -m755 $(STATIC_COMPILEDIR)/proxmox-backup-client $(DESTDIR)$(BINDIR)/proxmox-backup-client-static
 	$(MAKE) -C www install
 	$(MAKE) -C docs install
 	$(MAKE) -C templates install
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
-upload: $(SERVER_DEB) $(CLIENT_DEB) $(RESTORE_DEB) $(DOC_DEB)
+upload: $(SERVER_DEB) $(CLIENT_DEB) $(RESTORE_DEB) $(DOC_DEB) $(STATIC_CLIENT_DEB)
 	# check if working directory is clean
 	git diff --exit-code --stat && git diff --exit-code --stat --staged
 	tar cf - $(SERVER_DEB) $(SERVER_DBG_DEB) $(DOC_DEB) $(CLIENT_DEB) $(CLIENT_DBG_DEB) \
 	  | ssh -X repoman@repo.proxmox.com upload --product pbs --dist $(UPLOAD_DIST)
 	tar cf - $(CLIENT_DEB) $(CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve,pmg,pbs-client" --dist $(UPLOAD_DIST)
+	tar cf - $(STATIC_CLIENT_DEB) $(STATIC_CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pbs-client" --dist $(UPLOAD_DIST)
 	tar cf - $(RESTORE_DEB) $(RESTORE_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve" --dist $(UPLOAD_DIST)
+
+.PHONY: proxmox-backup-client-static
+proxmox-backup-client-static:
+	rm -f $(STATIC_BIN)
+	$(MAKE) $(STATIC_BIN)
+
+$(STATIC_BIN):
+	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
+          echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
+	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
+          --target-dir $(STATIC_TARGET_DIR) -- -C target-feature=+crt-static -L $(STATIC_COMPILEDIR)/deps-stubs/

@@ -47,6 +47,8 @@ override_dh_auto_install:
 	dh_auto_install -- \
 	    PROXY_USER=backup \
 	    LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
+	mkdir -p debian/proxmox-backup-client-static/usr/bin
+	mv debian/tmp/usr/bin/proxmox-backup-client-static debian/proxmox-backup-client-static/usr/bin/proxmox-backup-client
 
 override_dh_installsystemd:
 	dh_installsystemd -pproxmox-backup-server  proxmox-backup-daily-update.timer
