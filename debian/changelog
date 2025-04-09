@@ -1,3 +1,46 @@
+rust-proxmox-backup (3.4.0-1) bookworm; urgency=medium
+
+  * fix #4788: build statically linked version of the proxmox-backup-client
+    package.
+
+  * ui: sync job: change the rate limit direction based on sync direction.
+
+  * docs: mention how to set the push sync jobs rate limit
+
+  * ui: set error mask: ensure that message is html-encoded to avoid visual
+    glitches.
+
+  * api server: increase maximal request body size fro 64 kiB to 512 kiB,
+    similar to a recent change for our perl based projects.
+
+  * notifications: include Content-Length header for broader compatibility in
+    the webhook and gotify targets.
+
+  * notifications: allow overriding notification templates.
+
+  * docs: notifications: add section about how to use custom templates
+
+  * sync: print whole error chain per group on failure for more context.
+
+  * ui: options-view: fix typo in empty-text for GC tuning option.
+
+  * memory info: use the "MemAvailable" field from '/proc/meminfo' to compute
+    used memory to fix overestimation of that metric and to better align with
+    what modern versions of tools like `free` do and to future proof against
+    changes in how the kernel accounts memory usage for.
+
+  * add "MemAvailable" field to ProcFsMemInfo to promote its usage over the
+    existing "MemFree" field, which is almost never the right choice. This new
+    field will be provided for external metric server.
+
+  * docs: mention different name resolution for statically linked binary.
+
+  * docs: add basic info for how to install the statically linked client.
+
+  * docs: mention new verify-only and encrypted-only flags for sync jobs.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 09 Apr 2025 17:41:38 +0200
+
 rust-proxmox-backup (3.3.7-1) bookworm; urgency=medium
 
   * fix #5982: garbage collection: add a check to ensure that the underlying
