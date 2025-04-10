@@ -193,7 +193,7 @@ Ext.define('PBS.config.TokenView', {
 	    handler: 'regenerateToken',
 	    dangerous: true,
 	    confirmMsg: rec => Ext.String.format(
-		gettext("Regenerate the secret of the API token '{0}'? All current use-sites will lose access!"),
+		gettext("Regenerate the secret of the API token '{0}'? All users of the previous token secret will lose access!"),
 		rec.data.tokenid,
 	    ),
 	},
