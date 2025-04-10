@@ -46,11 +46,21 @@ user\@pbs!token@host:store       ``user@pbs!token`` host:8007          store
 [ff80::51]:1234:mydatastore      ``root@pam``       [ff80::51]:1234    mydatastore
 ================================ ================== ================== ===========
 
-.. Note:: If you are using the statically linked binary of proxmox backup client
-   name resolution will not be performed via the mechanisms provided by libc,
-   but uses a resolver written purely in the Rust programming language.
-   Therefore, features and modules provided by Name Service Switch cannot be
-   used.
+.. _statically_linked_client:
+
+Statically Linked Backup Client
+-------------------------------
+
+A statically linked version of the Proxmox Backup client is available for Linux
+based systems where the regular client is not available. Please note that it is
+recommended to use the regular client when possible, as the statically linked
+client is not a full replacement. For example, name resolution will not be
+performed via the mechanisms provided by libc, but uses a resolver written
+purely in the Rust programming language. Therefore, features and modules
+provided by Name Service Switch cannot be used.
+
+The statically linked client is available via the ``pbs-client`` repository as
+described in the :ref:`installation <install_pbc>` section.
 
 .. _environment-variables:
 
