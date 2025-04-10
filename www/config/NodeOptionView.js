@@ -59,6 +59,9 @@ Ext.define('PBS.NodeOptionView', {
 	    name: 'consent-text',
 	    text: gettext('Consent Text'),
 	    deleteEmpty: true,
+	    fieldOpts: {
+		maxLength: 64 * 1024,
+	    },
 	    onlineHelp: 'consent_banner',
 	},
     ],

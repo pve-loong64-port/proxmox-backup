@@ -174,6 +174,11 @@ pub enum Translation {
         "description" : {
             optional: true,
             schema: MULTI_LINE_COMMENT_SCHEMA,
+        },
+        "consent-text" : {
+            optional: true,
+            type: String,
+            max_length: 64 * 1024,
         }
     },
 )]
