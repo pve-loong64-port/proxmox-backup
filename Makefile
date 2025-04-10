@@ -50,6 +50,8 @@ COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/debug
 STATIC_COMPILEDIR := $(STATIC_TARGET_DIR)/$(DEB_HOST_RUST_TYPE)/debug
 endif
 
+STATIC_RUSTC_FLAGS := -C target-feature=+crt-static -L $(STATIC_COMPILEDIR)/deps-stubs/
+
 ifeq ($(valgrind), yes)
 CARGO_BUILD_ARGS += --features valgrind
 endif
@@ -59,8 +61,8 @@ CARGO ?= cargo
 COMPILED_BINS := \
 	$(addprefix $(COMPILEDIR)/,$(USR_BIN) $(USR_SBIN) $(SERVICE_BIN) $(RESTORE_BIN))
 
-STATIC_BIN := \
-	$(addprefix $(STATIC_COMPILEDIR)/,proxmox-backup-client-static)
+STATIC_BINS := \
+	$(addprefix $(STATIC_COMPILEDIR)/,proxmox-backup-client-static pxar-static)
 
 export DEB_VERSION DEB_VERSION_UPSTREAM
 
@@ -207,7 +209,7 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-
 lint:
 	cargo clippy -- -A clippy::all -D clippy::correctness
 
-install: $(COMPILED_BINS) $(STATIC_BIN)
+install: $(COMPILED_BINS) $(STATIC_BINS)
 	install -dm755 $(DESTDIR)$(BINDIR)
 	install -dm755 $(DESTDIR)$(ZSH_COMPL_DEST)
 	$(foreach i,$(USR_BIN), \
@@ -227,6 +229,7 @@ install: $(COMPILED_BINS) $(STATIC_BIN)
 	$(foreach i,$(SERVICE_BIN), \
 	    install -m755 $(COMPILEDIR)/$(i) $(DESTDIR)$(LIBEXECDIR)/proxmox-backup/ ;)
 	install -m755 $(STATIC_COMPILEDIR)/proxmox-backup-client $(DESTDIR)$(BINDIR)/proxmox-backup-client-static
+	install -m755 $(STATIC_COMPILEDIR)/pxar $(DESTDIR)$(BINDIR)/pxar-static
 	$(MAKE) -C www install
 	$(MAKE) -C docs install
 	$(MAKE) -C templates install
@@ -244,11 +247,13 @@ upload: $(SERVER_DEB) $(CLIENT_DEB) $(RESTORE_DEB) $(DOC_DEB) $(STATIC_CLIENT_DE
 
 .PHONY: proxmox-backup-client-static
 proxmox-backup-client-static:
-	rm -f $(STATIC_BIN)
-	$(MAKE) $(STATIC_BIN)
+	rm -f $(STATIC_BINS)
+	$(MAKE) $(STATIC_BINS)
 
-$(STATIC_BIN):
+$(STATIC_BINS):
 	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
           echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
+	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
+	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
 	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
-          --target-dir $(STATIC_TARGET_DIR) -- -C target-feature=+crt-static -L $(STATIC_COMPILEDIR)/deps-stubs/
+	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
