@@ -1129,7 +1129,7 @@ impl DataStore {
         // the detected index files not following the iterators logic.
 
         let mut unprocessed_index_list = self.list_index_files()?;
-        let index_count = unprocessed_index_list.len();
+        let mut index_count = unprocessed_index_list.len();
 
         let mut chunk_lru_cache = LruCache::new(cache_capacity);
         let mut processed_index_files = 0;
@@ -1156,7 +1156,10 @@ impl DataStore {
 
                         let index = match self.open_index_reader(&path)? {
                             Some(index) => index,
-                            None => continue,
+                            None => {
+                                unprocessed_index_list.remove(&path);
+                                continue;
+                            }
                         };
                         self.index_mark_used_chunks(
                             index,
@@ -1166,7 +1169,10 @@ impl DataStore {
                             worker,
                         )?;
 
-                        unprocessed_index_list.remove(&path);
+                        if !unprocessed_index_list.remove(&path) {
+                            info!("Encountered new index file '{path:?}', increment total index file count");
+                            index_count += 1;
+                        }
 
                         let percentage = (processed_index_files + 1) * 100 / index_count;
                         if percentage > last_percentage {
@@ -1182,17 +1188,21 @@ impl DataStore {
             }
         }
 
-        let strange_paths_count = unprocessed_index_list.len();
-        if strange_paths_count > 0 {
-            warn!("found {strange_paths_count} index files outside of expected directory scheme");
-        }
+        let mut strange_paths_count = unprocessed_index_list.len();
         for path in unprocessed_index_list {
             let index = match self.open_index_reader(&path)? {
                 Some(index) => index,
-                None => continue,
+                None => {
+                    // do not count vanished (pruned) backup snapshots as strange paths.
+                    strange_paths_count -= 1;
+                    continue;
+                }
             };
             self.index_mark_used_chunks(index, &path, &mut chunk_lru_cache, status, worker)?;
             warn!("Marked chunks for unexpected index file at '{path:?}'");
+        }
+        if strange_paths_count > 0 {
+            warn!("Found {strange_paths_count} index files outside of expected directory scheme");
         }
 
         Ok(())
