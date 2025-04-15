@@ -853,8 +853,8 @@ fn download_previous(
             };
             if let Some(index) = index {
                 env.log(format!(
-                    "register chunks in '{}' from previous backup.",
-                    archive_name
+                    "register chunks in '{archive_name}' from previous backup '{}'.",
+                    last_backup.backup_dir.dir(),
                 ));
 
                 for pos in 0..index.index_count() {
@@ -865,7 +865,10 @@ fn download_previous(
             }
         }
 
-        env.log(format!("download '{}' from previous backup.", archive_name));
+        env.log(format!(
+            "download '{archive_name}' from previous backup '{}'.",
+            last_backup.backup_dir.dir(),
+        ));
         crate::api2::helpers::create_download_response(path).await
     }
     .boxed()
