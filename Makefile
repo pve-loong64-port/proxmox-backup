@@ -155,7 +155,7 @@ clean: clean-deb
 	$(foreach i,$(SUBDIRS), \
 	    $(MAKE) -C $(i) clean ;)
 	$(CARGO) clean
-	rm -f .do-cargo-build
+	rm -f .do-cargo-build .do-static-cargo-build
 
 # allows one to avoid running cargo clean when one just wants to tidy up after a package build
 clean-deb:
@@ -204,6 +204,19 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-
 	    --bin sg-tape-cmd
 	touch "$@"
 
+.PHONY: proxmox-backup-client-static
+proxmox-backup-client-static:
+	rm -f .do-static-cargo-build
+	$(MAKE) $(STATIC_BINS)
+
+$(STATIC_BINS): .do-static-cargo-build
+.do-static-cargo-build:
+	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
+          echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
+	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
+	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
+	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
+	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
 
 .PHONY: lint
 lint:
@@ -244,16 +257,3 @@ upload: $(SERVER_DEB) $(CLIENT_DEB) $(RESTORE_DEB) $(DOC_DEB) $(STATIC_CLIENT_DE
 	tar cf - $(CLIENT_DEB) $(CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve,pmg,pbs-client" --dist $(UPLOAD_DIST)
 	tar cf - $(STATIC_CLIENT_DEB) $(STATIC_CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pbs-client" --dist $(UPLOAD_DIST)
 	tar cf - $(RESTORE_DEB) $(RESTORE_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve" --dist $(UPLOAD_DIST)
-
-.PHONY: proxmox-backup-client-static
-proxmox-backup-client-static:
-	rm -f $(STATIC_BINS)
-	$(MAKE) $(STATIC_BINS)
-
-$(STATIC_BINS):
-	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
-          echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
-	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
-	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
-	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
-	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
