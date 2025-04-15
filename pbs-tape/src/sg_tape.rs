@@ -659,7 +659,8 @@ impl SgTape {
     pub fn wait_until_ready(&mut self, timeout: Option<u64>) -> Result<(), Error> {
         let start = SystemTime::now();
         let timeout = timeout.unwrap_or(Self::SCSI_TAPE_DEFAULT_TIMEOUT as u64);
-        let max_wait = std::time::Duration::new(timeout, 0);
+        let mut max_wait = std::time::Duration::new(timeout, 0);
+        let mut increased_timeout = false;
 
         loop {
             match self.test_unit_ready() {
@@ -667,6 +668,16 @@ impl SgTape {
                 _ => {
                     std::thread::sleep(std::time::Duration::new(1, 0));
                     if start.elapsed()? > max_wait {
+                        if !increased_timeout {
+                            if let Ok(DeviceActivity::Calibrating) =
+                                read_device_activity(&mut self.file)
+                            {
+                                log::info!("Detected drive calibration, increasing timeout to 2 hours 5 minutes");
+                                max_wait = std::time::Duration::new(2 * 60 * 60 + 5 * 60, 0);
+                                increased_timeout = true;
+                                continue;
+                            }
+                        }
                         bail!("wait_until_ready failed - got timeout");
                     }
                 }
