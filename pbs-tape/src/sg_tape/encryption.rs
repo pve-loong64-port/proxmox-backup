@@ -12,15 +12,7 @@ use crate::sgutils2::{alloc_page_aligned_buffer, SgRaw};
 ///
 /// We always use mixed mode,
 pub fn drive_set_encryption<F: AsRawFd>(file: &mut F, key: Option<[u8; 32]>) -> Result<(), Error> {
-    let data = match sg_spin_data_encryption_caps(file) {
-        Ok(data) => data,
-        Err(_) if key.is_none() => {
-            // Assume device does not support HW encryption
-            // We can simply ignore the clear key request
-            return Ok(());
-        }
-        Err(err) => return Err(err),
-    };
+    let data = sg_spin_data_encryption_caps(file)?;
 
     let algorithm_index = decode_spin_data_encryption_caps(&data)?;
 
@@ -266,7 +258,7 @@ fn decode_spin_data_encryption_caps(data: &[u8]) -> Result<u8, Error> {
 
         match aes_gcm_index {
             Some(index) => Ok(index),
-            None => bail!("drive does not support AES-GCM encryption"),
+            None => bail!("drive does not support setting AES-GCM encryption"),
         }
     })
     .map_err(|err: Error| format_err!("decode data encryption caps page failed - {}", err))

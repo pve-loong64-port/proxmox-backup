@@ -136,6 +136,8 @@ pub struct SgTape {
     file: File,
     locate_offset: Option<i64>,
     info: InquiryInfo,
+    // auto-detect if we can set the encryption mode
+    encryption_possible: Option<bool>,
 }
 
 impl SgTape {
@@ -158,6 +160,7 @@ impl SgTape {
             file,
             info,
             locate_offset: None,
+            encryption_possible: None,
         })
     }
 
@@ -701,6 +704,14 @@ impl SgTape {
     }
 
     pub fn set_encryption(&mut self, key_data: Option<([u8; 32], Uuid)>) -> Result<(), Error> {
+        if self.encryption_possible == Some(false) {
+            if key_data.is_some() {
+                bail!("Drive does not support setting encryption mode");
+            } else {
+                // skip trying to set encryption if not supported and don't wanted
+                return Ok(());
+            }
+        }
         let key = if let Some((ref key, ref uuid)) = key_data {
             // derive specialized key for each media-set
 
@@ -721,7 +732,24 @@ impl SgTape {
             None
         };
 
-        drive_set_encryption(&mut self.file, key)
+        match drive_set_encryption(&mut self.file, key) {
+            Ok(()) => self.encryption_possible = Some(true),
+            Err(err) => {
+                self.encryption_possible = Some(false);
+                if key.is_some() {
+                    bail!("could not set encryption mode on drive: {err}");
+                } else {
+                    log::info!("could not set encryption mode on drive: {err}, ignoring.");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns if encryption is possible. Returns [`None`] if it's unknown, because
+    /// no attempt was made to set the mode yet.
+    pub fn encryption_possible(&self) -> Option<bool> {
+        self.encryption_possible
     }
 
     // Note: use alloc_page_aligned_buffer to alloc data transfer buffer

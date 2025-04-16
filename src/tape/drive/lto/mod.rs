@@ -264,6 +264,10 @@ impl TapeDriver for LtoTapeHandle {
     }
 
     fn assert_encryption_mode(&mut self, encryption_wanted: bool) -> Result<(), Error> {
+        if Some(false) == self.sg_tape.encryption_possible() && !encryption_wanted {
+            // ignore assertion for unencrypted mode, because we can't set it anyway
+            return Ok(());
+        }
         let encryption_set = drive_get_encryption(self.sg_tape.file_mut())?;
         if encryption_wanted != encryption_set {
             bail!("Set encryption mode not what was desired (set: {encryption_set}, wanted: {encryption_wanted})");
