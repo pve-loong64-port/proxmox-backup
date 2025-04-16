@@ -1,3 +1,26 @@
+rust-proxmox-backup (3.4.1-1) bookworm; urgency=medium
+
+  * ui: token view: fix typo in 'lose' and rephrase token regenerate dialog
+    message for more clarity.
+
+  * restrict consent-banner text length to 64 KiB.
+
+  * docs: describe the intend for the statically linked pbs client.
+
+  * api: backup: include previous snapshot name in log message.
+
+  * garbage collection: account for created/deleted index files concurrently
+    to GC to avoid potentially confusing log messages.
+
+  * garbage collection: fix rare race in chunk marking phase for setups doing
+    high frequent backups in quick succession while immediately pruning to a
+    single backup snapshot being left over after each such backup.
+
+  * tape: wait for calibration of LTO-9 tapes in general, not just in the
+    initial tape format procedure.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Apr 2025 14:45:37 +0200
+
 rust-proxmox-backup (3.4.0-1) bookworm; urgency=medium
 
   * fix #4788: build statically linked version of the proxmox-backup-client
