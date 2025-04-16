@@ -480,7 +480,7 @@ impl SyncSource for LocalSource {
     ) -> Result<Arc<dyn SyncSourceReader>, Error> {
         let dir = self.store.backup_dir(ns.clone(), dir.clone())?;
         let guard = dir
-            .lock()
+            .lock_shared()
             .with_context(|| format!("while reading snapshot '{dir:?}' for a sync job"))?;
         Ok(Arc::new(LocalSourceReader {
             _dir_lock: Arc::new(Mutex::new(guard)),
