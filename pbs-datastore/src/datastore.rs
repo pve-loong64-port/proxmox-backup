@@ -1031,13 +1031,15 @@ impl DataStore {
         Ok(list)
     }
 
-    // Similar to open index, but ignore index files with blob or unknown archive type.
-    // Further, do not fail if file vanished.
-    fn open_index_reader(&self, absolute_path: &Path) -> Result<Option<Box<dyn IndexFile>>, Error> {
+    // Similar to open index, but return with Ok(None) if index file vanished.
+    fn open_index_reader(
+        &self,
+        absolute_path: &Path,
+    ) -> Result<Option<Box<dyn IndexFile>>, Error> {
         let archive_type = match ArchiveType::from_path(absolute_path) {
-            Ok(archive_type) => archive_type,
             // ignore archives with unknown archive type
-            Err(_) => return Ok(None),
+            Ok(ArchiveType::Blob) | Err(_) => bail!("unexpected archive type"),
+            Ok(archive_type) => archive_type,
         };
 
         if absolute_path.is_relative() {
@@ -1064,7 +1066,7 @@ impl DataStore {
                     .with_context(|| format!("can't open dynamic index '{absolute_path:?}'"))?;
                 Ok(Some(Box::new(reader)))
             }
-            ArchiveType::Blob => Ok(None),
+            ArchiveType::Blob => bail!("unexpected archive type blob"),
         }
     }
 
@@ -1150,6 +1152,11 @@ impl DataStore {
                     for file in snapshot.files {
                         worker.check_abort()?;
                         worker.fail_on_shutdown()?;
+
+                        match ArchiveType::from_path(&file) {
+                            Ok(ArchiveType::FixedIndex) | Ok(ArchiveType::DynamicIndex) => (),
+                            Ok(ArchiveType::Blob) | Err(_) => continue,
+                        }
 
                         let mut path = snapshot.backup_dir.full_path();
                         path.push(file);
