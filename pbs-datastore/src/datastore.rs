@@ -1032,10 +1032,7 @@ impl DataStore {
     }
 
     // Similar to open index, but return with Ok(None) if index file vanished.
-    fn open_index_reader(
-        &self,
-        absolute_path: &Path,
-    ) -> Result<Option<Box<dyn IndexFile>>, Error> {
+    fn open_index_reader(&self, absolute_path: &Path) -> Result<Option<Box<dyn IndexFile>>, Error> {
         let archive_type = match ArchiveType::from_path(absolute_path) {
             // ignore archives with unknown archive type
             Ok(ArchiveType::Blob) | Err(_) => bail!("unexpected archive type"),
