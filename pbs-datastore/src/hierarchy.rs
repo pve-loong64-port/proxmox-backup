@@ -56,12 +56,7 @@ impl Iterator for ListSnapshots {
             };
             if let Ok(name) = entry.file_name().to_str() {
                 if BACKUP_DATE_REGEX.is_match(name) {
-                    let backup_time = match proxmox_time::parse_rfc3339(name) {
-                        Ok(time) => time,
-                        Err(err) => return Some(Err(err)),
-                    };
-
-                    return Some(BackupDir::with_group(self.group.clone(), backup_time));
+                    return Some(BackupDir::with_rfc3339(self.group.clone(), name.to_owned()));
                 }
             }
         }
