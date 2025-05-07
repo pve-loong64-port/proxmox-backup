@@ -244,6 +244,13 @@ impl BackupGroup {
 
     /// Helper function, assumes that no more snapshots are present in the group.
     fn remove_group_dir(&self) -> Result<(), Error> {
+        let note_path = self.store.group_notes_path(&self.ns, &self.group);
+        if let Err(err) = std::fs::remove_file(&note_path) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                bail!("removing the note file '{note_path:?}' failed - {err}")
+            }
+        }
+
         let owner_path = self.store.owner_path(&self.ns, &self.group);
 
         std::fs::remove_file(&owner_path).map_err(|err| {
