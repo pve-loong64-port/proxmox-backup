@@ -40,6 +40,8 @@ use crate::DataBlob;
 static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+const GROUP_NOTES_FILE_NAME: &str = "notes";
+
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
 pub fn check_backup_owner(owner: &Authid, auth_id: &Authid) -> Result<(), Error> {
@@ -522,6 +524,15 @@ impl DataStore {
         let mut full_path = self.namespace_path(ns);
         full_path.push(backup_group.to_string());
         full_path
+    }
+
+    /// Returns the absolute path of a backup groups notes file
+    pub fn group_notes_path(
+        &self,
+        ns: &BackupNamespace,
+        group: &pbs_api_types::BackupGroup,
+    ) -> PathBuf {
+        self.group_path(ns, group).join(GROUP_NOTES_FILE_NAME)
     }
 
     /// Returns the absolute path for backup_dir

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context, Error};
@@ -76,18 +76,6 @@ use crate::backup::{
 };
 
 use crate::server::jobstate::{compute_schedule_status, Job, JobState};
-
-const GROUP_NOTES_FILE_NAME: &str = "notes";
-
-fn get_group_note_path(
-    store: &DataStore,
-    ns: &BackupNamespace,
-    group: &pbs_api_types::BackupGroup,
-) -> PathBuf {
-    let mut note_path = store.group_path(ns, group);
-    note_path.push(GROUP_NOTES_FILE_NAME);
-    note_path
-}
 
 // helper to unify common sequence of checks:
 // 1. check privs on NS (full or limited access)
@@ -244,8 +232,8 @@ pub fn list_groups(
                 })
                 .to_owned();
 
-            let note_path = get_group_note_path(&datastore, &ns, group.as_ref());
-            let comment = file_read_firstline(note_path).ok();
+            let notes_path = datastore.group_notes_path(&ns, group.as_ref());
+            let comment = file_read_firstline(notes_path).ok();
 
             group_info.push(GroupListItem {
                 backup: group.into(),
@@ -2053,8 +2041,8 @@ pub fn get_group_notes(
         &backup_group,
     )?;
 
-    let note_path = get_group_note_path(&datastore, &ns, &backup_group);
-    Ok(file_read_optional_string(note_path)?.unwrap_or_else(|| "".to_owned()))
+    let notes_path = datastore.group_notes_path(&ns, &backup_group);
+    Ok(file_read_optional_string(notes_path)?.unwrap_or_else(|| "".to_owned()))
 }
 
 #[api(
@@ -2101,8 +2089,8 @@ pub fn set_group_notes(
         &backup_group,
     )?;
 
-    let note_path = get_group_note_path(&datastore, &ns, &backup_group);
-    replace_file(note_path, notes.as_bytes(), CreateOptions::new(), false)?;
+    let notes_path = datastore.group_notes_path(&ns, &backup_group);
+    replace_file(notes_path, notes.as_bytes(), CreateOptions::new(), false)?;
 
     Ok(())
 }
