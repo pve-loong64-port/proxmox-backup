@@ -456,7 +456,9 @@ There are some tuning related options for the datastore that are more advanced:
   the access time has already been updated during phase 1 of garbage collection.
   This avoids multiple updates and increases GC runtime performance. Higher
   values can reduce GC runtime at the cost of increase memory usage, setting the
-  value to 0 disables caching.
+  value to 0 disables caching. The given value sets the number of available
+  cache slots, 1048576 (= 1024 * 1024) being the default, 8388608 (= 8192 *
+  1024) the maximum value.
 
 If you want to set multiple tuning options simultaneously, you can separate them
 with a comma, like this:
