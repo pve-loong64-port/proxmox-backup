@@ -1083,7 +1083,7 @@ impl DataStore {
         &self,
         index: Box<dyn IndexFile>,
         file_name: &Path, // only used for error reporting
-        chunk_lru_cache: &mut LruCache<[u8; 32], ()>,
+        chunk_lru_cache: &mut Option<LruCache<[u8; 32], ()>>,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
     ) -> Result<(), Error> {
@@ -1096,8 +1096,10 @@ impl DataStore {
             let digest = index.index_digest(pos).unwrap();
 
             // Avoid multiple expensive atime updates by utimensat
-            if chunk_lru_cache.insert(*digest, ()) {
-                continue;
+            if let Some(chunk_lru_cache) = chunk_lru_cache {
+                if chunk_lru_cache.insert(*digest, ()) {
+                    continue;
+                }
             }
 
             if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
@@ -1141,7 +1143,11 @@ impl DataStore {
         let mut unprocessed_index_list = self.list_index_files()?;
         let mut index_count = unprocessed_index_list.len();
 
-        let mut chunk_lru_cache = LruCache::new(cache_capacity);
+        let mut chunk_lru_cache = if cache_capacity > 0 {
+            Some(LruCache::new(cache_capacity))
+        } else {
+            None
+        };
         let mut processed_index_files = 0;
         let mut last_percentage: usize = 0;
 
