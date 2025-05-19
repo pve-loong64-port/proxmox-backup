@@ -121,6 +121,8 @@ impl<K, V> LruCache<K, V> {
 
 impl<K: std::cmp::Eq + std::hash::Hash + Copy, V> LruCache<K, V> {
     /// Create LRU cache instance which holds up to `capacity` nodes at once.
+    ///
+    /// Forces a minimum `capacity` of 1 in case of the given value being 0.
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.max(1);
         Self {
