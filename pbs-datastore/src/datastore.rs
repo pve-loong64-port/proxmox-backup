@@ -31,7 +31,9 @@ use pbs_api_types::{
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::BackupLockGuard;
 
-use crate::backup_info::{BackupDir, BackupGroup, BackupInfo, OLD_LOCKING};
+use crate::backup_info::{
+    BackupDir, BackupGroup, BackupInfo, OLD_LOCKING, PROTECTED_MARKER_FILENAME,
+};
 use crate::chunk_store::ChunkStore;
 use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
@@ -1572,12 +1574,40 @@ impl DataStore {
 
         let protected_path = backup_dir.protected_file();
         if protection {
-            std::fs::File::create(protected_path)
+            std::fs::File::create(&protected_path)
                 .map_err(|err| format_err!("could not create protection file: {}", err))?;
-        } else if let Err(err) = std::fs::remove_file(protected_path) {
-            // ignore error for non-existing file
-            if err.kind() != std::io::ErrorKind::NotFound {
-                bail!("could not remove protection file: {}", err);
+            if let DatastoreBackend::S3(s3_client) = self.backend()? {
+                let object_key = crate::s3::object_key_from_path(
+                    &backup_dir.relative_path(),
+                    PROTECTED_MARKER_FILENAME,
+                )
+                .context("invalid protected marker object key")?;
+                let _is_duplicate = proxmox_async::runtime::block_on(
+                    s3_client
+                        .upload_no_replace_with_retry(object_key, hyper::body::Bytes::from("")),
+                )
+                .context("failed to mark snapshot as protected on s3 backend")?;
+            }
+        } else {
+            if let Err(err) = std::fs::remove_file(&protected_path) {
+                // ignore error for non-existing file
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    bail!("could not remove protection file: {err}");
+                }
+            }
+            if let DatastoreBackend::S3(s3_client) = self.backend()? {
+                let object_key = crate::s3::object_key_from_path(
+                    &backup_dir.relative_path(),
+                    PROTECTED_MARKER_FILENAME,
+                )
+                .context("invalid protected marker object key")?;
+                if let Err(err) =
+                    proxmox_async::runtime::block_on(s3_client.delete_object(object_key))
+                {
+                    std::fs::File::create(&protected_path)
+                        .map_err(|err| format_err!("could not re-create protection file: {err}"))?;
+                    return Err(err);
+                }
             }
         }
 

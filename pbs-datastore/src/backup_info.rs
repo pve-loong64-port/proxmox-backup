@@ -22,7 +22,7 @@ use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
 use crate::{DataBlob, DataStore, DatastoreBackend};
 
 pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
-const PROTECTED_MARKER_FILENAME: &str = ".protected";
+pub const PROTECTED_MARKER_FILENAME: &str = ".protected";
 
 proxmox_schema::const_regex! {
     pub BACKUP_FILES_AND_PROTECTED_REGEX = concatcp!(r"^(.*\.([fd]idx|blob)|\", PROTECTED_MARKER_FILENAME, ")$");
