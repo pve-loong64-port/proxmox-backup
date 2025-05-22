@@ -7,6 +7,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
+use const_format::concatcp;
 
 use proxmox_sys::fs::{lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions};
 use proxmox_systemd::escape_unit;
@@ -21,6 +22,11 @@ use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
 use crate::{DataBlob, DataStore};
 
 pub const DATASTORE_LOCKS_DIR: &str = "/run/proxmox-backup/locks";
+const PROTECTED_MARKER_FILENAME: &str = ".protected";
+
+proxmox_schema::const_regex! {
+    pub BACKUP_FILES_AND_PROTECTED_REGEX = concatcp!(r"^(.*\.([fd]idx|blob)|\", PROTECTED_MARKER_FILENAME, ")$");
+}
 
 // TODO: Remove with PBS 5
 // Note: The `expect()` call here will only happen if we can neither confirm nor deny the existence
@@ -113,9 +119,26 @@ impl BackupGroup {
                 }
 
                 let backup_dir = self.backup_dir_with_rfc3339(backup_time)?;
-                let files = list_backup_files(l2_fd, backup_time)?;
+                let mut protected = false;
+                let mut files = Vec::new();
 
-                let protected = backup_dir.is_protected();
+                proxmox_sys::fs::scandir(
+                    l2_fd,
+                    backup_time,
+                    &BACKUP_FILES_AND_PROTECTED_REGEX,
+                    |_, filename, file_type| {
+                        if file_type != nix::dir::Type::File {
+                            return Ok(());
+                        }
+                        // avoids more expensive check via `BackupDir::is_protected`
+                        if filename == ".protected" {
+                            protected = true;
+                        } else {
+                            files.push(filename.to_owned());
+                        }
+                        Ok(())
+                    },
+                )?;
 
                 list.push(BackupInfo {
                     backup_dir,
@@ -464,7 +487,7 @@ impl BackupDir {
 
     pub fn protected_file(&self) -> PathBuf {
         let mut path = self.full_path();
-        path.push(".protected");
+        path.push(PROTECTED_MARKER_FILENAME);
         path
     }
 
