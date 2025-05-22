@@ -1,4 +1,3 @@
-use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -73,17 +72,8 @@ pub struct ListGroupsType {
 
 impl ListGroupsType {
     pub fn new(store: Arc<DataStore>, ns: BackupNamespace, ty: BackupType) -> Result<Self, Error> {
-        Self::new_at(libc::AT_FDCWD, store, ns, ty)
-    }
-
-    fn new_at(
-        fd: RawFd,
-        store: Arc<DataStore>,
-        ns: BackupNamespace,
-        ty: BackupType,
-    ) -> Result<Self, Error> {
         Ok(Self {
-            dir: proxmox_sys::fs::read_subdir(fd, &store.type_path(&ns, ty))?,
+            dir: proxmox_sys::fs::read_subdir(libc::AT_FDCWD, &store.type_path(&ns, ty))?,
             store,
             ns,
             ty,
@@ -197,15 +187,16 @@ impl Iterator for ListGroups {
                     if let Ok(group_type) = BackupType::from_str(name) {
                         // found a backup group type, descend into it to scan all IDs in it
                         // by switching to the id-state branch
-                        match ListGroupsType::new_at(
-                            entry.parent_fd(),
-                            Arc::clone(&self.store),
-                            self.ns.clone(),
-                            group_type,
-                        ) {
-                            Ok(ty) => self.id_state = Some(ty),
-                            Err(err) => return Some(Err(err)),
-                        }
+                        let dir = match proxmox_sys::fs::read_subdir(entry.parent_fd(), name) {
+                            Ok(dir) => dir,
+                            Err(err) => return Some(Err(err.into())),
+                        };
+                        self.id_state = Some(ListGroupsType {
+                            dir,
+                            store: Arc::clone(&self.store),
+                            ns: self.ns.clone(),
+                            ty: group_type,
+                        });
                     }
                 }
             }
