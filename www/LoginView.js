@@ -130,7 +130,7 @@ Ext.define('PBS.LoginView', {
             'field[name=username]': {
                 specialkey: function (f, e) {
                     if (e.getKey() === e.ENTER) {
-                        var pf = this.lookupReference('passwordField');
+                        let pf = this.lookupReference('passwordField');
                         if (!pf.getValue()) {
                             pf.focus(false);
                         }
@@ -168,9 +168,9 @@ Ext.define('PBS.LoginView', {
                     checkboxField.setValue(checked);
 
                     if (checked === true) {
-                        var username = sp.get(unField.getStateId());
+                        let username = sp.get(unField.getStateId());
                         unField.setValue(username);
-                        var pwField = this.lookupReference('passwordField');
+                        let pwField = this.lookupReference('passwordField');
                         pwField.focus();
                     }
 

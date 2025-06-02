@@ -60,7 +60,7 @@ Ext.define('PBS.Dashboard', {
             viewModel.getStore('tasks').reload();
 
             if (setState) {
-                var sp = Ext.state.Manager.getProvider();
+                let sp = Ext.state.Manager.getProvider();
                 sp.set('dashboard-days', days);
             }
         },

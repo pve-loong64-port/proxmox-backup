@@ -362,7 +362,7 @@ Ext.define('PBS.view.main.NavigationTree', {
             if (silent) {
                 me.suspendEvents(false);
             }
-            var item = me.getStore().findRecord('path', path, 0, false, true, true);
+            let item = me.getStore().findRecord('path', path, 0, false, true, true);
             me.setSelection(item);
             if (silent) {
                 me.resumeEvents(true);

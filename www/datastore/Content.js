@@ -127,14 +127,14 @@ Ext.define('PBS.DataStoreContent', {
             let groups = {};
 
             for (const item of records) {
-                var btype = item.data['backup-type'];
+                let btype = item.data['backup-type'];
                 let group = btype + '/' + item.data['backup-id'];
 
                 if (groups[group] !== undefined) {
                     continue;
                 }
 
-                var cls = PBS.Utils.get_type_icon_cls(btype);
+                let cls = PBS.Utils.get_type_icon_cls(btype);
                 if (cls === '') {
                     console.warn(`got unknown backup-type '${btype}'`);
                     continue; // FIXME: auto render? what do?
