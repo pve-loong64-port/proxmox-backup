@@ -13,7 +13,7 @@ Ext.define('PBS.LongestTasks', {
         xclass: 'Ext.app.ViewController',
 
         openTask: function (record) {
-            let me = this;
+            let _me = this;
             Ext.create('Proxmox.window.TaskViewer', {
                 upid: record.data.upid,
                 endtime: record.data.endtime,

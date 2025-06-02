@@ -356,7 +356,7 @@ Ext.define('PBS.TapeManagement.DriveStatusGrid', {
         'file-number': {
             header: gettext('Tape Position'),
             renderer: function (value, mD, r, rI, cI, store) {
-                let me = this;
+                let _me = this;
                 let filenr = value;
                 let rec = store.getById('block-number');
                 if (rec) {

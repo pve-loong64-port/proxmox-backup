@@ -139,7 +139,7 @@ Ext.define('PBS.TapeManagement.ChangerStatus', {
         },
 
         labelMedia: function (button, event, record) {
-            let me = this;
+            let _me = this;
             Ext.create('PBS.TapeManagement.LabelMediaWindow', {
                 driveid: record.data.name,
                 label: record.data['label-text'],

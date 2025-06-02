@@ -11,7 +11,7 @@ Ext.define('PBS.TapeManagement.LabelMediaWindow', {
     url: '/api2/extjs/tape/drive/',
 
     cbindData: function (config) {
-        let me = this;
+        let _me = this;
         return {
             driveid: config.driveid,
             label: config.label,

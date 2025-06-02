@@ -97,7 +97,7 @@ Ext.define('PBS.LoginView', {
 
                 PBS.Utils.updateLoginData(data);
                 PBS.app.changeView('mainview');
-            } catch (error) {
+            } catch (_error) {
                 Proxmox.Utils.authClear();
                 loginForm.unmask();
                 Ext.MessageBox.alert(gettext('Error'), gettext('Login failed. Please try again'));
@@ -105,7 +105,7 @@ Ext.define('PBS.LoginView', {
         },
 
         performTFAChallenge: async function (data) {
-            let me = this;
+            let _me = this;
 
             let userid = data.username;
             let ticket = data.ticket;

@@ -96,7 +96,7 @@ Ext.define('PBS.config.GCJobView', {
         },
 
         showTaskLog: function () {
-            let me = this;
+            let _me = this;
 
             let upid = this.getData().upid;
             if (!upid) {

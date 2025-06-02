@@ -24,7 +24,7 @@ Ext.define('PBS.TapeManagement.BackupOverview', {
         },
 
         restoreBackups: function (view, rI, cI, item, e, rec) {
-            let me = this;
+            let _me = this;
 
             let mediaset = rec.data.is_media_set ? rec.data.text : rec.data['media-set'];
             Ext.create('PBS.TapeManagement.TapeRestoreWindow', {
