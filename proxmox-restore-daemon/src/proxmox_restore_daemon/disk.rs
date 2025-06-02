@@ -17,7 +17,7 @@ use pbs_api_types::BLOCKDEVICE_NAME_REGEX;
 
 const_regex! {
     VIRTIO_PART_REGEX = r"^vd[a-z]+(\d+)$";
-    ZPOOL_POOL_NAME_REGEX = r"^ {3}pool: (.*)$";
+    ZPOOL_POOL_NAME_REGEX = r"^ {2,3}pool: (.*)$";
     ZPOOL_IMPORT_DISK_REGEX = r"^\t {2,4}(vd[a-z]+(?:\d+)?)\s+ONLINE$";
 }
 
