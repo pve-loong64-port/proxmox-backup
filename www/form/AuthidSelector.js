@@ -38,7 +38,9 @@ Ext.define('PBS.form.AuthidSelector', {
 
     onLoad: function (store, data, success) {
         let me = this;
-        if (!success) return;
+        if (!success) {
+            return;
+        }
 
         let records = [];
         for (const rec of data) {

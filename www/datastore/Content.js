@@ -28,7 +28,9 @@ Ext.define('pbs-data-store-snapshots', {
                     count: 0,
                 };
                 data.files.forEach((file) => {
-                    if (file.filename === 'index.json.blob') return; // is never encrypted
+                    if (file.filename === 'index.json.blob') {
+                        return; // is never encrypted
+                    }
                     let mode = PBS.Utils.cryptmap.indexOf(file['crypt-mode']);
                     if (mode !== -1) {
                         crypt[file['crypt-mode']]++;
@@ -467,7 +469,9 @@ Ext.define('PBS.DataStoreContent', {
             let me = this;
             let view = me.getView();
 
-            if (!view.datastore) return;
+            if (!view.datastore) {
+                return;
+            }
 
             let ns = view.namespace;
             let titleNS = ns && ns !== '' ? `Namespace '${ns}' on ` : '';
@@ -497,7 +501,9 @@ Ext.define('PBS.DataStoreContent', {
         addNS: function () {
             let me = this;
             let view = me.getView();
-            if (!view.datastore) return;
+            if (!view.datastore) {
+                return;
+            }
 
             Ext.create('PBS.window.NamespaceEdit', {
                 autoShow: true,
@@ -683,9 +689,13 @@ Ext.define('PBS.DataStoreContent', {
             let me = this;
             view = this.getView();
 
-            if (!(rec && rec.data)) return;
+            if (!(rec && rec.data)) {
+                return;
+            }
             let data = rec.data;
-            if (!view.datastore) return;
+            if (!view.datastore) {
+                return;
+            }
 
             let type = data['backup-type'];
             let id = data['backup-id'];
@@ -748,7 +758,9 @@ Ext.define('PBS.DataStoreContent', {
         downloadFile: function (tV, rI, cI, item, e, rec) {
             let me = this;
             let view = me.getView();
-            if (rec.data.ty !== 'file') return;
+            if (rec.data.ty !== 'file') {
+                return;
+            }
 
             let snapshot = rec.parentNode.data;
             let file = rec.data.filename;
@@ -786,7 +798,9 @@ Ext.define('PBS.DataStoreContent', {
                 me.nsChange(null, rec.data.ns);
                 return;
             }
-            if (rec?.data?.ty !== 'file') return;
+            if (rec?.data?.ty !== 'file') {
+                return;
+            }
             let snapshot = rec.parentNode.data;
 
             let id = snapshot['backup-id'];
@@ -839,7 +853,9 @@ Ext.define('PBS.DataStoreContent', {
                 return;
             }
             tf.triggers.clear.setVisible(true);
-            if (value.length < 2) return;
+            if (value.length < 2) {
+                return;
+            }
             Proxmox.Utils.setErrorMask(view, true);
             // we do it a little bit later for the error mask to work
             setTimeout(function () {

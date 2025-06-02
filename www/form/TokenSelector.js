@@ -32,7 +32,9 @@ Ext.define('PBS.form.TokenSelector', {
 
     onLoad: function (store, data, success) {
         let me = this;
-        if (!success) return;
+        if (!success) {
+            return;
+        }
 
         let tokenStore = this.store;
 

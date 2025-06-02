@@ -189,7 +189,9 @@ Ext.define('PBS.view.main.NavigationTree', {
         },
 
         onTapeDriveLoad: function (store, records, success) {
-            if (!success) return;
+            if (!success) {
+                return;
+            }
 
             let view = this.getView();
             let root = view.getStore().getRoot();

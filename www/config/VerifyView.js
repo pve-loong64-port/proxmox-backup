@@ -14,7 +14,9 @@ Ext.define('pbs-verify-jobs-status', {
             name: 'duration',
             calculate: function (data) {
                 let endtime = data['last-run-endtime'];
-                if (!endtime) return undefined;
+                if (!endtime) {
+                    return undefined;
+                }
                 let task = Proxmox.Utils.parse_task_upid(data['last-run-upid']);
                 return endtime - task.starttime;
             },
@@ -59,7 +61,9 @@ Ext.define('PBS.config.VerifyJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('PBS.window.VerifyJobEdit', {
                 datastore: view.datastore,
@@ -76,10 +80,14 @@ Ext.define('PBS.config.VerifyJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             let upid = selection[0].data['last-run-upid'];
-            if (!upid) return;
+            if (!upid) {
+                return;
+            }
 
             Ext.create('Proxmox.window.TaskViewer', {
                 upid,
@@ -90,7 +98,9 @@ Ext.define('PBS.config.VerifyJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             let id = selection[0].data.id;
             Proxmox.Utils.API2Request({

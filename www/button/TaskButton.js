@@ -80,7 +80,9 @@ Ext.define('PBS.TaskButton', {
         });
         me.callParent();
         me.mon(me.grid.getStore().rstore, 'load', function (store, records, success) {
-            if (!success) return;
+            if (!success) {
+                return;
+            }
 
             let count = records.length;
             let text = count > 99 ? '99+' : count.toString();

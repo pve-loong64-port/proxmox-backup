@@ -55,7 +55,9 @@ Ext.define('PBS.config.TrafficControlView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('PBS.window.TrafficControlEdit', {
                 name: selection[0].data.name,

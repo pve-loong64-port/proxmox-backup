@@ -56,7 +56,9 @@ Ext.define('PBS.widget.UsageChart', {
                     tooltip: {
                         trackMouse: true,
                         renderer: function (tooltip, record, ctx) {
-                            if (!record || !record.data) return;
+                            if (!record || !record.data) {
+                                return;
+                            }
                             let date = new Date(record.data.time);
                             date = Ext.Date.format(date, 'c');
                             let value = (100 * record.data.val).toFixed(2);

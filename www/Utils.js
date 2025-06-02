@@ -233,7 +233,9 @@ Ext.define('PBS.Utils', {
     },
 
     render_next_task_run: function (value, metadat, record) {
-        if (!value) return '-';
+        if (!value) {
+            return '-';
+        }
 
         let now = new Date();
         let next = new Date(value * 1000);
@@ -245,7 +247,9 @@ Ext.define('PBS.Utils', {
     },
 
     render_optional_timestamp: function (value, metadata, record) {
-        if (!value) return '-';
+        if (!value) {
+            return '-';
+        }
         return Proxmox.Utils.render_timestamp(value);
     },
 
@@ -838,7 +842,9 @@ Ext.define('PBS.Utils', {
     },
 
     render_optional_namespace: function (value, metadata, record) {
-        if (!value) return `- (${gettext('Root')})`;
+        if (!value) {
+            return `- (${gettext('Root')})`;
+        }
         return Ext.String.htmlEncode(value);
     },
 

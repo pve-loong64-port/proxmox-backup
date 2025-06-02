@@ -148,7 +148,9 @@ Ext.define('PBS.LoginView', {
             'field[name=realm]': {
                 change: function (f, value) {
                     let record = f.store.getById(value);
-                    if (record === undefined) return;
+                    if (record === undefined) {
+                        return;
+                    }
                     let data = record.data;
                     this.getViewModel().set('openid', data.type === 'openid');
                 },

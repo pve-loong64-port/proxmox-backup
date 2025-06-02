@@ -60,7 +60,9 @@ Ext.define('PBS.config.TokenView', {
         },
 
         onLoad: function (store, data, success) {
-            if (!success) return;
+            if (!success) {
+                return;
+            }
 
             let tokenStore = this.getView().store.rstore;
 
@@ -97,7 +99,9 @@ Ext.define('PBS.config.TokenView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
             Ext.create('PBS.window.TokenEdit', {
                 user: PBS.Utils.extractTokenUser(selection[0].data.tokenid),
                 tokenname: PBS.Utils.extractTokenName(selection[0].data.tokenid),
@@ -133,7 +137,9 @@ Ext.define('PBS.config.TokenView', {
             let view = me.getView();
             let selection = view.getSelection();
 
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('Proxmox.PermissionView', {
                 auth_id: selection[0].data.tokenid,

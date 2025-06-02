@@ -24,7 +24,9 @@ Ext.define('PBS.admin.ZFSList', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (!selection || selection.length < 1) return;
+            if (!selection || selection.length < 1) {
+                return;
+            }
 
             let rec = selection[0];
             let zpool = rec.get('name');

@@ -20,7 +20,9 @@ Ext.define('pbs-sync-jobs-status', {
             name: 'duration',
             calculate: function (data) {
                 let endtime = data['last-run-endtime'];
-                if (!endtime) return undefined;
+                if (!endtime) {
+                    return undefined;
+                }
                 let task = Proxmox.Utils.parse_task_upid(data['last-run-upid']);
                 return endtime - task.starttime;
             },
@@ -53,7 +55,9 @@ Ext.define('PBS.config.SyncJobView', {
                 return;
             }
             tf.triggers.clear.setVisible(true);
-            if (value.length < 2) return;
+            if (value.length < 2) {
+                return;
+            }
 
             store.clearFilter();
 
@@ -102,7 +106,9 @@ Ext.define('PBS.config.SyncJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('PBS.window.SyncJobEdit', {
                 datastore: view.datastore,
@@ -120,10 +126,14 @@ Ext.define('PBS.config.SyncJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             let upid = selection[0].data['last-run-upid'];
-            if (!upid) return;
+            if (!upid) {
+                return;
+            }
 
             Ext.create('Proxmox.window.TaskViewer', {
                 upid,
@@ -134,7 +144,9 @@ Ext.define('PBS.config.SyncJobView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             let id = selection[0].data.id;
             Proxmox.Utils.API2Request({
@@ -155,7 +167,9 @@ Ext.define('PBS.config.SyncJobView', {
         },
 
         render_optional_owner: function (value, metadata, record) {
-            if (!value) return '-';
+            if (!value) {
+                return '-';
+            }
             return Ext.String.htmlEncode(value);
         },
 

@@ -44,7 +44,9 @@ Ext.define('PBS.config.UserView', {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('PBS.window.UserEdit', {
                 userid: selection[0].data.userid,
@@ -61,7 +63,9 @@ Ext.define('PBS.config.UserView', {
             let view = me.getView();
             let selection = view.getSelection();
 
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('Proxmox.window.PasswordEdit', {
                 userid: selection[0].data.userid,
@@ -75,7 +79,9 @@ Ext.define('PBS.config.UserView', {
             let view = me.getView();
             let selection = view.getSelection();
 
-            if (selection.length < 1) return;
+            if (selection.length < 1) {
+                return;
+            }
 
             Ext.create('Proxmox.PermissionView', {
                 auth_id: selection[0].data.userid,

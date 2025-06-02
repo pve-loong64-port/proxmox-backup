@@ -89,7 +89,9 @@ Ext.define('PBS.Dashboard', {
         },
 
         updateTasks: function (store, records, success) {
-            if (!success) return;
+            if (!success) {
+                return;
+            }
             let me = this;
             let viewModel = me.getViewModel();
 

@@ -99,7 +99,9 @@ Ext.define('PBS.config.GCJobView', {
             let me = this;
 
             let upid = this.getData().upid;
-            if (!upid) return;
+            if (!upid) {
+                return;
+            }
 
             Ext.create('Proxmox.window.TaskViewer', { upid }).show();
         },
