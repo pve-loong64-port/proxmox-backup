@@ -7,17 +7,19 @@ Ext.define('PBS.NodeNotes', {
     layout: 'fit',
 
     items: [
-	{
-	    xtype: 'container',
-	    layout: 'fit',
-	    items: [{
-		xtype: 'pmxNotesView',
-		tools: false,
-		border: false,
-		node: 'localhost',
-		enableTBar: true,
-		maxLength: 1022*64,
-	    }],
-	},
+        {
+            xtype: 'container',
+            layout: 'fit',
+            items: [
+                {
+                    xtype: 'pmxNotesView',
+                    tools: false,
+                    border: false,
+                    node: 'localhost',
+                    enableTBar: true,
+                    maxLength: 1022 * 64,
+                },
+            ],
+        },
     ],
 });

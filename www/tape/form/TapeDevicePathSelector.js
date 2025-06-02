@@ -10,53 +10,53 @@ Ext.define('PBS.form.TapeDevicePathSelector', {
     type: 'drives',
 
     listConfig: {
-	columns: [
-	    {
-		text: gettext('Path'),
-		dataIndex: 'path',
-		sortable: true,
-		flex: 1,
-		renderer: Ext.String.htmlEncode,
-	    },
-	    {
-		text: gettext('Vendor'),
-		dataIndex: 'vendor',
-		sortable: true,
-		flex: 1,
-		renderer: Ext.String.htmlEncode,
-	    },
-	    {
-		text: gettext('Model'),
-		dataIndex: 'model',
-		sortable: true,
-		flex: 1,
-		renderer: Ext.String.htmlEncode,
-	    },
-	    {
-		text: gettext('Serial'),
-		dataIndex: 'serial',
-		sortable: true,
-		flex: 1,
-		renderer: Ext.String.htmlEncode,
-	    },
-	],
+        columns: [
+            {
+                text: gettext('Path'),
+                dataIndex: 'path',
+                sortable: true,
+                flex: 1,
+                renderer: Ext.String.htmlEncode,
+            },
+            {
+                text: gettext('Vendor'),
+                dataIndex: 'vendor',
+                sortable: true,
+                flex: 1,
+                renderer: Ext.String.htmlEncode,
+            },
+            {
+                text: gettext('Model'),
+                dataIndex: 'model',
+                sortable: true,
+                flex: 1,
+                renderer: Ext.String.htmlEncode,
+            },
+            {
+                text: gettext('Serial'),
+                dataIndex: 'serial',
+                sortable: true,
+                flex: 1,
+                renderer: Ext.String.htmlEncode,
+            },
+        ],
     },
 
-    initComponent: function() {
-	let me = this;
-	if (me.type !== 'drives' && me.type !== 'changers') {
-	    throw `invalid type '${me.type}'`;
-	}
+    initComponent: function () {
+        let me = this;
+        if (me.type !== 'drives' && me.type !== 'changers') {
+            throw `invalid type '${me.type}'`;
+        }
 
-	let url = `/api2/json/tape/scan-${me.type}`;
-	me.store = {
-	    proxy: {
-		type: 'proxmox',
-		url,
-	    },
-	    autoLoad: true,
-	};
+        let url = `/api2/json/tape/scan-${me.type}`;
+        me.store = {
+            proxy: {
+                type: 'proxmox',
+                url,
+            },
+            autoLoad: true,
+        };
 
-	me.callParent();
+        me.callParent();
     },
 });

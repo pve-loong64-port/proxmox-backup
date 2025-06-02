@@ -17,141 +17,141 @@ Ext.define('PBS.window.TokenEdit', {
     fieldDefaults: { labelWidth: 120 },
 
     items: {
-	xtype: 'inputpanel',
-	column1: [
-	    {
-		xtype: 'pmxDisplayEditField',
-		cbind: {
-		    editable: (get) => get('isCreate') && !get('fixedUser'),
-		    value: () => Proxmox.UserName,
-		},
-		editConfig: {
-		    xtype: 'pmxUserSelector',
-		    allowBlank: false,
-		},
-		name: 'user',
-		renderer: Ext.String.htmlEncode,
-		fieldLabel: gettext('User'),
-	    },
-	    {
-		xtype: 'pmxDisplayEditField',
-		cbind: {
-		    editable: '{isCreate}',
-		},
-		name: 'tokenname',
-		fieldLabel: gettext('Token Name'),
-		minLength: 2,
-		allowBlank: false,
-	    },
-	],
+        xtype: 'inputpanel',
+        column1: [
+            {
+                xtype: 'pmxDisplayEditField',
+                cbind: {
+                    editable: (get) => get('isCreate') && !get('fixedUser'),
+                    value: () => Proxmox.UserName,
+                },
+                editConfig: {
+                    xtype: 'pmxUserSelector',
+                    allowBlank: false,
+                },
+                name: 'user',
+                renderer: Ext.String.htmlEncode,
+                fieldLabel: gettext('User'),
+            },
+            {
+                xtype: 'pmxDisplayEditField',
+                cbind: {
+                    editable: '{isCreate}',
+                },
+                name: 'tokenname',
+                fieldLabel: gettext('Token Name'),
+                minLength: 2,
+                allowBlank: false,
+            },
+        ],
 
-	column2: [
-	    {
+        column2: [
+            {
                 xtype: 'datefield',
                 name: 'expire',
-		emptyText: Proxmox.Utils.neverText,
-		format: 'Y-m-d',
-		submitFormat: 'U',
+                emptyText: Proxmox.Utils.neverText,
+                format: 'Y-m-d',
+                submitFormat: 'U',
                 fieldLabel: gettext('Expire'),
             },
-	    {
-		xtype: 'proxmoxcheckbox',
-		fieldLabel: gettext('Enabled'),
-		name: 'enable',
-		uncheckedValue: 0,
-		defaultValue: 1,
-		checked: true,
-	    },
-	],
+            {
+                xtype: 'proxmoxcheckbox',
+                fieldLabel: gettext('Enabled'),
+                name: 'enable',
+                uncheckedValue: 0,
+                defaultValue: 1,
+                checked: true,
+            },
+        ],
 
-	columnB: [
-	    {
-		xtype: 'proxmoxtextfield',
-		name: 'comment',
-		fieldLabel: gettext('Comment'),
-		cbind: {
-		    deleteEmpty: "{!isCreate}",
-		},
-	    },
-	],
+        columnB: [
+            {
+                xtype: 'proxmoxtextfield',
+                name: 'comment',
+                fieldLabel: gettext('Comment'),
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+        ],
     },
 
-    getValues: function(dirtyOnly) {
-	var me = this;
+    getValues: function (dirtyOnly) {
+        var me = this;
 
-	var values = me.callParent(arguments);
+        var values = me.callParent(arguments);
 
-	// hack: ExtJS datefield does not submit 0, so we need to set that
-	if (!values.expire) {
-	    values.expire = 0;
-	}
+        // hack: ExtJS datefield does not submit 0, so we need to set that
+        if (!values.expire) {
+            values.expire = 0;
+        }
 
-	if (me.isCreate) {
-	    me.url = '/api2/extjs/access/users/';
-	    let uid = encodeURIComponent(values.user);
-	    let tid = encodeURIComponent(values.tokenname);
-	    delete values.user;
-	    delete values.tokenname;
+        if (me.isCreate) {
+            me.url = '/api2/extjs/access/users/';
+            let uid = encodeURIComponent(values.user);
+            let tid = encodeURIComponent(values.tokenname);
+            delete values.user;
+            delete values.tokenname;
 
-	    me.url += `${uid}/token/${tid}`;
-	}
+            me.url += `${uid}/token/${tid}`;
+        }
 
-	return values;
+        return values;
     },
 
-    setValues: function(values) {
-	var me = this;
+    setValues: function (values) {
+        var me = this;
 
-	if (Ext.isDefined(values.expire)) {
-	    if (values.expire) {
-		values.expire = new Date(values.expire * 1000);
-	    } else {
-		// display 'never' instead of '1970-01-01'
-		values.expire = null;
-	    }
-	}
+        if (Ext.isDefined(values.expire)) {
+            if (values.expire) {
+                values.expire = new Date(values.expire * 1000);
+            } else {
+                // display 'never' instead of '1970-01-01'
+                values.expire = null;
+            }
+        }
 
-	me.callParent([values]);
+        me.callParent([values]);
     },
 
-    initComponent: function() {
-	let me = this;
+    initComponent: function () {
+        let me = this;
 
-	me.url = '/api2/extjs/access/users/';
+        me.url = '/api2/extjs/access/users/';
 
-	me.callParent();
+        me.callParent();
 
-	if (me.isCreate) {
-	    me.method = 'POST';
-	} else {
-	    me.method = 'PUT';
+        if (me.isCreate) {
+            me.method = 'POST';
+        } else {
+            me.method = 'PUT';
 
-	    let uid = encodeURIComponent(me.user);
-	    let tid = encodeURIComponent(me.tokenname);
+            let uid = encodeURIComponent(me.user);
+            let tid = encodeURIComponent(me.tokenname);
 
-	    me.url += `${uid}/token/${tid}`;
-	    me.load({
-		success: function(response, options) {
-		    let values = response.result.data;
-		    values.user = me.user;
-		    values.tokenname = me.tokenname;
-		    me.setValues(values);
-		},
-	    });
-	}
+            me.url += `${uid}/token/${tid}`;
+            me.load({
+                success: function (response, options) {
+                    let values = response.result.data;
+                    values.user = me.user;
+                    values.tokenname = me.tokenname;
+                    me.setValues(values);
+                },
+            });
+        }
     },
 
-    apiCallDone: function(success, response, options) {
-	let res = response.result.data;
-	if (!success || !res || !res.value) {
-	    return;
-	}
+    apiCallDone: function (success, response, options) {
+        let res = response.result.data;
+        if (!success || !res || !res.value) {
+            return;
+        }
 
-	Ext.create('PBS.window.TokenShow', {
-	    autoShow: true,
-	    tokenid: res.tokenid,
-	    secret: res.value,
-	});
+        Ext.create('PBS.window.TokenShow', {
+            autoShow: true,
+            tokenid: res.tokenid,
+            secret: res.value,
+        });
     },
 });
 
@@ -166,51 +166,51 @@ Ext.define('PBS.window.TokenShow', {
     title: gettext('Token Secret'),
 
     items: [
-	{
-	    xtype: 'container',
-	    layout: 'form',
-	    bodyPadding: 10,
-	    border: false,
-	    fieldDefaults: {
-		labelWidth: 100,
-		anchor: '100%',
+        {
+            xtype: 'container',
+            layout: 'form',
+            bodyPadding: 10,
+            border: false,
+            fieldDefaults: {
+                labelWidth: 100,
+                anchor: '100%',
             },
-	    padding: '0 10 10 10',
-	    items: [
-		{
-		    xtype: 'textfield',
-		    fieldLabel: gettext('Token ID'),
-		    cbind: {
-			value: '{tokenid}',
-		    },
-		    editable: false,
-		},
-		{
-		    xtype: 'textfield',
-		    fieldLabel: gettext('Secret'),
-		    inputId: 'token-secret-value',
-		    cbind: {
-			value: '{secret}',
-		    },
-		    editable: false,
-		},
-	    ],
-	},
-	{
-	    xtype: 'component',
-	    border: false,
-	    padding: '10 10 10 10',
-	    userCls: 'pmx-hint',
-	    html: gettext('Please record the API token secret - it will only be displayed now'),
-	},
+            padding: '0 10 10 10',
+            items: [
+                {
+                    xtype: 'textfield',
+                    fieldLabel: gettext('Token ID'),
+                    cbind: {
+                        value: '{tokenid}',
+                    },
+                    editable: false,
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: gettext('Secret'),
+                    inputId: 'token-secret-value',
+                    cbind: {
+                        value: '{secret}',
+                    },
+                    editable: false,
+                },
+            ],
+        },
+        {
+            xtype: 'component',
+            border: false,
+            padding: '10 10 10 10',
+            userCls: 'pmx-hint',
+            html: gettext('Please record the API token secret - it will only be displayed now'),
+        },
     ],
     buttons: [
-	{
-	    handler: async function(b) {
-		let el = document.getElementById('token-secret-value');
-		await navigator.clipboard.writeText(el.value);
-	    },
-	    text: gettext('Copy Secret Value'),
-	},
+        {
+            handler: async function (b) {
+                let el = document.getElementById('token-secret-value');
+                await navigator.clipboard.writeText(el.value);
+            },
+            text: gettext('Copy Secret Value'),
+        },
     ],
 });

@@ -1,6 +1,10 @@
 /* overwrite to use full black for enabled buttons */
 .x-btn-inner-default-toolbar-small {
-    font: 300 12px/16px helvetica, arial, verdana, sans-serif;
+    font:
+        300 12px / 16px helvetica,
+        arial,
+        verdana,
+        sans-serif;
     color: #000;
     padding: 0 5px;
     max-width: 100%;
@@ -8,7 +12,13 @@
 
 /* add missing class for context menu header */
 .x-menu-header {
-    font: 400 13px/20px 'Open Sans', 'Helvetica Neue', helvetica, arial, verdana, sans-serif;
+    font:
+        400 13px / 20px "Open Sans",
+        "Helvetica Neue",
+        helvetica,
+        arial,
+        verdana,
+        sans-serif;
     color: #fff;
     padding: 4px;
     background-color: #3892d4;
@@ -16,11 +26,12 @@
 
 /* make the upper window end visible */
 .x-css-shadow {
-    box-shadow: rgb(136,136,136) 0px -1px 15px !important;
+    box-shadow: rgb(136, 136, 136) 0px -1px 15px !important;
 }
 
 /* reduce tree space */
-.x-grid-cell-inner-treecolumn { /* vertical padding */
+.x-grid-cell-inner-treecolumn {
+    /* vertical padding */
     padding: 4px 0px 3px 0px;
 }
 
@@ -56,7 +67,6 @@
     font-size: 14px;
 }
 
-
 /* displayfield minheight is wrong */
 .x-form-display-field-default {
     min-height: 20px;
@@ -67,7 +77,7 @@
 }
 
 /* for resetcolumnsbutton */
-.x-button-reset:after{
+.x-button-reset:after {
     content: "\f0e7 ";
     position: relative;
     text-shadow: 0 0 2px #fff;
@@ -82,7 +92,7 @@
 /* loading in task list */
 .x-grid-row-loading {
     background: no-repeat center center;
-    background-image:url(../extjs/theme-crisp/resources/images/loadmask/loading.gif);
+    background-image: url(../extjs/theme-crisp/resources/images/loadmask/loading.gif);
 }
 
 /* displayfield minheight is wrong */
@@ -95,7 +105,7 @@
 }
 
 /* for resetcolumnsbutton */
-.x-button-reset:after{
+.x-button-reset:after {
     content: "\f0e7 ";
     position: relative;
     text-shadow: 0 0 2px #fff;
@@ -117,7 +127,7 @@ div.inline-block {
     cursor: pointer;
 }
 
-.x-grid-filters-filtered-column{
+.x-grid-filters-filtered-column {
     font-style: italic;
     font-weight: bold;
 }
@@ -168,7 +178,7 @@ table:not(.x-grid-item-selected) tr.x-grid-row.disabled {
     height: initial;
 }
 
-tr.x-grid-row-summary  td.x-grid-cell {
+tr.x-grid-row-summary td.x-grid-cell {
     border-top: 1px solid black;
     font-weight: bold;
 }
@@ -232,7 +242,7 @@ span.snapshot-comment-column {
 }
 
 .x-action-col-icon.good:before {
-    color: #21BF4B;
+    color: #21bf4b;
 }
 
 .x-action-col-icon.warning:before {
@@ -240,7 +250,7 @@ span.snapshot-comment-column {
 }
 
 .x-action-col-icon.critical:before {
-    color: #FF6C59;
+    color: #ff6c59;
 }
 
 .pve-icon-verify-lettering:after {
@@ -283,7 +293,8 @@ span.snapshot-comment-column {
     content: "\ ";
 }
 
-.x-treelist-item-icon.fa-plug, .pmx-tree-icon-custom.fa-plug {
+.x-treelist-item-icon.fa-plug,
+.pmx-tree-icon-custom.fa-plug {
     font-size: 12px;
 }
 
@@ -316,7 +327,7 @@ span.snapshot-comment-column {
     padding: 0;
     height: 16px;
     width: 16px;
-    background-image:url(../images/icon-tape.svg);
+    background-image: url(../images/icon-tape.svg);
     background-position: bottom;
     background-repeat: no-repeat;
     background-size: 16px;
@@ -326,13 +337,14 @@ span.snapshot-comment-column {
     padding: 0;
     height: 16px;
     width: 16px;
-    background-image:url(../images/icon-tape-drive.svg);
+    background-image: url(../images/icon-tape-drive.svg);
     background-position: bottom;
     background-repeat: no-repeat;
     background-size: 16px;
 }
 
-.x-treelist-item-icon.pbs-icon-tape, .x-treelist-item-icon.pbs-icon-tape-drive {
+.x-treelist-item-icon.pbs-icon-tape,
+.x-treelist-item-icon.pbs-icon-tape-drive {
     height: 20px;
 }
 

@@ -5,46 +5,45 @@ Ext.define('PBS.AccessControlPanel', {
 
     title: gettext('Access Control'),
 
-    tools: [PBS.Utils.get_help_tool("user-mgmt")],
+    tools: [PBS.Utils.get_help_tool('user-mgmt')],
 
     border: false,
     defaults: {
-	border: false,
+        border: false,
     },
 
     items: [
-	{
-	    xtype: 'pbsUserView',
-	    title: gettext('User Management'),
-	    itemId: 'users',
-	    iconCls: 'fa fa-user',
-	},
-	{
-	    xtype: 'pmxTfaView',
-	    title: gettext('Two Factor Authentication'),
-	    itemId: 'tfa',
-	    iconCls: 'fa fa-key',
-	},
-	{
-	    xtype: 'pbsTokenView',
-	    title: gettext('API Token'),
-	    itemId: 'apitokens',
-	    iconCls: 'fa fa-user-o',
-	},
-	{
-	    xtype: 'pbsACLView',
-	    title: gettext('Permissions'),
-	    itemId: 'permissions',
-	    iconCls: 'fa fa-unlock',
-	},
-	{
-	    xtype: 'pmxAuthView',
-	    baseUrl: '/config/access',
-	    title: gettext('Realms'),
-	    itemId: 'domains',
-	    iconCls: 'fa fa-address-book-o',
-	    showDefaultRealm: true,
-	},
+        {
+            xtype: 'pbsUserView',
+            title: gettext('User Management'),
+            itemId: 'users',
+            iconCls: 'fa fa-user',
+        },
+        {
+            xtype: 'pmxTfaView',
+            title: gettext('Two Factor Authentication'),
+            itemId: 'tfa',
+            iconCls: 'fa fa-key',
+        },
+        {
+            xtype: 'pbsTokenView',
+            title: gettext('API Token'),
+            itemId: 'apitokens',
+            iconCls: 'fa fa-user-o',
+        },
+        {
+            xtype: 'pbsACLView',
+            title: gettext('Permissions'),
+            itemId: 'permissions',
+            iconCls: 'fa fa-unlock',
+        },
+        {
+            xtype: 'pmxAuthView',
+            baseUrl: '/config/access',
+            title: gettext('Realms'),
+            itemId: 'domains',
+            iconCls: 'fa fa-address-book-o',
+            showDefaultRealm: true,
+        },
     ],
-
 });

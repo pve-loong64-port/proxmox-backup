@@ -5,33 +5,28 @@ Ext.define('PBS.view.main.VersionInfo', {
     makeApiCall: true,
 
     data: {
-	version: false,
+        version: false,
     },
 
     style: {
-	'font-size': '14px',
-	'line-height': '18px',
+        'font-size': '14px',
+        'line-height': '18px',
     },
 
-    tpl: [
-	'Backup Server',
-	'<tpl if="version">',
-	' {version}.{release}',
-	'</tpl>',
-    ],
+    tpl: ['Backup Server', '<tpl if="version">', ' {version}.{release}', '</tpl>'],
 
-    initComponent: function() {
-	var me = this;
-	me.callParent();
+    initComponent: function () {
+        var me = this;
+        me.callParent();
 
-	if (me.makeApiCall) {
-	    Proxmox.Utils.API2Request({
-		url: '/version',
-		method: 'GET',
-		success: function(response) {
-		    me.update(response.result.data);
-		},
-	    });
-	}
+        if (me.makeApiCall) {
+            Proxmox.Utils.API2Request({
+                url: '/version',
+                method: 'GET',
+                success: function (response) {
+                    me.update(response.result.data);
+                },
+            });
+        }
     },
 });

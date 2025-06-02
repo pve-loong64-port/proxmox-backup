@@ -3,7 +3,7 @@ Ext.define('PBS.config.NotificationConfigView', {
     alias: ['widget.pbsNotificationConfigView'],
     mixins: ['Proxmox.Mixin.CBind'],
 
-    cbindData: function(_initialConfig) {
+    cbindData: function (_initialConfig) {
         return {
             baseUrl: '/config/notifications',
         };

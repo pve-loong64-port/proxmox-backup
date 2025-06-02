@@ -3,22 +3,22 @@ Ext.define('PBS.window.UserEditViewModel', {
     alias: 'viewmodel.pbsUserEdit',
 
     data: {
-	realm: 'pbs',
+        realm: 'pbs',
     },
 
     formulas: {
-	maySetPassword: function(get) {
-	    let realm = get('realm');
+        maySetPassword: function (get) {
+            let realm = get('realm');
 
-	    let view = this.getView();
-	    let realmStore = view.down('pmxRealmComboBox').getStore();
-	    if (realmStore.isLoaded()) {
-		let rec = realmStore.findRecord('realm', realm, 0, false, true, true);
-		return Proxmox.Schema.authDomains[rec.data.type]?.pwchange && view.isCreate;
-	    } else {
-		return view.isCreate;
-	    }
-	},
+            let view = this.getView();
+            let realmStore = view.down('pmxRealmComboBox').getStore();
+            if (realmStore.isLoaded()) {
+                let rec = realmStore.findRecord('realm', realm, 0, false, true, true);
+                return Proxmox.Schema.authDomains[rec.data.type]?.pwchange && view.isCreate;
+            } else {
+                return view.isCreate;
+            }
+        },
     },
 });
 
@@ -38,180 +38,180 @@ Ext.define('PBS.window.UserEdit', {
     fieldDefaults: { labelWidth: 120 },
 
     viewModel: {
-	type: 'pbsUserEdit',
+        type: 'pbsUserEdit',
     },
 
-    cbindData: function(initialConfig) {
-	var me = this;
+    cbindData: function (initialConfig) {
+        var me = this;
 
-	var userid = initialConfig.userid;
-	var baseurl = '/api2/extjs/access/users';
+        var userid = initialConfig.userid;
+        var baseurl = '/api2/extjs/access/users';
 
-	me.isCreate = !userid;
-	me.url = userid ? baseurl + '/' + encodeURIComponent(userid) : baseurl;
-	me.method = userid ? 'PUT' : 'POST';
-	me.autoLoad = !!userid;
+        me.isCreate = !userid;
+        me.url = userid ? baseurl + '/' + encodeURIComponent(userid) : baseurl;
+        me.method = userid ? 'PUT' : 'POST';
+        me.autoLoad = !!userid;
 
-	return {
-	    useridXType: userid ? 'displayfield' : 'textfield',
-	};
+        return {
+            useridXType: userid ? 'displayfield' : 'textfield',
+        };
     },
 
     items: {
-	xtype: 'inputpanel',
-	column1: [
-	    {
-		xtype: 'pmxDisplayEditField',
-		name: 'userid',
-		fieldLabel: gettext('User name'),
-		renderer: Ext.htmlEncode,
-		allowBlank: false,
-		cbind: {
-		    editable: '{isCreate}',
-		},
-	    },
-	    {
-		xtype: 'pmxRealmComboBox',
-		name: 'realm',
-		fieldLabel: gettext('Realm'),
-		allowBlank: false,
-		matchFieldWidth: false,
-		listConfig: { width: 300 },
-		bind: {
-		    value: '{realm}',
-		},
-		cbind: {
-		    hidden: '{!isCreate}',
-		    disabled: '{!isCreate}',
-		},
-		submitValue: true,
-		storeFilter: rec => rec.data?.type !== 'pam',
-	    },
-	    {
-		xtype: 'textfield',
-		inputType: 'password',
-		fieldLabel: gettext('Password'),
-		minLength: 8,
-		allowBlank: false,
-		name: 'password',
-		listeners: {
-		    change: function(field) {
-			field.next().validate();
-		    },
-		    blur: function(field) {
-			field.next().validate();
-		    },
-		},
-		bind: {
-		    disabled: '{!maySetPassword}',
-		    hidden: '{!maySetPassword}',
-		},
-	    },
-	    {
-		xtype: 'textfield',
-		inputType: 'password',
-		fieldLabel: gettext('Confirm password'),
-		name: 'verifypassword',
-		vtype: 'password',
-		initialPassField: 'password',
-		allowBlank: false,
-		submitValue: false,
-		bind: {
-		    disabled: '{!maySetPassword}',
-		    hidden: '{!maySetPassword}',
-		},
-	    },
-	    {
-		xtype: 'datefield',
-		name: 'expire',
-		emptyText: Proxmox.Utils.neverText,
-		format: 'Y-m-d',
-		submitFormat: 'U',
-		fieldLabel: gettext('Expire'),
-	    },
-	    {
-		xtype: 'proxmoxcheckbox',
-		fieldLabel: gettext('Enabled'),
-		name: 'enable',
-		uncheckedValue: 0,
-		defaultValue: 1,
-		checked: true,
-	    },
-	],
+        xtype: 'inputpanel',
+        column1: [
+            {
+                xtype: 'pmxDisplayEditField',
+                name: 'userid',
+                fieldLabel: gettext('User name'),
+                renderer: Ext.htmlEncode,
+                allowBlank: false,
+                cbind: {
+                    editable: '{isCreate}',
+                },
+            },
+            {
+                xtype: 'pmxRealmComboBox',
+                name: 'realm',
+                fieldLabel: gettext('Realm'),
+                allowBlank: false,
+                matchFieldWidth: false,
+                listConfig: { width: 300 },
+                bind: {
+                    value: '{realm}',
+                },
+                cbind: {
+                    hidden: '{!isCreate}',
+                    disabled: '{!isCreate}',
+                },
+                submitValue: true,
+                storeFilter: (rec) => rec.data?.type !== 'pam',
+            },
+            {
+                xtype: 'textfield',
+                inputType: 'password',
+                fieldLabel: gettext('Password'),
+                minLength: 8,
+                allowBlank: false,
+                name: 'password',
+                listeners: {
+                    change: function (field) {
+                        field.next().validate();
+                    },
+                    blur: function (field) {
+                        field.next().validate();
+                    },
+                },
+                bind: {
+                    disabled: '{!maySetPassword}',
+                    hidden: '{!maySetPassword}',
+                },
+            },
+            {
+                xtype: 'textfield',
+                inputType: 'password',
+                fieldLabel: gettext('Confirm password'),
+                name: 'verifypassword',
+                vtype: 'password',
+                initialPassField: 'password',
+                allowBlank: false,
+                submitValue: false,
+                bind: {
+                    disabled: '{!maySetPassword}',
+                    hidden: '{!maySetPassword}',
+                },
+            },
+            {
+                xtype: 'datefield',
+                name: 'expire',
+                emptyText: Proxmox.Utils.neverText,
+                format: 'Y-m-d',
+                submitFormat: 'U',
+                fieldLabel: gettext('Expire'),
+            },
+            {
+                xtype: 'proxmoxcheckbox',
+                fieldLabel: gettext('Enabled'),
+                name: 'enable',
+                uncheckedValue: 0,
+                defaultValue: 1,
+                checked: true,
+            },
+        ],
 
-	column2: [
-	    {
-		xtype: 'proxmoxtextfield',
-		name: 'firstname',
-		fieldLabel: gettext('First Name'),
-		cbind: {
-		    deleteEmpty: '{!isCreate}',
-		},
-	    },
-	    {
-		xtype: 'proxmoxtextfield',
-		name: 'lastname',
-		fieldLabel: gettext('Last Name'),
-		cbind: {
-		    deleteEmpty: '{!isCreate}',
-		},
-	    },
-	    {
-		xtype: 'proxmoxtextfield',
-		name: 'email',
-		fieldLabel: gettext('E-Mail'),
-		vtype: 'proxmoxMail',
-		cbind: {
-		    deleteEmpty: '{!isCreate}',
-		},
-	    },
-	],
+        column2: [
+            {
+                xtype: 'proxmoxtextfield',
+                name: 'firstname',
+                fieldLabel: gettext('First Name'),
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+            {
+                xtype: 'proxmoxtextfield',
+                name: 'lastname',
+                fieldLabel: gettext('Last Name'),
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+            {
+                xtype: 'proxmoxtextfield',
+                name: 'email',
+                fieldLabel: gettext('E-Mail'),
+                vtype: 'proxmoxMail',
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+        ],
 
-	columnB: [
-	    {
-		xtype: 'proxmoxtextfield',
-		name: 'comment',
-		fieldLabel: gettext('Comment'),
-		cbind: {
-		    deleteEmpty: '{!isCreate}',
-		},
-	    },
-	],
+        columnB: [
+            {
+                xtype: 'proxmoxtextfield',
+                name: 'comment',
+                fieldLabel: gettext('Comment'),
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+        ],
     },
 
-    getValues: function(dirtyOnly) {
-	let me = this;
+    getValues: function (dirtyOnly) {
+        let me = this;
 
-	let values = me.callParent(arguments);
+        let values = me.callParent(arguments);
 
-	if (!values.expire) {
-	    values.expire = 0; // "no expiry" is encoded as 0, so set that explicitly if left empty
-	}
+        if (!values.expire) {
+            values.expire = 0; // "no expiry" is encoded as 0, so set that explicitly if left empty
+        }
 
-	if (me.isCreate) {
-	    values.userid = values.userid + '@' + values.realm;
-	    delete values.realm;
-	}
+        if (me.isCreate) {
+            values.userid = values.userid + '@' + values.realm;
+            delete values.realm;
+        }
 
-	if (!values.password) {
-	    delete values.password;
-	}
+        if (!values.password) {
+            delete values.password;
+        }
 
-	return values;
+        return values;
     },
 
-    setValues: function(values) {
-	var me = this;
+    setValues: function (values) {
+        var me = this;
 
-	if (Ext.isDefined(values.expire)) {
-	    if (values.expire) {
-		values.expire = new Date(values.expire * 1000);
-	    } else {
-		// display 'never' instead of '1970-01-01'
-		values.expire = null;
-	    }
-	}
+        if (Ext.isDefined(values.expire)) {
+            if (values.expire) {
+                values.expire = new Date(values.expire * 1000);
+            } else {
+                // display 'never' instead of '1970-01-01'
+                values.expire = null;
+            }
+        }
 
-	me.callParent([values]);
+        me.callParent([values]);
     },
 });

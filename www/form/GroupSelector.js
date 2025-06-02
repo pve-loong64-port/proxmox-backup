@@ -1,21 +1,21 @@
 Ext.define('pbs-groups', {
     extend: 'Ext.data.Model',
     fields: [
-	'backup-type',
-	'backup-id',
-	{
-	    name: 'group',
-	    type: 'string',
-	    convert: function(value, record) {
-		if (record.data['backup-type'] && record.data['backup-id']) {
-		    return `${record.data['backup-type']}/${record.data['backup-id']}`;
-		}
-		return value;
-	    },
-	},
+        'backup-type',
+        'backup-id',
+        {
+            name: 'group',
+            type: 'string',
+            convert: function (value, record) {
+                if (record.data['backup-type'] && record.data['backup-id']) {
+                    return `${record.data['backup-type']}/${record.data['backup-id']}`;
+                }
+                return value;
+            },
+        },
     ],
     proxy: {
-	type: 'proxmox',
+        type: 'proxmox',
     },
 });
 
@@ -32,24 +32,24 @@ Ext.define('PBS.form.GroupSelector', {
     displayField: 'group',
 
     store: {
-	sorters: 'group',
-	model: 'pbs-groups',
+        sorters: 'group',
+        model: 'pbs-groups',
     },
 
     listConfig: {
-	minHeight: 80,
-	emptyText: gettext('No Groups'),
-	viewConfig: {
-	    deferEmptyText: false,
-	},
-	columns: [
-	    {
-		header: gettext('Group'),
-		sortable: true,
-		dataIndex: 'group',
-		renderer: Ext.String.htmlEncode,
-		flex: 1,
-	    },
-	],
+        minHeight: 80,
+        emptyText: gettext('No Groups'),
+        viewConfig: {
+            deferEmptyText: false,
+        },
+        columns: [
+            {
+                header: gettext('Group'),
+                sortable: true,
+                dataIndex: 'group',
+                renderer: Ext.String.htmlEncode,
+                flex: 1,
+            },
+        ],
     },
 });

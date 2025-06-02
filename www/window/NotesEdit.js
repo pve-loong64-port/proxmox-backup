@@ -15,24 +15,24 @@ Ext.define('PBS.window.NotesEdit', {
 
     notesFieldName: 'notes',
 
-    setValues: function(values) {
-	let me = this;
-	if (typeof values === "string") {
-	    let v = values;
-	    values = {};
-	    values[me.notesFieldName] = v;
-	}
-	me.callParent([values]);
+    setValues: function (values) {
+        let me = this;
+        if (typeof values === 'string') {
+            let v = values;
+            values = {};
+            values[me.notesFieldName] = v;
+        }
+        me.callParent([values]);
     },
 
     items: {
-	xtype: 'textarea',
-	name: 'notes',
-	cbind: {
-	    name: '{notesFieldName}',
-	},
-	height: '100%',
-	value: '',
-	hideLabel: true,
+        xtype: 'textarea',
+        name: 'notes',
+        cbind: {
+            name: '{notesFieldName}',
+        },
+        height: '100%',
+        value: '',
+        hideLabel: true,
     },
 });

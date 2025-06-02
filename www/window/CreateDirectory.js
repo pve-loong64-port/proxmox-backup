@@ -11,53 +11,52 @@ Ext.define('PBS.window.CreateDirectory', {
     onlineHelp: 'storage-disk-management',
 
     items: [
-	{
-	    xtype: 'pmxDiskSelector',
-	    name: 'disk',
-	    valueField: 'name',
-	    typeProperty: 'usage-type',
-	    nodename: 'localhost',
-	    diskType: 'unused',
-	    fieldLabel: gettext('Disk'),
-	    allowBlank: false,
-	},
-	{
-	    xtype: 'proxmoxKVComboBox',
-	    comboItems: [
-		['ext4', 'ext4'],
-		['xfs', 'xfs'],
-	    ],
-	    fieldLabel: gettext('Filesystem'),
-	    name: 'filesystem',
-	    value: '',
-	    allowBlank: false,
-	},
-	{
-	    xtype: 'proxmoxtextfield',
-	    name: 'name',
-	    fieldLabel: gettext('Name'),
-	    allowBlank: false,
-	},
-	{
-	    xtype: 'proxmoxcheckbox',
-	    name: 'add-datastore',
-	    fieldLabel: gettext('Add as Datastore'),
-	    value: '1',
-	    listeners: {
-		change(field, newValue, _oldValue) {
-		    let form = field.up('form');
-		    let rmBox = form.down('[name=removable-datastore]');
+        {
+            xtype: 'pmxDiskSelector',
+            name: 'disk',
+            valueField: 'name',
+            typeProperty: 'usage-type',
+            nodename: 'localhost',
+            diskType: 'unused',
+            fieldLabel: gettext('Disk'),
+            allowBlank: false,
+        },
+        {
+            xtype: 'proxmoxKVComboBox',
+            comboItems: [
+                ['ext4', 'ext4'],
+                ['xfs', 'xfs'],
+            ],
+            fieldLabel: gettext('Filesystem'),
+            name: 'filesystem',
+            value: '',
+            allowBlank: false,
+        },
+        {
+            xtype: 'proxmoxtextfield',
+            name: 'name',
+            fieldLabel: gettext('Name'),
+            allowBlank: false,
+        },
+        {
+            xtype: 'proxmoxcheckbox',
+            name: 'add-datastore',
+            fieldLabel: gettext('Add as Datastore'),
+            value: '1',
+            listeners: {
+                change(field, newValue, _oldValue) {
+                    let form = field.up('form');
+                    let rmBox = form.down('[name=removable-datastore]');
 
-		    rmBox.setDisabled(!newValue);
-		    rmBox.setValue(false);
-		},
-	    },
-	},
-	{
-	    xtype: 'proxmoxcheckbox',
-	    name: 'removable-datastore',
-	    fieldLabel: gettext('Removable datastore'),
-	},
+                    rmBox.setDisabled(!newValue);
+                    rmBox.setValue(false);
+                },
+            },
+        },
+        {
+            xtype: 'proxmoxcheckbox',
+            name: 'removable-datastore',
+            fieldLabel: gettext('Removable datastore'),
+        },
     ],
 });
-

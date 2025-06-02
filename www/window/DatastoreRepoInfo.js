@@ -11,86 +11,86 @@ Ext.define('PBS.window.DatastoreRepoInfo', {
     layout: 'anchor',
     bodyPadding: 10,
 
-    cbindData: function() {
-	let me = this;
-	let fingerprint = Proxmox.Fingerprint;
-	let host = window.location.hostname;
-	let hostname = host;
-	if (window.location.port.toString() !== "8007") {
-	    host += `:${window.location.port}`;
-	}
-	let datastore = me.datastore;
-	let user = Proxmox.UserName;
-	let repository = `${host}:${datastore}`;
-	let repositoryWithUser = `${user}@${host}:${datastore}`;
+    cbindData: function () {
+        let me = this;
+        let fingerprint = Proxmox.Fingerprint;
+        let host = window.location.hostname;
+        let hostname = host;
+        if (window.location.port.toString() !== '8007') {
+            host += `:${window.location.port}`;
+        }
+        let datastore = me.datastore;
+        let user = Proxmox.UserName;
+        let repository = `${host}:${datastore}`;
+        let repositoryWithUser = `${user}@${host}:${datastore}`;
 
-	return {
-	    datastore,
-	    hostname,
-	    fingerprint,
-	    repository,
-	    repositoryWithUser,
-	};
+        return {
+            datastore,
+            hostname,
+            fingerprint,
+            repository,
+            repositoryWithUser,
+        };
     },
 
     defaults: {
-	xtype: 'pbsCopyField',
-	labelWidth: 120,
+        xtype: 'pbsCopyField',
+        labelWidth: 120,
     },
 
     items: [
-	{
-	    fieldLabel: gettext('Datastore'),
-	    cbind: {
-		value: '{datastore}',
-	    },
-	},
-	{
-	    fieldLabel: gettext('Hostname/IP'),
-	    cbind: {
-		value: '{hostname}',
-	    },
-	},
-	{
-	    fieldLabel: gettext('Fingerprint'),
-	    cbind: {
-		value: '{fingerprint}',
-		hidden: '{!fingerprint}',
-	    },
-	},
-	{
-	    xtype: 'displayfield',
-	    value: '',
-	    labelWidth: 500,
-	    fieldLabel: gettext('Repository for CLI and API'),
-	    padding: '10 0 0 0',
-	},
-	{
-	    fieldLabel: gettext('Repository'),
-	    cbind: {
-		value: '{repository}',
-	    },
-	},
-	{
-	    fieldLabel: gettext('With Current User'),
-	    cbind: {
-		value: '{repositoryWithUser}',
-	    },
-	},
+        {
+            fieldLabel: gettext('Datastore'),
+            cbind: {
+                value: '{datastore}',
+            },
+        },
+        {
+            fieldLabel: gettext('Hostname/IP'),
+            cbind: {
+                value: '{hostname}',
+            },
+        },
+        {
+            fieldLabel: gettext('Fingerprint'),
+            cbind: {
+                value: '{fingerprint}',
+                hidden: '{!fingerprint}',
+            },
+        },
+        {
+            xtype: 'displayfield',
+            value: '',
+            labelWidth: 500,
+            fieldLabel: gettext('Repository for CLI and API'),
+            padding: '10 0 0 0',
+        },
+        {
+            fieldLabel: gettext('Repository'),
+            cbind: {
+                value: '{repository}',
+            },
+        },
+        {
+            fieldLabel: gettext('With Current User'),
+            cbind: {
+                value: '{repositoryWithUser}',
+            },
+        },
     ],
     buttons: [
-	{
-	    xtype: 'proxmoxHelpButton',
-	    onlineHelp: 'client_repository',
-	    hidden: false,
-	},
-	'->',
-	{
-	    text: gettext('Ok'),
-	    handler: function() {
-		this.up('window').close();
-	    },
-	},
+        {
+            xtype: 'proxmoxHelpButton',
+            onlineHelp: 'client_repository',
+            hidden: false,
+        },
+        '->',
+        {
+            text: gettext('Ok'),
+            handler: function () {
+                this.up('window').close();
+            },
+        },
     ],
 });
 
@@ -101,34 +101,34 @@ Ext.define('PBS.form.CopyField', {
     layout: 'hbox',
 
     items: [
-	{
-	    xtype: 'textfield',
-	    itemId: 'inputField',
-	    editable: false,
-	    flex: 1,
-	},
-	{
-	    xtype: 'button',
-	    margin: '0 0 0 10',
-	    iconCls: 'fa fa-clipboard x-btn-icon-el-default-toolbar-small',
-	    baseCls: 'x-btn',
-	    cls: 'x-btn-default-toolbar-small proxmox-inline-button',
-	    handler: async function() {
-		let me = this;
-		let field = me.up('pbsCopyField');
-		let el = field.getComponent('inputField')?.inputEl;
-		if (!el?.dom) {
-		    return;
-		}
-		await navigator.clipboard.writeText(el.dom.value);
-	    },
-	    text: gettext('Copy'),
-	},
+        {
+            xtype: 'textfield',
+            itemId: 'inputField',
+            editable: false,
+            flex: 1,
+        },
+        {
+            xtype: 'button',
+            margin: '0 0 0 10',
+            iconCls: 'fa fa-clipboard x-btn-icon-el-default-toolbar-small',
+            baseCls: 'x-btn',
+            cls: 'x-btn-default-toolbar-small proxmox-inline-button',
+            handler: async function () {
+                let me = this;
+                let field = me.up('pbsCopyField');
+                let el = field.getComponent('inputField')?.inputEl;
+                if (!el?.dom) {
+                    return;
+                }
+                await navigator.clipboard.writeText(el.dom.value);
+            },
+            text: gettext('Copy'),
+        },
     ],
 
-    initComponent: function() {
-	let me = this;
-	me.callParent();
-	me.getComponent('inputField').setValue(me.value);
+    initComponent: function () {
+        let me = this;
+        me.callParent();
+        me.getComponent('inputField').setValue(me.value);
     },
 });

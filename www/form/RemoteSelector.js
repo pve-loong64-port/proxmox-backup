@@ -8,33 +8,33 @@ Ext.define('PBS.form.RemoteSelector', {
     displayField: 'name',
 
     store: {
-	model: 'pmx-remotes',
-	autoLoad: true,
-	sorters: 'name',
+        model: 'pmx-remotes',
+        autoLoad: true,
+        sorters: 'name',
     },
 
     listConfig: {
-	columns: [
-	    {
-		header: gettext('Remote ID'),
-		sortable: true,
-		dataIndex: 'name',
-		renderer: Ext.String.htmlEncode,
-		flex: 1,
-	    },
-	    {
-		header: gettext('Host'),
-		sortable: true,
-		dataIndex: 'host',
-		flex: 1,
-	    },
-	    {
-		header: gettext('Auth ID'),
-		sortable: true,
-		dataIndex: 'auth-id',
-		renderer: Ext.String.htmlEncode,
-		flex: 1,
-	    },
-	],
+        columns: [
+            {
+                header: gettext('Remote ID'),
+                sortable: true,
+                dataIndex: 'name',
+                renderer: Ext.String.htmlEncode,
+                flex: 1,
+            },
+            {
+                header: gettext('Host'),
+                sortable: true,
+                dataIndex: 'host',
+                flex: 1,
+            },
+            {
+                header: gettext('Auth ID'),
+                sortable: true,
+                dataIndex: 'auth-id',
+                renderer: Ext.String.htmlEncode,
+                flex: 1,
+            },
+        ],
     },
 });
