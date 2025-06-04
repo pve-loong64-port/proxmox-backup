@@ -14,7 +14,7 @@ use proxmox_systemd::escape_unit;
 
 use pbs_api_types::{
     Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter, VerifyState,
-    BACKUP_DATE_REGEX, BACKUP_FILE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
+    BACKUP_DATE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
@@ -119,26 +119,7 @@ impl BackupGroup {
                 }
 
                 let backup_dir = self.backup_dir_with_rfc3339(backup_time)?;
-                let mut protected = false;
-                let mut files = Vec::new();
-
-                proxmox_sys::fs::scandir(
-                    l2_fd,
-                    backup_time,
-                    &BACKUP_FILES_AND_PROTECTED_REGEX,
-                    |_, filename, file_type| {
-                        if file_type != nix::dir::Type::File {
-                            return Ok(());
-                        }
-                        // avoids more expensive check via `BackupDir::is_protected`
-                        if filename == ".protected" {
-                            protected = true;
-                        } else {
-                            files.push(filename.to_owned());
-                        }
-                        Ok(())
-                    },
-                )?;
+                let (files, protected) = list_backup_files(l2_fd, backup_time)?;
 
                 list.push(BackupInfo {
                     backup_dir,
@@ -800,8 +781,7 @@ impl BackupInfo {
     pub fn new(backup_dir: BackupDir) -> Result<BackupInfo, Error> {
         let path = backup_dir.full_path();
 
-        let files = list_backup_files(libc::AT_FDCWD, &path)?;
-        let protected = backup_dir.is_protected();
+        let (files, protected) = list_backup_files(libc::AT_FDCWD, &path)?;
 
         Ok(BackupInfo {
             backup_dir,
@@ -831,18 +811,29 @@ impl BackupInfo {
 fn list_backup_files<P: ?Sized + nix::NixPath>(
     dirfd: RawFd,
     path: &P,
-) -> Result<Vec<String>, Error> {
+) -> Result<(Vec<String>, bool), Error> {
     let mut files = vec![];
+    let mut protected = false;
 
-    proxmox_sys::fs::scandir(dirfd, path, &BACKUP_FILE_REGEX, |_, filename, file_type| {
-        if file_type != nix::dir::Type::File {
-            return Ok(());
-        }
-        files.push(filename.to_owned());
-        Ok(())
-    })?;
+    proxmox_sys::fs::scandir(
+        dirfd,
+        path,
+        &BACKUP_FILES_AND_PROTECTED_REGEX,
+        |_, filename, file_type| {
+            if file_type != nix::dir::Type::File {
+                return Ok(());
+            }
+            // avoids more expensive check via `BackupDir::is_protected`
+            if filename == ".protected" {
+                protected = true;
+            } else {
+                files.push(filename.to_owned());
+            }
+            Ok(())
+        },
+    )?;
 
-    Ok(files)
+    Ok((files, protected))
 }
 
 /// Creates a path to a lock file depending on the relative path of an object (snapshot, group,
