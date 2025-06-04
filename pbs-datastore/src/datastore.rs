@@ -23,8 +23,8 @@ use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
-    DataStoreConfig, DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionStatus,
-    MaintenanceMode, MaintenanceType, Operation, UPID,
+    DataStoreConfig, DatastoreFSyncLevel, DatastoreTuning, GarbageCollectionCacheStats,
+    GarbageCollectionStatus, MaintenanceMode, MaintenanceType, Operation, UPID,
 };
 use pbs_config::BackupLockGuard;
 
@@ -1098,7 +1098,13 @@ impl DataStore {
             // Avoid multiple expensive atime updates by utimensat
             if let Some(chunk_lru_cache) = chunk_lru_cache {
                 if chunk_lru_cache.insert(*digest, ()) {
+                    if let Some(cache_stats) = status.cache_stats.as_mut() {
+                        cache_stats.hits += 1;
+                    }
                     continue;
+                }
+                if let Some(cache_stats) = status.cache_stats.as_mut() {
+                    cache_stats.misses += 1;
                 }
             }
 
@@ -1304,6 +1310,7 @@ impl DataStore {
 
             let mut gc_status = GarbageCollectionStatus {
                 upid: Some(upid.to_string()),
+                cache_stats: Some(GarbageCollectionCacheStats::default()),
                 ..Default::default()
             };
             let tuning: DatastoreTuning = serde_json::from_value(
@@ -1366,6 +1373,17 @@ impl DataStore {
                 worker,
             )?;
 
+            if let Some(cache_stats) = &gc_status.cache_stats {
+                let total_cache_counts = cache_stats.hits + cache_stats.misses;
+                if total_cache_counts > 0 {
+                    let cache_hit_ratio =
+                        (cache_stats.hits as f64 * 100.) / total_cache_counts as f64;
+                    info!(
+                        "Chunk cache: hits {}, misses {} (hit ratio {cache_hit_ratio:.2}%)",
+                        cache_stats.hits, cache_stats.misses,
+                    );
+                }
+            }
             info!(
                 "Removed garbage: {}",
                 HumanByte::from(gc_status.removed_bytes),
