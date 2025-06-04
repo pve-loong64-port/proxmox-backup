@@ -1,3 +1,21 @@
+rust-proxmox-backup (3.4.2-1) bookworm; urgency=medium
+
+  * datastore: various small perf optimizations
+
+  * restore-daemon: adapt to zpool output changes in 2.3
+
+  * fix #6358: remove group note file if present on group destroy
+
+  * docs: tuning: list default and maximum values for `gc-cache-capacity`
+
+  * backup info: avoid additional stat syscall for protected check
+
+  * tools: lru cache: document limitations for cache capacity
+
+  * garbage collection: bypass cache if gc-cache-capacity is 0
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 04 Jun 2025 14:42:05 +0200
+
 rust-proxmox-backup (3.4.1-1) bookworm; urgency=medium
 
   * ui: token view: fix typo in 'lose' and rephrase token regenerate dialog
