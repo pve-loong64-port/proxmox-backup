@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-base64.workspace = true
 const_format.workspace = true
 crc32fast.workspace = true
 endian_trait.workspace = true
@@ -30,6 +29,7 @@ zstd-safe.workspace = true
 pathpatterns.workspace = true
 pxar.workspace = true
 
+proxmox-base64.workspace = true
 proxmox-borrow.workspace = true
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true

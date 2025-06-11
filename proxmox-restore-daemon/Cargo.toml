@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-base64.workspace = true
 env_logger.workspace = true
 futures.workspace = true
 hyper.workspace = true
@@ -26,6 +25,7 @@ pathpatterns.workspace = true
 pxar.workspace = true
 
 proxmox-async.workspace = true
+proxmox-base64.workspace = true
 proxmox-compression.workspace = true
 proxmox-http.workspace = true
 proxmox-rest-server.workspace = true
