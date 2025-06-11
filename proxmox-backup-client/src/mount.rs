@@ -262,7 +262,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
             }
             // Signal the parent process that we are done with the setup and it can
             // terminate.
-            nix::unistd::write(pipe.as_raw_fd(), &[1u8])?;
+            nix::unistd::write(&pipe, &[1u8])?;
             let _: OwnedFd = pipe;
         }
 
