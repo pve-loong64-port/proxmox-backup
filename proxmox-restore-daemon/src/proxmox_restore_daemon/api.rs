@@ -145,7 +145,7 @@ fn list(
 
     let mut res = Vec::new();
 
-    let param_path = base64::decode(path)?;
+    let param_path = proxmox_base64::decode(path)?;
     let mut path = param_path.clone();
     if let Some(b'/') = path.last() {
         path.pop();
@@ -282,7 +282,7 @@ fn extract(
         };
 
         let path = required_string_param(&param, "path")?;
-        let mut path = base64::decode(path)?;
+        let mut path = proxmox_base64::decode(path)?;
         if let Some(b'/') = path.last() {
             path.pop();
         }

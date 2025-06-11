@@ -1,10 +1,8 @@
 //! Daemon binary to run inside a micro-VM for secure single file restore of disk images
 use std::fs::File;
 use std::io::prelude::*;
-use std::os::unix::{
-    io::{FromRawFd, RawFd},
-    net,
-};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::unix::net;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
@@ -142,7 +140,7 @@ async fn run() -> Result<(), Error> {
 }
 
 fn accept_vsock_connections(
-    vsock_fd: RawFd,
+    vsock_fd: OwnedFd,
 ) -> mpsc::Receiver<Result<tokio::net::UnixStream, Error>> {
     use nix::sys::socket::*;
     let (sender, receiver) = mpsc::channel(MAX_PENDING);
@@ -151,7 +149,7 @@ fn accept_vsock_connections(
         loop {
             let stream: Result<tokio::net::UnixStream, Error> = tokio::task::block_in_place(|| {
                 // we need to accept manually, as UnixListener aborts if socket type != AF_UNIX ...
-                let client_fd = accept(vsock_fd)?;
+                let client_fd = accept(vsock_fd.as_raw_fd())?;
                 let stream = unsafe { net::UnixStream::from_raw_fd(client_fd) };
                 stream.set_nonblocking(true)?;
                 tokio::net::UnixStream::from_std(stream).map_err(|err| err.into())
@@ -173,7 +171,7 @@ fn accept_vsock_connections(
     receiver
 }
 
-fn get_vsock_fd() -> Result<RawFd, Error> {
+fn get_vsock_fd() -> Result<OwnedFd, Error> {
     use nix::sys::socket::*;
     let sock_fd = socket(
         AddressFamily::Vsock,
@@ -182,7 +180,11 @@ fn get_vsock_fd() -> Result<RawFd, Error> {
         None,
     )?;
     let sock_addr = VsockAddr::new(libc::VMADDR_CID_ANY, DEFAULT_VSOCK_PORT as u32);
-    bind(sock_fd, &sock_addr)?;
-    listen(sock_fd, MAX_PENDING)?;
+    bind(sock_fd.as_raw_fd(), &sock_addr)?;
+    listen(
+        &sock_fd,
+        nix::sys::socket::Backlog::new(MAX_PENDING as i32)
+            .expect("MAX_PENDING is invalid as a listening backlog"),
+    )?;
     Ok(sock_fd)
 }
