@@ -512,7 +512,7 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
             SCSI_PT_DO_TIMEOUT => return Err(format_err!("do_scsi_pt failed - timeout").into()),
             code if code < 0 => {
                 let errno = unsafe { get_scsi_pt_os_err(ptvp.as_ptr()) };
-                let err = nix::errno::Errno::from_i32(errno);
+                let err = nix::errno::Errno::from_raw(errno);
                 return Err(format_err!("do_scsi_pt failed with err {}", err).into());
             }
             unknown => {
@@ -594,7 +594,7 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
             }
             SCSI_PT_RESULT_OS_ERR => {
                 let errno = unsafe { get_scsi_pt_os_err(ptvp.as_ptr()) };
-                let err = nix::errno::Errno::from_i32(errno);
+                let err = nix::errno::Errno::from_raw(errno);
                 Err(format_err!("scsi command failed with err {}", err).into())
             }
             unknown => {
