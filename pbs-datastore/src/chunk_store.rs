@@ -390,7 +390,11 @@ impl ChunkStore {
 
             let lock = self.mutex.lock();
 
-            if let Ok(stat) = fstatat(dirfd, filename, nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW) {
+            if let Ok(stat) = fstatat(
+                Some(dirfd),
+                filename,
+                nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW,
+            ) {
                 let file_type = file_type_from_file_stat(&stat);
                 if file_type != Some(nix::dir::Type::File) {
                     drop(lock);

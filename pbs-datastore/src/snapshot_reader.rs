@@ -111,7 +111,7 @@ impl SnapshotReader {
     /// Opens a file inside the snapshot (using openat) for reading
     pub fn open_file(&self, filename: &str) -> Result<File, Error> {
         let raw_fd = nix::fcntl::openat(
-            self.locked_dir.as_raw_fd(),
+            Some(self.locked_dir.as_raw_fd()),
             Path::new(filename),
             nix::fcntl::OFlag::O_RDONLY | nix::fcntl::OFlag::O_CLOEXEC,
             nix::sys::stat::Mode::empty(),

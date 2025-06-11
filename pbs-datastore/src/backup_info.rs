@@ -161,7 +161,7 @@ impl BackupGroup {
 
                 use nix::fcntl::{openat, OFlag};
                 match openat(
-                    l2_fd,
+                    Some(l2_fd),
                     &manifest_path,
                     OFlag::O_RDONLY | OFlag::O_CLOEXEC,
                     nix::sys::stat::Mode::empty(),

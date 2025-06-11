@@ -973,7 +973,7 @@ impl ArchiveEntry {
         size: Option<u64>,
     ) -> Self {
         Self {
-            filepath: base64::encode(filepath),
+            filepath: proxmox_base64::encode(filepath),
             text: String::from_utf8_lossy(filepath.split(|x| *x == b'/').last().unwrap())
                 .to_string(),
             entry_type: match entry_type {

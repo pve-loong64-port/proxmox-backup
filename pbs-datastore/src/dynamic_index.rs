@@ -134,7 +134,7 @@ impl DynamicIndexReader {
 
         let index = unsafe {
             Mmap::map_fd(
-                rawfd,
+                &file,
                 header_size as u64,
                 index_count,
                 nix::sys::mman::ProtFlags::PROT_READ,

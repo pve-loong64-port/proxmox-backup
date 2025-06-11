@@ -3,6 +3,7 @@ use std::io::Write;
 use std::io::{Seek, SeekFrom};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
+use std::ptr::NonNull;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
@@ -109,10 +110,12 @@ impl FixedIndexReader {
                     .ok_or_else(|| format_err!("invalid index size"))?,
                 nix::sys::mman::ProtFlags::PROT_READ,
                 nix::sys::mman::MapFlags::MAP_PRIVATE,
-                file.as_raw_fd(),
+                &file,
                 header_size as i64,
             )
-        }? as *mut u8;
+        }?
+        .as_ptr()
+        .cast::<u8>();
 
         Ok(Self {
             _file: file,
@@ -127,15 +130,13 @@ impl FixedIndexReader {
     }
 
     fn unmap(&mut self) -> Result<(), Error> {
-        if self.index.is_null() {
+        let Some(index) = NonNull::new(self.index as *mut std::ffi::c_void) else {
             return Ok(());
-        }
+        };
 
         let index_size = self.index_length * 32;
 
-        if let Err(err) =
-            unsafe { nix::sys::mman::munmap(self.index as *mut std::ffi::c_void, index_size) }
-        {
+        if let Err(err) = unsafe { nix::sys::mman::munmap(index, index_size) } {
             bail!("unmap file failed - {}", err);
         }
 
@@ -287,7 +288,7 @@ impl FixedIndexWriter {
 
         let index_length = size.div_ceil(chunk_size);
         let index_size = index_length * 32;
-        nix::unistd::ftruncate(file.as_raw_fd(), (header_size + index_size) as i64)?;
+        nix::unistd::ftruncate(&file, (header_size + index_size) as i64)?;
 
         let data = unsafe {
             nix::sys::mman::mmap(
@@ -296,10 +297,12 @@ impl FixedIndexWriter {
                     .ok_or_else(|| format_err!("invalid index size"))?,
                 nix::sys::mman::ProtFlags::PROT_READ | nix::sys::mman::ProtFlags::PROT_WRITE,
                 nix::sys::mman::MapFlags::MAP_SHARED,
-                file.as_raw_fd(),
+                &file,
                 header_size as i64,
             )
-        }? as *mut u8;
+        }?
+        .as_ptr()
+        .cast::<u8>();
 
         Ok(Self {
             store,
@@ -321,15 +324,13 @@ impl FixedIndexWriter {
     }
 
     fn unmap(&mut self) -> Result<(), Error> {
-        if self.index.is_null() {
+        let Some(index) = NonNull::new(self.index as *mut std::ffi::c_void) else {
             return Ok(());
-        }
+        };
 
         let index_size = self.index_length * 32;
 
-        if let Err(err) =
-            unsafe { nix::sys::mman::munmap(self.index as *mut std::ffi::c_void, index_size) }
-        {
+        if let Err(err) = unsafe { nix::sys::mman::munmap(index, index_size) } {
             bail!("unmap file {:?} failed - {}", self.tmp_filename, err);
         }
 
