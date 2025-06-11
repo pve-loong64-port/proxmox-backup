@@ -247,7 +247,7 @@ impl BlockRestoreDriver for QemuBlockDriver {
                 path.insert(0, b'/');
             }
             handle_extra_guest_memory_needs(cid, &path).await;
-            let path = base64::encode(img_file.bytes().chain(path).collect::<Vec<u8>>());
+            let path = proxmox_base64::encode(img_file.bytes().chain(path).collect::<Vec<u8>>());
             let mut result = client
                 .get("api2/json/list", Some(json!({ "path": path })))
                 .await?;
@@ -270,7 +270,7 @@ impl BlockRestoreDriver for QemuBlockDriver {
                 path.insert(0, b'/');
             }
             handle_extra_guest_memory_needs(cid, &path).await;
-            let path = base64::encode(img_file.bytes().chain(path).collect::<Vec<u8>>());
+            let path = proxmox_base64::encode(img_file.bytes().chain(path).collect::<Vec<u8>>());
             let (mut tx, rx) = tokio::io::duplex(1024 * 4096);
             let mut data = json!({ "path": path, "zstd": zstd });
             if let Some(format) = format {
