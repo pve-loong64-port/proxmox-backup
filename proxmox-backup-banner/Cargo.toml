@@ -6,4 +6,4 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-nix.workspace = true
+nix = { workspace = true, features = [ "feature" ] }
