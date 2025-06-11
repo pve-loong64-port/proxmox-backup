@@ -1647,7 +1647,8 @@ pub fn upload_backup_log(
 
 fn decode_path(path: &str) -> Result<Vec<u8>, Error> {
     if path != "root" && path != "/" {
-        base64::decode(path).map_err(|err| format_err!("base64 decoding of path failed - {err}"))
+        proxmox_base64::decode(path)
+            .map_err(|err| format_err!("base64 decoding of path failed - {err}"))
     } else {
         Ok(vec![b'/'])
     }
@@ -1832,14 +1833,14 @@ pub fn pxar_file_download(
 
         let tar = param["tar"].as_bool().unwrap_or(false);
 
-        let mut components = base64::decode(&filepath)?;
+        let mut components = proxmox_base64::decode(&filepath)?;
         if !components.is_empty() && components[0] == b'/' {
             components.remove(0);
         }
 
         let (pxar_name, file_path) = if let Some(archive_name) = param["archive-name"].as_str() {
             let archive_name = archive_name.as_bytes().to_owned();
-            (archive_name, base64::decode(&filepath)?)
+            (archive_name, proxmox_base64::decode(&filepath)?)
         } else {
             let mut split = components.splitn(2, |c| *c == b'/');
             let pxar_name = split.next().unwrap();

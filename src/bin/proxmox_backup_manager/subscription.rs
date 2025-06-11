@@ -47,7 +47,7 @@ fn get(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
 )]
 /// (Internal use only!) Set a signed subscription info blob as offline key
 pub fn set_offline_subscription_key(data: String) -> Result<(), Error> {
-    let mut info: SubscriptionInfo = serde_json::from_slice(&base64::decode(data)?)?;
+    let mut info: SubscriptionInfo = serde_json::from_slice(&proxmox_base64::decode(data)?)?;
     if !info.is_signed() {
         bail!("Offline subscription key must be signed!");
     }
