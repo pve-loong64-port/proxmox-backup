@@ -298,16 +298,16 @@ async fn run() -> Result<(), Error> {
                 proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
 
                 let secure_server = async move {
-                    let graceful = Arc::new(GracefulShutdown::new());
+                    let graceful = GracefulShutdown::new();
                     loop {
-                        let graceful2 = Arc::clone(&graceful);
                         tokio::select! {
                             Some(conn) = secure_connections.next() => {
                                 match conn {
                                     Ok(conn) => {
                                         let api_service = rest_server.api_service(&conn)?;
+                            let watcher = graceful.watcher();
                                         tokio::spawn(async move {
-                                            api_service.serve(conn, Some(graceful2)).await
+                                            api_service.serve(conn, Some(watcher)).await
                                         });
                                     },
                                     Err(err) => { log::warn!("Failed to accept insecure connection: {err:?}"); }
@@ -318,23 +318,21 @@ async fn run() -> Result<(), Error> {
                             }
                         }
                     }
-                    if let Some(shutdown) = Arc::into_inner(graceful) {
-                        shutdown.shutdown().await
-                    }
+                    graceful.shutdown().await;
                     Ok::<(), Error>(())
                 };
 
                 let insecure_server = async move {
-                    let graceful = Arc::new(GracefulShutdown::new());
+                    let graceful = GracefulShutdown::new();
                     loop {
-                        let graceful2 = Arc::clone(&graceful);
                         tokio::select! {
                             Some(conn) = insecure_connections.next() => {
                                 match conn {
                                     Ok(conn) => {
                                         let redirect_service = redirector.redirect_service();
+                            let watcher = graceful.watcher();
                                         tokio::spawn(async move {
-                                            redirect_service.serve(conn, Some(graceful2)).await
+                                            redirect_service.serve(conn, Some(watcher)).await
                                         });
                                     },
                                     Err(err) => { log::warn!("Failed to accept insecure connection: {err:?}"); }
@@ -345,9 +343,7 @@ async fn run() -> Result<(), Error> {
                             }
                         }
                     }
-                    if let Some(shutdown) = Arc::into_inner(graceful) {
-                        shutdown.shutdown().await
-                    }
+                    graceful.shutdown().await;
                     Ok::<(), Error>(())
                 };
 

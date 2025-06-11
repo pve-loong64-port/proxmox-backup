@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::pin::{pin, Pin};
-use std::sync::Arc;
 
 use anyhow::{bail, Error};
 use hyper::http::Response;
@@ -115,24 +114,22 @@ async fn run() -> Result<(), Error> {
         move |listener: TcpListener| {
             Ok(async move {
                 proxmox_systemd::notify::SystemdNotify::Ready.notify()?;
-                let graceful = Arc::new(GracefulShutdown::new());
+                let graceful = GracefulShutdown::new();
                 loop {
-                    let graceful2 = Arc::clone(&graceful);
                     tokio::select! {
                         incoming = listener.accept() => {
                             let (conn, _) = incoming?;
                             let api_service = rest_server.api_service(&conn)?;
-                            tokio::spawn(async move { api_service.serve(conn, Some(graceful2)).await });
+                            let watcher = graceful.watcher();
+                            tokio::spawn(async move { api_service.serve(conn, Some(watcher)).await });
                         },
                         _shutdown = proxmox_daemon::shutdown_future() => {
                             break;
                         },
                     }
                 }
-                if let Some(shutdown) = Arc::into_inner(graceful) {
-                    log::info!("shutting down..");
-                    shutdown.shutdown().await
-                }
+                log::info!("shutting down..");
+                graceful.shutdown().await;
                 Ok(())
             })
         },
