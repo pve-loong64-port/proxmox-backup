@@ -1,3 +1,4 @@
+use std::os::fd::{AsRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -76,10 +77,11 @@ impl tower_service::Service<Uri> for VsockConnector {
             )?;
 
             let sock_addr = VsockAddr::new(cid, port as u32);
-            connect(sock_fd, &sock_addr)?;
+            connect(sock_fd.as_raw_fd(), &sock_addr)?;
 
             // connect sync, but set nonblock after (tokio requires it)
-            let std_stream = unsafe { std::os::unix::net::UnixStream::from_raw_fd(sock_fd) };
+            let std_stream =
+                unsafe { std::os::unix::net::UnixStream::from_raw_fd(sock_fd.into_raw_fd()) };
             std_stream.set_nonblocking(true)?;
 
             let stream = tokio::net::UnixStream::from_std(std_stream)?;

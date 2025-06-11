@@ -627,7 +627,7 @@ impl Extractor {
                 target.as_c_str(),
                 Some(parent),
                 file_name,
-                nix::unistd::LinkatFlags::NoSymlinkFollow,
+                nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW,
             )
         };
 
@@ -697,8 +697,13 @@ impl Extractor {
         }
         let mut file = unsafe {
             std::fs::File::from_raw_fd(
-                nix::fcntl::openat(parent, file_name, oflags, Mode::from_bits(0o600).unwrap())
-                    .with_context(|| format!("failed to create file {file_name:?}"))?,
+                nix::fcntl::openat(
+                    Some(parent),
+                    file_name,
+                    oflags,
+                    Mode::from_bits(0o600).unwrap(),
+                )
+                .with_context(|| format!("failed to create file {file_name:?}"))?,
             )
         };
 
@@ -722,7 +727,7 @@ impl Extractor {
         }
 
         if result.seeked_last {
-            while match nix::unistd::ftruncate(file.as_raw_fd(), size as i64) {
+            while match nix::unistd::ftruncate(&file, size as i64) {
                 Ok(_) => false,
                 Err(nix::errno::Errno::EINTR) => true,
                 Err(err) => return Err(err).context("error setting file size"),
@@ -758,8 +763,13 @@ impl Extractor {
         }
         let mut file = tokio::fs::File::from_std(unsafe {
             std::fs::File::from_raw_fd(
-                nix::fcntl::openat(parent, file_name, oflags, Mode::from_bits(0o600).unwrap())
-                    .with_context(|| format!("failed to create file {file_name:?}"))?,
+                nix::fcntl::openat(
+                    Some(parent),
+                    file_name,
+                    oflags,
+                    Mode::from_bits(0o600).unwrap(),
+                )
+                .with_context(|| format!("failed to create file {file_name:?}"))?,
             )
         });
 
@@ -784,7 +794,7 @@ impl Extractor {
         }
 
         if result.seeked_last {
-            while match nix::unistd::ftruncate(file.as_raw_fd(), size as i64) {
+            while match nix::unistd::ftruncate(&file, size as i64) {
                 Ok(_) => false,
                 Err(nix::errno::Errno::EINTR) => true,
                 Err(err) => return Err(err).context("error setting file size"),

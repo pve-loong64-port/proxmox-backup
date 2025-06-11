@@ -306,7 +306,7 @@ async fn restore_command(target: String, pattern: Option<String>) -> Result<(), 
 /// here:
 pub struct Shell {
     /// Readline instance handling input and callbacks
-    rl: rustyline::Editor<CliHelper>,
+    rl: rustyline::Editor<CliHelper, rustyline::history::MemHistory>,
 
     /// Interactive prompt.
     prompt: String,
@@ -352,7 +352,10 @@ impl Shell {
         archive: Accessor,
     ) -> Result<Self, Error> {
         let cli_helper = CliHelper::new(catalog_shell_cli());
-        let mut rl = rustyline::Editor::<CliHelper>::new();
+        let mut rl = rustyline::Editor::<CliHelper, _>::with_history(
+            rustyline::Config::default(),
+            rustyline::history::MemHistory::new(),
+        )?;
         rl.set_helper(Some(cli_helper));
 
         let mut position = Vec::new();
@@ -426,7 +429,7 @@ impl Shell {
             let _ =
                 cli::handle_command_future(helper.cmd_def(), "", args, cli::CliEnvironment::new())
                     .await;
-            this.rl.add_history_entry(line);
+            let _ = this.rl.add_history_entry(line);
             this.update_prompt();
         }
         Ok(())

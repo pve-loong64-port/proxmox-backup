@@ -630,7 +630,11 @@ impl Archiver {
             let mut stat_results: Option<FileStat> = None;
 
             let get_file_mode = || {
-                nix::sys::stat::fstatat(dir_fd, file_name, nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW)
+                nix::sys::stat::fstatat(
+                    Some(dir_fd),
+                    file_name,
+                    nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW,
+                )
             };
 
             let match_result = self
@@ -1309,7 +1313,7 @@ impl Archiver {
         file_name: &Path,
         metadata: &Metadata,
     ) -> Result<(), Error> {
-        let dest = match nix::fcntl::readlinkat(fd.as_raw_fd(), &b""[..]) {
+        let dest = match nix::fcntl::readlinkat(Some(fd.as_raw_fd()), &b""[..]) {
             Ok(dest) => dest,
             Err(Errno::ESTALE) => {
                 self.report_stale_file_handle(None);

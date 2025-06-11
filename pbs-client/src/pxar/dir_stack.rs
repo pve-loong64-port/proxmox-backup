@@ -41,7 +41,7 @@ impl PxarDir {
         allow_existing_dirs: bool,
     ) -> Result<BorrowedFd, Error> {
         if let Err(err) = mkdirat(
-            parent,
+            Some(parent),
             self.file_name.as_os_str(),
             perms_from_metadata(&self.metadata)?,
         ) {
@@ -55,7 +55,7 @@ impl PxarDir {
 
     fn open_dir(&mut self, parent: RawFd) -> Result<BorrowedFd, Error> {
         let dir = Dir::openat(
-            parent,
+            Some(parent),
             self.file_name.as_os_str(),
             OFlag::O_DIRECTORY | OFlag::O_CLOEXEC,
             Mode::empty(),
