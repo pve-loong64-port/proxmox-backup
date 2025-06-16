@@ -74,7 +74,7 @@ proxmox-notify = "1"
 proxmox-openid = "1"
 proxmox-rest-server = { version = "1", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
-proxmox-router = { version = "3.0.0", default-features = false }
+proxmox-router = { version = "3.2.2", default-features = false }
 proxmox-rrd = "1"
 proxmox-rrd-api-types = "1.0.2"
 # everything but pbs-config and pbs-client use "api-macro"
