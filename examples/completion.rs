@@ -1,4 +1,5 @@
 use anyhow::Error;
+use rustyline::history::MemHistory;
 
 use proxmox_router::cli::*;
 use proxmox_schema::*;
@@ -71,7 +72,10 @@ fn cli_definition() -> CommandLineInterface {
 fn main() -> Result<(), Error> {
     let helper = CliHelper::new(cli_definition());
 
-    let mut rl = rustyline::Editor::<CliHelper>::new();
+    let mut rl = rustyline::Editor::<CliHelper, MemHistory>::with_history(
+        Default::default(),
+        MemHistory::new(),
+    )?;
     rl.set_helper(Some(helper));
 
     while let Ok(line) = rl.readline("# prompt: ") {
@@ -82,7 +86,7 @@ fn main() -> Result<(), Error> {
         let rpcenv = CliEnvironment::new();
         let _ = handle_command(helper.cmd_def(), "", args, rpcenv, None);
 
-        rl.add_history_entry(line);
+        rl.add_history_entry(line)?;
     }
 
     Ok(())
