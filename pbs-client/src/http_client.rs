@@ -56,7 +56,7 @@ mod resolver {
     use hickory_resolver::error::ResolveError;
     use hickory_resolver::lookup_ip::LookupIpIntoIter;
     use hickory_resolver::TokioAsyncResolver;
-    use hyper::client::connect::dns::Name;
+    use hyper_util::client::legacy::connect::dns::Name;
     use tower_service::Service;
 
     pub(crate) struct SocketAddrIter {
