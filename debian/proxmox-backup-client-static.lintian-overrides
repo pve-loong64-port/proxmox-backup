@@ -1,0 +1,2 @@
+proxmox-backup-client-static: embedded-library zlib [usr/bin/proxmox-backup-client]
+proxmox-backup-client-static: embedded-library zlib [usr/bin/pxar]

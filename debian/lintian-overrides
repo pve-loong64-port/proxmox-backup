@@ -1,5 +1,3 @@
-proxmox-backup-client-static: embedded-library zlib [usr/bin/proxmox-backup-client]
-proxmox-backup-client-static: embedded-library zlib [usr/bin/pxar]
 proxmox-backup-server: elevated-privileges 4755 root/root [usr/lib/x86_64-linux-gnu/proxmox-backup/sg-tape-cmd]
 proxmox-backup-server: mail-transport-agent-dependency-does-not-specify-default-mta
 proxmox-backup-server: package-installs-apt-sources [etc/apt/sources.list.d/pbs-enterprise.list]
