@@ -88,7 +88,7 @@ class ReflabelMapper(Builder):
                 #pprint(vars(node))
 
                 if hasattr(node, 'expect_referenced_by_id') and len(node['ids']) > 1: # explicit labels
-                    filename = self.env.doc2path(docname)
+                    filename = str(self.env.doc2path(docname))
                     filename_html = re.sub('.rst', '.html', filename)
 
                     # node['ids'][0] contains a normalized version of the
