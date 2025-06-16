@@ -155,7 +155,6 @@ clean: clean-deb
 	$(foreach i,$(SUBDIRS), \
 	    $(MAKE) -C $(i) clean ;)
 	$(CARGO) clean
-	rm -f .do-cargo-build .do-static-cargo-build
 
 # allows one to avoid running cargo clean when one just wants to tidy up after a package build
 clean-deb:
@@ -171,11 +170,9 @@ docs: $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen
 
 .PHONY: cargo-build
 cargo-build:
-	rm -f .do-cargo-build
 	$(MAKE) $(COMPILED_BINS)
 
-$(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-cargo-build
-.do-cargo-build:
+$(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen &:
 	$(CARGO) build $(CARGO_BUILD_ARGS) \
 	    --package proxmox-backup-banner \
 	    --bin proxmox-backup-banner \
@@ -206,11 +203,9 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen: .do-
 
 .PHONY: proxmox-backup-client-static
 proxmox-backup-client-static:
-	rm -f .do-static-cargo-build
 	$(MAKE) $(STATIC_BINS)
 
-$(STATIC_BINS): .do-static-cargo-build
-.do-static-cargo-build:
+$(STATIC_BINS) &:
 	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
           echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
 	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
