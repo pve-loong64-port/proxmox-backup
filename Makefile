@@ -208,8 +208,10 @@ proxmox-backup-client-static:
 $(STATIC_BINS) &:
 	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
           echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
+	OPENSSL_STATIC=1 \
 	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
 	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
+	OPENSSL_STATIC=1 \
 	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
 	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
 
