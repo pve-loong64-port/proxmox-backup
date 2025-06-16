@@ -1,10 +1,10 @@
 etc/pbs-enterprise.list /etc/apt/sources.list.d/
-etc/proxmox-backup-banner.service /lib/systemd/system/
-etc/proxmox-backup-daily-update.service /lib/systemd/system/
-etc/proxmox-backup-daily-update.timer /lib/systemd/system/
-etc/proxmox-backup-proxy.service /lib/systemd/system/
-etc/proxmox-backup.service /lib/systemd/system/
-etc/removable-device-attach@.service /lib/systemd/system/
+etc/proxmox-backup-banner.service /usr/lib/systemd/system/
+etc/proxmox-backup-daily-update.service /usr/lib/systemd/system/
+etc/proxmox-backup-daily-update.timer /usr/lib/systemd/system/
+etc/proxmox-backup-proxy.service /usr/lib/systemd/system/
+etc/proxmox-backup.service /usr/lib/systemd/system/
+etc/removable-device-attach@.service /usr/lib/systemd/system/
 usr/bin/pmt
 usr/bin/pmtx
 usr/bin/proxmox-tape
