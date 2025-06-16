@@ -53,6 +53,41 @@ Ext.define('PBS.DataStoreEdit', {
                         fieldLabel: gettext('Name'),
                     },
                     {
+                        xtype: 'proxmoxKVComboBox',
+                        name: 'datastore-type',
+                        fieldLabel: gettext('Datastore Type'),
+                        value: '__default__',
+                        submitValue: false,
+                        comboItems: [
+                            ['__default__', gettext('Local')],
+                            ['removable', gettext('Removable')],
+                        ],
+                        cbind: {
+                            disabled: '{!isCreate}',
+                        },
+                        listeners: {
+                            change: function (checkbox, selected) {
+                                let isRemovable = selected === 'removable';
+
+                                let inputPanel = checkbox.up('inputpanel');
+                                let pathField = inputPanel.down('[name=path]');
+                                let uuidEditField = inputPanel.down('[name=backing-device]');
+
+                                uuidEditField.setDisabled(!isRemovable);
+                                uuidEditField.allowBlank = !isRemovable;
+                                uuidEditField.setValue('');
+
+                                if (isRemovable) {
+                                    pathField.setFieldLabel(gettext('Path on Device'));
+                                    pathField.setEmptyText(gettext('A relative path'));
+                                } else {
+                                    pathField.setFieldLabel(gettext('Backing Path'));
+                                    pathField.setEmptyText(gettext('An absolute path'));
+                                }
+                            },
+                        },
+                    },
+                    {
                         xtype: 'pmxDisplayEditField',
                         cbind: {
                             editable: '{isCreate}',
@@ -62,17 +97,6 @@ Ext.define('PBS.DataStoreEdit', {
                         fieldLabel: gettext('Backing Path'),
                         emptyText: gettext('An absolute path'),
                         validator: (val) => val?.trim() !== '/',
-                    },
-                    {
-                        xtype: 'pbsPartitionSelector',
-                        fieldLabel: gettext('Device'),
-                        name: 'backing-device',
-                        disabled: true,
-                        allowBlank: true,
-                        cbind: {
-                            editable: '{isCreate}',
-                        },
-                        emptyText: gettext('Device path'),
                     },
                 ],
                 column2: [
@@ -97,31 +121,19 @@ Ext.define('PBS.DataStoreEdit', {
                             value: '{scheduleValue}',
                         },
                     },
+                    {
+                        xtype: 'pbsPartitionSelector',
+                        fieldLabel: gettext('Device'),
+                        name: 'backing-device',
+                        disabled: true,
+                        allowBlank: true,
+                        cbind: {
+                            editable: '{isCreate}',
+                        },
+                        emptyText: gettext('Device path'),
+                    },
                 ],
                 columnB: [
-                    {
-                        xtype: 'checkbox',
-                        boxLabel: gettext('Removable datastore'),
-                        submitValue: false,
-                        listeners: {
-                            change: function (checkbox, isRemovable) {
-                                let inputPanel = checkbox.up('inputpanel');
-                                let pathField = inputPanel.down('[name=path]');
-                                let uuidEditField = inputPanel.down('[name=backing-device]');
-
-                                uuidEditField.setDisabled(!isRemovable);
-                                uuidEditField.allowBlank = !isRemovable;
-                                uuidEditField.setValue('');
-                                if (isRemovable) {
-                                    pathField.setFieldLabel(gettext('Path on Device'));
-                                    pathField.setEmptyText(gettext('A relative path'));
-                                } else {
-                                    pathField.setFieldLabel(gettext('Backing Path'));
-                                    pathField.setEmptyText(gettext('An absolute path'));
-                                }
-                            },
-                        },
-                    },
                     {
                         xtype: 'textfield',
                         name: 'comment',
