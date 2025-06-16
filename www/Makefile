@@ -1,6 +1,6 @@
 include ../defines.mk
 
-ESLINT ?= $(if $(shell command -v pve-eslint), pve-eslint, eslint)
+BIOME ?= proxmox-biome
 
 IMAGES := \
 	images/icon-tape.svg 				\
@@ -140,11 +140,11 @@ js/proxmox-backup-gui.js: .lint-incremental js OnlineHelpInfo.js ${JSSRC}
 
 .PHONY: check
 check:
-	$(ESLINT) --strict ${JSSRC}
+	$(BIOME) lint --error-on-warnings ${JSSRC}
 	touch ".lint-incremental"
 
 .lint-incremental: ${JSSRC}
-	$(ESLINT) $?
+	$(BIOME) lint $?
 	touch "$@"
 
 .PHONY: clean
