@@ -123,6 +123,22 @@ Ext.define('PBS.DataStoreContent', {
             this.store.load();
         },
 
+        s3Refresh: function () {
+            let me = this;
+            let view = me.getView();
+            Proxmox.Utils.API2Request({
+                url: `/admin/datastore/${view.datastore}/s3-refresh`,
+                method: 'PUT',
+                failure: (response) => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
+                success: function (response, options) {
+                    Ext.create('Proxmox.window.TaskViewer', {
+                        upid: response.result.data,
+                        taskDone: () => me.reload(),
+                    }).show();
+                },
+            });
+        },
+
         getRecordGroups: function (records) {
             let groups = {};
 
@@ -1273,11 +1289,43 @@ Ext.define('PBS.DataStoreContent', {
         },
     ],
 
+    initComponent: function () {
+        let me = this;
+
+        me.callParent();
+
+        Proxmox.Utils.API2Request({
+            url: `/config/datastore/${me.datastore}`,
+            failure: (response) => Ext.Msg.alert(gettext('Error'), response.htmlStatus),
+            success: function (response, options) {
+                let data = response.result.data;
+                if (data.backend) {
+                    let backendConfig = PBS.Utils.parsePropertyString(data.backend);
+                    let hasS3Backend = backendConfig.type === 's3';
+                    me.down('#moreDropdown').setDisabled(!hasS3Backend);
+                }
+            },
+        });
+    },
+
     tbar: [
         {
             text: gettext('Reload'),
             iconCls: 'fa fa-refresh',
             handler: 'reload',
+        },
+        {
+            text: gettext('More'),
+            itemId: 'moreDropdown',
+            disabled: true,
+            menu: [
+                {
+                    text: gettext('Refresh contents from S3 bucket'),
+                    iconCls: 'fa fa-cloud-download',
+                    handler: 's3Refresh',
+                    selModel: false,
+                },
+            ],
         },
         '-',
         {
