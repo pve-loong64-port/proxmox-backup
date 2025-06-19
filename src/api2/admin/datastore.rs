@@ -2711,6 +2711,39 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
     Ok(json!(upid))
 }
 
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: {
+                schema: DATASTORE_SCHEMA,
+            },
+        }
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, false),
+    },
+)]
+/// Refresh datastore contents from S3 to local cache store.
+pub async fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Lookup))?;
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    let upid = WorkerTask::spawn(
+        "s3-refresh",
+        Some(store),
+        auth_id.to_string(),
+        to_stdout,
+        move |_worker| async move { datastore.s3_refresh().await },
+    )?;
+
+    Ok(json!(upid))
+}
+
 #[sortable]
 const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
     (
@@ -2777,6 +2810,7 @@ const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
         &Router::new().download(&API_METHOD_PXAR_FILE_DOWNLOAD),
     ),
     ("rrd", &Router::new().get(&API_METHOD_GET_RRD_STATS)),
+    ("s3-refresh", &Router::new().put(&API_METHOD_S3_REFRESH)),
     (
         "snapshots",
         &Router::new()
