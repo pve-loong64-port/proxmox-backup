@@ -90,13 +90,17 @@ Ext.define('PBS.window.MaintenanceOptions', {
         }
 
         let unmounting = options['maintenance-type'] === 'unmount';
+        let s3Refresh = options['maintenance-type'] === 's3-refresh';
         let defaultType = options['maintenance-type'] === '__default__';
         if (unmounting) {
             options['maintenance-type'] = gettext('Unmounting');
         }
+        if (s3Refresh) {
+            options['maintenance-type'] = gettext('S3 Refresh');
+        }
 
         me.callParent([options]);
 
-        me.lookupReference('message-field').setDisabled(unmounting || defaultType);
+        me.lookupReference('message-field').setDisabled(unmounting || s3Refresh || defaultType);
     },
 });

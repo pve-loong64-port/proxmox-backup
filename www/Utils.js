@@ -441,6 +441,7 @@ Ext.define('PBS.Utils', {
             prunejob: (type, id) => PBS.Utils.render_prune_job_worker_id(id, gettext('Prune Job')),
             reader: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Read Objects')),
             'rewind-media': [gettext('Drive'), gettext('Rewind Media')],
+            's3-refresh': [gettext('Datastore'), gettext('S3 Refresh')],
             sync: ['Datastore', gettext('Remote Sync')],
             syncjob: [gettext('Sync Job'), gettext('Remote Sync')],
             'tape-backup': (type, id) =>
@@ -837,6 +838,9 @@ Ext.define('PBS.Utils', {
                 break;
             case 'unmount':
                 modeText = gettext('Unmounting');
+                break;
+            case 's3-refresh':
+                modeText = gettext('S3 refresh');
                 break;
         }
         return `${modeText} ${extra}`;
