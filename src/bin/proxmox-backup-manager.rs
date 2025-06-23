@@ -712,9 +712,9 @@ async fn run() -> Result<(), Error> {
         .insert("report", CliCommand::new(&API_METHOD_REPORT))
         .insert("versions", CliCommand::new(&API_METHOD_GET_VERSIONS));
 
-    let args: Vec<String> = std::env::args().take(2).collect();
-    if args.len() >= 2 && args[1] == "update-to-prune-jobs-config" {
-        return update_to_prune_jobs_config();
+    let args: Vec<String> = std::env::args().take(3).collect();
+    if args.len() >= 3 && args[1] == "migrate-config" {
+        return migrate_config::handle_command(&args[2]);
     }
     let avoid_init = args.len() >= 2 && (args[1] == "bashcomplete" || args[1] == "printdoc");
 

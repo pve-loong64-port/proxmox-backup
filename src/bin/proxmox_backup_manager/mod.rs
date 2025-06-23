@@ -14,6 +14,7 @@ mod dns;
 pub use dns::*;
 mod ldap;
 pub use ldap::*;
+pub mod migrate_config;
 mod network;
 pub use network::*;
 mod node;

@@ -35,7 +35,7 @@ case "$1" in
 
 		if dpkg --compare-versions "$2" 'lt' '2.2.2~'; then
 			echo "moving prune schedule from datacenter config to new prune job config"
-			proxmox-backup-manager update-to-prune-jobs-config \
+			proxmox-backup-manager migrate-config update-to-prune-jobs-config \
 			    || echo "Failed to move prune jobs, please check manually"
 			true
 		fi
