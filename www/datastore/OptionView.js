@@ -167,12 +167,12 @@ Ext.define('PBS.Datastore.Options', {
         'notification-mode': {
             required: true,
             defaultValue: 'notification-system',
-            header: gettext('Notification mode'),
+            header: gettext('Notifications'),
             renderer: function (value) {
                 if (value === 'notification-system') {
-                    return gettext('Notification system');
+                    return gettext('Use global settings');
                 } else {
-                    return gettext('Email (legacy)');
+                    return gettext('Use sendmail to send an email (legacy)');
                 }
             },
             editor: {
