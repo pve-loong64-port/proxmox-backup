@@ -46,23 +46,6 @@ Ext.define('PBS.TapeManagement.BackupJobEdit', {
         },
     },
 
-    viewModel: {
-        data: {
-            notificationMode: '__default__',
-        },
-        formulas: {
-            notificationSystemSelected: (get) => get('notificationMode') === 'notification-system',
-        },
-    },
-
-    initComponent: function () {
-        let me = this;
-        // Automatically select the new system for new jobs
-        let mode = me.isCreate ? 'notification-system' : '__default__';
-        me.getViewModel().set('notificationMode', mode);
-        me.callParent();
-    },
-
     items: {
         xtype: 'tabpanel',
         bodyPadding: 10,
@@ -125,31 +108,6 @@ Ext.define('PBS.TapeManagement.BackupJobEdit', {
                         xtype: 'pbsDriveSelector',
                         fieldLabel: gettext('Drive'),
                         name: 'drive',
-                    },
-                    {
-                        xtype: 'proxmoxKVComboBox',
-                        comboItems: [
-                            ['__default__', `${Proxmox.Utils.defaultText}  (Email)`],
-                            ['legacy-sendmail', gettext('Email (legacy)')],
-                            ['notification-system', gettext('Notification system')],
-                        ],
-                        fieldLabel: gettext('Notification mode'),
-                        name: 'notification-mode',
-                        bind: {
-                            value: '{notificationMode}',
-                        },
-                    },
-                    {
-                        xtype: 'pmxUserSelector',
-                        name: 'notify-user',
-                        fieldLabel: gettext('Notify User'),
-                        emptyText: 'root@pam',
-                        allowBlank: true,
-                        value: null,
-                        renderer: Ext.String.htmlEncode,
-                        bind: {
-                            disabled: '{notificationSystemSelected}',
-                        },
                     },
                 ],
 
@@ -257,6 +215,73 @@ Ext.define('PBS.TapeManagement.BackupJobEdit', {
                     {
                         xtype: 'pbsGroupFilter',
                         name: 'group-filter',
+                    },
+                ],
+            },
+            {
+                xtype: 'inputpanel',
+                title: gettext('Notifications'),
+
+                viewModel: {
+                    data: {
+                        notificationMode: undefined,
+                    },
+                    formulas: {
+                        notificationSystemSelected: (get) =>
+                            get('notificationMode')['notification-mode'] === 'notification-system',
+                    },
+                },
+
+                onSetValues: function (values) {
+                    let me = this;
+
+                    let mode = values['notification-mode'];
+                    me.getViewModel().set('notificationMode', { 'notification-mode': mode });
+
+                    return values;
+                },
+
+                items: [
+                    {
+                        xtype: 'radiogroup',
+                        height: '15px',
+                        layout: {
+                            type: 'vbox',
+                        },
+                        bind: {
+                            value: '{notificationMode}',
+                        },
+                        items: [
+                            {
+                                xtype: 'radiofield',
+                                name: 'notification-mode',
+                                inputValue: 'notification-system',
+                                boxLabel: gettext('Use global notification settings'),
+                                cbind: {
+                                    checked: '{isCreate}',
+                                },
+                            },
+                            {
+                                xtype: 'radiofield',
+                                name: 'notification-mode',
+                                inputValue: 'legacy-sendmail',
+                                boxLabel: gettext('Use sendmail to send an email (legacy)'),
+                            },
+                        ],
+                    },
+                    {
+                        xtype: 'pmxUserSelector',
+                        name: 'notify-user',
+                        fieldLabel: gettext('Recipient'),
+                        emptyText: 'root@pam',
+                        allowBlank: false,
+                        value: null,
+                        renderer: Ext.String.htmlEncode,
+                        padding: '0 0 0 50',
+                        disabled: true,
+                        bind: {
+                            disabled: '{notificationSystemSelected}',
+                        },
                     },
                 ],
             },
