@@ -19,11 +19,12 @@ certain hosts.
 
 You can manage the traffic controls either via the web-interface or using the
 ``traffic-control`` commands of the ``proxmox-backup-manager`` command-line
-tool.
+tool. Traffic is limited by rate (``rate-in`` and ``rate-out``) and allows for
+short bursts by setting the token bucket size (``burst-in`` and ``burst-out``).
 
-.. note:: Sync jobs on the server are not affected by the configured rate-in limits.
-   If you want to limit the incoming traffic that a pull-based sync job
-   generates, you need to setup a job-specific rate-in limit. See
+.. note:: Sync jobs on the server are not affected by the configured rate limits.
+   If you want to limit the incoming traffic of pull-based or outgoing traffic
+   of push-based sync job, you need to setup a job-specific rate-in limit. See
    :ref:`syncjobs`.
 
 The following command adds a traffic control rule to limit all IPv4 clients

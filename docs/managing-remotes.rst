@@ -239,7 +239,9 @@ command-line tool:
 
     # proxmox-backup-manager sync-job update ID --rate-in 20MiB
 
-For sync jobs in push direction use the ``rate-out`` option instead.
+For sync jobs in push direction use the ``rate-out`` option instead. To allow
+for traffic bursts, you can set the size of the token bucket filter used for
+traffic limiting via ``burst-in`` or ``burst-out`` parameters.
 
 Sync Direction Push
 ^^^^^^^^^^^^^^^^^^^
