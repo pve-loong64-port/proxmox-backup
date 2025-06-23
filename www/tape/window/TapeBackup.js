@@ -8,6 +8,8 @@ Ext.define('PBS.TapeManagement.TapeBackupWindow', {
     showTaskViewer: true,
     isCreate: true,
 
+    width: 750,
+
     viewModel: {
         data: {
             notificationMode: 'notification-system',
@@ -95,10 +97,10 @@ Ext.define('PBS.TapeManagement.TapeBackupWindow', {
                     xtype: 'proxmoxKVComboBox',
                     labelWidth: 150,
                     comboItems: [
-                        ['legacy-sendmail', gettext('Email (legacy)')],
-                        ['notification-system', gettext('Notification system')],
+                        ['notification-system', gettext('Use global settings')],
+                        ['legacy-sendmail', gettext('Use sendmail (legacy)')],
                     ],
-                    fieldLabel: gettext('Notification mode'),
+                    fieldLabel: gettext('Notification'),
                     name: 'notification-mode',
                     bind: {
                         value: '{notificationMode}',
@@ -114,7 +116,7 @@ Ext.define('PBS.TapeManagement.TapeBackupWindow', {
                     allowBlank: true,
                     skipEmptyText: true,
                     bind: {
-                        disabled: '{notificationSystemSelected}',
+                        hidden: '{notificationSystemSelected}',
                     },
                     renderer: Ext.String.htmlEncode,
                 },
