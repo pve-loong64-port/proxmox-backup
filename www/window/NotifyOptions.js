@@ -49,7 +49,8 @@ Ext.define('PBS.window.NotifyOptions', {
             notificationMode: '__default__',
         },
         formulas: {
-            notificationSystemSelected: (get) => get('notificationMode') === 'notification-system',
+            notificationSystemSelected: (get) =>
+                get('notificationMode')['notification-mode'] === 'notification-system',
         },
     },
 
@@ -74,23 +75,36 @@ Ext.define('PBS.window.NotifyOptions', {
         },
         items: [
             {
-                xtype: 'proxmoxKVComboBox',
-                comboItems: [
-                    ['__default__', `${Proxmox.Utils.defaultText}  (Email)`],
-                    ['legacy-sendmail', gettext('Email (legacy)')],
-                    ['notification-system', gettext('Notification system')],
-                ],
-                deleteEmpty: true,
-                fieldLabel: gettext('Notification mode'),
-                name: 'notification-mode',
+                xtype: 'radiogroup',
+                height: '15px',
+                layout: {
+                    type: 'vbox',
+                },
                 bind: {
                     value: '{notificationMode}',
                 },
+                items: [
+                    {
+                        xtype: 'radiofield',
+                        name: 'notification-mode',
+                        inputValue: 'notification-system',
+                        boxLabel: gettext('Use global notification settings'),
+                        cbind: {
+                            checked: '{isCreate}',
+                        },
+                    },
+                    {
+                        xtype: 'radiofield',
+                        name: 'notification-mode',
+                        inputValue: 'legacy-sendmail',
+                        boxLabel: gettext('Use sendmail to send an email (legacy)'),
+                    },
+                ],
             },
             {
                 xtype: 'pmxUserSelector',
                 name: 'notify-user',
-                fieldLabel: gettext('Notify User'),
+                fieldLabel: gettext('Recipient'),
                 emptyText: 'root@pam',
                 value: null,
                 allowBlank: true,
@@ -99,6 +113,7 @@ Ext.define('PBS.window.NotifyOptions', {
                 bind: {
                     disabled: '{notificationSystemSelected}',
                 },
+                padding: '0 0 0 50',
             },
             {
                 xtype: 'pbsNotifyType',
@@ -109,6 +124,7 @@ Ext.define('PBS.window.NotifyOptions', {
                 bind: {
                     disabled: '{notificationSystemSelected}',
                 },
+                padding: '0 0 0 50',
             },
             {
                 xtype: 'pbsNotifyType',
@@ -119,6 +135,7 @@ Ext.define('PBS.window.NotifyOptions', {
                 bind: {
                     disabled: '{notificationSystemSelected}',
                 },
+                padding: '0 0 0 50',
             },
             {
                 xtype: 'pbsNotifyErrorDefaultType',
@@ -129,6 +146,7 @@ Ext.define('PBS.window.NotifyOptions', {
                 bind: {
                     disabled: '{notificationSystemSelected}',
                 },
+                padding: '0 0 0 50',
             },
             {
                 xtype: 'pbsNotifyType',
@@ -139,6 +157,7 @@ Ext.define('PBS.window.NotifyOptions', {
                 bind: {
                     disabled: '{notificationSystemSelected}',
                 },
+                padding: '0 0 0 50',
             },
         ],
     },
@@ -151,7 +170,7 @@ Ext.define('PBS.window.NotifyOptions', {
             'verify-new': values['verify-new'],
             'notification-mode': values['notification-mode']
                 ? values['notification-mode']
-                : '__default__',
+                : 'notification-system',
         };
 
         let notify = {};
