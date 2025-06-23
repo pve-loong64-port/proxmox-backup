@@ -179,31 +179,6 @@ Ext.define('PBS.Datastore.Options', {
                 xtype: 'pbsNotifyOptionEdit',
             },
         },
-        notify: {
-            required: true,
-            header: gettext('Notify'),
-            renderer: (value) => {
-                let notify = PBS.Utils.parsePropertyString(value);
-                let res = [];
-                for (const k of ['Verify', 'Sync', 'GC', 'Prune']) {
-                    let fallback = k === 'Prune' ? 'Error' : 'Always';
-                    let v = Ext.String.capitalize(notify[k.toLowerCase()]) || fallback;
-                    res.push(`${k}=${v}`);
-                }
-                return res.join(', ');
-            },
-            editor: {
-                xtype: 'pbsNotifyOptionEdit',
-            },
-        },
-        'notify-user': {
-            required: true,
-            defaultValue: 'root@pam',
-            header: gettext('Notify User'),
-            editor: {
-                xtype: 'pbsNotifyOptionEdit',
-            },
-        },
         'verify-new': {
             required: true,
             header: gettext('Verify New Snapshots'),
