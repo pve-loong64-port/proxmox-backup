@@ -38,19 +38,23 @@ SUBCRATES != cargo metadata --no-deps --format-version=1 \
 	| grep "$$PWD/" \
 	| sed -e "s!.*$$PWD/!!g" -e 's/\#.*$$//g' -e 's/)$$//g'
 
+# sync with debian/rules!
 STATIC_TARGET_DIR := target/static-build
-
 ifeq ($(BUILD_MODE), release)
 CARGO_BUILD_ARGS += --release --target $(DEB_HOST_RUST_TYPE)
+CARGO_STATIC_CONFIG ?= --config debian/cargo_home/config.static.toml
+CARGO_STATIC_BUILD_ARGS += $(CARGO_STATIC_CONFIG) --release --target $(DEB_HOST_RUST_TYPE) --target-dir $(STATIC_TARGET_DIR)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/release
 STATIC_COMPILEDIR := $(STATIC_TARGET_DIR)/$(DEB_HOST_RUST_TYPE)/release
 else
 CARGO_BUILD_ARGS += --target $(DEB_HOST_RUST_TYPE)
+CARGO_STATIC_BUILD_ARGS += --target $(DEB_HOST_RUST_TYPE) --target-dir $(STATIC_TARGET_DIR)
 COMPILEDIR := target/$(DEB_HOST_RUST_TYPE)/debug
 STATIC_COMPILEDIR := $(STATIC_TARGET_DIR)/$(DEB_HOST_RUST_TYPE)/debug
 endif
 
 STATIC_RUSTC_FLAGS := -C target-feature=+crt-static -L $(STATIC_COMPILEDIR)/deps-stubs/
+# end sync with debian/rules
 
 ifeq ($(valgrind), yes)
 CARGO_BUILD_ARGS += --features valgrind
@@ -209,11 +213,11 @@ $(STATIC_BINS) &:
 	mkdir -p $(STATIC_COMPILEDIR)/deps-stubs/ && \
           echo '!<arch>' > $(STATIC_COMPILEDIR)/deps-stubs/libsystemd.a # workaround for to greedy linkage and proxmox-systemd
 	OPENSSL_STATIC=1 \
-	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package pxar-bin --bin pxar \
-	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
+	RUSTFLAGS="$(STATIC_RUSTC_FLAGS)" \
+	$(CARGO) build $(CARGO_STATIC_BUILD_ARGS) --package pxar-bin --bin pxar
 	OPENSSL_STATIC=1 \
-	$(CARGO) rustc $(CARGO_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client \
-	  --target-dir $(STATIC_TARGET_DIR) -- $(STATIC_RUSTC_FLAGS)
+	RUSTFLAGS="$(STATIC_RUSTC_FLAGS)" \
+	$(CARGO) build $(CARGO_STATIC_BUILD_ARGS) --package proxmox-backup-client --bin proxmox-backup-client
 
 .PHONY: lint
 lint:
