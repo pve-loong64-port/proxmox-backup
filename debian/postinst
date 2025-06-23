@@ -40,6 +40,13 @@ case "$1" in
 			true
 		fi
 
+		# TODO: Make sure the version is correct when applying
+		if dpkg --compare-versions "$2" 'lt' '4.0.0~'; then
+			proxmox-backup-manager migrate-config default-notification-mode \
+			    || echo "Failed migrate tape-job/datastore notification mode, please check manually"
+			true
+		fi
+
 		if dpkg --compare-versions "$2" 'lt' '2.3.1~' && test -e /etc/proxmox-backup/.datastore.lck; then
 			lock_user="$(stat --format '%U' /etc/proxmox-backup/.datastore.lck)"
 			if [ "${lock_user}" != "backup" ]; then
