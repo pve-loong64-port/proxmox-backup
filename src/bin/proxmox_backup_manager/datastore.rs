@@ -290,6 +290,30 @@ async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Va
     Ok(Value::Null)
 }
 
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: {
+                schema: DATASTORE_SCHEMA,
+            },
+        },
+    },
+)]
+/// Refresh datastore contents from S3 to local cache store.
+async fn s3_refresh(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
+    param["node"] = "localhost".into();
+
+    let info = &api2::admin::datastore::API_METHOD_S3_REFRESH;
+    let result = match info.handler {
+        ApiHandler::Async(handler) => (handler)(param, info, rpcenv).await?,
+        _ => unreachable!(),
+    };
+
+    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    Ok(())
+}
+
 pub fn datastore_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_DATASTORES))
@@ -301,6 +325,12 @@ pub fn datastore_commands() -> CommandLineInterface {
                     "store",
                     pbs_config::datastore::complete_removable_datastore_name,
                 ),
+        )
+        .insert(
+            "s3-refresh",
+            CliCommand::new(&API_METHOD_S3_REFRESH)
+                .arg_param(&["store"])
+                .completion_cb("store", pbs_config::datastore::complete_datastore_name),
         )
         .insert(
             "show",
