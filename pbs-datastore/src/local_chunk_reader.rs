@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use anyhow::{bail, Error};
+use anyhow::{bail, format_err, Error};
 use http_body_util::BodyExt;
 
 use pbs_api_types::CryptMode;
@@ -67,9 +67,18 @@ impl ReadChunk for LocalChunkReader {
     fn read_raw_chunk(&self, digest: &[u8; 32]) -> Result<DataBlob, Error> {
         let chunk = match &self.backend {
             DatastoreBackend::Filesystem => self.store.load_chunk(digest)?,
-            DatastoreBackend::S3(s3_client) => {
-                proxmox_async::runtime::block_on(fetch(Arc::clone(s3_client), digest))?
-            }
+            DatastoreBackend::S3(s3_client) => match self.store.cache() {
+                None => proxmox_async::runtime::block_on(fetch(Arc::clone(s3_client), digest))?,
+                Some(cache) => {
+                    let mut cacher = self
+                        .store
+                        .cacher()?
+                        .ok_or(format_err!("no cacher for datastore"))?;
+                    proxmox_async::runtime::block_on(cache.access(digest, &mut cacher))?.ok_or(
+                        format_err!("unable to access chunk with digest {}", hex::encode(digest)),
+                    )?
+                }
+            },
         };
         self.ensure_crypt_mode(chunk.crypt_mode()?)?;
 
@@ -97,7 +106,19 @@ impl AsyncReadChunk for LocalChunkReader {
                     let raw_data = tokio::fs::read(&path).await?;
                     DataBlob::load_from_reader(&mut &raw_data[..])?
                 }
-                DatastoreBackend::S3(s3_client) => fetch(Arc::clone(s3_client), digest).await?,
+                DatastoreBackend::S3(s3_client) => match self.store.cache() {
+                    None => fetch(Arc::clone(s3_client), digest).await?,
+                    Some(cache) => {
+                        let mut cacher = self
+                            .store
+                            .cacher()?
+                            .ok_or(format_err!("no cacher for datastore"))?;
+                        cache.access(digest, &mut cacher).await?.ok_or(format_err!(
+                            "unable to access chunk with digest {}",
+                            hex::encode(digest)
+                        ))?
+                    }
+                },
             };
             self.ensure_crypt_mode(chunk.crypt_mode()?)?;
 
