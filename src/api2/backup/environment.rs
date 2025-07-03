@@ -19,7 +19,7 @@ use pbs_datastore::fixed_index::FixedIndexWriter;
 use pbs_datastore::{DataBlob, DataStore};
 use proxmox_rest_server::{formatter::*, WorkerTask};
 
-use crate::backup::verify_backup_dir_with_lock;
+use crate::backup::VerifyWorker;
 
 use hyper::Response;
 
@@ -672,9 +672,8 @@ impl BackupEnvironment {
             move |worker| {
                 worker.log_message("Automatically verifying newly added snapshot");
 
-                let verify_worker = crate::backup::VerifyWorker::new(worker.clone(), datastore);
-                if !verify_backup_dir_with_lock(
-                    &verify_worker,
+                let verify_worker = VerifyWorker::new(worker.clone(), datastore);
+                if !verify_worker.verify_backup_dir_with_lock(
                     &backup_dir,
                     worker.upid().clone(),
                     None,

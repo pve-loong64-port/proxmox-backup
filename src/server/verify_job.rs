@@ -5,10 +5,7 @@ use pbs_api_types::{Authid, Operation, VerificationJobConfig};
 use pbs_datastore::DataStore;
 use proxmox_rest_server::WorkerTask;
 
-use crate::{
-    backup::{verify_all_backups, verify_filter},
-    server::jobstate::Job,
-};
+use crate::{backup::VerifyWorker, server::jobstate::Job};
 
 /// Runs a verification job.
 pub fn do_verification_job(
@@ -44,15 +41,14 @@ pub fn do_verification_job(
                 None => Default::default(),
             };
 
-            let verify_worker = crate::backup::VerifyWorker::new(worker.clone(), datastore);
-            let result = verify_all_backups(
-                &verify_worker,
+            let verify_worker = VerifyWorker::new(worker.clone(), datastore);
+            let result = verify_worker.verify_all_backups(
                 worker.upid(),
                 ns,
                 verification_job.max_depth,
                 None,
                 Some(&move |manifest| {
-                    verify_filter(ignore_verified_snapshots, outdated_after, manifest)
+                    VerifyWorker::verify_filter(ignore_verified_snapshots, outdated_after, manifest)
                 }),
             );
             let job_result = match result {

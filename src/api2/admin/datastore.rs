@@ -72,10 +72,7 @@ use proxmox_rest_server::{formatter, WorkerTask};
 
 use crate::api2::backup::optional_ns_param;
 use crate::api2::node::rrd::create_value_from_rrd;
-use crate::backup::{
-    check_ns_privs_full, verify_all_backups, verify_backup_dir, verify_backup_group, verify_filter,
-    ListAccessibleBackupGroups, NS_PRIVS_OK,
-};
+use crate::backup::{check_ns_privs_full, ListAccessibleBackupGroups, VerifyWorker, NS_PRIVS_OK};
 
 use crate::server::jobstate::{compute_schedule_status, Job, JobState};
 
@@ -886,14 +883,15 @@ pub fn verify(
         auth_id.to_string(),
         to_stdout,
         move |worker| {
-            let verify_worker = crate::backup::VerifyWorker::new(worker.clone(), datastore);
+            let verify_worker = VerifyWorker::new(worker.clone(), datastore);
             let failed_dirs = if let Some(backup_dir) = backup_dir {
                 let mut res = Vec::new();
-                if !verify_backup_dir(
-                    &verify_worker,
+                if !verify_worker.verify_backup_dir(
                     &backup_dir,
                     worker.upid().clone(),
-                    Some(&move |manifest| verify_filter(ignore_verified, outdated_after, manifest)),
+                    Some(&move |manifest| {
+                        VerifyWorker::verify_filter(ignore_verified, outdated_after, manifest)
+                    }),
                 )? {
                     res.push(print_ns_and_snapshot(
                         backup_dir.backup_ns(),
@@ -902,12 +900,13 @@ pub fn verify(
                 }
                 res
             } else if let Some(backup_group) = backup_group {
-                verify_backup_group(
-                    &verify_worker,
+                verify_worker.verify_backup_group(
                     &backup_group,
                     &mut StoreProgress::new(1),
                     worker.upid(),
-                    Some(&move |manifest| verify_filter(ignore_verified, outdated_after, manifest)),
+                    Some(&move |manifest| {
+                        VerifyWorker::verify_filter(ignore_verified, outdated_after, manifest)
+                    }),
                 )?
             } else {
                 let owner = if owner_check_required {
@@ -916,13 +915,14 @@ pub fn verify(
                     None
                 };
 
-                verify_all_backups(
-                    &verify_worker,
+                verify_worker.verify_all_backups(
                     worker.upid(),
                     ns,
                     max_depth,
                     owner,
-                    Some(&move |manifest| verify_filter(ignore_verified, outdated_after, manifest)),
+                    Some(&move |manifest| {
+                        VerifyWorker::verify_filter(ignore_verified, outdated_after, manifest)
+                    }),
                 )?
             };
             if !failed_dirs.is_empty() {
