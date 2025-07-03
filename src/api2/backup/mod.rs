@@ -168,7 +168,7 @@ fn upgrade_to_backup_protocol(
                     Ok(None) => {
                         // no verify state found, treat as valid
                         Some(info)
-                    },
+                    }
                     Err(err) => {
                         warn!("error parsing the snapshot manifest: {err:#}");
                         Some(info)
@@ -238,7 +238,8 @@ fn upgrade_to_backup_protocol(
                     .and_then(move |conn| {
                         env2.debug("protocol upgrade done");
 
-                        let mut http = hyper::server::conn::http2::Builder::new(ExecInheritLogContext);
+                        let mut http =
+                            hyper::server::conn::http2::Builder::new(ExecInheritLogContext);
                         // increase window size: todo - find optiomal size
                         let window_size = 32 * 1024 * 1024; // max = (1 << 31) - 2
                         http.initial_stream_window_size(window_size);
