@@ -257,9 +257,11 @@ impl BackupGroup {
 
         let owner_path = self.store.owner_path(&self.ns, &self.group);
 
-        std::fs::remove_file(&owner_path).map_err(|err| {
-            format_err!("removing the owner file '{owner_path:?}' failed - {err}")
-        })?;
+        if let Err(err) = std::fs::remove_file(&owner_path) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                bail!("removing the owner file '{owner_path:?}' failed - {err}");
+            }
+        }
 
         let path = self.full_group_path();
 
