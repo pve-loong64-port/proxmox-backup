@@ -182,6 +182,7 @@ pub mod manifest;
 pub mod paperkey;
 pub mod prune;
 pub mod read_chunk;
+pub mod s3;
 pub mod store_progress;
 pub mod task_tracking;
 

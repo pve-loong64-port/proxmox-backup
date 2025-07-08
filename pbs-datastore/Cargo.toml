@@ -34,6 +34,7 @@ proxmox-borrow.workspace = true
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true
 proxmox-lang.workspace=true
+proxmox-s3-client = { workspace = true, features = [ "impl" ] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
 proxmox-serde = { workspace = true, features = [ "serde_json" ] }
 proxmox-sys.workspace = true
