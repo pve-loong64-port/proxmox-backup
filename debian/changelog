@@ -1,3 +1,14 @@
+rust-proxmox-backup (4.0.1-1) trixie; urgency=medium
+
+  * proxmox-backup-client: fix static build.
+
+  * datastore: ignore missing owner file when removing group directory.
+
+  * update proxmox-apt to fix target paths for repository sources files when
+    using the modern deb822 based format.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 08 Jul 2025 19:28:26 +0200
+
 rust-proxmox-backup (4.0.0-1) trixie; urgency=medium
 
   * re-build for Debian 13 Trixie based Proxmox Backup Server 4 release.
