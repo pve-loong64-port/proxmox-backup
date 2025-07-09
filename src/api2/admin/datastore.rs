@@ -1637,6 +1637,17 @@ pub fn upload_backup_log(
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
 
+        if let DatastoreBackend::S3(s3_client) = datastore.backend()? {
+            let object_key = pbs_datastore::s3::object_key_from_path(
+                &backup_dir.relative_path(),
+                file_name.as_ref(),
+            )
+            .context("invalid client log object key")?;
+            let data = hyper::body::Bytes::copy_from_slice(blob.raw_data());
+            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
+                .context("failed to upload client log to s3 backend")?;
+        };
+
         replace_file(&path, blob.raw_data(), CreateOptions::new(), false)?;
 
         // fixme: use correct formatter
