@@ -1537,10 +1537,19 @@ impl DataStore {
                     .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
             )?;
 
+            let s3_client = match self.backend()? {
+                DatastoreBackend::Filesystem => None,
+                DatastoreBackend::S3(s3_client) => {
+                    proxmox_async::runtime::block_on(s3_client.head_bucket())
+                        .context("failed to reach bucket")?;
+                    Some(s3_client)
+                }
+            };
+
             if tuning.gc_atime_safety_check.unwrap_or(true) {
                 self.inner
                     .chunk_store
-                    .check_fs_atime_updates(true)
+                    .check_fs_atime_updates(true, s3_client.clone())
                     .context("atime safety check failed")?;
                 info!("Access time update check successful, proceeding with GC.");
             } else {
@@ -1577,15 +1586,6 @@ impl DataStore {
                 capacity
             } else {
                 1024 * 1024
-            };
-
-            let s3_client = match self.backend()? {
-                DatastoreBackend::Filesystem => None,
-                DatastoreBackend::S3(s3_client) => {
-                    proxmox_async::runtime::block_on(s3_client.head_bucket())
-                        .context("failed to reach bucket")?;
-                    Some(s3_client)
-                }
             };
 
             info!("Start GC phase1 (mark used chunks)");

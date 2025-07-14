@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, format_err, Context, Error};
@@ -118,6 +119,7 @@ pub(crate) fn do_create_datastore(
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
 
+    let mut backend_s3_client = None;
     if let Some(ref backend_config) = datastore.backend {
         let backend_config: DatastoreBackendConfig = backend_config.parse()?;
         match backend_config.ty.unwrap_or_default() {
@@ -142,6 +144,7 @@ pub(crate) fn do_create_datastore(
                 // Fine to block since this runs in worker task
                 proxmox_async::runtime::block_on(s3_client.head_bucket())
                     .context("failed to access bucket")?;
+                backend_s3_client = Some(Arc::new(s3_client));
             }
         }
     }
@@ -185,7 +188,7 @@ pub(crate) fn do_create_datastore(
 
     if tuning.gc_atime_safety_check.unwrap_or(true) {
         chunk_store
-            .check_fs_atime_updates(true)
+            .check_fs_atime_updates(true, backend_s3_client)
             .context("access time safety check failed")?;
         info!("Access time update check successful.");
     } else {

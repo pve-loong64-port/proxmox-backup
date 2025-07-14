@@ -9,6 +9,7 @@ use tracing::{info, warn};
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
 use proxmox_io::ReadExt;
+use proxmox_s3_client::S3Client;
 use proxmox_sys::fs::{create_dir, create_path, file_type_from_file_stat, CreateOptions};
 use proxmox_sys::process_locker::{
     ProcessLockExclusiveGuard, ProcessLockSharedGuard, ProcessLocker,
@@ -454,10 +455,28 @@ impl ChunkStore {
     /// Uses a 4 MiB fixed size, compressed but unencrypted chunk to test. The chunk is inserted in
     /// the chunk store if not yet present.
     /// Returns with error if the check could not be performed.
-    pub fn check_fs_atime_updates(&self, retry_on_file_changed: bool) -> Result<(), Error> {
+    pub fn check_fs_atime_updates(
+        &self,
+        retry_on_file_changed: bool,
+        s3_client: Option<Arc<S3Client>>,
+    ) -> Result<(), Error> {
         let (zero_chunk, digest) = DataChunkBuilder::build_zero_chunk(None, 4096 * 1024, true)?;
-        let (pre_existing, _) = self.insert_chunk(&zero_chunk, &digest)?;
         let (path, _digest) = self.chunk_path(&digest);
+
+        if let Some(ref s3_client) = s3_client {
+            if let Err(err) = std::fs::metadata(&path) {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    let object_key = crate::s3::object_key_from_digest(&digest)?;
+                    proxmox_async::runtime::block_on(s3_client.upload_no_replace_with_retry(
+                        object_key,
+                        zero_chunk.raw_data().to_vec().into(),
+                    ))
+                    .context("failed to upload chunk to s3 backend")?;
+                }
+            }
+        }
+
+        let (pre_existing, _) = self.insert_chunk(&zero_chunk, &digest)?;
 
         // Take into account timestamp update granularity in the kernel
         // Blocking the thread is fine here since this runs in a worker.
@@ -478,7 +497,7 @@ impl ChunkStore {
         // two metadata calls, try to check once again on changed file
         if metadata_before.ino() != metadata_now.ino() {
             if retry_on_file_changed {
-                return self.check_fs_atime_updates(false);
+                return self.check_fs_atime_updates(false, s3_client);
             }
             bail!("chunk {path:?} changed twice during access time safety check, cannot proceed.");
         }
