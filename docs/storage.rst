@@ -233,6 +233,79 @@ datastore is not mounted when they are scheduled. Sync jobs start, but fail
 with an error saying the datastore was not mounted. The reason is that syncs
 not happening as scheduled should at least be noticeable.
 
+Datastores with S3 Backend (experimental)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Proxmox Backup Server supports S3 compatible object stores as storage backend for datastores. For
+this, an S3 client needs to be set-up under "Configuration" > "S3 Clients".
+
+In the client configuration, provide the REST API endpoint for the object store. The endpoint
+is provider dependent and allows for the bucket and region templating. For example, configuring
+the endpoint as e.g. ``{{bucket}}.s3.{{region}}.amazonaws.com`` will be expanded to
+``my-pbs-bucket.s3.eu-central-1.amazonaws.com`` with a configured bucket of name ``my-pbs-bucket``
+located in region ``eu-central-1``.
+
+The bucket name is part of the datastore backend configuration rather than the client configuration,
+as the same client might be reused for multiple bucket. Objects placed in the bucket are prefixed by
+the datastore name, therefore it is possible to create multiple datastores using the same bucket.
+
+.. note:: Proxmox Backup Server does not handle bucket creation and access control. The bucket used
+   to store the datastore's objects as well as the access key have to be setup beforehand in your S3
+   provider interface. The Proxmox Backup Server acts as client and requires permissions to get, put
+   list and delete objects in the bucket.
+
+Most providers allow to access buckets either using a vhost style addressing, the bucket name being
+part of the endpoint address, or via path style addressing, the bucket name being the prefix to
+the path components of requests. Proxmox Backup Server supports both styles, favoring the vhost
+style urls over the path style. To use path style addresses, set the corresponding configuration
+flag.
+
+Proxmox Backup Server does not support plain text communication with the S3 API, all communication
+is encrypted using HTTPS in transit. Therefore, for self-hosted S3 object stores using a self-signed
+certificate, the matching fingerprint has to be provided to the client configuration. Otherwise the
+client refuses connections to the S3 object store.
+
+The following example shows the setup of a new s3 client configuration:
+
+.. code-block:: console
+
+   # proxmox-backup-manager s3 client create my-s3-client --access-key 'my-access-key' --secret-key 'my-secret-key' --endpoint '{{bucket}}.s3.{{region}}.amazonaws.com' --region eu-central-1
+
+To list your s3 client configuration, run:
+
+.. code-block:: console
+
+   # proxmox-backup-manager s3 client list
+
+A new datastore with S3 backend can be created using one of the configures S3 clients. Although
+storing all contents on the S3 object store, the datastore requires nevertheless a local cache store,
+used to increase performance and reduce the number of requests to the backend. For this, a local
+filesystem path has to be provided during datastore creation, just like for regular datastore setup.
+A minimum size of a few GiB of storage is recommended, given that cache datastore contents include
+also data chunks.
+
+To setup a new datastore called ``my-s3-store`` placed in a bucket called ``pbs-s3-bucket``, run:
+
+.. code-block:: console
+
+   # proxmox-backup-manager datastore create my-s3-store /mnt/datastore/my-s3-store-cache --backend type=s3,client=my-s3-client,bucket=pbs-s3-bucket
+
+A datastore cannot be shared between multiple Proxmox Backup Server instances, only one instance can
+operate on the datastore at a time. However, datastore contents used on an instance which is no
+longer available can be reused on a fresh installation. To recreate the datastore, you must pass the
+``reuse-datastore`` and ``overwrite-in-use`` flags. Since the datastore name is used as prefix, the
+same datastore name must be used.
+
+.. code-block:: console
+
+   # proxmox-backup-manager datastore create my-s3-store /mnt/datastore/my-new-s3-store-cache --backend type=s3,client=my-s3-client,bucket=pbs-s3-bucket --reuse-datastore true --overwrite-in-use true
+
+.. note:: If your S3 object store runs out of space while performing write operation to it, most
+   likely cleanup operations such as cleaning up of contents within a snapshot directory will fail
+   as well. The recommended procedure is to cleanup any stray objects corresponding to this snapshot
+   on the S3 object store manually and refresh the contents via an ``S3 refresh``, either via the
+   CLI or UI.
+
 Managing Datastores
 ^^^^^^^^^^^^^^^^^^^
 
