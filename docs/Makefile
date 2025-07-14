@@ -26,6 +26,7 @@ GENERATED_SYNOPSIS := 						\
 
 MAN1_PAGES := 				\
 	pbs2to3.1			\
+	pbs3to4.1			\
 	pmt.1				\
 	pmtx.1				\
 	proxmox-backup-client.1		\
