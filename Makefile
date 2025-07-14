@@ -195,7 +195,7 @@ $(COMPILED_BINS) $(COMPILEDIR)/dump-catalog-shell-cli $(COMPILEDIR)/docgen &:
 	    --bin proxmox-restore-daemon \
 	    --package proxmox-backup \
 	    --bin docgen \
-	    --bin pbs2to3 \
+	    --bin pbs3to4 \
 	    --bin proxmox-backup-api \
 	    --bin proxmox-backup-manager \
 	    --bin proxmox-backup-proxy \
@@ -233,7 +233,7 @@ install: $(COMPILED_BINS) $(STATIC_BINS)
 	$(foreach i,$(USR_SBIN), \
 	    install -m755 $(COMPILEDIR)/$(i) $(DESTDIR)$(SBINDIR)/ ; \
 	    install -m644 zsh-completions/_$(i) $(DESTDIR)$(ZSH_COMPL_DEST)/ ;)
-	install -m755 $(COMPILEDIR)/pbs2to3 $(DESTDIR)$(SBINDIR)/
+	install -m755 $(COMPILEDIR)/pbs3to4 $(DESTDIR)$(SBINDIR)/
 	install -dm755 $(DESTDIR)$(LIBEXECDIR)/proxmox-backup
 	install -dm755 $(DESTDIR)$(LIBEXECDIR)/proxmox-backup/file-restore
 	$(foreach i,$(RESTORE_BIN), \
