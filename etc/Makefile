@@ -10,7 +10,7 @@ DYNAMIC_UNITS := \
 	proxmox-backup.service \
 	proxmox-backup-proxy.service
 
-all: $(UNITS) $(DYNAMIC_UNITS) pbs-enterprise.list
+all: $(UNITS) $(DYNAMIC_UNITS) pbs-enterprise.sources
 
 clean:
 	rm -f $(DYNAMIC_UNITS)
