@@ -4,6 +4,7 @@ use std::sync::Arc;
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, format_err, Context, Error};
 use hex::FromHex;
+use http_body_util::BodyExt;
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -35,9 +36,19 @@ use pbs_config::CachedUserInfo;
 
 use pbs_datastore::get_datastore_mount_status;
 use proxmox_rest_server::WorkerTask;
+use proxmox_s3_client::S3ObjectKey;
 
 use crate::server::jobstate;
 use crate::tools::disks::unmount_by_mountpoint;
+
+const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
+
+#[derive(Default, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+struct InUseContent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostname: Option<String>,
+}
 
 #[api(
     input: {
@@ -144,6 +155,24 @@ pub(crate) fn do_create_datastore(
                 // Fine to block since this runs in worker task
                 proxmox_async::runtime::block_on(s3_client.head_bucket())
                     .context("failed to access bucket")?;
+
+                let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+                    .context("failed to generate s3 object key")?;
+                if let Some(response) =
+                    proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
+                        .context("failed to get in-use marker from bucket")?
+                {
+                    let content = proxmox_async::runtime::block_on(response.content.collect())
+                        .unwrap_or_default();
+                    let content =
+                        String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
+                    let in_use: InUseContent = serde_json::from_str(&content).unwrap_or_default();
+                    if let Some(hostname) = in_use.hostname {
+                        bail!("Bucket already contains datastore in use by host {hostname}");
+                    } else {
+                        bail!("Bucket already contains datastore in use");
+                    }
+                }
                 backend_s3_client = Some(Arc::new(s3_client));
             }
         }
@@ -156,7 +185,7 @@ pub(crate) fn do_create_datastore(
         UnmountGuard::new(None)
     };
 
-    let chunk_store = if reuse_datastore {
+    let chunk_store = if reuse_datastore && backend_s3_client.is_none() {
         ChunkStore::verify_chunkstore(&path).and_then(|_| {
             // Must be the only instance accessing and locking the chunk store,
             // dropping will close all other locks from this process on the lockfile as well.
@@ -185,6 +214,21 @@ pub(crate) fn do_create_datastore(
             tuning.sync_level.unwrap_or_default(),
         )?
     };
+
+    if let Some(ref s3_client) = backend_s3_client {
+        let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+            .context("failed to generate s3 object key")?;
+        let content = serde_json::to_string(&InUseContent {
+            hostname: Some(proxmox_sys::nodename().to_string()),
+        })
+        .context("failed to encode hostname")?;
+        proxmox_async::runtime::block_on(s3_client.put_object(
+            object_key,
+            hyper::body::Bytes::from(content).into(),
+            true,
+        ))
+        .context("failed to upload in-use marker for datastore")?;
+    }
 
     if tuning.gc_atime_safety_check.unwrap_or(true) {
         chunk_store
