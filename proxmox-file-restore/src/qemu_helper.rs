@@ -316,7 +316,6 @@ pub async fn start_vm(
     } else {
         // add more RAM if many drives are given
         match id {
-            f if f < 10 => 192,
             f if f < 20 => 256,
             _ => 384,
         }
