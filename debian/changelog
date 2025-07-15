@@ -1,3 +1,13 @@
+rust-proxmox-backup (3.4.3-1) bookworm; urgency=medium
+
+  * proxmox-backup-client: fix static build.
+
+  * bin: add pbs3to4 upgrade check-list script.
+
+  * docs: rephrase and extend rate limiting description for sync jobs.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Jul 2025 01:02:16 +0200
+
 rust-proxmox-backup (3.4.2-1) bookworm; urgency=medium
 
   * datastore: various small perf optimizations
