@@ -41,7 +41,7 @@ case "$1" in
 		fi
 
 		# TODO: Make sure the version is correct when applying
-		if dpkg --compare-versions "$2" 'lt' '4.0.0~'; then
+		if dpkg --compare-versions "$2" 'lt' '4.0.2~'; then
 			proxmox-backup-manager migrate-config default-notification-mode \
 			    || echo "Failed migrate tape-job/datastore notification mode, please check manually"
 			true
