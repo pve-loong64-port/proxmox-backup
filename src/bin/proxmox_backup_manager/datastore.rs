@@ -113,6 +113,12 @@ fn show_datastore(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value
                 default: false,
                 description: "Re-use existing datastore directory."
             },
+            "overwrite-in-use": {
+                type: Boolean,
+                optional: true,
+                default: false,
+                description: "Overwrite in use marker (S3 backed datastores only)."
+            },
             "output-format": {
                 schema: OUTPUT_FORMAT,
                 optional: true,

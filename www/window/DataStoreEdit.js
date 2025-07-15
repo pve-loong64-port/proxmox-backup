@@ -76,6 +76,8 @@ Ext.define('PBS.DataStoreEdit', {
                                 let uuidEditField = inputPanel.down('[name=backing-device]');
                                 let bucketField = inputPanel.down('[name=bucket]');
                                 let s3ClientSelector = inputPanel.down('[name=s3client]');
+                                let overwriteInUseField =
+                                    inputPanel.down('[name=overwrite-in-use]');
 
                                 uuidEditField.setDisabled(!isRemovable);
                                 uuidEditField.allowBlank = !isRemovable;
@@ -88,6 +90,10 @@ Ext.define('PBS.DataStoreEdit', {
                                 s3ClientSelector.setDisabled(!isS3);
                                 s3ClientSelector.allowBlank = !isS3;
                                 s3ClientSelector.setValue('');
+
+                                overwriteInUseField.setHidden(!isS3);
+                                overwriteInUseField.setDisabled(!isS3);
+                                overwriteInUseField.setValue(false);
 
                                 if (isRemovable) {
                                     pathField.setFieldLabel(gettext('Path on Device'));
@@ -176,6 +182,22 @@ Ext.define('PBS.DataStoreEdit', {
                         xtype: 'checkbox',
                         name: 'reuse-datastore',
                         fieldLabel: gettext('Reuse existing datastore'),
+                        listeners: {
+                            change: function (checkbox, selected) {
+                                let inputPanel = checkbox.up('inputpanel');
+                                let overwriteInUseField =
+                                    inputPanel.down('[name=overwrite-in-use]');
+                                overwriteInUseField.setDisabled(!selected);
+                                overwriteInUseField.setValue(false);
+                            },
+                        },
+                    },
+                ],
+                advancedColumn2: [
+                    {
+                        xtype: 'checkbox',
+                        name: 'overwrite-in-use',
+                        fieldLabel: gettext('Overwrite in-use marker'),
                     },
                 ],
 

@@ -314,7 +314,7 @@ pub fn create_zpool(
                 }
 
                 crate::api2::config::datastore::do_create_datastore(
-                    lock, config, datastore, false,
+                    lock, config, datastore, false, false,
                 )?;
             }
 

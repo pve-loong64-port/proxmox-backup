@@ -113,6 +113,7 @@ pub(crate) fn do_create_datastore(
     mut config: SectionConfigData,
     datastore: DataStoreConfig,
     reuse_datastore: bool,
+    overwrite_in_use: bool,
 ) -> Result<(), Error> {
     let path: PathBuf = datastore.absolute_path().into();
 
@@ -156,21 +157,24 @@ pub(crate) fn do_create_datastore(
                 proxmox_async::runtime::block_on(s3_client.head_bucket())
                     .context("failed to access bucket")?;
 
-                let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
-                    .context("failed to generate s3 object key")?;
-                if let Some(response) =
-                    proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
-                        .context("failed to get in-use marker from bucket")?
-                {
-                    let content = proxmox_async::runtime::block_on(response.content.collect())
-                        .unwrap_or_default();
-                    let content =
-                        String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
-                    let in_use: InUseContent = serde_json::from_str(&content).unwrap_or_default();
-                    if let Some(hostname) = in_use.hostname {
-                        bail!("Bucket already contains datastore in use by host {hostname}");
-                    } else {
-                        bail!("Bucket already contains datastore in use");
+                if !overwrite_in_use {
+                    let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+                        .context("failed to generate s3 object key")?;
+                    if let Some(response) =
+                        proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
+                            .context("failed to get in-use marker from bucket")?
+                    {
+                        let content = proxmox_async::runtime::block_on(response.content.collect())
+                            .unwrap_or_default();
+                        let content =
+                            String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
+                        let in_use: InUseContent =
+                            serde_json::from_str(&content).unwrap_or_default();
+                        if let Some(hostname) = in_use.hostname {
+                            bail!("Bucket already contains datastore in use by host {hostname}");
+                        } else {
+                            bail!("Bucket already contains datastore in use");
+                        }
                     }
                 }
                 backend_s3_client = Some(Arc::new(s3_client));
@@ -263,7 +267,13 @@ pub(crate) fn do_create_datastore(
                 optional: true,
                 default: false,
                 description: "Re-use existing datastore directory."
-            }
+            },
+            "overwrite-in-use": {
+                type: Boolean,
+                optional: true,
+                default: false,
+                description: "Overwrite in use marker (S3 backed datastores only)."
+            },
         },
     },
     access: {
@@ -275,6 +285,7 @@ pub(crate) fn do_create_datastore(
 pub fn create_datastore(
     config: DataStoreConfig,
     reuse_datastore: bool,
+    overwrite_in_use: bool,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let lock = pbs_config::datastore::lock_config()?;
@@ -343,7 +354,13 @@ pub fn create_datastore(
         auth_id.to_string(),
         to_stdout,
         move |_worker| {
-            do_create_datastore(lock, section_config, config, reuse_datastore)?;
+            do_create_datastore(
+                lock,
+                section_config,
+                config,
+                reuse_datastore,
+                overwrite_in_use,
+            )?;
 
             if let Some(prune_job_config) = prune_job_config {
                 do_create_prune_job(prune_job_config)?;
