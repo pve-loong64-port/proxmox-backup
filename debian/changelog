@@ -1,3 +1,42 @@
+rust-proxmox-backup (4.0.2-1) trixie; urgency=medium
+
+  * ui: utils: add missing task description override for 'create-datastore'.
+
+  * bin: add pbs3to4 upgrade check-list script.
+
+  * fix #6188: smtp: quote sender's display name if needed due to special
+    characters being used.
+
+  * proxmox-file-restore: allocate at least 256MB of RAM for the restore VM
+    due to increased resource demand of the restire-image build on Trixie.
+
+  * docs: rephrase and extend rate limiting description for sync jobs.
+
+  * manager cli: move legacy update-to-prune-jobs command to new
+    migrate-config sub-command.
+
+  * manager cli: add 'migrate-config default-notification-mode' command.
+
+  * ui: datastore options view: switch to new notification-mode default of
+    using the modern notification-system.
+
+  * ui: tape backup job: move notification settings to a separate tab.
+
+  * ui: one-shot tape backup: use same wording as tape-backup jobs.
+
+  * ui: one-shot tape backup: use same wording as tape-backup jobs.
+
+  * ui: datastore options: drop notify and notify-user rows.
+
+  * ui: datastore options: notification: use radio controls to select mode.
+
+  * d/postinst: migrate notification mode default on update.
+
+  * garbage collection: track chunk cache hit and miss stats and show in task
+    log.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Jul 2025 01:28:11 +0200
+
 rust-proxmox-backup (4.0.1-2) trixie; urgency=medium
 
   * proxmox-backup-server package: update SCSI library to libsgutils2-1.48
