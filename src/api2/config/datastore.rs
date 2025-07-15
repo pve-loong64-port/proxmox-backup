@@ -16,7 +16,7 @@ use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
     Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendConfig, DatastoreBackendType,
-    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, PruneJobConfig,
+    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, Operation, PruneJobConfig,
     PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
     PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
@@ -34,7 +34,7 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
-use pbs_datastore::get_datastore_mount_status;
+use pbs_datastore::{get_datastore_mount_status, DatastoreBackend};
 use proxmox_rest_server::WorkerTask;
 use proxmox_s3_client::S3ObjectKey;
 
@@ -336,19 +336,37 @@ pub fn create_datastore(
         ..config
     };
 
+    let store_name = config.name.to_string();
     WorkerTask::new_thread(
         "create-datastore",
-        Some(config.name.to_string()),
+        Some(store_name.clone()),
         auth_id.to_string(),
         to_stdout,
         move |_worker| {
             do_create_datastore(lock, section_config, config, reuse_datastore)?;
 
             if let Some(prune_job_config) = prune_job_config {
-                do_create_prune_job(prune_job_config)
-            } else {
-                Ok(())
+                do_create_prune_job(prune_job_config)?;
             }
+
+            if reuse_datastore {
+                let datastore = pbs_datastore::DataStore::lookup_datastore(
+                    &store_name,
+                    Some(Operation::Lookup),
+                )
+                .context("failed to lookup datastore")?;
+                match datastore
+                    .backend()
+                    .context("failed to get datastore backend")?
+                {
+                    DatastoreBackend::Filesystem => (),
+                    DatastoreBackend::S3(_s3_client) => {
+                        proxmox_async::runtime::block_on(datastore.s3_refresh())
+                            .context("S3 refresh failed")?;
+                    }
+                }
+            }
+            Ok(())
         },
     )
 }
