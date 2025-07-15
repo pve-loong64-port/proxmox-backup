@@ -107,6 +107,12 @@ fn show_datastore(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value
                 type: DataStoreConfig,
                 flatten: true,
             },
+            "reuse-datastore": {
+                type: Boolean,
+                optional: true,
+                default: false,
+                description: "Re-use existing datastore directory."
+            },
             "output-format": {
                 schema: OUTPUT_FORMAT,
                 optional: true,
