@@ -4,25 +4,62 @@ Debian Package Repositories
 ---------------------------
 
 All Debian based systems use APT_ as a package management tool. The lists of
-repositories are defined in ``/etc/apt/sources.list`` and the ``.list`` files found
-in the ``/etc/apt/sources.d/`` directory. Updates can be installed directly
-with the ``apt`` command-line tool, or via the GUI.
+repositories are defined in ``/etc/apt/sources.list`` and the ``.list`` or
+``.sources`` files found in the ``/etc/apt/sources.d/`` directory. Updates can
+be installed directly with the ``apt`` command-line tool, or via the GUI.
 
-APT_ ``sources.list`` files list one package repository per line, with the most
-preferred source listed first. Empty lines are ignored and a ``#`` character
-anywhere on a line marks the remainder of that line as a comment. The
-information available from the configured sources is acquired by ``apt
-update``.
+.. _package_repos_repository_formats:
 
-.. code-block:: sources.list
-  :caption: File: ``/etc/apt/sources.list``
+Repository Formats
+~~~~~~~~~~~~~~~~~~
 
-  deb http://deb.debian.org/debian bookworm main contrib
-  deb http://deb.debian.org/debian bookworm-updates main contrib
+APT_ repositories can be configured in two distinct formats, the old single
+line format and the newer deb822 format. No matter what format you choose,
+``apt update`` will fetch the information from all configured sources.
 
-  # security updates
-  deb http://security.debian.org/debian-security bookworm-security main contrib
+Single Line
+^^^^^^^^^^^
 
+Single line repositories are defined in ``.list`` files list one package
+repository per line, with the most preferred source listed first. Empty lines
+are ignored and a ``#`` character anywhere on a line marks the remainder of
+that line as a comment.
+
+deb822 Style
+^^^^^^^^^^^^
+
+The newer deb822 multiline format is used in ``.sources`` files. Each
+repository consists of a stanza with multiple key value pairs. A stanza is
+simply a group of lines. One file can contain multiple stanzas by separating
+them with a blank line. You can still use ``#`` to comment out lines.
+
+.. note:: Modernizing your repositories is recommended under Debian Trixie, as
+   ``apt`` will complain about older repository definitions otherwise. You can
+   run the command ``apt modernize-sources`` to modernize your existing
+   repositories automatically.
+
+.. _package_repos_debian_base_repositories:
+
+Debian Base Repositories
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+You will need a Debian base repository as a minimum to get updates for all
+packages provided by Debian itself:
+
+.. code-block:: debian.sources
+  :caption: File: ``/etc/apt/sources.list.d/debian.sources``
+
+  Types: deb
+  URIs: http://deb.debian.org/debian/
+  Suites: trixie trixie-updates
+  Components: main contrib non-free-firmware
+  Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+  Types: deb
+  URIs: http://security.debian.org/debian-security/
+  Suites: trixie-security
+  Components: main contrib non-free-firmware
+  Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
 In addition, you need a package repository from Proxmox to get Proxmox Backup
 updates.
@@ -31,38 +68,6 @@ updates.
   :target: _images/pbs-gui-administration-apt-repos.png
   :align: right
   :alt: APT Repository Management in the Web Interface
-
-.. _package_repos_secure_apt:
-
-SecureApt
-~~~~~~~~~
-
-The `Release` files in the repositories are signed with GnuPG. APT is using
-these signatures to verify that all packages are from a trusted source.
-
-If you install Proxmox Backup Server from an official ISO image, the
-verification key is already installed.
-
-If you install Proxmox Backup Server on top of Debian, download and install the
-key with the following commands:
-
-.. code-block:: console
-
- # wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
-
-Verify the SHA512 checksum afterwards with the expected output below:
-
-.. code-block:: console
-
- # sha512sum /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
- 7da6fe34168adc6e479327ba517796d4702fa2f8b4f0a9833f5ea6e6b48f6507a6da403a274fe201595edc86a84463d50383d07f64bdde2e3658108db7d6dc87  /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
-
-and the md5sum, with the expected output below:
-
-.. code-block:: console
-
- # md5sum /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
- 41558dc019ef90bd0f6067644a51cf5b /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
 
 .. _sysadmin_package_repos_enterprise:
 
@@ -74,11 +79,14 @@ all Proxmox Backup subscription users. It contains the most stable packages,
 and is suitable for production use. The ``pbs-enterprise`` repository is
 enabled by default:
 
-.. code-block:: sources.list
-  :caption: File: ``/etc/apt/sources.list.d/pbs-enterprise.list``
+.. code-block:: debian.sources
+  :caption: File: ``/etc/apt/sources.list.d/pbs-enterprise.sources``
 
-  deb https://enterprise.proxmox.com/debian/pbs bookworm pbs-enterprise
-
+  Types: deb
+  URIs: https://enterprise.proxmox.com/debian/pbs
+  Suites: trixie
+  Components: pbs-enterprise
+  Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 To never miss important security fixes, the superuser (``root@pam`` user) is
 notified via email about new packages as soon as they are available. The
@@ -88,11 +96,8 @@ Please note that you need a valid subscription key to access this
 repository. More information regarding subscription levels and pricing can be
 found at https://www.proxmox.com/en/proxmox-backup-server/pricing
 
-.. note:: You can disable this repository by commenting out the above line
- using a `#` (at the start of the line). This prevents error messages if you do
- not have a subscription key. Please configure the ``pbs-no-subscription``
- repository in that case.
-
+.. note:: You can disable this repository by adding the line ``Enabled: false``
+   to the stanza.
 
 `Proxmox Backup`_ No-Subscription Repository
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -102,21 +107,17 @@ this repository. It can be used for testing and non-production
 use. It is not recommended to use it on production servers, because these
 packages are not always heavily tested and validated.
 
-We recommend to configure this repository in ``/etc/apt/sources.list``.
+We recommend to configure this repository in
+``/etc/apt/sources.list.d/proxmox.sources``.
 
-.. code-block:: sources.list
-  :caption: File: ``/etc/apt/sources.list``
+.. code-block:: debian.sources
+  :caption: File: ``/etc/apt/sources.list.d/proxmox.sources``
 
-  deb http://deb.debian.org/debian bookworm main contrib
-  deb http://deb.debian.org/debian bookworm-updates main contrib
-
-  # Proxmox Backup Server pbs-no-subscription repository provided by proxmox.com,
-  # NOT recommended for production use
-  deb http://download.proxmox.com/debian/pbs bookworm pbs-no-subscription
-
-  # security updates
-  deb http://security.debian.org/debian-security bookworm-security main contrib
-
+  Types: deb
+  URIs: http://download.proxmox.com/debian/pbs
+  Suites: trixie
+  Components: pbs-no-subscription
+  Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 `Proxmox Backup`_ Test Repository
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,13 +128,17 @@ to test new features.
 .. .. warning:: the ``pbstest`` repository should (as the name implies)
   only be used to test new features or bug fixes.
 
-You can access this repository by adding the following line to
-``/etc/apt/sources.list``:
+You can access this repository by adding the following stanza to
+``/etc/apt/sources.list.d/proxmox.sources``:
 
-.. code-block:: sources.list
+.. code-block:: debian.sources
   :caption: sources.list entry for ``pbstest``
 
-  deb http://download.proxmox.com/debian/pbs bookworm pbstest
+  Types: deb
+  URIs: http://download.proxmox.com/debian/pbs
+  Suites: trixie
+  Components: pbs-test
+  Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 .. _package_repositories_client_only:
 
@@ -157,6 +162,24 @@ and Ubuntu Derivative do, you may be able to use the APT-based repository.
 In order to configure this repository you need to first :ref:`setup the Proxmox
 release key <package_repos_secure_apt>`. After that, add the repository URL to
 the APT sources lists.
+
+**Repositories for Debian 13 (Trixie) based releases**
+
+This repository is tested with:
+
+- Debian Trixie
+
+Edit the file ``/etc/apt/sources.list.d/pbs-client.sources`` and add the following
+snippet
+
+.. code-block:: debian.sources
+  :caption: File: ``/etc/apt/sources.list.d/pbs``
+
+  Types: deb
+  URIs: http://download.proxmox.com/debian/pbs-client
+  Suites: trixie
+  Components: main
+  Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 **Repositories for Debian 12 (Bookworm) based releases**
 
@@ -202,6 +225,42 @@ snippet
   :caption: File: ``/etc/apt/sources.list``
 
   deb http://download.proxmox.com/debian/pbs-client buster main
+
+.. _package_repos_secure_apt:
+
+SecureApt
+~~~~~~~~~
+
+The `Release` files in the repositories are signed with GnuPG. APT is using
+these signatures to verify that all packages are from a trusted source.
+
+If you install Proxmox Backup Server from an official ISO image, the
+verification key is already installed.
+
+If you install Proxmox Backup Server on top of Debian, download and install the
+key with the following commands:
+
+.. code-block:: console
+
+ # wget https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg -O /usr/share/keyrings/proxmox-archive-keyring.gpg
+
+Verify the SHA512 checksum afterwards with the expected output below:
+
+.. code-block:: console
+
+ # sha512sum /usr/share/keyrings/proxmox-archive-keyring.gpg
+ 8678f2327c49276615288d7ca11e7d296bc8a2b96946fe565a9c81e533f9b15a5dbbad210a0ad5cd46d361ff1d3c4bac55844bc296beefa4f88b86e44e69fa51 /usr/share/keyrings/proxmox-archive-keyring.gpg
+
+and the md5sum, with the expected output below:
+
+.. code-block:: console
+
+ # md5sum /usr/share/keyrings/proxmox-archive-keyring.gpg
+ c94e3775fbafec13fec20f981db61e93 /usr/share/keyrings/proxmox-archive-keyring.gpg
+
+.. note:: Make sure that the path that you download the key to, matches the
+   path specified in the ``Signed-By:`` lines in your repository stanzas from
+   above.
 
 .. _node_options_http_proxy:
 
