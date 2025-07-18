@@ -16,7 +16,7 @@ use proxmox_schema::{api, ApiType, ReturnType};
 
 use pbs_api_types::{BackupNamespace, BackupType};
 use pbs_client::tools::key_source::get_encryption_key_password;
-use pbs_client::{BackupRepository, BackupWriter};
+use pbs_client::{BackupRepository, BackupWriter, BackupWriterOptions};
 use pbs_datastore::data_blob::{DataBlob, DataChunkBuilder};
 use pbs_key_config::{load_and_decrypt_key, KeyDerivationConfig};
 use pbs_tools::crypt_config::CryptConfig;
@@ -230,12 +230,14 @@ async fn test_upload_speed(
     log::debug!("Connecting to backup server");
     let client = BackupWriter::start(
         &client,
-        crypt_config.clone(),
-        repo.store(),
-        &BackupNamespace::root(),
-        &(BackupType::Host, "benchmark".to_string(), backup_time).into(),
-        false,
-        true,
+        BackupWriterOptions {
+            datastore: repo.store(),
+            ns: &BackupNamespace::root(),
+            backup: &(BackupType::Host, "benchmark".to_string(), backup_time).into(),
+            crypt_config: crypt_config.clone(),
+            debug: false,
+            benchmark: true,
+        },
     )
     .await?;
 

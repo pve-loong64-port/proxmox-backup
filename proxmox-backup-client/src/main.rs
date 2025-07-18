@@ -46,8 +46,8 @@ use pbs_client::tools::{
 use pbs_client::{
     delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
     BackupReader, BackupRepository, BackupSpecificationType, BackupStats, BackupWriter,
-    ChunkStream, FixedChunkStream, HttpClient, InjectionData, PxarBackupStream, RemoteChunkReader,
-    UploadOptions, BACKUP_SOURCE_SCHEMA,
+    BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, InjectionData,
+    PxarBackupStream, RemoteChunkReader, UploadOptions, BACKUP_SOURCE_SCHEMA,
 };
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogReader, CatalogWriter};
 use pbs_datastore::chunk_store::verify_chunk_size;
@@ -954,12 +954,14 @@ async fn create_backup(
 
     let client = BackupWriter::start(
         &http_client,
-        crypt_config.clone(),
-        repo.store(),
-        &backup_ns,
-        &snapshot,
-        true,
-        false,
+        BackupWriterOptions {
+            datastore: repo.store(),
+            ns: &backup_ns,
+            backup: &snapshot,
+            crypt_config: crypt_config.clone(),
+            debug: true,
+            benchmark: false,
+        },
     )
     .await?;
 

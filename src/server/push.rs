@@ -16,7 +16,9 @@ use pbs_api_types::{
     MANIFEST_BLOB_NAME, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP,
     PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
 };
-use pbs_client::{BackupRepository, BackupWriter, HttpClient, MergedChunkInfo, UploadOptions};
+use pbs_client::{
+    BackupRepository, BackupWriter, BackupWriterOptions, HttpClient, MergedChunkInfo, UploadOptions,
+};
 use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::ChunkInfo;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
@@ -822,12 +824,14 @@ pub(crate) async fn push_snapshot(
     // Writer instance locks the snapshot on the remote side
     let backup_writer = BackupWriter::start(
         &params.target.client,
-        None,
-        params.target.repo.store(),
-        &target_ns,
-        snapshot,
-        false,
-        false,
+        BackupWriterOptions {
+            datastore: params.target.repo.store(),
+            ns: &target_ns,
+            backup: snapshot,
+            crypt_config: None,
+            debug: false,
+            benchmark: false,
+        },
     )
     .await?;
 

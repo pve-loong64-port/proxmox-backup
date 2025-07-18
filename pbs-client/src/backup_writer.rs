@@ -63,6 +63,22 @@ struct ChunkUploadResponse {
 type UploadQueueSender = mpsc::Sender<(MergedChunkInfo, Option<ChunkUploadResponse>)>;
 type UploadResultReceiver = oneshot::Receiver<Result<(), Error>>;
 
+/// Additional configuration options for BackupWriter instance
+pub struct BackupWriterOptions<'a> {
+    /// Target datastore
+    pub datastore: &'a str,
+    /// Target namespace
+    pub ns: &'a BackupNamespace,
+    /// Target snapshot
+    pub backup: &'a BackupDir,
+    /// Crypto configuration
+    pub crypt_config: Option<Arc<CryptConfig>>,
+    /// Run in debug mode
+    pub debug: bool,
+    /// Start benchmark
+    pub benchmark: bool,
+}
+
 impl BackupWriter {
     fn new(h2: H2Client, abort: AbortHandle, crypt_config: Option<Arc<CryptConfig>>) -> Arc<Self> {
         Arc::new(Self {
@@ -72,28 +88,22 @@ impl BackupWriter {
         })
     }
 
-    // FIXME: extract into (flattened) parameter struct?
     #[allow(clippy::too_many_arguments)]
-    pub async fn start(
+    pub async fn start<'a>(
         client: &HttpClient,
-        crypt_config: Option<Arc<CryptConfig>>,
-        datastore: &str,
-        ns: &BackupNamespace,
-        backup: &BackupDir,
-        debug: bool,
-        benchmark: bool,
+        writer_options: BackupWriterOptions<'a>,
     ) -> Result<Arc<BackupWriter>, Error> {
         let mut param = json!({
-            "backup-type": backup.ty(),
-            "backup-id": backup.id(),
-            "backup-time": backup.time,
-            "store": datastore,
-            "debug": debug,
-            "benchmark": benchmark
+            "backup-type": writer_options.backup.ty(),
+            "backup-id": writer_options.backup.id(),
+            "backup-time": writer_options.backup.time,
+            "store": writer_options.datastore,
+            "debug": writer_options.debug,
+            "benchmark": writer_options.benchmark,
         });
 
-        if !ns.is_root() {
-            param["ns"] = serde_json::to_value(ns)?;
+        if !writer_options.ns.is_root() {
+            param["ns"] = serde_json::to_value(writer_options.ns)?;
         }
 
         let req = HttpClient::request_builder(
@@ -109,7 +119,7 @@ impl BackupWriter {
             .start_h2_connection(req, String::from(PROXMOX_BACKUP_PROTOCOL_ID_V1!()))
             .await?;
 
-        Ok(BackupWriter::new(h2, abort, crypt_config))
+        Ok(BackupWriter::new(h2, abort, writer_options.crypt_config))
     }
 
     pub async fn get(&self, path: &str, param: Option<Value>) -> Result<Value, Error> {
