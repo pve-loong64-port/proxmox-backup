@@ -1,3 +1,14 @@
+rust-proxmox-backup (4.0.3-1) trixie; urgency=medium
+
+  * docs: update repository chapter to reflect new deb822 format.
+
+  * docs: update apt key installation guide to use the new release key rings.
+
+  * pxar extract: fix regression within extraction of hardlinks that caused a
+    "failed to extract hardlink: EINVAL: Invalid argument" error.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 19 Jul 2025 20:03:38 +0200
+
 rust-proxmox-backup (4.0.2-1) trixie; urgency=medium
 
   * ui: utils: add missing task description override for 'create-datastore'.
