@@ -627,7 +627,7 @@ impl Extractor {
                 target.as_c_str(),
                 Some(parent),
                 file_name,
-                nix::fcntl::AtFlags::AT_SYMLINK_NOFOLLOW,
+                nix::fcntl::AtFlags::empty(),
             )
         };
 
