@@ -2473,14 +2473,14 @@ fn setup_mounted_device(datastore: &DataStoreConfig, tmp_mount_path: &str) -> Re
 /// The reason for the randomized device mounting paths is to avoid two tasks trying to mount to
 /// the same path, this is *very* unlikely since the device is only mounted really shortly, but
 /// technically possible.
-pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
+pub fn do_mount_device(datastore: DataStoreConfig) -> Result<bool, Error> {
     if let Some(uuid) = datastore.backing_device.as_ref() {
         if pbs_datastore::get_datastore_mount_status(&datastore) == Some(true) {
             info!(
                 "device is already mounted at '{}'",
                 datastore.absolute_path()
             );
-            return Ok(());
+            return Ok(false);
         }
         let tmp_mount_path = format!(
             "{}/{:x}",
@@ -2525,7 +2525,7 @@ pub fn do_mount_device(datastore: DataStoreConfig) -> Result<(), Error> {
             datastore.name
         )
     }
-    Ok(())
+    Ok(true)
 }
 
 async fn do_sync_jobs(
@@ -2627,14 +2627,17 @@ pub fn mount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Er
         move |_worker| async move {
             let name = datastore.name.clone();
             let log_context = LogContext::current();
-            tokio::task::spawn_blocking(|| {
+            if !tokio::task::spawn_blocking(|| {
                 if let Some(log_context) = log_context {
                     log_context.sync_scope(|| do_mount_device(datastore))
                 } else {
                     do_mount_device(datastore)
                 }
             })
-            .await??;
+            .await??
+            {
+                return Ok(());
+            }
             let Ok((sync_config, _digest)) = pbs_config::sync::config() else {
                 warn!("unable to read sync job config, won't run any sync jobs");
                 return Ok(());
