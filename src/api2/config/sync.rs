@@ -339,6 +339,8 @@ pub enum DeletableProperty {
     EncryptedOnly,
     /// Delete the verified_only property,
     VerifiedOnly,
+    /// Delete the run_on_mount property,
+    RunOnMount,
     /// Delete the sync_direction property,
     SyncDirection,
 }
@@ -458,6 +460,9 @@ pub fn update_sync_job(
                 DeletableProperty::VerifiedOnly => {
                     data.verified_only = None;
                 }
+                DeletableProperty::RunOnMount => {
+                    data.run_on_mount = None;
+                }
                 DeletableProperty::SyncDirection => {
                     data.sync_direction = None;
                 }
@@ -506,6 +511,9 @@ pub fn update_sync_job(
     }
     if let Some(verified_only) = update.verified_only {
         data.verified_only = Some(verified_only);
+    }
+    if let Some(run_on_mount) = update.run_on_mount {
+        data.run_on_mount = Some(run_on_mount);
     }
     if let Some(sync_direction) = update.sync_direction {
         data.sync_direction = Some(sync_direction);
@@ -683,6 +691,7 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         transfer_last: None,
         encrypted_only: None,
         verified_only: None,
+        run_on_mount: None,
         sync_direction: None, // use default
     };
 
