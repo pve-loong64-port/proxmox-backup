@@ -49,6 +49,10 @@ fn list_datastores(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
             store: {
                 schema: DATASTORE_SCHEMA,
             },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
             digest: {
                 optional: true,
                 schema: PROXMOX_CONFIG_DIGEST_SCHEMA,
@@ -57,16 +61,23 @@ fn list_datastores(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
     },
 )]
 /// Mount a removable datastore.
-async fn mount_datastore(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
-    param["node"] = "localhost".into();
+async fn mount_datastore(
+    store: String,
+    mut param: Value,
+    _rpcenv: &mut dyn RpcEnvironment,
+) -> Result<(), Error> {
+    let output_format = extract_output_format(&mut param);
 
-    let info = &api2::admin::datastore::API_METHOD_MOUNT;
-    let result = match info.handler {
-        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
-        _ => unreachable!(),
-    };
+    let client = connect_to_localhost()?;
+    let result = client
+        .post(
+            format!("api2/json/admin/datastore/{store}/mount").as_str(),
+            None,
+        )
+        .await?;
 
-    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    view_task_result(&client, result, &output_format).await?;
+
     Ok(())
 }
 
@@ -272,7 +283,8 @@ async fn update_datastore(name: String, mut param: Value) -> Result<(), Error> {
     },
 )]
 /// Try mounting a removable datastore given the UUID.
-async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+async fn uuid_mount(mut param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let output_format = extract_output_format(&mut param);
     let uuid = param["uuid"]
         .as_str()
         .ok_or_else(|| format_err!("uuid has to be specified"))?;
@@ -294,7 +306,16 @@ async fn uuid_mount(param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Result<Va
     }
 
     if let Some(store) = matching_stores.first() {
-        api2::admin::datastore::do_mount_device(store.clone())?;
+        let client = connect_to_localhost()?;
+        let result = client
+            .post(
+                format!("api2/json/admin/datastore/{}/mount", store.name).as_str(),
+                None,
+            )
+            .await?;
+
+        view_task_result(&client, result, &output_format).await?;
+        return Ok(Value::Null);
     }
 
     // we don't want to fail for UUIDs that are not associated with datastores, as that produces
