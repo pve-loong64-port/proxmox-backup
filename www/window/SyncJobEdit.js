@@ -121,6 +121,7 @@ Ext.define('PBS.window.SyncJobEdit', {
                         values.id = 's-' + Ext.data.identifier.Uuid.Global.generate().slice(0, 13);
                     }
                     if (!me.isCreate) {
+                        PBS.Utils.delete_if_default(values, 'run-on-mount', false);
                         PBS.Utils.delete_if_default(values, 'rate-in');
                         PBS.Utils.delete_if_default(values, 'rate-out');
                         PBS.Utils.delete_if_default(values, 'remote');
@@ -205,7 +206,7 @@ Ext.define('PBS.window.SyncJobEdit', {
                         xtype: 'pbsCalendarEvent',
                         name: 'schedule',
                         fieldLabel: gettext('Sync Schedule'),
-                        emptyText: gettext('none (disabled)'),
+                        emptyText: gettext('none'),
                         cbind: {
                             deleteEmpty: '{!isCreate}',
                             value: '{scheduleValue}',
@@ -483,6 +484,19 @@ Ext.define('PBS.window.SyncJobEdit', {
                             tag: 'div',
                             'data-qtip': gettext(
                                 'Sync only verified backup snapshots, exclude others.',
+                            ),
+                        },
+                        uncheckedValue: false,
+                        value: false,
+                    },
+                    {
+                        xtype: 'proxmoxcheckbox',
+                        name: 'run-on-mount',
+                        fieldLabel: gettext('Run when mounted'),
+                        autoEl: {
+                            tag: 'div',
+                            'data-qtip': gettext(
+                                'Run this job when a relevant removable datastore is mounted.',
                             ),
                         },
                         uncheckedValue: false,
