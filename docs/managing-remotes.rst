@@ -145,6 +145,11 @@ job needs to be run before a sync job with 'resync-corrupt' can be carried out. 
 that a 'resync-corrupt'-job needs to check the manifests of all snapshots in a datastore
 and might take much longer than regular sync jobs.
 
+If the ``run-on-mount`` flag is set, the sync job will be automatically started whenever a
+relevant removable datastore is mounted. If mounting a removable datastore would start
+multiple sync jobs, these jobs will be run sequentially in alphabetical order based on
+their ID.
+
 Namespace Support
 ^^^^^^^^^^^^^^^^^
 
