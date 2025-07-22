@@ -492,11 +492,11 @@ Ext.define('PBS.window.SyncJobEdit', {
                     {
                         xtype: 'proxmoxcheckbox',
                         name: 'run-on-mount',
-                        fieldLabel: gettext('Run when mounted'),
+                        fieldLabel: gettext('Run on Mount'),
                         autoEl: {
                             tag: 'div',
                             'data-qtip': gettext(
-                                'Run this job when a relevant removable datastore is mounted.',
+                                'Run this job when a relevant removable datastore gets mounted.',
                             ),
                         },
                         uncheckedValue: false,
