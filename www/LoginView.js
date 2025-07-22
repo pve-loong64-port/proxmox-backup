@@ -22,6 +22,9 @@ Ext.define('PBS.LoginView', {
 
         init: async function () {
             if (Proxmox.consentText !== '') {
+                if (Proxmox.Utils.getOpenIDRedirectionAuthorization() !== undefined) {
+                    return; // avoid showing the banner another time after OIDC login redirection.
+                }
                 Ext.create('Proxmox.window.ConsentModal', {
                     autoShow: true,
                     consent: Proxmox.Markdown.parse(
