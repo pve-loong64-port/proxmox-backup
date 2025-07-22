@@ -233,11 +233,13 @@ datastore is not mounted when they are scheduled. Sync jobs start, but fail
 with an error saying the datastore was not mounted. The reason is that syncs
 not happening as scheduled should at least be noticeable.
 
-Datastores with S3 Backend (experimental)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Datastores with S3 Backend
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Proxmox Backup Server supports S3 compatible object stores as storage backend for datastores. For
 this, an S3 endpoint needs to be set-up under "Configuration" > "Remotes" > "S3 Endpoints".
+
+.. important:: The S3 datastore backend is currently a technology preview.
 
 In the endpoint configuration, provide the REST API endpoint for the object store. The endpoint
 is provider dependent and allows for the bucket and region templating. For example, configuring
