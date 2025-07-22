@@ -1,3 +1,23 @@
+rust-proxmox-backup (4.0.4-1) trixie; urgency=medium
+
+  * Add new S3 backend for datastores. This allows you to save all data on any
+    S3 compatible object storage. A local cache for core index files is used
+    to reduce access to slow(er) and potentially costly S3 endpoints. See the
+    documentation for more details.
+
+  * ui: do not show consent banner twice for OIDC login.
+
+  * api: node system services: postfix is again a non-templated systemd unit.
+
+  * tape: ignore error on clearing the encryption mode when the changer forces
+    encryption. This is a legitimate mode of operation, e.g., due to policy
+    reasons where the hardware must be in control of the encryption mode.
+
+  * removable datastore: allow one to configure sync jobs to trigger when the
+    underlying datastore gets mounted.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 22 Jul 2025 22:05:59 +0200
+
 rust-proxmox-backup (4.0.3-1) trixie; urgency=medium
 
   * docs: update repository chapter to reflect new deb822 format.
