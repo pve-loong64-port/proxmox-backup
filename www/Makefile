@@ -131,12 +131,14 @@ js:
 
 .PHONY: OnlineHelpInfo.js
 OnlineHelpInfo.js:
+	rm -f $@
 	$(MAKE) -C ../docs onlinehelpinfo
 	mv ../docs/output/scanrefs/OnlineHelpInfo.js .
 
 js/proxmox-backup-gui.js: .lint-incremental js OnlineHelpInfo.js ${JSSRC}
+	rm -f $@ $@.tmp
 	cat OnlineHelpInfo.js ${JSSRC} >$@.tmp
-	mv $@.tmp $@
+	mv -f $@.tmp $@
 
 .PHONY: check
 check:
