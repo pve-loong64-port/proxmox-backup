@@ -10,7 +10,7 @@ use serde_json::Value;
 #[api(
     input: {
         properties: {
-            "s3-client-id": {
+            "s3-endpoint-id": {
                 schema: S3_CLIENT_ID_SCHEMA,
             },
             bucket: {
@@ -25,12 +25,12 @@ use serde_json::Value;
 )]
 /// Perform basic sanity checks for given S3 client configuration
 async fn check(
-    s3_client_id: String,
+    s3_endpoint_id: String,
     bucket: String,
     store_prefix: String,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
-    api2::admin::s3::check(s3_client_id, bucket, store_prefix, rpcenv).await?;
+    api2::admin::s3::check(s3_endpoint_id, bucket, store_prefix, rpcenv).await?;
     Ok(Value::Null)
 }
 
@@ -69,7 +69,7 @@ fn list_s3_clients(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
 }
 
 pub fn s3_commands() -> CommandLineInterface {
-    let client_cmd_def = CliCommandMap::new()
+    let endpoint_cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_S3_CLIENTS))
         .insert(
             "create",
@@ -93,10 +93,10 @@ pub fn s3_commands() -> CommandLineInterface {
         .insert(
             "check",
             CliCommand::new(&API_METHOD_CHECK)
-                .arg_param(&["s3-client-id", "bucket"])
-                .completion_cb("s3-client-id", pbs_config::s3::complete_s3_client_id),
+                .arg_param(&["s3-endpoint-id", "bucket"])
+                .completion_cb("s3-endpoint-id", pbs_config::s3::complete_s3_client_id),
         )
-        .insert("client", client_cmd_def);
+        .insert("endpoint", endpoint_cmd_def);
 
     cmd_def.into()
 }
