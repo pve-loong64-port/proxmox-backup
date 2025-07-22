@@ -1302,7 +1302,7 @@ Ext.define('PBS.DataStoreContent', {
                 if (data.backend) {
                     let backendConfig = PBS.Utils.parsePropertyString(data.backend);
                     let hasS3Backend = backendConfig.type === 's3';
-                    me.down('#moreDropdown').setDisabled(!hasS3Backend);
+                    me.down('#moreDropdown').setHidden(!hasS3Backend);
                 }
             },
         });
@@ -1317,7 +1317,7 @@ Ext.define('PBS.DataStoreContent', {
         {
             text: gettext('More'),
             itemId: 'moreDropdown',
-            disabled: true,
+            hidden: true,
             menu: [
                 {
                     text: gettext('Refresh contents from S3 bucket'),
