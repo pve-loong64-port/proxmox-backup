@@ -4,7 +4,10 @@ use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
-use proxmox_s3_client::{S3ClientConfig, S3ClientConfigUpdater};
+use proxmox_s3_client::{
+    S3ClientConf, S3ClientConfig, S3ClientConfigUpdater, S3ClientConfigWithoutSecret,
+    S3_CLIENT_ID_SCHEMA,
+};
 use proxmox_schema::{api, param_bail, ApiType};
 
 use pbs_api_types::{
@@ -20,7 +23,7 @@ use pbs_config::s3::{self, S3_CFG_TYPE_ID};
     returns: {
         description: "List configured s3 clients.",
         type: Array,
-        items: { type: S3ClientConfig },
+        items: { type: S3ClientConfigWithoutSecret },
     },
     access: {
         permission: &Permission::Privilege(&[], PRIV_SYS_AUDIT, false),
@@ -30,7 +33,7 @@ use pbs_config::s3::{self, S3_CFG_TYPE_ID};
 pub fn list_s3_client_config(
     _param: Value,
     rpcenv: &mut dyn RpcEnvironment,
-) -> Result<Vec<S3ClientConfig>, Error> {
+) -> Result<Vec<S3ClientConfigWithoutSecret>, Error> {
     let (config, digest) = s3::config()?;
     let list = config.convert_to_typed_array(S3_CFG_TYPE_ID)?;
     rpcenv["digest"] = hex::encode(digest).into();
@@ -42,9 +45,16 @@ pub fn list_s3_client_config(
     protected: true,
     input: {
         properties: {
+            id: {
+                schema: S3_CLIENT_ID_SCHEMA,
+            },
             config: {
                 type: S3ClientConfig,
                 flatten: true,
+            },
+            "secret-key": {
+                type: String,
+                description: "S3 secret key",
             },
         },
     },
@@ -54,14 +64,22 @@ pub fn list_s3_client_config(
 )]
 /// Create a new s3 client configuration.
 pub fn create_s3_client_config(
+    id: String,
     config: S3ClientConfig,
+    secret_key: String,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
     let _lock = s3::lock_config()?;
     let (mut section_config, _digest) = s3::config()?;
-    if section_config.sections.contains_key(&config.id) {
-        param_bail!("id", "s3 client config '{}' already exists.", config.id);
+    if section_config.sections.contains_key(&id) {
+        param_bail!("id", "s3 client config '{}' already exists.", &id);
     }
+
+    let config = S3ClientConf {
+        id: id.clone(),
+        config,
+        secret_key,
+    };
 
     section_config.set_data(&config.id, S3_CFG_TYPE_ID, &config)?;
     s3::save_config(&section_config)?;
@@ -77,7 +95,7 @@ pub fn create_s3_client_config(
             },
         },
     },
-    returns: { type: S3ClientConfig },
+    returns: { type: S3ClientConfigWithoutSecret },
     access: {
         permission: &Permission::Privilege(&[], PRIV_SYS_AUDIT, false),
     },
@@ -86,9 +104,9 @@ pub fn create_s3_client_config(
 pub fn read_s3_client_config(
     id: String,
     rpcenv: &mut dyn RpcEnvironment,
-) -> Result<S3ClientConfig, Error> {
+) -> Result<S3ClientConfigWithoutSecret, Error> {
     let (config, digest) = s3::config()?;
-    let s3_client_config: S3ClientConfig = config.lookup(S3_CFG_TYPE_ID, &id)?;
+    let s3_client_config: S3ClientConfigWithoutSecret = config.lookup(S3_CFG_TYPE_ID, &id)?;
     rpcenv["digest"] = hex::encode(digest).into();
 
     Ok(s3_client_config)
@@ -120,6 +138,11 @@ pub enum DeletableProperty {
                 type: S3ClientConfigUpdater,
                 flatten: true,
             },
+            "secret-key": {
+                type: String,
+                description: "S3 client secret key.",
+                optional: true,
+            },
             delete: {
                 description: "List of properties to delete.",
                 type: Array,
@@ -143,6 +166,7 @@ pub enum DeletableProperty {
 pub fn update_s3_client_config(
     id: String,
     update: S3ClientConfigUpdater,
+    secret_key: Option<String>,
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
     _rpcenv: &mut dyn RpcEnvironment,
@@ -156,46 +180,47 @@ pub fn update_s3_client_config(
         crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
     }
 
-    let mut data: S3ClientConfig = config.lookup(S3_CFG_TYPE_ID, &id)?;
+    let mut data: S3ClientConf = config.lookup(S3_CFG_TYPE_ID, &id)?;
 
     if let Some(delete) = delete {
         for delete_prop in delete {
             match delete_prop {
                 DeletableProperty::Port => {
-                    data.port = None;
+                    data.config.port = None;
                 }
                 DeletableProperty::Region => {
-                    data.region = None;
+                    data.config.region = None;
                 }
                 DeletableProperty::Fingerprint => {
-                    data.fingerprint = None;
+                    data.config.fingerprint = None;
                 }
                 DeletableProperty::PathStyle => {
-                    data.path_style = None;
+                    data.config.path_style = None;
                 }
             }
         }
     }
 
     if let Some(endpoint) = update.endpoint {
-        data.endpoint = endpoint;
+        data.config.endpoint = endpoint;
     }
     if let Some(port) = update.port {
-        data.port = Some(port);
+        data.config.port = Some(port);
     }
     if let Some(region) = update.region {
-        data.region = Some(region);
+        data.config.region = Some(region);
     }
     if let Some(access_key) = update.access_key {
-        data.access_key = access_key;
+        data.config.access_key = access_key;
     }
     if let Some(fingerprint) = update.fingerprint {
-        data.fingerprint = Some(fingerprint);
+        data.config.fingerprint = Some(fingerprint);
     }
     if let Some(path_style) = update.path_style {
-        data.path_style = Some(path_style);
+        data.config.path_style = Some(path_style);
     }
-    if let Some(secret_key) = update.secret_key {
+
+    if let Some(secret_key) = secret_key {
         data.secret_key = secret_key;
     }
 

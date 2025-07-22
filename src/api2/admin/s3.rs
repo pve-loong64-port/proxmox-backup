@@ -6,7 +6,7 @@ use serde_json::Value;
 use proxmox_http::Body;
 use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_s3_client::{
-    S3Client, S3ClientConfig, S3ClientOptions, S3ObjectKey, S3_BUCKET_NAME_SCHEMA,
+    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3_BUCKET_NAME_SCHEMA,
     S3_CLIENT_ID_SCHEMA,
 };
 use proxmox_schema::*;
@@ -43,11 +43,12 @@ pub async fn check(
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     let (config, _digest) = pbs_config::s3::config()?;
-    let config: S3ClientConfig = config
+    let config: S3ClientConf = config
         .lookup(S3_CFG_TYPE_ID, &s3_client_id)
         .context("config lookup failed")?;
 
-    let options = S3ClientOptions::from_config(config, bucket, store_prefix);
+    let options =
+        S3ClientOptions::from_config(config.config, config.secret_key, bucket, store_prefix);
 
     let test_object_key =
         S3ObjectKey::try_from(".s3-client-test").context("failed to generate s3 object key")?;

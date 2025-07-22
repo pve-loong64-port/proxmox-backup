@@ -9,7 +9,7 @@ use serde_json::Value;
 use tracing::{info, warn};
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
-use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions};
+use proxmox_s3_client::{S3Client, S3ClientConf, S3ClientOptions};
 use proxmox_schema::{api, param_bail, ApiType};
 use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
@@ -147,11 +147,15 @@ pub(crate) fn do_create_datastore(
                     .ok_or_else(|| format_err!("missing required bucket"))?;
                 let (config, _config_digest) =
                     pbs_config::s3::config().context("failed to get s3 config")?;
-                let config: S3ClientConfig = config
+                let config: S3ClientConf = config
                     .lookup(S3_CFG_TYPE_ID, s3_client_id)
                     .with_context(|| format!("no '{s3_client_id}' in config"))?;
-                let options =
-                    S3ClientOptions::from_config(config, bucket, datastore.name.to_owned());
+                let options = S3ClientOptions::from_config(
+                    config.config,
+                    config.secret_key,
+                    bucket,
+                    datastore.name.to_owned(),
+                );
                 let s3_client = S3Client::new(options).context("failed to create s3 client")?;
                 // Fine to block since this runs in worker task
                 proxmox_async::runtime::block_on(s3_client.head_bucket())

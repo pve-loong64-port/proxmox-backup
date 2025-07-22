@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
-use proxmox_s3_client::{S3Client, S3ClientConfig, S3ClientOptions, S3ObjectKey, S3PathPrefix};
+use proxmox_s3_client::{S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix};
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
@@ -251,9 +251,14 @@ impl DataStore {
                     .ok_or_else(|| format_err!("missing bucket for s3 backend"))?;
 
                 let (config, _config_digest) = pbs_config::s3::config()?;
-                let config: S3ClientConfig = config.lookup(S3_CFG_TYPE_ID, s3_client_id)?;
+                let config: S3ClientConf = config.lookup(S3_CFG_TYPE_ID, s3_client_id)?;
 
-                let options = S3ClientOptions::from_config(config, bucket, self.name().to_owned());
+                let options = S3ClientOptions::from_config(
+                    config.config,
+                    config.secret_key,
+                    bucket,
+                    self.name().to_owned(),
+                );
                 let s3_client = S3Client::new(options)?;
                 DatastoreBackend::S3(Arc::new(s3_client))
             }
