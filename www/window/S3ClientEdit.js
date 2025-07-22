@@ -130,6 +130,10 @@ Ext.define('PBS.window.S3ClientEdit', {
         }
         PBS.Utils.delete_if_default(values, 'path-style', false, me.isCreate);
 
+        let https_scheme_prefix = 'https://';
+        if (values.endpoint.startsWith(https_scheme_prefix)) {
+            values.endpoint = values.endpoint.slice(https_scheme_prefix.length);
+        }
         if (values['access-key'] === '') {
             delete values['access-key'];
         }
