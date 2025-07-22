@@ -57,6 +57,12 @@ Ext.define('PBS.store.NavigationStore', {
                         leaf: true,
                     },
                     {
+                        text: gettext('S3 Endpoints'),
+                        iconCls: 'fa fa-cloud-upload',
+                        path: 'pbsS3ClientView',
+                        leaf: true,
+                    },
+                    {
                         text: gettext('Traffic Control'),
                         iconCls: 'fa fa-signal fa-rotate-90',
                         path: 'pbsTrafficControlView',
@@ -78,12 +84,6 @@ Ext.define('PBS.store.NavigationStore', {
                         text: gettext('Subscription'),
                         iconCls: 'fa fa-support',
                         path: 'pbsSubscription',
-                        leaf: true,
-                    },
-                    {
-                        text: gettext('S3 Remotes'),
-                        iconCls: 'fa fa-cloud-upload',
-                        path: 'pbsS3ClientView',
                         leaf: true,
                     },
                 ],
