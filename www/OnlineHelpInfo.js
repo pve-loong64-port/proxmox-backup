@@ -3,9 +3,17 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/index.html",
     "title": "Proxmox Backup Server Documentation Index"
   },
+  "client-usage": {
+    "link": "/docs/backup-client.html#client-usage",
+    "title": "Backup Client Usage"
+  },
   "client-repository": {
     "link": "/docs/backup-client.html#client-repository",
     "title": "Backup Repository Locations"
+  },
+  "statically-linked-client": {
+    "link": "/docs/backup-client.html#statically-linked-client",
+    "title": "Statically Linked Backup Client"
   },
   "environment-variables": {
     "link": "/docs/backup-client.html#environment-variables",
