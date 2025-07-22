@@ -78,6 +78,8 @@ Ext.define('PBS.DataStoreEdit', {
                                 let s3ClientSelector = inputPanel.down('[name=s3client]');
                                 let overwriteInUseField =
                                     inputPanel.down('[name=overwrite-in-use]');
+                                let reuseDatastore =
+                                    inputPanel.down('[name=reuse-datastore]').getValue();
 
                                 uuidEditField.setDisabled(!isRemovable);
                                 uuidEditField.allowBlank = !isRemovable;
@@ -92,7 +94,7 @@ Ext.define('PBS.DataStoreEdit', {
                                 s3ClientSelector.setValue('');
 
                                 overwriteInUseField.setHidden(!isS3);
-                                overwriteInUseField.setDisabled(!isS3);
+                                overwriteInUseField.setDisabled(!reuseDatastore);
                                 overwriteInUseField.setValue(false);
 
                                 if (isRemovable) {
@@ -198,6 +200,8 @@ Ext.define('PBS.DataStoreEdit', {
                         xtype: 'checkbox',
                         name: 'overwrite-in-use',
                         fieldLabel: gettext('Overwrite in-use marker'),
+                        hidden: true,
+                        disabled: true,
                     },
                 ],
 
