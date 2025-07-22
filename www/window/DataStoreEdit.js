@@ -61,7 +61,7 @@ Ext.define('PBS.DataStoreEdit', {
                         comboItems: [
                             ['__default__', gettext('Local')],
                             ['removable', gettext('Removable')],
-                            ['s3', gettext('S3 (experimental)')],
+                            ['s3', gettext('S3 (tech preview)')],
                         ],
                         cbind: {
                             disabled: '{!isCreate}',
