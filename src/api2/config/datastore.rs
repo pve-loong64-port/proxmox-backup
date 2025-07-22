@@ -137,31 +137,28 @@ pub(crate) fn do_create_datastore(
         match backend_config.ty.unwrap_or_default() {
             DatastoreBackendType::Filesystem => (),
             DatastoreBackendType::S3 => {
-                let s3_client_id = backend_config
-                    .client
-                    .as_ref()
-                    .ok_or_else(|| format_err!("missing required client"))?;
-                let bucket = backend_config
-                    .bucket
-                    .clone()
-                    .ok_or_else(|| format_err!("missing required bucket"))?;
-                let (config, _config_digest) =
-                    pbs_config::s3::config().context("failed to get s3 config")?;
-                let config: S3ClientConf = config
-                    .lookup(S3_CFG_TYPE_ID, s3_client_id)
-                    .with_context(|| format!("no '{s3_client_id}' in config"))?;
-                let options = S3ClientOptions::from_config(
-                    config.config,
-                    config.secret_key,
-                    bucket,
-                    datastore.name.to_owned(),
-                );
-                let s3_client = S3Client::new(options).context("failed to create s3 client")?;
-                // Fine to block since this runs in worker task
-                proxmox_async::runtime::block_on(s3_client.head_bucket())
-                    .context("failed to access bucket")?;
-
                 if !overwrite_in_use {
+                    let s3_client_id = backend_config
+                        .client
+                        .as_ref()
+                        .ok_or_else(|| format_err!("missing required client"))?;
+                    let bucket = backend_config
+                        .bucket
+                        .clone()
+                        .ok_or_else(|| format_err!("missing required bucket"))?;
+                    let (config, _config_digest) =
+                        pbs_config::s3::config().context("failed to get s3 config")?;
+                    let config: S3ClientConf = config
+                        .lookup(S3_CFG_TYPE_ID, s3_client_id)
+                        .with_context(|| format!("no '{s3_client_id}' in config"))?;
+                    let options = S3ClientOptions::from_config(
+                        config.config,
+                        config.secret_key,
+                        bucket,
+                        datastore.name.to_owned(),
+                    );
+                    let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+
                     let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
                         .context("failed to generate s3 object key")?;
                     if let Some(response) =
@@ -180,8 +177,8 @@ pub(crate) fn do_create_datastore(
                             bail!("Bucket already contains datastore in use");
                         }
                     }
+                    backend_s3_client = Some(Arc::new(s3_client));
                 }
-                backend_s3_client = Some(Arc::new(s3_client));
             }
         }
     }
@@ -352,6 +349,37 @@ pub fn create_datastore(
     };
 
     let store_name = config.name.to_string();
+
+    let backend_config: DatastoreBackendConfig = config.backend.as_deref().unwrap_or("").parse()?;
+    match backend_config.ty.unwrap_or_default() {
+        DatastoreBackendType::Filesystem => (),
+        DatastoreBackendType::S3 => {
+            let s3_client_id = backend_config
+                .client
+                .as_ref()
+                .ok_or_else(|| format_err!("missing required client"))?;
+            let bucket = backend_config
+                .bucket
+                .clone()
+                .ok_or_else(|| format_err!("missing required bucket"))?;
+            let (config, _config_digest) =
+                pbs_config::s3::config().context("failed to get s3 config")?;
+            let config: S3ClientConf = config
+                .lookup(S3_CFG_TYPE_ID, s3_client_id)
+                .with_context(|| format!("no '{s3_client_id}' in config"))?;
+            let options = S3ClientOptions::from_config(
+                config.config,
+                config.secret_key,
+                bucket,
+                store_name.clone(),
+            );
+            let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+            // Fine to block since this runs in worker task
+            proxmox_async::runtime::block_on(s3_client.head_bucket())
+                .context("failed to access bucket")?;
+        }
+    }
+
     WorkerTask::new_thread(
         "create-datastore",
         Some(store_name.clone()),
