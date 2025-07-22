@@ -32,7 +32,7 @@ Ext.define('PBS.window.S3ClientEdit', {
             {
                 xtype: 'pmxDisplayEditField',
                 name: 'id',
-                fieldLabel: gettext('S3 Client ID'),
+                fieldLabel: gettext('S3 Endpoint ID'),
                 renderer: Ext.htmlEncode,
                 allowBlank: false,
                 minLength: 4,

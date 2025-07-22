@@ -16,7 +16,7 @@ Ext.define('PBS.form.S3ClientSelector', {
     listConfig: {
         columns: [
             {
-                header: gettext('S3 Client ID'),
+                header: gettext('S3 Endpoint ID'),
                 sortable: true,
                 dataIndex: 'id',
                 renderer: Ext.String.htmlEncode,

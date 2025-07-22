@@ -105,7 +105,7 @@ Ext.define('PBS.config.S3ClientView', {
     columns: [
         {
             dataIndex: 'id',
-            header: gettext('S3 Client ID'),
+            header: gettext('S3 Endpoint ID'),
             renderer: Ext.String.htmlEncode,
             sortable: true,
             width: 200,
