@@ -22,15 +22,8 @@ static SERVICE_NAME_LIST: [&str; 7] = [
 ];
 
 pub fn real_service_name(service: &str) -> &str {
-    // since postfix package 3.1.0-3.1 the postfix unit is only here
-    // to manage subinstances, of which the default is called "-".
-    // This is where we look for the daemon status
-
-    if service == "postfix" {
-        "postfix@-"
-    } else {
-        service
-    }
+    // can be used to centrally map to templated units, like postfix was during Debian Bookworm.
+    service
 }
 
 fn get_full_service_state(service: &str) -> Result<Value, Error> {
