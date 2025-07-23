@@ -1,3 +1,29 @@
+rust-proxmox-backup (4.0.5-1) trixie; urgency=medium
+
+  * s3 docs: add warning of potential costs when using s3 backends.
+
+  * s3 docs: add object store provider specific configuration examples.
+
+  * client: backup writer: make no-cache parameter backwards compatible to
+    avoid confusing older Proxmox Backup Server needlessly if it's not
+    configured.
+
+  * notifications docs: adapt to latest notification system UI changes.
+
+  * api: access: add opt-in HTTP-only cookie based ticket authentication flow.
+
+  * ui: opt into the new HTTP-only ticket authentication flow.
+
+  * client: adapt pbs client to also handle HTTP-only authentication flows
+    correctly.
+
+  * tape: forbid operations on a s3 datastore for now.
+
+  * avoid leaking internal s3client struct name to the outside, favor using
+    's3-endpoint' term where sensible and easy to adapt.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 23 Jul 2025 21:53:47 +0200
+
 rust-proxmox-backup (4.0.4-1) trixie; urgency=medium
 
   * Add new S3 backend for datastores. This allows you to save all data on any
