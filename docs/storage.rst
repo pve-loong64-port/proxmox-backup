@@ -241,6 +241,11 @@ this, an S3 endpoint needs to be set-up under "Configuration" > "Remotes" > "S3 
 
 .. important:: The S3 datastore backend is currently a technology preview.
 
+.. important:: Keep in mind that operating as S3 backed object store might cause additional costs.
+   Providers might charge you for storage space and API requests performed to the buckets, egress
+   and bandwidth fees might be charged as well. Therefore, monitoring of these values and eventual
+   costs is highly recommended.
+
 In the endpoint configuration, provide the REST API endpoint for the object store. The endpoint
 is provider dependent and allows for the bucket and region templating. For example, configuring
 the endpoint as e.g. ``{{bucket}}.s3.{{region}}.amazonaws.com`` will be expanded to
