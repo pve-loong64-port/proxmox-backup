@@ -2,14 +2,23 @@
 
 use anyhow::{bail, format_err, Error};
 
-use serde_json::Value;
+use hyper::header::CONTENT_TYPE;
+use hyper::http::request::Parts;
+use hyper::Response;
+use serde_json::{json, Value};
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use proxmox_auth_api::api::API_METHOD_CREATE_TICKET_HTTP_ONLY;
+use proxmox_auth_api::types::{CreateTicket, CreateTicketResponse};
 use proxmox_router::{
-    http_bail, http_err, list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap,
+    http_bail, http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture,
+    Permission, Router, RpcEnvironment, SubdirMap,
 };
-use proxmox_schema::api;
+use proxmox_schema::{
+    api, AllOfSchema, ApiType, BooleanSchema, ObjectSchema, ParameterSchema, ReturnType,
+};
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
@@ -268,7 +277,9 @@ const SUBDIRS: SubdirMap = &sorted!([
     ),
     (
         "ticket",
-        &Router::new().post(&proxmox_auth_api::api::API_METHOD_CREATE_TICKET)
+        &Router::new()
+            .post(&API_METHOD_CREATE_TICKET_TOGGLE)
+            .delete(&proxmox_auth_api::api::API_METHOD_LOGOUT)
     ),
     ("openid", &openid::ROUTER),
     ("domains", &domain::ROUTER),
@@ -276,6 +287,63 @@ const SUBDIRS: SubdirMap = &sorted!([
     ("users", &user::ROUTER),
     ("tfa", &tfa::ROUTER),
 ]);
+
+const API_METHOD_CREATE_TICKET_TOGGLE: ApiMethod = ApiMethod::new_full(
+    &proxmox_router::ApiHandler::AsyncHttpBodyParameters(&handle_ticket_toggle),
+    ParameterSchema::AllOf(&AllOfSchema::new(
+        "Either create a new HttpOnly ticket or a regular ticket.",
+        &[
+            &ObjectSchema::new(
+                "<INNER: Toggle between HttpOnly or legacy ticket endpoints.>",
+                &[(
+                    "http-only",
+                    true,
+                    &BooleanSchema::new("Whether the HttpOnly authentication flow should be used.")
+                        .default(false)
+                        .schema(),
+                )],
+            )
+            .schema(),
+            &CreateTicket::API_SCHEMA,
+        ],
+    )),
+)
+.returns(ReturnType::new(false, &CreateTicketResponse::API_SCHEMA))
+.protected(true)
+.access(None, &Permission::World);
+
+fn handle_ticket_toggle(
+    parts: Parts,
+    mut param: Value,
+    info: &'static ApiMethod,
+    mut rpcenv: Box<dyn RpcEnvironment>,
+) -> ApiResponseFuture {
+    // If the client specifies that they want to use HttpOnly cookies, prefer those.
+    if Some(true) == param["http-only"].take().as_bool() {
+        if let ApiHandler::AsyncHttpBodyParameters(handler) =
+            API_METHOD_CREATE_TICKET_HTTP_ONLY.handler
+        {
+            tracing::debug!("client requests HttpOnly authentication, using new endpoint...");
+            return handler(parts, param, info, rpcenv);
+        }
+    }
+
+    // Otherwise, default back to the previous ticket method.
+    Box::pin(async move {
+        let create_params: CreateTicket = serde_json::from_value(param)?;
+
+        let ticket_response =
+            proxmox_auth_api::api::create_ticket(create_params, rpcenv.as_mut()).await?;
+
+        let response = Response::builder().header(CONTENT_TYPE, "application/json");
+
+        Ok(response.body(
+            json!({"data": ticket_response, "status": 200, "success": true })
+                .to_string()
+                .into(),
+        )?)
+    })
+}
 
 pub const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))
