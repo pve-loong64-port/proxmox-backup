@@ -20,7 +20,7 @@ use pbs_config::CachedUserInfo;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::{DataStore, StoreProgress};
 
-use crate::tape::TapeNotificationMode;
+use crate::tape::{assert_datastore_type, TapeNotificationMode};
 use crate::{
     server::{
         jobstate::{compute_schedule_status, Job, JobState},
@@ -140,6 +140,8 @@ pub fn do_tape_backup_job(
     schedule: Option<String>,
     to_stdout: bool,
 ) -> Result<String, Error> {
+    assert_datastore_type(&setup.store)?;
+
     let job_id = format!(
         "{}:{}:{}:{}",
         setup.store,
@@ -302,6 +304,8 @@ pub fn backup(
     force_media_set: bool,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
+    assert_datastore_type(&setup.store)?;
+
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     check_backup_permission(&auth_id, &setup.store, &setup.pool, &setup.drive)?;

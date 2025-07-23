@@ -37,7 +37,7 @@ use pbs_tape::{
 };
 
 use crate::backup::check_ns_modification_privs;
-use crate::tape::TapeNotificationMode;
+use crate::tape::{assert_datastore_type, TapeNotificationMode};
 use crate::{
     tape::{
         drive::{lock_tape_device, request_and_load_media, set_tape_device_state, TapeDriver},
@@ -352,6 +352,10 @@ pub fn restore(
     let used_datastores = store_map.used_datastores();
     if used_datastores.is_empty() {
         bail!("no datastores given");
+    }
+
+    for (_, (target, _)) in &used_datastores {
+        assert_datastore_type(target.name())?;
     }
 
     for (target, namespaces) in used_datastores.values() {

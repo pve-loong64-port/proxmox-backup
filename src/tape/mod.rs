@@ -1,6 +1,6 @@
 //! Magnetic tape backup
 
-use anyhow::{format_err, Error};
+use anyhow::{bail, format_err, Error};
 use proxmox_auth_api::types::Userid;
 
 use proxmox_sys::fs::{create_path, CreateOptions};
@@ -152,6 +152,16 @@ impl From<(Option<Userid>, Option<NotificationMode>)> for TapeNotificationMode {
                 Self::LegacySendmail { notify_user }
             }
             NotificationMode::NotificationSystem => Self::NotificationSystem,
+        }
+    }
+}
+
+/// Asserts that the datastore is on a supported backend type
+pub fn assert_datastore_type(store: &str) -> Result<(), Error> {
+    match pbs_config::datastore::datastore_backend_type(store)? {
+        pbs_api_types::DatastoreBackendType::Filesystem => Ok(()),
+        pbs_api_types::DatastoreBackendType::S3 => {
+            bail!("direct s3/tape operations are not supported")
         }
     }
 }

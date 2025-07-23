@@ -13,6 +13,8 @@ use pbs_api_types::{
 
 use pbs_config::CachedUserInfo;
 
+use crate::tape::assert_datastore_type;
+
 #[api(
     input: {
         properties: {},
@@ -71,6 +73,8 @@ pub fn create_tape_backup_job(
     job: TapeBackupJobConfig,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
+    assert_datastore_type(&job.setup.store)?;
+
     let _lock = pbs_config::tape_job::lock()?;
 
     let (mut config, _digest) = pbs_config::tape_job::config()?;
@@ -180,6 +184,9 @@ pub fn update_tape_backup_job(
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
 ) -> Result<(), Error> {
+    if let Some(store) = &update.setup.store {
+        assert_datastore_type(&store)?;
+    }
     let _lock = pbs_config::tape_job::lock()?;
 
     let (mut config, expected_digest) = pbs_config::tape_job::config()?;
