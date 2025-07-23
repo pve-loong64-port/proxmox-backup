@@ -7,6 +7,7 @@ use bytes::Bytes;
 use futures::*;
 use http_body_util::{BodyDataStream, BodyExt};
 use hyper::body::Incoming;
+use hyper::header::SET_COOKIE;
 use hyper::http::header::HeaderValue;
 use hyper::http::Uri;
 use hyper::http::{Request, Response};
@@ -111,11 +112,16 @@ mod resolver {
 /// certain error conditions. Keep it generous, to avoid false-positive under high load.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
+const PROXMOX_BACKUP_AUTH_COOKIE: &str = "PBSAuthCookie";
+const PROXMOX_BACKUP_PREFIXED_AUTH_COOKIE: &str = "__Host-PBSAuthCookie";
+
 #[derive(Clone)]
 pub struct AuthInfo {
     pub auth_id: Authid,
     pub ticket: String,
     pub token: String,
+    // Whether the server uses HttpOnly cookies for authentication
+    pub http_only: bool,
 }
 
 pub struct HttpClientOptions {
@@ -504,6 +510,7 @@ impl HttpClient {
             auth_id: auth_id.clone(),
             ticket: password.clone(),
             token: "".to_string(),
+            http_only: false,
         }));
 
         let server2 = server.to_string();
@@ -725,10 +732,18 @@ impl HttpClient {
                 HeaderValue::from_str(&enc_api_token).unwrap(),
             );
         } else {
+            let cookie_name = if auth.http_only {
+                // server has switched to http only flow, provide ticket in properly prefixed cookie
+                PROXMOX_BACKUP_PREFIXED_AUTH_COOKIE
+            } else {
+                PROXMOX_BACKUP_AUTH_COOKIE
+            };
+
             let enc_ticket = format!(
-                "PBSAuthCookie={}",
+                "{cookie_name}={}",
                 percent_encode(auth.ticket.as_bytes(), DEFAULT_ENCODE_SET)
             );
+
             req.headers_mut()
                 .insert("Cookie", HeaderValue::from_str(&enc_ticket).unwrap());
             req.headers_mut().insert(
@@ -767,10 +782,18 @@ impl HttpClient {
 
         let auth = self.login().await?;
 
+        let cookie_name = if auth.http_only {
+            // server has switched to http only flow, provide ticket in properly prefixed cookie
+            PROXMOX_BACKUP_PREFIXED_AUTH_COOKIE
+        } else {
+            PROXMOX_BACKUP_AUTH_COOKIE
+        };
+
         let enc_ticket = format!(
-            "PBSAuthCookie={}",
+            "{cookie_name}={}",
             percent_encode(auth.ticket.as_bytes(), DEFAULT_ENCODE_SET)
         );
+
         req.headers_mut()
             .insert("Cookie", HeaderValue::from_str(&enc_ticket).unwrap());
 
@@ -836,10 +859,18 @@ impl HttpClient {
                 HeaderValue::from_str(&enc_api_token).unwrap(),
             );
         } else {
+            let cookie_name = if auth.http_only {
+                // server has switched to http only flow, provide ticket in properly prefixed cookie
+                PROXMOX_BACKUP_PREFIXED_AUTH_COOKIE
+            } else {
+                PROXMOX_BACKUP_AUTH_COOKIE
+            };
+
             let enc_ticket = format!(
-                "PBSAuthCookie={}",
+                "{cookie_name}={}",
                 percent_encode(auth.ticket.as_bytes(), DEFAULT_ENCODE_SET)
             );
+
             req.headers_mut()
                 .insert("Cookie", HeaderValue::from_str(&enc_ticket).unwrap());
             req.headers_mut().insert(
@@ -905,14 +936,43 @@ impl HttpClient {
             "/api2/json/access/ticket",
             Some(data),
         )?;
-        let cred = Self::api_request(client, req).await?;
+
+        let res = tokio::time::timeout(HTTP_TIMEOUT, client.request(req))
+            .await
+            .map_err(|_| format_err!("http request timed out"))??;
+
+        // check if the headers contain a newer HttpOnly cookie
+        let http_only_ticket = res
+            .headers()
+            .get_all(SET_COOKIE)
+            .iter()
+            .filter_map(|c| c.to_str().ok())
+            .filter_map(|c| match (c.find('='), c.find(';')) {
+                (Some(begin), Some(end))
+                    if begin < end && &c[..begin] == PROXMOX_BACKUP_PREFIXED_AUTH_COOKIE =>
+                {
+                    Some(c[begin + 1..end].to_string())
+                }
+                _ => None,
+            })
+            .next();
+
+        // if the headers contained a new HttpOnly cookie, the server switched to providing these
+        // by default. this means that older cookies may no longer be supported, so switch to using
+        // the new cookie name.
+        let http_only = http_only_ticket.is_some();
+
+        let cred = Self::api_response(res).await?;
         let auth = AuthInfo {
             auth_id: cred["data"]["username"].as_str().unwrap().parse()?,
-            ticket: cred["data"]["ticket"].as_str().unwrap().to_owned(),
+            ticket: http_only_ticket
+                .or(cred["data"]["ticket"].as_str().map(|t| t.to_string()))
+                .unwrap(),
             token: cred["data"]["CSRFPreventionToken"]
                 .as_str()
                 .unwrap()
                 .to_owned(),
+            http_only,
         };
 
         Ok(auth)
