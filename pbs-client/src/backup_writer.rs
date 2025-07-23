@@ -102,8 +102,10 @@ impl BackupWriter {
             "store": writer_options.datastore,
             "debug": writer_options.debug,
             "benchmark": writer_options.benchmark,
-            "no-cache": writer_options.no_cache,
         });
+        if writer_options.no_cache {
+            param["no-cache"] = serde_json::to_value(writer_options.no_cache)?;
+        }
 
         if !writer_options.ns.is_root() {
             param["ns"] = serde_json::to_value(writer_options.ns)?;
