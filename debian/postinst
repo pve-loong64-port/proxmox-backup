@@ -39,6 +39,14 @@ case "$1" in
 			    || echo "Failed to move prune jobs, please check manually"
 		fi
 
+		# TODO: remove with 4.1+, this was just exposed on internal testing.
+		if dpkg --compare-versions "$2" 'lt' '4.0.5~'; then
+			if [ -e /etc/proxmox-backup/s3.cfg ]; then
+				sed -i 's/^s3client:/s3-endpoint:/' /etc/proxmox-backup/s3.cfg \
+				 || echo "Failed to rename 's3client' config section-type to 's3-endpoint' in /etc/proxmox-backup/s3.cfg."
+			fi
+		fi
+
 		# TODO: remove with PBS 5+
 		if dpkg --compare-versions "$2" 'lt' '4.0.2~'; then
 			proxmox-backup-manager migrate-config default-notification-mode \

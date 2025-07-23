@@ -8,7 +8,7 @@ Ext.define('PBS.form.S3ClientSelector', {
     displayField: 'id',
 
     store: {
-        model: 'pmx-s3client',
+        model: 'pmx-s3-endpoint',
         autoLoad: true,
         sorters: 'id',
     },

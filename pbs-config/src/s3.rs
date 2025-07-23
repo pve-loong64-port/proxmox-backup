@@ -7,7 +7,6 @@ use proxmox_s3_client::{S3ClientConf, S3_CLIENT_ID_SCHEMA};
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-
 use pbs_buildcfg::configdir;
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
@@ -16,8 +15,11 @@ pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
 fn init() -> SectionConfig {
     let obj_schema = S3ClientConf::API_SCHEMA.unwrap_all_of_schema();
-    let plugin =
-        SectionConfigPlugin::new("s3client".to_string(), Some(String::from("id")), obj_schema);
+    let plugin = SectionConfigPlugin::new(
+        "s3-endpoint".to_string(),
+        Some(String::from("id")),
+        obj_schema,
+    );
     let mut config = SectionConfig::new(&S3_CLIENT_ID_SCHEMA);
     config.register_plugin(plugin);
 
@@ -30,7 +32,7 @@ pub const S3_CFG_FILENAME: &str = configdir!("/s3.cfg");
 pub const S3_CFG_LOCKFILE: &str = configdir!("/.s3.lck");
 
 /// Config type for s3 client config entries
-pub const S3_CFG_TYPE_ID: &str = "s3client";
+pub const S3_CFG_TYPE_ID: &str = "s3-endpoint";
 
 /// Get exclusive lock for S3 client configuration update.
 pub fn lock_config() -> Result<BackupLockGuard, Error> {

@@ -329,7 +329,7 @@ certificate and path-style bucket:
 
    # cat /etc/proxmox-backup/s3.cfg
 
-   s3client: ceph-s3-rados-gw
+   s3-endpoint: ceph-s3-rados-gw
         access-key XXXXXXXXXXXXXXXXXXXX
         endpoint 172.16.0.200
         fingerprint XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX
@@ -351,7 +351,7 @@ url:
 
    # cat /etc/proxmox-backup/s3.cfg
 
-   s3client: aws-s3
+   s3-endpoint: aws-s3
         access-key XXXXXXXXXXXXXXXXXXXX
         endpoint {{bucket}}.s3.{{region}}.amazonaws.com
         region eu-central-1
@@ -370,7 +370,7 @@ otherwise request authentication might fail:
 
    # cat /etc/proxmox-backup/s3.cfg
 
-   s3client: cloudflare-r2
+   s3-endpoint: cloudflare-r2
         access-key XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         endpoint XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.r2.cloudflarestorage.com
         path-style true

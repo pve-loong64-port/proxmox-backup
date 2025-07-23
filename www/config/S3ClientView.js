@@ -1,4 +1,4 @@
-Ext.define('pmx-s3client', {
+Ext.define('pmx-s3-endpoint', {
     extend: 'Ext.data.Model',
     fields: ['id', 'endpoint', 'port', 'access-key', 'secret-key', 'region', 'fingerprint'],
     idProperty: 'id',
@@ -15,7 +15,7 @@ Ext.define('PBS.config.S3ClientView', {
     title: gettext('S3 Endpoints'),
 
     stateful: true,
-    stateId: 'grid-s3clients',
+    stateId: 'grid-s3-endpoints',
     tools: [PBS.Utils.get_help_tool('backup-s3-client')],
 
     controller: {
@@ -71,8 +71,8 @@ Ext.define('PBS.config.S3ClientView', {
         sorters: 'id',
         rstore: {
             type: 'update',
-            storeid: 'pmx-s3client',
-            model: 'pmx-s3client',
+            storeid: 'pmx-s3-endpoint',
+            model: 'pmx-s3-endpoint',
             autoStart: true,
             interval: 5000,
         },
