@@ -39,7 +39,7 @@ case "$1" in
 			    || echo "Failed to move prune jobs, please check manually"
 		fi
 
-		# TODO: Make sure the version is correct when applying
+		# TODO: remove with PBS 5+
 		if dpkg --compare-versions "$2" 'lt' '4.0.2~'; then
 			proxmox-backup-manager migrate-config default-notification-mode \
 			    || echo "Failed migrate tape-job/datastore notification mode, please check manually"
