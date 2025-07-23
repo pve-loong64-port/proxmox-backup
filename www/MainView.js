@@ -172,6 +172,7 @@ Ext.define('PBS.MainView', {
                         params: {
                             username: Proxmox.UserName,
                             password: ticket,
+                            'http-only': true,
                         },
                         url: '/api2/json/access/ticket',
                         method: 'POST',

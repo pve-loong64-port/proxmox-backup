@@ -8,6 +8,12 @@ Ext.define('PBS.Utils', {
     missingText: gettext('missing'),
 
     updateLoginData: function (data) {
+        if (data['ticket-info']) {
+            // we received a HttpOnly ticket response, the actual cookie is handled by the browser.
+            // set the ticket field to use the information from `ticket-info`
+            data.ticket = data['ticket-info'];
+        }
+
         Proxmox.Utils.setAuthData(data);
     },
 

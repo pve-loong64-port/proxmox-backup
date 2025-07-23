@@ -86,6 +86,8 @@ Ext.define('PBS.LoginView', {
             }
             sp.set(saveunField.getStateId(), saveunField.getValue());
 
+            creds['http-only'] = true;
+
             try {
                 let resp = await Proxmox.Async.api2({
                     url: '/api2/extjs/access/ticket',
@@ -94,7 +96,7 @@ Ext.define('PBS.LoginView', {
                 });
 
                 let data = resp.result.data;
-                if (data.ticket.startsWith('PBS:!tfa!')) {
+                if (data.ticket?.startsWith('PBS:!tfa!')) {
                     data = await me.performTFAChallenge(data);
                 }
 

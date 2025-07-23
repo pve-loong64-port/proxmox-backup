@@ -18,7 +18,17 @@ Ext.define('PBS.Application', {
     logout: function () {
         var me = this;
         Proxmox.Utils.authClear();
-        me.changeView('loginview', true);
+        Proxmox.Utils.API2Request({
+            url: '/api2/extjs/access/ticket',
+            method: 'DELETE',
+            success: function () {
+                me.changeView('loginview', true);
+            },
+            failure: function ({ response }) {
+                // logout failed
+                console.error('could not log out', response);
+            },
+        });
     },
 
     changeView: function (view, skipCheck) {
