@@ -7,9 +7,9 @@ Overview
 --------
 
 * Proxmox Backup Server emits :ref:`notification_events` in case of noteworthy
-  events in the system. These events are handled by the notification system. A
-  notification event has metadata, for example a timestamp, a severity level, a
-  type and other metadata fields.
+  events in the system. These events are processed based on the global
+  notification settings. Each notification event includes metadata, such as a
+  timestamp, severity level, type, and additional event-specific fields.
 * :ref:`notification_matchers` route a notification event to one or more
   notification targets. A matcher can have match rules to selectively route
   based on the metadata of a notification event.
@@ -17,12 +17,7 @@ Overview
   is routed to by a matcher. There are multiple types of target, mail-based
   (Sendmail and SMTP) and Gotify.
 
-Datastores and tape backup jobs have a configurable :ref:`notification_mode`.
-It allows you to choose between the notification system and a legacy mode for
-sending notification emails. The legacy mode is equivalent to the way
-notifications were handled before Proxmox Backup Server 3.2.
-
-The notification system can be configured in the GUI under *Configuration →
+Global notification settings can be configured in the GUI under *Configuration →
 Notifications*. The configuration is stored in :ref:`notifications.cfg` and
 :ref:`notifications_priv.cfg` - the latter contains sensitive configuration
 options such as passwords or authentication tokens for notification targets and
@@ -304,9 +299,8 @@ Metadata field       Description
 System Mail Forwarding
 ----------------------
 Certain local system daemons, such as ``smartd``, send notification emails to
-the local ``root`` user. Proxmox Backup Server will feed these mails into the
-notification system as a notification of type ``system-mail`` and with severity
-``unknown``.
+the local ``root`` user. These mails are converted into notification events
+with the type ``system-mail`` and with a severity of ``unknown``.
 
 When the email is forwarded to a sendmail target, the mail's content and
 headers are forwarded as-is. For all other targets, the system tries to extract
@@ -327,24 +321,14 @@ Notification Mode
 Datastores and tape backup/restore job configuration have a
 ``notification-mode`` option which can have one of two values:
 
-* ``legacy-sendmail``: Send notification emails via the system's ``sendmail``
-  command. The notification system will be bypassed and any configured
-  targets/matchers will be ignored. This mode is equivalent to the notification
-  behavior for version before Proxmox Backup Server 3.2.
+* Send notifications based on the global notification settings (``notification-system``).
 
-* ``notification-system``: Use the new, flexible notification system.
+* Send notification emails via the system's ``sendmail`` command
+  (``legacy-sendmail``). Any targets or matchers from the global notification
+  settings are ignored. This mode is equivalent to the notification behavior
+  for version before Proxmox Backup Server 3.2. It might be removed in a
+  later release of Proxmox Backup Server.
 
-If the ``notification-mode`` option is not set, Proxmox Backup Server will
-default to ``legacy-sendmail``.
-
-Starting with Proxmox Backup Server 3.2, a datastore created in the UI will
-automatically opt in to the new notification system. If the datastore is
-created via the API or the ``proxmox-backup-manager`` CLI, the
-``notification-mode`` option has to be set explicitly to
-``notification-system`` if the notification system shall be used.
-
-The ``legacy-sendmail`` mode might be removed in a later release of
-Proxmox Backup Server.
 
 Settings for ``legacy-sendmail`` notification mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -364,8 +348,9 @@ task type via the ``notify`` option.
 
 * Never: do not send any notification at all
 
-The ``notify-user`` and ``notify`` options are ignored if ``notification-mode``
-is set to ``notification-system``.
+The ``notify-user`` and ``notify`` options are ignored when using the global
+notification settings (``notification-mode`` is set to
+``notification-system``).
 
 Overriding Notification Templates
 ---------------------------------
