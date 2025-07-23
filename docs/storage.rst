@@ -314,6 +314,76 @@ same datastore name must be used.
    on the S3 object store manually and refresh the contents via an ``S3 refresh``, either via the
    CLI or UI.
 
+
+S3 Datastore Backend Configuration Examples
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following shows example configurations for some typical S3 object store providers as excerpts
+(data relevant to S3 config only) from ``/etc/proxmox-backup/s3.cfg`` and
+``/etc/proxmox-backup/datastore.cfg``:
+
+Self hosted S3 object store with Ceph Rados Gateway using plain IP address, custom port, self-signed
+certificate and path-style bucket:
+
+.. code-block:: console
+
+   # cat /etc/proxmox-backup/s3.cfg
+
+   s3client: ceph-s3-rados-gw
+        access-key XXXXXXXXXXXXXXXXXXXX
+        endpoint 172.16.0.200
+        fingerprint XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX
+        path-style true
+        port 7480
+        secret-key XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+
+   # cat /etc/proxmox-backup/datastore.cfg
+
+   datastore: ceph-s3-rgw-store
+        backend bucket=pbs-ceph-bucket,client=ceph-s3-rados-gw,type=s3
+        path /mnt/datastore/ceph-s3-rgw-store-local-cache
+
+AWS S3 with vhost style bucket addressing, using bucket name and region templating for the endpoint
+url:
+
+.. code-block:: console
+
+   # cat /etc/proxmox-backup/s3.cfg
+
+   s3client: aws-s3
+        access-key XXXXXXXXXXXXXXXXXXXX
+        endpoint {{bucket}}.s3.{{region}}.amazonaws.com
+        region eu-central-1
+        secret-key XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+   # cat /etc/proxmox-backup/datastore.cfg
+
+   datastore: aws-s3-store
+        backend bucket=pbs-s3-bucket,client=aws-s3,type=s3
+        path /mnt/datastore/aws-s3-store-local-cache
+
+Cloudflare R2 with path style bucket addressing, note that region must be set to ``auto`` as
+otherwise request authentication might fail:
+
+.. code-block:: console
+
+   # cat /etc/proxmox-backup/s3.cfg
+
+   s3client: cloudflare-r2
+        access-key XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        endpoint XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.r2.cloudflarestorage.com
+        path-style true
+        region auto
+        secret-key XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+    # cat /etc/proxmox-backup/datastore.cfg
+
+    datastore: r2-s3-store
+        backend bucket=pbs-r2-bucket,client=cloudflare-r2,type=s3
+        path /mnt/datastore/r2-s3-store-local-cache
+
+
 Managing Datastores
 ^^^^^^^^^^^^^^^^^^^
 
