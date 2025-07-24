@@ -45,7 +45,7 @@ case "$1" in
 		fi
 
 		# FIXME: remove after beta is over and add hunk to actively remove the repo
-		BETA_SOURCES="/etc/apt/sources.list.d/pve-test-for-beta.sources"
+		BETA_SOURCES="/etc/apt/sources.list.d/pbs-test-for-beta.sources"
 		if test -e /proxmox_install_mode && ! test -f "$BETA_SOURCES"; then
 			echo "Adding pbs-test repo to '$BETA_SOURCES' to enable updates during Proxmox Backup Server 4.0 BETA"
 			printf 'Types: deb\nURIs: http://download.proxmox.com/debian/pbs\nSuites: trixie\nComponents: pbs-test\nSigned-By: /usr/share/keyrings/proxmox-archive-keyring.gpg\n' \
