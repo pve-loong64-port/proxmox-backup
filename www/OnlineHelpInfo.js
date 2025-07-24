@@ -287,6 +287,14 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/storage.html#storage-datastore-create",
     "title": "Creating a Datastore"
   },
+  "datastore-s3-backend": {
+    "link": "/docs/storage.html#datastore-s3-backend",
+    "title": "Datastores with S3 Backend"
+  },
+  "datastore-s3-endpoint-examples": {
+    "link": "/docs/storage.html#datastore-s3-endpoint-examples",
+    "title": "S3 Datastore Backend Configuration Examples"
+  },
   "storage-namespaces": {
     "link": "/docs/storage.html#storage-namespaces",
     "title": "Backup Namespaces"

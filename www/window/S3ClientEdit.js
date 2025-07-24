@@ -3,7 +3,7 @@ Ext.define('PBS.window.S3ClientEdit', {
     alias: 'widget.pbsS3ClientEdit',
     mixins: ['Proxmox.Mixin.CBind'],
 
-    onlineHelp: 'backup_s3client',
+    onlineHelp: 'datastore-s3-backend',
 
     isAdd: true,
 

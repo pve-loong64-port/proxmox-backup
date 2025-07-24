@@ -233,6 +233,8 @@ datastore is not mounted when they are scheduled. Sync jobs start, but fail
 with an error saying the datastore was not mounted. The reason is that syncs
 not happening as scheduled should at least be noticeable.
 
+.. _datastore_s3_backend:
+
 Datastores with S3 Backend
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -314,6 +316,8 @@ same datastore name must be used.
    on the S3 object store manually and refresh the contents via an ``S3 refresh``, either via the
    CLI or UI.
 
+
+.. _datastore_s3_endpoint_examples:
 
 S3 Datastore Backend Configuration Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
