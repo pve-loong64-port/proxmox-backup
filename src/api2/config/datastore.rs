@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, format_err, Context, Error};
 use hex::FromHex;
 use http_body_util::BodyExt;
 use serde_json::Value;
@@ -341,7 +341,8 @@ pub fn create_datastore(
         DataStore::s3_client_and_backend_from_datastore_config(&config)?
     {
         proxmox_async::runtime::block_on(s3_client.head_bucket())
-            .context("failed to access bucket")?;
+            .context("failed to access bucket")
+            .map_err(|err| format_err!("{err:#}"))?;
     }
 
     WorkerTask::new_thread(

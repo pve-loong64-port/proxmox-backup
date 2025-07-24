@@ -2435,7 +2435,9 @@ impl DataStore {
             Some(bucket),
             datastore_config.name.to_owned(),
         );
-        let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+        let s3_client = S3Client::new(options)
+            .context("failed to create s3 client")
+            .map_err(|err| format_err!("{err:#}"))?;
         Ok((backend_type, Some(s3_client)))
     }
 }
