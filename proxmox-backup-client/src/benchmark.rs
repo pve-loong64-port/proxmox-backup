@@ -103,22 +103,22 @@ static BENCHMARK_RESULT_2020_TOP: BenchmarkResult = BenchmarkResult {
 };
 
 #[api(
-   input: {
-       properties: {
-           repository: {
-               schema: REPO_URL_SCHEMA,
-               optional: true,
-           },
-           keyfile: {
-               schema: KEYFILE_SCHEMA,
-               optional: true,
-           },
-           "output-format": {
-               schema: OUTPUT_FORMAT,
-               optional: true,
-           },
-       }
-   }
+    input: {
+        properties: {
+            repository: {
+                schema: REPO_URL_SCHEMA,
+                optional: true,
+            },
+            keyfile: {
+                schema: KEYFILE_SCHEMA,
+                optional: true,
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        },
+    },
 )]
 /// Run benchmark tests
 pub async fn benchmark(
