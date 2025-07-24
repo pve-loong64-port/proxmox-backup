@@ -71,7 +71,7 @@ pub async fn check(
 }
 
 #[sortable]
-const S3_OPERATION_SUBDIRS: SubdirMap = &[("check", &Router::new().get(&API_METHOD_CHECK))];
+const S3_OPERATION_SUBDIRS: SubdirMap = &[("check", &Router::new().put(&API_METHOD_CHECK))];
 
 const S3_OPERATION_ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(S3_OPERATION_SUBDIRS))
