@@ -131,57 +131,54 @@ pub(crate) fn do_create_datastore(
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
 
-    let mut backend_s3_client = None;
-    if let Some(ref backend_config) = datastore.backend {
-        let backend_config: DatastoreBackendConfig = backend_config.parse()?;
-        match backend_config.ty.unwrap_or_default() {
-            DatastoreBackendType::Filesystem => (),
-            DatastoreBackendType::S3 => {
-                if !overwrite_in_use {
-                    let s3_client_id = backend_config
-                        .client
-                        .as_ref()
-                        .ok_or_else(|| format_err!("missing required client"))?;
-                    let bucket = backend_config
-                        .bucket
-                        .clone()
-                        .ok_or_else(|| format_err!("missing required bucket"))?;
-                    let (config, _config_digest) =
-                        pbs_config::s3::config().context("failed to get s3 config")?;
-                    let config: S3ClientConf = config
-                        .lookup(S3_CFG_TYPE_ID, s3_client_id)
-                        .with_context(|| format!("no '{s3_client_id}' in config"))?;
-                    let options = S3ClientOptions::from_config(
-                        config.config,
-                        config.secret_key,
-                        bucket,
-                        datastore.name.to_owned(),
-                    );
-                    let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+    let backend_config: DatastoreBackendConfig =
+        datastore.backend.as_deref().unwrap_or("").parse()?;
+    let backend_type = backend_config.ty.unwrap_or_default();
+    let backend_s3_client = if backend_type == DatastoreBackendType::S3 {
+        let s3_client_id = backend_config
+            .client
+            .as_ref()
+            .ok_or_else(|| format_err!("missing required client"))?;
+        let bucket = backend_config
+            .bucket
+            .clone()
+            .ok_or_else(|| format_err!("missing required bucket"))?;
+        let (config, _config_digest) =
+            pbs_config::s3::config().context("failed to get s3 config")?;
+        let config: S3ClientConf = config
+            .lookup(S3_CFG_TYPE_ID, s3_client_id)
+            .with_context(|| format!("no '{s3_client_id}' in config"))?;
+        let options = S3ClientOptions::from_config(
+            config.config,
+            config.secret_key,
+            bucket,
+            datastore.name.to_owned(),
+        );
+        let s3_client = S3Client::new(options).context("failed to create s3 client")?;
 
-                    let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
-                        .context("failed to generate s3 object key")?;
-                    if let Some(response) =
-                        proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
-                            .context("failed to get in-use marker from bucket")?
-                    {
-                        let content = proxmox_async::runtime::block_on(response.content.collect())
-                            .unwrap_or_default();
-                        let content =
-                            String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
-                        let in_use: InUseContent =
-                            serde_json::from_str(&content).unwrap_or_default();
-                        if let Some(hostname) = in_use.hostname {
-                            bail!("Bucket already contains datastore in use by host {hostname}");
-                        } else {
-                            bail!("Bucket already contains datastore in use");
-                        }
-                    }
-                    backend_s3_client = Some(Arc::new(s3_client));
+        if !overwrite_in_use {
+            let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+                .context("failed to generate s3 object key")?;
+            if let Some(response) =
+                proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
+                    .context("failed to get in-use marker from bucket")?
+            {
+                let content = proxmox_async::runtime::block_on(response.content.collect())
+                    .unwrap_or_default();
+                let content = String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
+                let in_use: InUseContent = serde_json::from_str(&content).unwrap_or_default();
+                if let Some(hostname) = in_use.hostname {
+                    bail!("Bucket already contains datastore in use by host {hostname}");
+                } else {
+                    bail!("Bucket already contains datastore in use");
                 }
             }
         }
-    }
+
+        Some(Arc::new(s3_client))
+    } else {
+        None
+    };
 
     let unmount_guard = if datastore.backing_device.is_some() {
         do_mount_device(datastore.clone())?;
@@ -190,7 +187,7 @@ pub(crate) fn do_create_datastore(
         UnmountGuard::new(None)
     };
 
-    let chunk_store = if reuse_datastore && backend_s3_client.is_none() {
+    let chunk_store = if reuse_datastore && backend_type == DatastoreBackendType::Filesystem {
         ChunkStore::verify_chunkstore(&path).and_then(|_| {
             // Must be the only instance accessing and locking the chunk store,
             // dropping will close all other locks from this process on the lockfile as well.
@@ -201,12 +198,24 @@ pub(crate) fn do_create_datastore(
             )
         })?
     } else {
-        if let Ok(dir) = std::fs::read_dir(&path) {
-            for file in dir {
-                let name = file?.file_name();
-                let name = name.to_str();
-                if !name.is_some_and(|name| name.starts_with('.') || name == "lost+found") {
-                    bail!("datastore path not empty");
+        if !reuse_datastore && backend_type == DatastoreBackendType::Filesystem {
+            if let Ok(dir) = std::fs::read_dir(&path) {
+                for file in dir {
+                    let name = file?.file_name();
+                    let name = name.to_str();
+                    if !name.is_some_and(|name| name.starts_with('.') || name == "lost+found") {
+                        bail!("datastore path not empty");
+                    }
+                }
+            }
+        }
+        if reuse_datastore && backend_type == DatastoreBackendType::S3 {
+            let chunks_path = path.join(".chunks");
+            if let Err(err) = std::fs::remove_dir_all(&chunks_path) {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    return Err(err).with_context(|| {
+                        format!("failed to remove pre-existing chunks in {chunks_path:?}")
+                    });
                 }
             }
         }
