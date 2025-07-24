@@ -113,6 +113,12 @@ static BENCHMARK_RESULT_2020_TOP: BenchmarkResult = BenchmarkResult {
                 schema: KEYFILE_SCHEMA,
                 optional: true,
             },
+            "no-cache": {
+                type: Boolean,
+                description: "Bypass local datastore cache for network storages.",
+                optional: true,
+                default: false,
+            },
             "output-format": {
                 schema: OUTPUT_FORMAT,
                 optional: true,
@@ -123,6 +129,7 @@ static BENCHMARK_RESULT_2020_TOP: BenchmarkResult = BenchmarkResult {
 /// Run benchmark tests
 pub async fn benchmark(
     param: Value,
+    no_cache: bool,
     _info: &ApiMethod,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
@@ -145,7 +152,7 @@ pub async fn benchmark(
 
     // do repo tests first, because this may prompt for a password
     if let Some(repo) = repo {
-        test_upload_speed(&mut benchmark_result, repo, crypt_config.clone()).await?;
+        test_upload_speed(&mut benchmark_result, repo, crypt_config.clone(), no_cache).await?;
     }
 
     test_crypt_speed(&mut benchmark_result)?;
@@ -221,6 +228,7 @@ async fn test_upload_speed(
     benchmark_result: &mut BenchmarkResult,
     repo: BackupRepository,
     crypt_config: Option<Arc<CryptConfig>>,
+    no_cache: bool,
 ) -> Result<(), Error> {
     let backup_time = proxmox_time::epoch_i64();
 
@@ -237,7 +245,7 @@ async fn test_upload_speed(
             crypt_config: crypt_config.clone(),
             debug: false,
             benchmark: true,
-            no_cache: true,
+            no_cache,
         },
     )
     .await?;
