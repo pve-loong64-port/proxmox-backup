@@ -9,6 +9,14 @@ case "$1" in
 	# need to have user backup in the tape group
 	usermod -a -G tape backup
 
+	# FIXME: remove after beta is over and add hunk to actively remove the repo
+	BETA_SOURCES="/etc/apt/sources.list.d/pbs-test-for-beta.sources"
+	if test -e /proxmox_install_mode && ! test -f "$BETA_SOURCES"; then
+		echo "Adding pbs-test repo to '$BETA_SOURCES' to enable updates during Proxmox Backup Server 4.0 BETA"
+		printf 'Types: deb\nURIs: http://download.proxmox.com/debian/pbs\nSuites: trixie\nComponents: pbs-test\nSigned-By: /usr/share/keyrings/proxmox-archive-keyring.gpg\n' \
+			| tee "$BETA_SOURCES"
+	fi
+
 	# modeled after dh_systemd_start output
 	systemctl --system daemon-reload >/dev/null || true
 	if [ -n "$2" ]; then
@@ -44,13 +52,6 @@ case "$1" in
 			touch "/run/proxmox-backup/old-locking"
 		fi
 
-		# FIXME: remove after beta is over and add hunk to actively remove the repo
-		BETA_SOURCES="/etc/apt/sources.list.d/pbs-test-for-beta.sources"
-		if test -e /proxmox_install_mode && ! test -f "$BETA_SOURCES"; then
-			echo "Adding pbs-test repo to '$BETA_SOURCES' to enable updates during Proxmox Backup Server 4.0 BETA"
-			printf 'Types: deb\nURIs: http://download.proxmox.com/debian/pbs\nSuites: trixie\nComponents: pbs-test\nSigned-By: /usr/share/keyrings/proxmox-archive-keyring.gpg\n' \
-				| tee "$BETA_SOURCES"
-		fi
 	fi
     ;;
 
