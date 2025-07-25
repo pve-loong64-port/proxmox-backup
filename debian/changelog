@@ -1,3 +1,20 @@
+rust-proxmox-backup (4.0.7-1) trixie; urgency=medium
+
+  * s3 api types: make region regex less strict to allow more providers, like
+    e.g., Hetzner, to work.
+
+  * tell client to remove authentication cookies via http header on
+    unauthorized request.
+
+  * allow log-in via valid parameters even if there is a pre-existing HttpOnly
+    cookie with a (now) invalid ticket, as that should not block valid new
+    logins.
+
+  * don't set `Expire` for HttpOnly cookies anymore as heuristic to try to
+    make browsers clear these login-ticket cookies on exit.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 25 Jul 2025 17:47:33 +0200
+
 rust-proxmox-backup (4.0.6-2) trixie; urgency=medium
 
   * d/postinst: fix setting up pbs-test repo on fresh installation during the
