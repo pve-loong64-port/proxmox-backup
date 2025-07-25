@@ -326,7 +326,7 @@ Datastores and tape backup/restore job configuration have a
 * Send notification emails via the system's ``sendmail`` command
   (``legacy-sendmail``). Any targets or matchers from the global notification
   settings are ignored. This mode is equivalent to the notification behavior
-  for version before Proxmox Backup Server 3.2. It might be removed in a
+  for Proxmox Backup Server versions before 3.2. It might be removed in a
   later release of Proxmox Backup Server.
 
 
