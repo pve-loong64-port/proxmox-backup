@@ -88,6 +88,7 @@ async fn run() -> Result<(), Error> {
     let config = ApiConfig::new(pbs_buildcfg::JS_DIR, RpcEnvironmentType::PRIVILEGED)
         .index_handler_func(|_, _| get_index())
         .auth_handler_func(|h, m| Box::pin(check_pbs_auth(h, m)))
+        .auth_cookie_name(proxmox_backup::auth_helpers::get_auth_cookie_name())
         .default_api2_handler(&proxmox_backup::api2::ROUTER)
         .enable_access_log(
             pbs_buildcfg::API_ACCESS_LOG_FN,

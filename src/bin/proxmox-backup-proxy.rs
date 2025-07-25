@@ -195,6 +195,7 @@ async fn run() -> Result<(), Error> {
     let mut config = ApiConfig::new(pbs_buildcfg::JS_DIR, RpcEnvironmentType::PUBLIC)
         .index_handler_func(|e, p| Box::pin(get_index_future(e, p)))
         .auth_handler_func(|h, m| Box::pin(check_pbs_auth(h, m)))
+        .auth_cookie_name(proxmox_backup::auth_helpers::get_auth_cookie_name())
         .register_template("index", &indexpath)?
         .register_template("console", "/usr/share/pve-xtermjs/index.html.hbs")?
         .default_api2_handler(&proxmox_backup::api2::ROUTER)

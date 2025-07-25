@@ -13,7 +13,7 @@ use pbs_config::open_backup_lockfile;
 use proxmox_router::http_bail;
 use serde_json::json;
 
-use proxmox_auth_api::api::{Authenticator, LockedTfaConfig};
+use proxmox_auth_api::api::{AuthContext, Authenticator, LockedTfaConfig};
 use proxmox_auth_api::ticket::{Empty, Ticket};
 use proxmox_auth_api::types::Authid;
 use proxmox_auth_api::{HMACKey, Keyring};
@@ -375,6 +375,14 @@ pub fn setup_auth_context(use_private_key: bool) {
         .expect("auth context setup twice");
 
     proxmox_auth_api::set_auth_context(AUTH_CONTEXT.get().unwrap());
+}
+
+pub fn get_auth_cookie_name() -> String {
+    AUTH_CONTEXT
+        .get()
+        .expect("auth context needs to be set before accessing the auth cookie name")
+        .prefixed_auth_cookie_name()
+        .to_string()
 }
 
 pub(crate) fn private_auth_keyring() -> &'static Keyring {

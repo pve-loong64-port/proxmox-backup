@@ -10,6 +10,7 @@ use proxmox_sys::fs::{file_get_contents, replace_file, CreateOptions};
 use pbs_buildcfg::configdir;
 use serde_json::json;
 
+pub use crate::auth::get_auth_cookie_name;
 pub use crate::auth::setup_auth_context;
 pub use proxmox_auth_api::api::assemble_csrf_prevention_token;
 
