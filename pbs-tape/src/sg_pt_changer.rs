@@ -18,6 +18,7 @@ use crate::{
 };
 
 const SCSI_CHANGER_DEFAULT_TIMEOUT: usize = 60 * 5; // 5 minutes
+const SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT: usize = 60 * 45; // 45 minutes
 const SCSI_VOLUME_TAG_LEN: usize = 36;
 
 /// Initialize element status (Inventory)
@@ -181,7 +182,7 @@ pub fn load_slot(file: &mut File, from_slot: u64, drivenum: u64) -> Result<(), E
     );
 
     let mut sg_raw = SgRaw::new(file, 64)?;
-    sg_raw.set_timeout(SCSI_CHANGER_DEFAULT_TIMEOUT);
+    sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw
         .do_command(&cmd)
@@ -205,7 +206,7 @@ pub fn unload(file: &mut File, to_slot: u64, drivenum: u64) -> Result<(), Error>
     );
 
     let mut sg_raw = SgRaw::new(file, 64)?;
-    sg_raw.set_timeout(SCSI_CHANGER_DEFAULT_TIMEOUT);
+    sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw
         .do_command(&cmd)
@@ -233,7 +234,7 @@ pub fn transfer_medium<F: AsRawFd>(
     );
 
     let mut sg_raw = SgRaw::new(file, 64)?;
-    sg_raw.set_timeout(SCSI_CHANGER_DEFAULT_TIMEOUT);
+    sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw.do_command(&cmd).map_err(|err| {
         format_err!(
