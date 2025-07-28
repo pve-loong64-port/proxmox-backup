@@ -11,10 +11,11 @@ use proxmox_s3_client::{
 use proxmox_schema::{api, param_bail, ApiType};
 
 use pbs_api_types::{
-    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, JOB_ID_SCHEMA, PRIV_SYS_AUDIT,
-    PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, JOB_ID_SCHEMA,
+    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
 use pbs_config::s3::{self, S3_CFG_TYPE_ID};
+use pbs_config::CachedUserInfo;
 
 #[api(
     input: {
@@ -26,7 +27,8 @@ use pbs_config::s3::{self, S3_CFG_TYPE_ID};
         items: { type: S3ClientConfigWithoutSecret },
     },
     access: {
-        permission: &Permission::Privilege(&[], PRIV_SYS_AUDIT, false),
+        permission: &Permission::Anybody,
+        description: "List configured s3 endpoints filtered by Sys.Audit privileges",
     },
 )]
 /// List all s3 client configurations.
@@ -34,8 +36,20 @@ pub fn list_s3_client_config(
     _param: Value,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<S3ClientConfigWithoutSecret>, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let user_info = CachedUserInfo::new()?;
+
     let (config, digest) = s3::config()?;
-    let list = config.convert_to_typed_array(S3_CFG_TYPE_ID)?;
+    let list: Vec<S3ClientConfigWithoutSecret> = config.convert_to_typed_array(S3_CFG_TYPE_ID)?;
+
+    let list = list
+        .into_iter()
+        .filter(|endpoint| {
+            let privs = user_info.lookup_privs(&auth_id, &["system", "s3-endpoint", &endpoint.id]);
+            privs & PRIV_SYS_AUDIT != 0
+        })
+        .collect();
+
     rpcenv["digest"] = hex::encode(digest).into();
 
     Ok(list)
@@ -59,7 +73,7 @@ pub fn list_s3_client_config(
         },
     },
     access: {
-        permission: &Permission::Privilege(&[], PRIV_SYS_MODIFY, false),
+        permission: &Permission::Privilege(&["system", "s3-endpoint"], PRIV_SYS_MODIFY, false),
     },
 )]
 /// Create a new s3 client configuration.
@@ -97,7 +111,7 @@ pub fn create_s3_client_config(
     },
     returns: { type: S3ClientConfigWithoutSecret },
     access: {
-        permission: &Permission::Privilege(&[], PRIV_SYS_AUDIT, false),
+        permission: &Permission::Privilege(&["system", "s3-endpoint", "{id}"], PRIV_SYS_AUDIT, false),
     },
 )]
 /// Read an s3 client configuration.
@@ -158,7 +172,7 @@ pub enum DeletableProperty {
         },
     },
     access: {
-        permission: &Permission::Privilege(&[], PRIV_SYS_MODIFY, false),
+        permission: &Permission::Privilege(&["system", "s3-endpoint", "{id}"], PRIV_SYS_MODIFY, false),
     },
 )]
 /// Update an s3 client configuration.
@@ -244,7 +258,7 @@ pub fn update_s3_client_config(
         },
     },
     access: {
-        permission: &Permission::Privilege(&[], PRIV_SYS_MODIFY, false),
+        permission: &Permission::Privilege(&["system", "s3-endpoint", "{id}"], PRIV_SYS_MODIFY, false),
     },
 )]
 /// Remove an s3 client configuration.
