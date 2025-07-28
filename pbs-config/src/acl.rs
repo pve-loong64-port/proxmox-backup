@@ -127,6 +127,12 @@ pub fn check_acl_path(path: &str) -> Result<(), Error> {
                         _ => {}
                     }
                 }
+                "s3-endpoint" => {
+                    // /system/s3-endpoint/{id}
+                    if components_len <= 3 {
+                        return Ok(());
+                    }
+                }
                 _ => {}
             }
         }
