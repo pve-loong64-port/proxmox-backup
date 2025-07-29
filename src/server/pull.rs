@@ -613,13 +613,6 @@ async fn pull_group(
         .await?;
     raw_list.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
 
-    let total_amount = raw_list.len();
-
-    let cutoff = params
-        .transfer_last
-        .map(|count| total_amount.saturating_sub(count))
-        .unwrap_or_default();
-
     let target_ns = source_namespace.map_prefix(&params.source.get_ns(), &params.target.ns)?;
 
     let mut source_snapshots = HashSet::new();
@@ -633,8 +626,7 @@ async fn pull_group(
     // Also stores if the snapshot is corrupt (verification job failed)
     let list: Vec<(BackupDir, bool)> = raw_list
         .into_iter()
-        .enumerate()
-        .filter_map(|(pos, item)| {
+        .filter_map(|item| {
             let dir = item.backup;
 
             source_snapshots.insert(dir.time);
@@ -666,6 +658,20 @@ async fn pull_group(
                     }
                 }
             }
+            Some((dir, false))
+        })
+        .collect();
+
+    let total_amount = list.len();
+    let cutoff = params
+        .transfer_last
+        .map(|count| total_amount.saturating_sub(count))
+        .unwrap_or_default();
+
+    let list: Vec<(BackupDir, bool)> = list
+        .into_iter()
+        .enumerate()
+        .filter_map(|(pos, (dir, verified))| {
             // Note: the snapshot represented by `last_sync_time` might be missing its backup log
             // or post-backup verification state if those were not yet available during the last
             // sync run, always resync it
@@ -677,7 +683,7 @@ async fn pull_group(
                 transfer_last_skip_info.update(dir.time);
                 return None;
             }
-            Some((dir, false))
+            Some((dir, verified))
         })
         .collect();
 
