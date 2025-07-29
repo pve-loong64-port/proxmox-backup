@@ -3,8 +3,15 @@
 //! This is a collection of small and useful tools.
 
 use anyhow::{bail, Error};
+use std::collections::HashSet;
 
+use pbs_api_types::{
+    Authid, BackupContent, CryptMode, SnapshotListItem, SnapshotVerifyState, MANIFEST_BLOB_NAME,
+};
 use proxmox_http::{client::Client, HttpOptions, ProxyConfig};
+
+use pbs_datastore::backup_info::{BackupDir, BackupInfo};
+use pbs_datastore::manifest::BackupManifest;
 
 pub mod config;
 pub mod disks;
@@ -59,5 +66,127 @@ pub fn setup_safe_path_env() {
     // Make %ENV safer - as suggested by https://perldoc.perl.org/perlsec.html
     for name in &["IFS", "CDPATH", "ENV", "BASH_ENV"] {
         std::env::remove_var(name);
+    }
+}
+
+pub(crate) fn read_backup_index(
+    backup_dir: &BackupDir,
+) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
+    let (manifest, index_size) = backup_dir.load_manifest()?;
+
+    let mut result = Vec::new();
+    for item in manifest.files() {
+        result.push(BackupContent {
+            filename: item.filename.clone(),
+            crypt_mode: Some(item.crypt_mode),
+            size: Some(item.size),
+        });
+    }
+
+    result.push(BackupContent {
+        filename: MANIFEST_BLOB_NAME.to_string(),
+        crypt_mode: match manifest.signature {
+            Some(_) => Some(CryptMode::SignOnly),
+            None => Some(CryptMode::None),
+        },
+        size: Some(index_size),
+    });
+
+    Ok((manifest, result))
+}
+
+pub(crate) fn get_all_snapshot_files(
+    info: &BackupInfo,
+) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
+    let (manifest, mut files) = read_backup_index(&info.backup_dir)?;
+
+    let file_set = files.iter().fold(HashSet::new(), |mut acc, item| {
+        acc.insert(item.filename.clone());
+        acc
+    });
+
+    for file in &info.files {
+        if file_set.contains(file) {
+            continue;
+        }
+        files.push(BackupContent {
+            filename: file.to_string(),
+            size: None,
+            crypt_mode: None,
+        });
+    }
+
+    Ok((manifest, files))
+}
+
+/// Helper to transform `BackupInfo` to `SnapshotListItem` with given owner.
+pub(crate) fn backup_info_to_snapshot_list_item(
+    info: &BackupInfo,
+    owner: &Authid,
+) -> SnapshotListItem {
+    let backup = info.backup_dir.dir().to_owned();
+    let protected = info.protected;
+    let owner = Some(owner.to_owned());
+
+    match get_all_snapshot_files(info) {
+        Ok((manifest, files)) => {
+            // extract the first line from notes
+            let comment: Option<String> = manifest.unprotected["notes"]
+                .as_str()
+                .and_then(|notes| notes.lines().next())
+                .map(String::from);
+
+            let fingerprint = match manifest.fingerprint() {
+                Ok(fp) => fp,
+                Err(err) => {
+                    eprintln!("error parsing fingerprint: '{}'", err);
+                    None
+                }
+            };
+
+            let verification: Option<SnapshotVerifyState> = match manifest.verify_state() {
+                Ok(verify) => verify,
+                Err(err) => {
+                    eprintln!("error parsing verification state : '{err}'");
+                    None
+                }
+            };
+
+            let size = Some(files.iter().map(|x| x.size.unwrap_or(0)).sum());
+
+            SnapshotListItem {
+                backup,
+                comment,
+                verification,
+                fingerprint,
+                files,
+                size,
+                owner,
+                protected,
+            }
+        }
+        Err(err) => {
+            eprintln!("error during snapshot file listing: '{err}'");
+            let files = info
+                .files
+                .iter()
+                .map(|filename| BackupContent {
+                    filename: filename.to_owned(),
+                    size: None,
+                    crypt_mode: None,
+                })
+                .collect();
+
+            SnapshotListItem {
+                backup,
+                comment: None,
+                verification: None,
+                fingerprint: None,
+                files,
+                size: None,
+                owner,
+                protected,
+            }
+        }
     }
 }

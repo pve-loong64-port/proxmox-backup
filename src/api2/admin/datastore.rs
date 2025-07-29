@@ -1,6 +1,5 @@
 //! Datastore Management
 
-use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
@@ -43,13 +42,12 @@ use pbs_api_types::{
     BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
     DataStoreConfig, DataStoreListItem, DataStoreMountStatus, DataStoreStatus,
     GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions, MaintenanceMode,
-    MaintenanceType, Operation, PruneJobOptions, SnapshotListItem, SnapshotVerifyState,
-    SyncJobConfig, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
-    IGNORE_VERIFIED_BACKUPS_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
-    PRIV_DATASTORE_READ, PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA,
-    VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    MaintenanceType, Operation, PruneJobOptions, SnapshotListItem, SyncJobConfig,
+    BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
+    BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
+    IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT,
+    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ,
+    PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};
 use pbs_config::CachedUserInfo;
@@ -73,8 +71,8 @@ use proxmox_rest_server::{formatter, worker_is_active, WorkerTask};
 use crate::api2::backup::optional_ns_param;
 use crate::api2::node::rrd::create_value_from_rrd;
 use crate::backup::{check_ns_privs_full, ListAccessibleBackupGroups, VerifyWorker, NS_PRIVS_OK};
-
 use crate::server::jobstate::{compute_schedule_status, Job, JobState};
+use crate::tools::{backup_info_to_snapshot_list_item, get_all_snapshot_files, read_backup_index};
 
 // helper to unify common sequence of checks:
 // 1. check privs on NS (full or limited access)
@@ -99,56 +97,6 @@ fn check_privs_and_load_store(
     }
 
     Ok(datastore)
-}
-
-fn read_backup_index(
-    backup_dir: &BackupDir,
-) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
-    let (manifest, index_size) = backup_dir.load_manifest()?;
-
-    let mut result = Vec::new();
-    for item in manifest.files() {
-        result.push(BackupContent {
-            filename: item.filename.clone(),
-            crypt_mode: Some(item.crypt_mode),
-            size: Some(item.size),
-        });
-    }
-
-    result.push(BackupContent {
-        filename: MANIFEST_BLOB_NAME.to_string(),
-        crypt_mode: match manifest.signature {
-            Some(_) => Some(CryptMode::SignOnly),
-            None => Some(CryptMode::None),
-        },
-        size: Some(index_size),
-    });
-
-    Ok((manifest, result))
-}
-
-fn get_all_snapshot_files(
-    info: &BackupInfo,
-) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
-    let (manifest, mut files) = read_backup_index(&info.backup_dir)?;
-
-    let file_set = files.iter().fold(HashSet::new(), |mut acc, item| {
-        acc.insert(item.filename.clone());
-        acc
-    });
-
-    for file in &info.files {
-        if file_set.contains(file) {
-            continue;
-        }
-        files.push(BackupContent {
-            filename: file.to_string(),
-            size: None,
-            crypt_mode: None,
-        });
-    }
-
-    Ok((manifest, files))
 }
 
 #[api(
@@ -516,73 +464,6 @@ unsafe fn list_snapshots_blocking(
         (None, None) => datastore.list_backup_groups(ns.clone())?,
     };
 
-    let info_to_snapshot_list_item = |owner, info: BackupInfo| {
-        let backup = info.backup_dir.dir().to_owned();
-        let protected = info.protected;
-
-        match get_all_snapshot_files(&info) {
-            Ok((manifest, files)) => {
-                // extract the first line from notes
-                let comment: Option<String> = manifest.unprotected["notes"]
-                    .as_str()
-                    .and_then(|notes| notes.lines().next())
-                    .map(String::from);
-
-                let fingerprint = match manifest.fingerprint() {
-                    Ok(fp) => fp,
-                    Err(err) => {
-                        eprintln!("error parsing fingerprint: '{}'", err);
-                        None
-                    }
-                };
-
-                let verification: Option<SnapshotVerifyState> = match manifest.verify_state() {
-                    Ok(verify) => verify,
-                    Err(err) => {
-                        eprintln!("error parsing verification state : '{}'", err);
-                        None
-                    }
-                };
-
-                let size = Some(files.iter().map(|x| x.size.unwrap_or(0)).sum());
-
-                SnapshotListItem {
-                    backup,
-                    comment,
-                    verification,
-                    fingerprint,
-                    files,
-                    size,
-                    owner,
-                    protected,
-                }
-            }
-            Err(err) => {
-                eprintln!("error during snapshot file listing: '{}'", err);
-                let files = info
-                    .files
-                    .into_iter()
-                    .map(|filename| BackupContent {
-                        filename,
-                        size: None,
-                        crypt_mode: None,
-                    })
-                    .collect();
-
-                SnapshotListItem {
-                    backup,
-                    comment: None,
-                    verification: None,
-                    fingerprint: None,
-                    files,
-                    size: None,
-                    owner,
-                    protected,
-                }
-            }
-        }
-    };
-
     groups.iter().try_fold(Vec::new(), |mut snapshots, group| {
         let owner = match group.get_owner() {
             Ok(auth_id) => auth_id,
@@ -606,7 +487,7 @@ unsafe fn list_snapshots_blocking(
         snapshots.extend(
             group_backups
                 .into_iter()
-                .map(|info| info_to_snapshot_list_item(Some(owner.clone()), info)),
+                .map(|info| backup_info_to_snapshot_list_item(&info, &owner)),
         );
 
         Ok(snapshots)
