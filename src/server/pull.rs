@@ -12,9 +12,9 @@ use tracing::info;
 
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
-    BackupNamespace, GroupFilter, Operation, RateLimitConfig, Remote, VerifyState,
-    CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_BACKUP,
+    BackupNamespace, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
+    VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
@@ -607,11 +607,11 @@ async fn pull_group(
     let mut already_synced_skip_info = SkipInfo::new(SkipReason::AlreadySynced);
     let mut transfer_last_skip_info = SkipInfo::new(SkipReason::TransferLast);
 
-    let mut raw_list: Vec<BackupDir> = params
+    let mut raw_list: Vec<SnapshotListItem> = params
         .source
-        .list_backup_dirs(source_namespace, group)
+        .list_backup_snapshots(source_namespace, group)
         .await?;
-    raw_list.sort_unstable_by(|a, b| a.time.cmp(&b.time));
+    raw_list.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
 
     let total_amount = raw_list.len();
 
@@ -634,7 +634,9 @@ async fn pull_group(
     let list: Vec<(BackupDir, bool)> = raw_list
         .into_iter()
         .enumerate()
-        .filter_map(|(pos, dir)| {
+        .filter_map(|(pos, item)| {
+            let dir = item.backup;
+
             source_snapshots.insert(dir.time);
             // If resync_corrupt is set, check if the corresponding local snapshot failed to
             // verification

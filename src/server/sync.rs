@@ -32,6 +32,7 @@ use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
 use crate::server::pull::{pull_store, PullParameters};
 use crate::server::push::{push_store, PushParameters};
+use crate::tools::backup_info_to_snapshot_list_item;
 
 #[derive(Default)]
 pub(crate) struct RemovedVanishedStats {
@@ -238,11 +239,11 @@ pub(crate) trait SyncSource: Send + Sync {
     ) -> Result<Vec<BackupGroup>, Error>;
 
     /// Lists backup directories for a specific group within a specific namespace from the source.
-    async fn list_backup_dirs(
+    async fn list_backup_snapshots(
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-    ) -> Result<Vec<BackupDir>, Error>;
+    ) -> Result<Vec<SnapshotListItem>, Error>;
     fn get_ns(&self) -> BackupNamespace;
     fn get_store(&self) -> &str;
 
@@ -351,11 +352,11 @@ impl SyncSource for RemoteSource {
         )
     }
 
-    async fn list_backup_dirs(
+    async fn list_backup_snapshots(
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-    ) -> Result<Vec<BackupDir>, Error> {
+    ) -> Result<Vec<SnapshotListItem>, Error> {
         let path = format!("api2/json/admin/datastore/{}/snapshots", self.repo.store());
 
         let mut args = json!({
@@ -374,16 +375,15 @@ impl SyncSource for RemoteSource {
         Ok(snapshot_list
             .into_iter()
             .filter_map(|item: SnapshotListItem| {
-                let snapshot = item.backup;
                 // in-progress backups can't be synced
                 if item.size.is_none() {
-                    info!("skipping snapshot {snapshot} - in-progress backup");
+                    info!("skipping snapshot {} - in-progress backup", item.backup);
                     return None;
                 }
 
-                Some(snapshot)
+                Some(item)
             })
-            .collect::<Vec<BackupDir>>())
+            .collect::<Vec<SnapshotListItem>>())
     }
 
     fn get_ns(&self) -> BackupNamespace {
@@ -445,18 +445,23 @@ impl SyncSource for LocalSource {
         .collect::<Vec<pbs_api_types::BackupGroup>>())
     }
 
-    async fn list_backup_dirs(
+    async fn list_backup_snapshots(
         &self,
         namespace: &BackupNamespace,
         group: &BackupGroup,
-    ) -> Result<Vec<BackupDir>, Error> {
-        Ok(self
-            .store
-            .backup_group(namespace.clone(), group.clone())
-            .iter_snapshots()?
-            .filter_map(Result::ok)
-            .map(|snapshot| snapshot.dir().to_owned())
-            .collect::<Vec<BackupDir>>())
+    ) -> Result<Vec<SnapshotListItem>, Error> {
+        let backup_group = self.store.backup_group(namespace.clone(), group.clone());
+        Ok(backup_group
+            .list_backups()?
+            .iter()
+            .filter_map(|info| {
+                let owner = match backup_group.get_owner() {
+                    Ok(owner) => owner,
+                    Err(_) => return None,
+                };
+                Some(backup_info_to_snapshot_list_item(info, &owner))
+            })
+            .collect::<Vec<SnapshotListItem>>())
     }
 
     fn get_ns(&self) -> BackupNamespace {

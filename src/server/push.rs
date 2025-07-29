@@ -674,8 +674,11 @@ pub(crate) async fn push_group(
     let mut already_synced_skip_info = SkipInfo::new(SkipReason::AlreadySynced);
     let mut transfer_last_skip_info = SkipInfo::new(SkipReason::TransferLast);
 
-    let mut snapshots: Vec<BackupDir> = params.source.list_backup_dirs(namespace, group).await?;
-    snapshots.sort_unstable_by(|a, b| a.time.cmp(&b.time));
+    let mut snapshots: Vec<SnapshotListItem> = params
+        .source
+        .list_backup_snapshots(namespace, group)
+        .await?;
+    snapshots.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
 
     if snapshots.is_empty() {
         info!("Group '{group}' contains no snapshots to sync to remote");
@@ -700,19 +703,19 @@ pub(crate) async fn push_group(
     let snapshots: Vec<BackupDir> = snapshots
         .into_iter()
         .enumerate()
-        .filter(|&(pos, ref snapshot)| {
+        .filter_map(|(pos, item)| {
+            let snapshot = item.backup;
             source_snapshots.insert(snapshot.time);
             if last_snapshot_time >= snapshot.time {
                 already_synced_skip_info.update(snapshot.time);
-                return false;
+                return None;
             }
             if pos < cutoff {
                 transfer_last_skip_info.update(snapshot.time);
-                return false;
+                return None;
             }
-            true
+            Some(snapshot)
         })
-        .map(|(_, dir)| dir)
         .collect();
 
     if already_synced_skip_info.count > 0 {
