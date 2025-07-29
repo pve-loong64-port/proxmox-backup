@@ -64,8 +64,8 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
-    check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, BackupGroup,
-    DataStore, DatastoreBackend, LocalChunkReader, StoreProgress,
+    check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, DataStore,
+    DatastoreBackend, LocalChunkReader, StoreProgress,
 };
 use pbs_tools::json::required_string_param;
 use proxmox_rest_server::{formatter, worker_is_active, WorkerTask};
@@ -516,11 +516,8 @@ unsafe fn list_snapshots_blocking(
         (None, None) => datastore.list_backup_groups(ns.clone())?,
     };
 
-    let info_to_snapshot_list_item = |group: &BackupGroup, owner, info: BackupInfo| {
-        let backup = pbs_api_types::BackupDir {
-            group: group.into(),
-            time: info.backup_dir.backup_time(),
-        };
+    let info_to_snapshot_list_item = |owner, info: BackupInfo| {
+        let backup = info.backup_dir.dir().to_owned();
         let protected = info.protected;
 
         match get_all_snapshot_files(&info) {
@@ -609,7 +606,7 @@ unsafe fn list_snapshots_blocking(
         snapshots.extend(
             group_backups
                 .into_iter()
-                .map(|info| info_to_snapshot_list_item(group, Some(owner.clone()), info)),
+                .map(|info| info_to_snapshot_list_item(Some(owner.clone()), info)),
         );
 
         Ok(snapshots)
