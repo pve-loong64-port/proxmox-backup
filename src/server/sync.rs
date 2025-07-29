@@ -20,8 +20,8 @@ use proxmox_router::HttpError;
 
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
-    SyncDirection, SyncJobConfig, VerifyState, CLIENT_LOG_BLOB_NAME, MAX_NAMESPACE_DEPTH,
-    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    SyncDirection, SyncJobConfig, VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
+    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_datastore::data_blob::DataBlob;
@@ -755,9 +755,37 @@ pub(super) fn ignore_not_verified_or_encrypted(
             .iter()
             .all(|file| file.chunk_crypt_mode() == CryptMode::Encrypt)
         {
-            info!("Snapshot {snapshot} not encrypted but encrypted-only set, snapshot skipped");
             return true;
         }
+    }
+
+    false
+}
+
+pub(super) fn exclude_not_verified_or_encrypted(
+    item: &SnapshotListItem,
+    verified_only: bool,
+    encrypted_only: bool,
+) -> bool {
+    if verified_only {
+        match &item.verification {
+            Some(state) if state.state == VerifyState::Ok => (),
+            _ => return true,
+        }
+    }
+
+    if encrypted_only
+        && !item.files.iter().all(|content| {
+            if content.filename == MANIFEST_BLOB_NAME.as_ref() {
+                content.crypt_mode == Some(CryptMode::SignOnly)
+            } else if content.filename == CLIENT_LOG_BLOB_NAME.as_ref() {
+                true
+            } else {
+                content.crypt_mode == Some(CryptMode::Encrypt)
+            }
+        })
+    {
+        return true;
     }
 
     false

@@ -28,8 +28,9 @@ use pbs_datastore::{check_backup_owner, DataStore, DatastoreBackend, StoreProgre
 use pbs_tools::sha::sha256;
 
 use super::sync::{
-    check_namespace_depth_limit, ignore_not_verified_or_encrypted, LocalSource, RemoteSource,
-    RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncSourceReader, SyncStats,
+    check_namespace_depth_limit, exclude_not_verified_or_encrypted,
+    ignore_not_verified_or_encrypted, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
+    SkipReason, SyncSource, SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::tools::parallel_handler::ParallelHandler;
@@ -627,8 +628,12 @@ async fn pull_group(
     let list: Vec<(BackupDir, bool)> = raw_list
         .into_iter()
         .filter_map(|item| {
-            let dir = item.backup;
+            if exclude_not_verified_or_encrypted(&item, params.verified_only, params.encrypted_only)
+            {
+                return None;
+            }
 
+            let dir = item.backup;
             source_snapshots.insert(dir.time);
             // If resync_corrupt is set, check if the corresponding local snapshot failed to
             // verification

@@ -28,8 +28,9 @@ use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, StoreProgress};
 
 use super::sync::{
-    check_namespace_depth_limit, ignore_not_verified_or_encrypted, LocalSource,
-    RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncStats,
+    check_namespace_depth_limit, exclude_not_verified_or_encrypted,
+    ignore_not_verified_or_encrypted, LocalSource, RemovedVanishedStats, SkipInfo, SkipReason,
+    SyncSource, SyncStats,
 };
 use crate::api2::config::remote;
 
@@ -684,12 +685,6 @@ pub(crate) async fn push_group(
         info!("Group '{group}' contains no snapshots to sync to remote");
     }
 
-    let total_snapshots = snapshots.len();
-    let cutoff = params
-        .transfer_last
-        .map(|count| total_snapshots.saturating_sub(count))
-        .unwrap_or_default();
-
     let target_namespace = params.map_to_target(namespace)?;
     let mut target_snapshots = fetch_target_snapshots(params, &target_namespace, group).await?;
     target_snapshots.sort_unstable_by_key(|a| a.backup.time);
@@ -702,9 +697,25 @@ pub(crate) async fn push_group(
     let mut source_snapshots = HashSet::new();
     let snapshots: Vec<BackupDir> = snapshots
         .into_iter()
+        .filter_map(|item| {
+            if exclude_not_verified_or_encrypted(&item, params.verified_only, params.encrypted_only)
+            {
+                return None;
+            }
+            Some(item.backup)
+        })
+        .collect();
+
+    let total_snapshots = snapshots.len();
+    let cutoff = params
+        .transfer_last
+        .map(|count| total_snapshots.saturating_sub(count))
+        .unwrap_or_default();
+
+    let snapshots: Vec<BackupDir> = snapshots
+        .into_iter()
         .enumerate()
-        .filter_map(|(pos, item)| {
-            let snapshot = item.backup;
+        .filter_map(|(pos, snapshot)| {
             source_snapshots.insert(snapshot.time);
             if last_snapshot_time >= snapshot.time {
                 already_synced_skip_info.update(snapshot.time);
