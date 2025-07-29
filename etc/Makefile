@@ -1,6 +1,7 @@
 include ../defines.mk
 
 UNITS := \
+	pbs-network-config-commit.service \
 	proxmox-backup-daily-update.timer \
 	removable-device-attach@.service
 
