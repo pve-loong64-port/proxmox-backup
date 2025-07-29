@@ -1,4 +1,5 @@
 etc/pbs-enterprise.list /etc/apt/sources.list.d/
+etc/pbs-network-config-commit.service /lib/systemd/system/
 etc/proxmox-backup-banner.service /lib/systemd/system/
 etc/proxmox-backup-daily-update.service /lib/systemd/system/
 etc/proxmox-backup-daily-update.timer /lib/systemd/system/
