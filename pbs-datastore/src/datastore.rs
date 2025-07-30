@@ -2144,6 +2144,18 @@ impl DataStore {
                 }
             }
 
+            if let (_backend, Some(s3_client)) =
+                Self::s3_client_and_backend_from_datastore_config(&datastore_config)?
+            {
+                // Delete all objects within the datastore prefix
+                let prefix = S3PathPrefix::Some(String::default());
+                let delete_objects_error =
+                    proxmox_async::runtime::block_on(s3_client.delete_objects_by_prefix(&prefix))?;
+                if delete_objects_error {
+                    bail!("deleting objects failed");
+                }
+            }
+
             // chunks get removed last and only if the backups were successfully deleted
             if ok {
                 remove(".chunks", &mut ok);
