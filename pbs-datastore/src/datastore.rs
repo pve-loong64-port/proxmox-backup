@@ -1835,11 +1835,8 @@ impl DataStore {
     // Check and generate a chunk path from given object key
     fn chunk_path_from_object_key(&self, object_key: &S3ObjectKey) -> Option<(PathBuf, [u8; 32])> {
         // Check object is actually a chunk
-        let digest = match Path::new::<str>(object_key).file_name() {
-            Some(file_name) => file_name,
-            // should never be the case as objects will have a filename
-            None => return None,
-        };
+        // file_name() should always be Some, as objects will have a filename
+        let digest = Path::new::<str>(object_key).file_name()?;
         let bytes = digest.as_bytes();
         if bytes.len() != 64 && bytes.len() != 64 + ".0.bad".len() {
             return None;
