@@ -185,7 +185,7 @@ pub fn update_tape_backup_job(
     digest: Option<String>,
 ) -> Result<(), Error> {
     if let Some(store) = &update.setup.store {
-        assert_datastore_type(&store)?;
+        assert_datastore_type(store)?;
     }
     let _lock = pbs_config::tape_job::lock()?;
 

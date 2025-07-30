@@ -117,7 +117,7 @@ pub fn complete_calendar_event(_arg: &str, _param: &HashMap<String, String>) -> 
 /// Returns the datastore backend type from it's name
 pub fn datastore_backend_type(store: &str) -> Result<pbs_api_types::DatastoreBackendType, Error> {
     let (config, _) = config()?;
-    let store_config: DataStoreConfig = config.lookup("datastore", &store)?;
+    let store_config: DataStoreConfig = config.lookup("datastore", store)?;
 
     let backend_config: pbs_api_types::DatastoreBackendConfig = serde_json::from_value(
         pbs_api_types::DatastoreBackendConfig::API_SCHEMA

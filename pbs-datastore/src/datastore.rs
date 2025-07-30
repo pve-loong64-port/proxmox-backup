@@ -1780,7 +1780,7 @@ impl DataStore {
         delete_list: &mut Vec<S3ObjectKey>,
         gc_status: &mut GarbageCollectionStatus,
     ) -> Result<bool, Error> {
-        let (chunk_path, digest) = match self.chunk_path_from_object_key(&object_key) {
+        let (chunk_path, digest) = match self.chunk_path_from_object_key(object_key) {
             Some(path) => path,
             None => return Ok(false),
         };
@@ -2218,7 +2218,7 @@ impl DataStore {
                 .await?
                 .context("failed to set maintenance mode")?;
 
-                let tmp_base = proxmox_sys::fs::make_tmp_dir(&self.base_path(), None)
+                let tmp_base = proxmox_sys::fs::make_tmp_dir(self.base_path(), None)
                     .context("failed to create temporary content folder in {store_base}")?;
 
                 if let Err(err) = async {
@@ -2377,7 +2377,7 @@ impl DataStore {
             .with_context(|| format!("failed to refresh {:?}", self.base_path()))?;
         }
 
-        std::fs::remove_dir_all(&tmp_base)
+        std::fs::remove_dir_all(tmp_base)
             .with_context(|| format!("failed to cleanup temporary content in {tmp_base:?}"))?;
 
         Ok(())
