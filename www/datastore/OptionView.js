@@ -18,6 +18,10 @@ Ext.define('PBS.window.SafeDatastoreDestroy', {
                     ? gettext('All backup snapshots and their data will be permanently destroyed!')
                     : gettext('Configuration change only, no data will be deleted.'),
             destroyNoteCls: (get) => (get('destroyData') ? 'pmx-hint' : ''),
+            destroyCheckboxLabel: (get) =>
+                get('backendType') === 's3'
+                    ? gettext('Remove data from S3 bucket and local cache (dangerous!)')
+                    : gettext('Destroy all data (dangerous!)'),
         },
     },
 
@@ -46,10 +50,10 @@ Ext.define('PBS.window.SafeDatastoreDestroy', {
         {
             xtype: 'proxmoxcheckbox',
             name: 'destroy-data',
-            boxLabel: gettext('Destroy all data (dangerous!)'),
             defaultValue: false,
             bind: {
                 value: '{destroyData}',
+                boxLabel: '{destroyCheckboxLabel}',
             },
         },
         {
@@ -70,6 +74,12 @@ Ext.define('PBS.window.SafeDatastoreDestroy', {
             },
         },
     ],
+
+    initComponent: function () {
+        let me = this;
+        me.getViewModel().set('backendType', me.backendType);
+        me.callParent();
+    },
 });
 
 Ext.define('PBS.Datastore.Options', {
@@ -118,7 +128,15 @@ Ext.define('PBS.Datastore.Options', {
 
         removeDatastore: function () {
             let me = this;
+            let backendType = 'filesystem';
+            let backend = me.getView().getStore().getById('backend');
+
+            if (backend) {
+                let backendConfig = PBS.Utils.parsePropertyString(backend.get('value'), 'type');
+                backendType = backendConfig.type;
+            }
             Ext.create('PBS.window.SafeDatastoreDestroy', {
+                backendType: backendType,
                 datastore: me.getView().datastore,
             });
         },
@@ -164,6 +182,10 @@ Ext.define('PBS.Datastore.Options', {
     },
 
     rows: {
+        backend: {
+            required: false,
+            visible: false,
+        },
         'notification-mode': {
             required: true,
             defaultValue: 'notification-system',
