@@ -91,9 +91,9 @@ impl BackupWriter {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub async fn start<'a>(
+    pub async fn start(
         client: &HttpClient,
-        writer_options: BackupWriterOptions<'a>,
+        writer_options: BackupWriterOptions<'_>,
     ) -> Result<Arc<BackupWriter>, Error> {
         let mut param = json!({
             "backup-type": writer_options.backup.ty(),
