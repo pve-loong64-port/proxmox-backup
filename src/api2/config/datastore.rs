@@ -32,14 +32,14 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
-use pbs_datastore::{get_datastore_mount_status, DataStore, DatastoreBackend};
+use pbs_datastore::{
+    get_datastore_mount_status, DataStore, DatastoreBackend, S3_DATASTORE_IN_USE_MARKER,
+};
 use proxmox_rest_server::WorkerTask;
 use proxmox_s3_client::S3ObjectKey;
 
 use crate::server::jobstate;
 use crate::tools::disks::unmount_by_mountpoint;
-
-const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
 
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]

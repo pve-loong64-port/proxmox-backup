@@ -53,6 +53,8 @@ static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
 pub const GROUP_NOTES_FILE_NAME: &str = "notes";
 /// Filename to store backup group owner
 pub const GROUP_OWNER_FILE_NAME: &str = "owner";
+/// Filename for in-use marker stored on S3 object store backend
+pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 
 /// checks if auth_id is owner, or, if owner is a token, if
@@ -2160,6 +2162,15 @@ impl DataStore {
             if ok {
                 remove(".chunks", &mut ok);
             }
+        } else if let (_backend, Some(s3_client)) =
+            Self::s3_client_and_backend_from_datastore_config(&datastore_config)?
+        {
+
+            // Only delete in-use marker so datastore can be re-imported
+            let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+                .context("failed to generate in-use marker object key")?;
+            proxmox_async::runtime::block_on(s3_client.delete_object(object_key))
+                .context("failed to delete in-use marker")?;
         }
 
         // now the config
