@@ -354,7 +354,7 @@ pub fn restore(
         bail!("no datastores given");
     }
 
-    for (_, (target, _)) in &used_datastores {
+    for (target, _) in used_datastores.values() {
         assert_datastore_type(target.name())?;
     }
 
