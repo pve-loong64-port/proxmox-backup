@@ -1798,7 +1798,10 @@ impl DataStore {
         };
         let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
 
-        let bad = chunk_path.as_path().ends_with(".bad");
+        let bad = chunk_path
+            .as_path()
+            .extension()
+            .is_some_and(|ext| ext == "bad");
 
         if atime < min_atime {
             if let Some(cache) = self.cache() {
