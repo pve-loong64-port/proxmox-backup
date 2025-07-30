@@ -2382,4 +2382,38 @@ impl DataStore {
 
         Ok(())
     }
+
+    pub fn s3_client_and_backend_from_datastore_config(
+        datastore_config: &DataStoreConfig,
+    ) -> Result<(DatastoreBackendType, Option<S3Client>), Error> {
+        let backend_config: DatastoreBackendConfig =
+            datastore_config.backend.as_deref().unwrap_or("").parse()?;
+        let backend_type = backend_config.ty.unwrap_or_default();
+
+        if backend_type != DatastoreBackendType::S3 {
+            return Ok((backend_type, None));
+        }
+
+        let s3_client_id = backend_config
+            .client
+            .as_ref()
+            .ok_or_else(|| format_err!("missing required client"))?;
+        let bucket = backend_config
+            .bucket
+            .clone()
+            .ok_or_else(|| format_err!("missing required bucket"))?;
+        let (config, _config_digest) =
+            pbs_config::s3::config().context("failed to get s3 config")?;
+        let client_config: S3ClientConf = config
+            .lookup(S3_CFG_TYPE_ID, s3_client_id)
+            .with_context(|| format!("no '{s3_client_id}' in config"))?;
+        let options = S3ClientOptions::from_config(
+            client_config.config,
+            client_config.secret_key,
+            bucket,
+            datastore_config.name.to_owned(),
+        );
+        let s3_client = S3Client::new(options).context("failed to create s3 client")?;
+        Ok((backend_type, Some(s3_client)))
+    }
 }

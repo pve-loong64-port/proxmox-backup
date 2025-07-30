@@ -2,25 +2,23 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{bail, Context, Error};
 use hex::FromHex;
 use http_body_util::BodyExt;
 use serde_json::Value;
 use tracing::{info, warn};
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
-use proxmox_s3_client::{S3Client, S3ClientConf, S3ClientOptions};
 use proxmox_schema::{api, param_bail, ApiType};
 use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendConfig, DatastoreBackendType,
-    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, Operation, PruneJobConfig,
-    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType, DatastoreNotify,
+    DatastoreTuning, KeepOptions, MaintenanceMode, Operation, PruneJobConfig, PruneJobOptions,
+    DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY,
+    PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
-use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
@@ -34,7 +32,7 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
-use pbs_datastore::{get_datastore_mount_status, DatastoreBackend};
+use pbs_datastore::{get_datastore_mount_status, DataStore, DatastoreBackend};
 use proxmox_rest_server::WorkerTask;
 use proxmox_s3_client::S3ObjectKey;
 
@@ -131,54 +129,34 @@ pub(crate) fn do_create_datastore(
             .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
     )?;
 
-    let backend_config: DatastoreBackendConfig =
-        datastore.backend.as_deref().unwrap_or("").parse()?;
-    let backend_type = backend_config.ty.unwrap_or_default();
-    let backend_s3_client = if backend_type == DatastoreBackendType::S3 {
-        let s3_client_id = backend_config
-            .client
-            .as_ref()
-            .ok_or_else(|| format_err!("missing required client"))?;
-        let bucket = backend_config
-            .bucket
-            .clone()
-            .ok_or_else(|| format_err!("missing required bucket"))?;
-        let (config, _config_digest) =
-            pbs_config::s3::config().context("failed to get s3 config")?;
-        let config: S3ClientConf = config
-            .lookup(S3_CFG_TYPE_ID, s3_client_id)
-            .with_context(|| format!("no '{s3_client_id}' in config"))?;
-        let options = S3ClientOptions::from_config(
-            config.config,
-            config.secret_key,
-            bucket,
-            datastore.name.to_owned(),
-        );
-        let s3_client = S3Client::new(options).context("failed to create s3 client")?;
-
-        if !overwrite_in_use {
-            let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
-                .context("failed to generate s3 object key")?;
-            if let Some(response) =
-                proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
-                    .context("failed to get in-use marker from bucket")?
-            {
-                let content = proxmox_async::runtime::block_on(response.content.collect())
-                    .unwrap_or_default();
-                let content = String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
-                let in_use: InUseContent = serde_json::from_str(&content).unwrap_or_default();
-                if let Some(hostname) = in_use.hostname {
-                    bail!("Bucket already contains datastore in use by host {hostname}");
-                } else {
-                    bail!("Bucket already contains datastore in use");
+    let (backend_type, backend_s3_client) =
+        match DataStore::s3_client_and_backend_from_datastore_config(&datastore)? {
+            (backend_type, Some(s3_client)) => {
+                if !overwrite_in_use {
+                    let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
+                        .context("failed to generate s3 object key")?;
+                    if let Some(response) =
+                        proxmox_async::runtime::block_on(s3_client.get_object(object_key.clone()))
+                            .context("failed to get in-use marker from bucket")?
+                    {
+                        let content = proxmox_async::runtime::block_on(response.content.collect())
+                            .unwrap_or_default();
+                        let content =
+                            String::from_utf8(content.to_bytes().to_vec()).unwrap_or_default();
+                        let in_use: InUseContent =
+                            serde_json::from_str(&content).unwrap_or_default();
+                        if let Some(hostname) = in_use.hostname {
+                            bail!("Bucket already contains datastore in use by host {hostname}");
+                        } else {
+                            bail!("Bucket already contains datastore in use");
+                        }
+                    }
                 }
-            }
-        }
 
-        Some(Arc::new(s3_client))
-    } else {
-        None
-    };
+                (backend_type, Some(Arc::new(s3_client)))
+            }
+            (backend_type, None) => (backend_type, None),
+        };
 
     let unmount_guard = if datastore.backing_device.is_some() {
         do_mount_device(datastore.clone())?;
@@ -359,34 +337,11 @@ pub fn create_datastore(
 
     let store_name = config.name.to_string();
 
-    let backend_config: DatastoreBackendConfig = config.backend.as_deref().unwrap_or("").parse()?;
-    match backend_config.ty.unwrap_or_default() {
-        DatastoreBackendType::Filesystem => (),
-        DatastoreBackendType::S3 => {
-            let s3_client_id = backend_config
-                .client
-                .as_ref()
-                .ok_or_else(|| format_err!("missing required client"))?;
-            let bucket = backend_config
-                .bucket
-                .clone()
-                .ok_or_else(|| format_err!("missing required bucket"))?;
-            let (config, _config_digest) =
-                pbs_config::s3::config().context("failed to get s3 config")?;
-            let config: S3ClientConf = config
-                .lookup(S3_CFG_TYPE_ID, s3_client_id)
-                .with_context(|| format!("no '{s3_client_id}' in config"))?;
-            let options = S3ClientOptions::from_config(
-                config.config,
-                config.secret_key,
-                bucket,
-                store_name.clone(),
-            );
-            let s3_client = S3Client::new(options).context("failed to create s3 client")?;
-            // Fine to block since this runs in worker task
-            proxmox_async::runtime::block_on(s3_client.head_bucket())
-                .context("failed to access bucket")?;
-        }
+    if let (_backend, Some(s3_client)) =
+        DataStore::s3_client_and_backend_from_datastore_config(&config)?
+    {
+        proxmox_async::runtime::block_on(s3_client.head_bucket())
+            .context("failed to access bucket")?;
     }
 
     WorkerTask::new_thread(
