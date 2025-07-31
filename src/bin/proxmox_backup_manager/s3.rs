@@ -19,6 +19,7 @@ use serde_json::Value;
             "store-prefix": {
                 type: String,
                 description: "Store prefix within bucket for S3 object keys (commonly datastore name)",
+                optional: true,
             },
         },
     },
@@ -27,7 +28,7 @@ use serde_json::Value;
 async fn check(
     s3_endpoint_id: String,
     bucket: String,
-    store_prefix: String,
+    store_prefix: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     api2::admin::s3::check(s3_endpoint_id, bucket, store_prefix, rpcenv).await?;

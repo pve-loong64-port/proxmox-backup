@@ -28,6 +28,7 @@ use pbs_config::s3::S3_CFG_TYPE_ID;
             "store-prefix": {
                 type: String,
                 description: "Store prefix within bucket for S3 object keys (commonly datastore name)",
+                optional: true,
             },
         },
     },
@@ -39,7 +40,7 @@ use pbs_config::s3::S3_CFG_TYPE_ID;
 pub async fn check(
     s3_client_id: String,
     bucket: String,
-    store_prefix: String,
+    store_prefix: Option<String>,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     let (config, _digest) = pbs_config::s3::config()?;
@@ -47,6 +48,7 @@ pub async fn check(
         .lookup(S3_CFG_TYPE_ID, &s3_client_id)
         .context("config lookup failed")?;
 
+    let store_prefix = store_prefix.unwrap_or_default();
     let options =
         S3ClientOptions::from_config(config.config, config.secret_key, Some(bucket), store_prefix);
 
