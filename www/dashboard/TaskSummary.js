@@ -165,7 +165,7 @@ Ext.define('PBS.TaskSummary', {
                         status = gettext('OK');
                         break;
                     case 'warnings':
-                        status = gettext('Warning');
+                        status = ngettext('Warning', 'Warnings', 1); // TODO: use actual count
                         break;
                     case 'error':
                         status = Proxmox.Utils.errorText;
