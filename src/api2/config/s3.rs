@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
 use proxmox_s3_client::{
-    S3ClientConf, S3ClientConfig, S3ClientConfigUpdater, S3ClientConfigWithoutSecret,
-    S3_CLIENT_ID_SCHEMA,
+    S3BucketListItem, S3Client, S3ClientConf, S3ClientConfig, S3ClientConfigUpdater,
+    S3ClientConfigWithoutSecret, S3ClientOptions, S3_CLIENT_ID_SCHEMA,
 };
 use proxmox_schema::{api, param_bail, ApiType};
 
@@ -273,6 +273,45 @@ pub fn delete_s3_client_config(
     s3::save_config(&config)
 }
 
+#[api(
+    input: {
+        properties: {
+            id: {
+                schema: S3_CLIENT_ID_SCHEMA,
+            },
+        },
+    },
+    access: {
+        permission: &Permission::Privilege(&[], PRIV_SYS_AUDIT, false),
+    },
+)]
+/// List buckets accessible by given s3 client configuration
+pub async fn list_buckets(
+    id: String,
+    _rpcenv: &mut dyn RpcEnvironment,
+) -> Result<Vec<S3BucketListItem>, Error> {
+    let (config, _digest) = pbs_config::s3::config()?;
+    let config: S3ClientConf = config
+        .lookup(S3_CFG_TYPE_ID, &id)
+        .context("config lookup failed")?;
+
+    let empty_prefix = String::new();
+    let options =
+        S3ClientOptions::from_config(config.config, config.secret_key, None, empty_prefix);
+    let client = S3Client::new(options).context("client creation failed")?;
+    let list_buckets_response = client
+        .list_buckets()
+        .await
+        .context("failed to list buckets")?;
+    let buckets = list_buckets_response
+        .buckets
+        .into_iter()
+        .map(|bucket| S3BucketListItem { name: bucket.name })
+        .collect();
+
+    Ok(buckets)
+}
+
 // Check if the configured s3 client is still in-use by a datastore backend.
 //
 // If so, return the first datastore name with the configured client.
@@ -294,10 +333,13 @@ fn s3_client_in_use(id: &str) -> Result<Option<String>, Error> {
     Ok(None)
 }
 
+const LIST_BUCKETS_ROUTER: Router = Router::new().get(&API_METHOD_LIST_BUCKETS);
+
 const ITEM_ROUTER: Router = Router::new()
     .get(&API_METHOD_READ_S3_CLIENT_CONFIG)
     .put(&API_METHOD_UPDATE_S3_CLIENT_CONFIG)
-    .delete(&API_METHOD_DELETE_S3_CLIENT_CONFIG);
+    .delete(&API_METHOD_DELETE_S3_CLIENT_CONFIG)
+    .subdirs(&[("list-buckets", &LIST_BUCKETS_ROUTER)]);
 
 pub const ROUTER: Router = Router::new()
     .get(&API_METHOD_LIST_S3_CLIENT_CONFIG)
