@@ -1,5 +1,5 @@
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
-use proxmox_s3_client::{S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA};
+use proxmox_s3_client::{S3BucketListItem, S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA};
 use proxmox_schema::api;
 
 use proxmox_backup::api2;
@@ -33,6 +33,23 @@ async fn check(
 ) -> Result<Value, Error> {
     api2::admin::s3::check(s3_endpoint_id, bucket, store_prefix, rpcenv).await?;
     Ok(Value::Null)
+}
+
+#[api(
+    input: {
+        properties: {
+            "s3-endpoint-id": {
+                schema: S3_CLIENT_ID_SCHEMA,
+            },
+        },
+    },
+)]
+/// List buckets accessible by the given S3 client configuration
+async fn list_buckets(
+    s3_endpoint_id: String,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<Vec<S3BucketListItem>, Error> {
+    api2::config::s3::list_buckets(s3_endpoint_id, rpcenv).await
 }
 
 #[api(
@@ -88,6 +105,12 @@ pub fn s3_commands() -> CommandLineInterface {
             CliCommand::new(&api2::config::s3::API_METHOD_DELETE_S3_CLIENT_CONFIG)
                 .arg_param(&["id"])
                 .completion_cb("id", pbs_config::s3::complete_s3_client_id),
+        )
+        .insert(
+            "list-buckets",
+            CliCommand::new(&API_METHOD_LIST_BUCKETS)
+                .arg_param(&["s3-endpoint-id"])
+                .completion_cb("s3-endpoint-id", pbs_config::s3::complete_s3_client_id),
         );
 
     let cmd_def = CliCommandMap::new()
