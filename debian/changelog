@@ -1,3 +1,28 @@
+rust-proxmox-backup (4.0.8-1) trixie; urgency=medium
+
+  * add pbs-network-config-commit systemd service to apply pending network
+    changes on boot.
+
+  * datastore: delete all objects on datastore destroy when the remove data
+    flag was set.
+
+  * ui: switch datastore destroy label text depending on the backend type.
+
+  * docs: s3: extend recommendations and limitations for local cache.
+
+  * datastore: destroy: delete s3 in-use marker unconditionally to make
+    re-adding the bucket as datastore easier.
+
+  * datastore: wrap bucket name, as in is now optional in the s3 client.
+
+  * api: admin s3: make store prefix for check command optional.
+
+  * api: config s3: add bucket list api endpoint.
+
+  * ui: replace bucket field by bucket selector
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 31 Jul 2025 14:52:02 +0200
+
 rust-proxmox-backup (4.0.7-1) trixie; urgency=medium
 
   * s3 api types: make region regex less strict to allow more providers, like
