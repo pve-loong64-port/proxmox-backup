@@ -258,7 +258,7 @@ impl DataStore {
                 let options = S3ClientOptions::from_config(
                     config.config,
                     config.secret_key,
-                    bucket,
+                    Some(bucket),
                     self.name().to_owned(),
                 );
                 let s3_client = S3Client::new(options)?;
@@ -2433,7 +2433,7 @@ impl DataStore {
         let options = S3ClientOptions::from_config(
             client_config.config,
             client_config.secret_key,
-            bucket,
+            Some(bucket),
             datastore_config.name.to_owned(),
         );
         let s3_client = S3Client::new(options).context("failed to create s3 client")?;
