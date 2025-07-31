@@ -74,7 +74,7 @@ Ext.define('PBS.DataStoreEdit', {
                                 let inputPanel = checkbox.up('inputpanel');
                                 let pathField = inputPanel.down('[name=path]');
                                 let uuidEditField = inputPanel.down('[name=backing-device]');
-                                let bucketField = inputPanel.down('[name=bucket]');
+                                let s3BucketSelector = inputPanel.down('[name=bucket]');
                                 let s3ClientSelector = inputPanel.down('[name=s3client]');
                                 let overwriteInUseField =
                                     inputPanel.down('[name=overwrite-in-use]');
@@ -86,9 +86,11 @@ Ext.define('PBS.DataStoreEdit', {
                                 uuidEditField.allowBlank = !isRemovable;
                                 uuidEditField.setValue('');
 
-                                bucketField.setDisabled(!isS3);
-                                bucketField.allowBlank = !isS3;
-                                bucketField.setValue('');
+                                if (!isS3) {
+                                    s3BucketSelector.setDisabled(true);
+                                    s3BucketSelector.setValue('');
+                                }
+                                s3BucketSelector.allowBlank = !isS3;
 
                                 s3ClientSelector.setDisabled(!isS3);
                                 s3ClientSelector.allowBlank = !isS3;
@@ -130,6 +132,13 @@ Ext.define('PBS.DataStoreEdit', {
                         cbind: {
                             editable: '{isCreate}',
                         },
+                        listeners: {
+                            change: function (selector, endpointId) {
+                                let inputPanel = selector.up('inputpanel');
+                                let s3BucketSelector = inputPanel.down('[name=bucket]');
+                                s3BucketSelector.setS3Endpoint(endpointId);
+                            },
+                        },
                     },
                 ],
                 column2: [
@@ -166,11 +175,14 @@ Ext.define('PBS.DataStoreEdit', {
                         emptyText: gettext('Device path'),
                     },
                     {
-                        xtype: 'proxmoxtextfield',
+                        xtype: 'pbsS3BucketSelector',
                         name: 'bucket',
                         fieldLabel: gettext('Bucket'),
                         allowBlank: false,
                         disabled: true,
+                        cbind: {
+                            editable: '{isCreate}',
+                        },
                     },
                 ],
                 columnB: [
