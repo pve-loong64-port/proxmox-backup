@@ -78,8 +78,9 @@ Ext.define('PBS.DataStoreEdit', {
                                 let s3ClientSelector = inputPanel.down('[name=s3client]');
                                 let overwriteInUseField =
                                     inputPanel.down('[name=overwrite-in-use]');
-                                let reuseDatastore =
-                                    inputPanel.down('[name=reuse-datastore]').getValue();
+                                let reuseDatastore = inputPanel
+                                    .down('[name=reuse-datastore]')
+                                    .getValue();
 
                                 uuidEditField.setDisabled(!isRemovable);
                                 uuidEditField.allowBlank = !isRemovable;

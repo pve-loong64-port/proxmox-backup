@@ -443,7 +443,10 @@ Ext.define('PBS.Utils', {
                 PBS.Utils.render_drive_load_media_id(id, gettext('Load Media')),
             logrotate: [null, gettext('Log Rotation')],
             'mount-device': [gettext('Datastore'), gettext('Mount Device')],
-            'mount-sync-jobs': [gettext('Datastore'), gettext('sync jobs handler triggered by mount')],
+            'mount-sync-jobs': [
+                gettext('Datastore'),
+                gettext('sync jobs handler triggered by mount'),
+            ],
             prune: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Prune')),
             prunejob: (type, id) => PBS.Utils.render_prune_job_worker_id(id, gettext('Prune Job')),
             reader: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Read Objects')),
