@@ -244,8 +244,8 @@ Ext.define('PBS.LoginView', {
             height: 38,
             items: [
                 {
-                    xtype: 'proxmoxlogo',
-                    prefix: '',
+                    xtype: 'proxmoxLogoSvg',
+                    prefix: 'widgettoolkit',
                 },
                 {
                     xtype: 'versioninfo',

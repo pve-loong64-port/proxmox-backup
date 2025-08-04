@@ -222,8 +222,8 @@ Ext.define('PBS.MainView', {
             height: 38,
             items: [
                 {
-                    xtype: 'proxmoxlogo',
-                    prefix: '',
+                    xtype: 'proxmoxLogoSvg',
+                    prefix: 'widgettoolkit',
                 },
                 {
                     padding: '0 0 0 5',
