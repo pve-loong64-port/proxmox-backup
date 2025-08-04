@@ -2165,7 +2165,6 @@ impl DataStore {
         } else if let (_backend, Some(s3_client)) =
             Self::s3_client_and_backend_from_datastore_config(&datastore_config)?
         {
-
             // Only delete in-use marker so datastore can be re-imported
             let object_key = S3ObjectKey::try_from(S3_DATASTORE_IN_USE_MARKER)
                 .context("failed to generate in-use marker object key")?;
