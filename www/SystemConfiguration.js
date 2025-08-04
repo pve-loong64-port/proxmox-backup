@@ -43,6 +43,7 @@ Ext.define('PBS.SystemConfiguration', {
                     showApplyBtn: true,
                     types: ['bond', 'bridge', 'vlan'],
                     nodename: 'localhost',
+                    showAltNames: true,
                 },
             ],
         },
