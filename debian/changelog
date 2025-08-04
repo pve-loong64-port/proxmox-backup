@@ -1,3 +1,17 @@
+rust-proxmox-backup (4.0.9-1) trixie; urgency=medium
+
+  * sync: conditionally pre-filter source list by verified or encrypted state.
+
+  * api: return s3 client errors during datastore create with context.
+
+  * acls: add s3-endpoint as valid 'system' subpath and expose on the web UI.
+
+  * s3 endpoint: make required permissions specific to acl sub-paths in
+    '/system/s3-endpoint/{id}' to allowing one to provide only access to a
+    specific S3 endpoint.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 04 Aug 2025 22:47:30 +0200
+
 rust-proxmox-backup (4.0.8-1) trixie; urgency=medium
 
   * add pbs-network-config-commit systemd service to apply pending network
