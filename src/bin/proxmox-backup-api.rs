@@ -74,9 +74,10 @@ async fn run() -> Result<(), Error> {
 
     proxmox_backup::auth_helpers::setup_auth_context(true);
     proxmox_backup::server::notifications::init()?;
-
     let backup_user = pbs_config::backup_user()?;
     let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
+
+    proxmox_product_config::init(backup_user.clone(), pbs_config::priv_user()?);
 
     let dir_opts = CreateOptions::new()
         .owner(backup_user.uid)

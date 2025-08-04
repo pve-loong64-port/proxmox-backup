@@ -6,7 +6,6 @@ pub mod domains;
 pub mod drive;
 pub mod media_pool;
 pub mod metrics;
-pub mod network;
 pub mod notifications;
 pub mod prune;
 pub mod remote;
@@ -45,6 +44,15 @@ pub fn backup_group() -> Result<nix::unistd::Group, Error> {
     } else {
         Group::from_name(BACKUP_GROUP_NAME)?
             .ok_or_else(|| format_err!("Unable to lookup '{}' group.", BACKUP_GROUP_NAME))
+    }
+}
+
+/// Return User info for root
+pub fn priv_user() -> Result<nix::unistd::User, Error> {
+    if cfg!(test) {
+        Ok(User::from_uid(Uid::current())?.expect("current user does not exist"))
+    } else {
+        User::from_name("root")?.ok_or_else(|| format_err!("Unable to lookup superuser."))
     }
 }
 

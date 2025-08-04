@@ -659,6 +659,7 @@ async fn run() -> Result<(), Error> {
         .tasklog_pbs()
         .init()?;
     proxmox_backup::server::notifications::init()?;
+    proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
 
     let cmd_def = CliCommandMap::new()
         .insert("acl", acl_commands())
