@@ -12,7 +12,7 @@ use proxmox_shared_cache::SharedCache;
 use proxmox_sys::fs::CreateOptions;
 use serde::{Deserialize, Serialize};
 
-use super::{DiskStat, HostStats, METRIC_COLLECTION_INTERVAL};
+use super::{DiskStat, HostStats, NetdevType, METRIC_COLLECTION_INTERVAL};
 
 const METRIC_CACHE_TIME: Duration = Duration::from_secs(30 * 60);
 const STORED_METRIC_GENERATIONS: u64 =
@@ -113,11 +113,10 @@ pub(super) fn update_metrics(
     }
 
     if let Some(netdev) = &host.net {
-        use pbs_config::network::is_physical_nic;
         let mut netin = 0;
         let mut netout = 0;
         for item in netdev {
-            if !is_physical_nic(&item.device) {
+            if item.ty != NetdevType::Physical {
                 continue;
             }
             netin += item.receive;

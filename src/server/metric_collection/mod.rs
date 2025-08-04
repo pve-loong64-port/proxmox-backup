@@ -1,7 +1,8 @@
 use std::{
+    collections::HashMap,
     path::Path,
     pin::pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -9,6 +10,7 @@ use anyhow::Error;
 use tokio::join;
 
 use pbs_api_types::{DataStoreConfig, Operation};
+use proxmox_network_api::{get_network_interfaces, IpLink};
 use proxmox_sys::{
     fs::FileSystemInformation,
     linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat},
@@ -101,7 +103,7 @@ async fn run_stat_generator() {
 struct HostStats {
     proc: Option<ProcFsStat>,
     meminfo: Option<ProcFsMemInfo>,
-    net: Option<Vec<ProcFsNetDev>>,
+    net: Option<Vec<NetdevStat>>,
     load: Option<Loadavg>,
 }
 
@@ -111,10 +113,77 @@ struct DiskStat {
     dev: Option<BlockDevStat>,
 }
 
-fn collect_host_stats_sync() -> HostStats {
-    use proxmox_sys::linux::procfs::{
-        read_loadavg, read_meminfo, read_proc_net_dev, read_proc_stat,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+enum NetdevType {
+    Physical,
+    Virtual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+struct NetdevStat {
+    pub device: String,
+    pub receive: u64,
+    pub send: u64,
+    pub ty: NetdevType,
+}
+
+impl NetdevStat {
+    fn from_fs_net_dev(net_dev: ProcFsNetDev, ty: NetdevType) -> Self {
+        Self {
+            device: net_dev.device,
+            receive: net_dev.receive,
+            send: net_dev.send,
+            ty,
+        }
+    }
+}
+
+static NETWORK_INTERFACE_CACHE: OnceLock<HashMap<String, IpLink>> = OnceLock::new();
+
+fn collect_netdev_stats() -> Option<Vec<NetdevStat>> {
+    use proxmox_sys::linux::procfs::read_proc_net_dev;
+
+    let net_devs = match read_proc_net_dev() {
+        Ok(net_devs) => net_devs,
+        Err(err) => {
+            eprintln!("read_prox_net_dev failed - {err}");
+            return None;
+        }
     };
+
+    let ip_links = match NETWORK_INTERFACE_CACHE.get() {
+        Some(ip_links) => ip_links,
+        None => match get_network_interfaces() {
+            Ok(network_interfaces) => {
+                let _ = NETWORK_INTERFACE_CACHE.set(network_interfaces);
+                NETWORK_INTERFACE_CACHE.get().unwrap()
+            }
+            Err(err) => {
+                eprintln!("get_network_interfaces failed - {err}");
+                return None;
+            }
+        },
+    };
+
+    let mut stat_devs = Vec::with_capacity(net_devs.len());
+
+    for net_dev in net_devs {
+        if let Some(ip_link) = ip_links.get(&net_dev.device) {
+            let ty = if ip_link.is_physical() {
+                NetdevType::Physical
+            } else {
+                NetdevType::Virtual
+            };
+
+            stat_devs.push(NetdevStat::from_fs_net_dev(net_dev, ty));
+        }
+    }
+
+    Some(stat_devs)
+}
+
+fn collect_host_stats_sync() -> HostStats {
+    use proxmox_sys::linux::procfs::{read_loadavg, read_meminfo, read_proc_stat};
 
     let proc = match read_proc_stat() {
         Ok(stat) => Some(stat),
@@ -132,13 +201,7 @@ fn collect_host_stats_sync() -> HostStats {
         }
     };
 
-    let net = match read_proc_net_dev() {
-        Ok(netdev) => Some(netdev),
-        Err(err) => {
-            eprintln!("read_prox_net_dev failed - {err}");
-            None
-        }
-    };
+    let net = collect_netdev_stats();
 
     let load = match read_loadavg() {
         Ok(loadavg) => Some(loadavg),
