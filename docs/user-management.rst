@@ -532,7 +532,7 @@ WebAuthn
 For WebAuthn to work, you need to have two things:
 
 * A trusted HTTPS certificate (for example, by using `Let's Encrypt
-  <https://pbs.proxmox.com/wiki/index.php/HTTPS_Certificate_Configuration>`_).
+  <https://pbs.proxmox.com/wiki/HTTPS_Certificate_Configuration>`_).
   While it probably works with an untrusted certificate, some browsers may warn
   or refuse WebAuthn operations if it is not trusted.
 
