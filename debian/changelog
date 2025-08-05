@@ -1,3 +1,16 @@
+rust-proxmox-backup (4.0.11-1) trixie; urgency=medium
+
+  * drop beta label and bump for 4.0 release.
+
+  * re-build with newer proxmox-auth-api to ensure correct PAM return value
+    gets logged on error.
+
+  * docs: update release EOL table in FAQ.
+
+  * docs: add link to Proxmox Backup Server 3 to 4 upgrade guide.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 05 Aug 2025 18:54:02 +0200
+
 rust-proxmox-backup (4.0.10-1) trixie; urgency=medium
 
   * notifications templates: adapt to whitespace handling changes with
