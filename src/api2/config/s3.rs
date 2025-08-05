@@ -139,6 +139,8 @@ pub enum DeletableProperty {
     Fingerprint,
     /// Delete the path-style property.
     PathStyle,
+    /// Delete the provider quirks property.
+    ProviderQuirks,
 }
 
 #[api(
@@ -211,6 +213,9 @@ pub fn update_s3_client_config(
                 DeletableProperty::PathStyle => {
                     data.config.path_style = None;
                 }
+                DeletableProperty::ProviderQuirks => {
+                    data.config.provider_quirks = None;
+                }
             }
         }
     }
@@ -232,6 +237,9 @@ pub fn update_s3_client_config(
     }
     if let Some(path_style) = update.path_style {
         data.config.path_style = Some(path_style);
+    }
+    if let Some(provider_quirks) = update.provider_quirks {
+        data.config.provider_quirks = Some(provider_quirks);
     }
 
     if let Some(secret_key) = secret_key {
