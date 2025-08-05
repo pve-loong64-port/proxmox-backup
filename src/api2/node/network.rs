@@ -7,13 +7,14 @@ use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, BondXmitHashPolicy, Interface, LinuxBondMode, NetworkConfigMethod,
-    NetworkInterfaceType, CIDR_V4_SCHEMA, CIDR_V6_SCHEMA, IP_V4_SCHEMA, IP_V6_SCHEMA,
-    NETWORK_INTERFACE_ARRAY_SCHEMA, NETWORK_INTERFACE_LIST_SCHEMA, NETWORK_INTERFACE_NAME_SCHEMA,
-    NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
-use pbs_config::network::{
-    self, parse_vlan_id_from_name, parse_vlan_raw_device_from_name, NetworkConfig,
+
+use proxmox_network_api::{
+    self as network, parse_vlan_id_from_name, parse_vlan_raw_device_from_name, BondXmitHashPolicy,
+    Interface, LinuxBondMode, NetworkConfig, NetworkConfigMethod, NetworkInterfaceType,
+    CIDR_V4_SCHEMA, CIDR_V6_SCHEMA, IP_V4_SCHEMA, IP_V6_SCHEMA, NETWORK_INTERFACE_ARRAY_SCHEMA,
+    NETWORK_INTERFACE_LIST_SCHEMA, NETWORK_INTERFACE_NAME_SCHEMA,
 };
 
 use proxmox_rest_server::WorkerTask;

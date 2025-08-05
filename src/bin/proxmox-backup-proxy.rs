@@ -188,6 +188,7 @@ async fn run() -> Result<(), Error> {
     proxmox_backup::auth_helpers::setup_auth_context(false);
     proxmox_backup::server::notifications::init()?;
     metric_collection::init()?;
+    proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
 
     let mut indexpath = PathBuf::from(pbs_buildcfg::JS_DIR);
     indexpath.push("index.hbs");

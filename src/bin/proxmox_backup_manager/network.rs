@@ -159,25 +159,25 @@ pub fn network_commands() -> CommandLineInterface {
             CliCommand::new(&api2::node::network::API_METHOD_CREATE_INTERFACE)
                 .fixed_param("node", String::from("localhost"))
                 .arg_param(&["iface"])
-                .completion_cb("iface", pbs_config::network::complete_interface_name)
-                .completion_cb("bridge_ports", pbs_config::network::complete_port_list)
-                .completion_cb("slaves", pbs_config::network::complete_port_list),
+                .completion_cb("iface", proxmox_network_api::complete_interface_name)
+                .completion_cb("bridge_ports", proxmox_network_api::complete_port_list)
+                .completion_cb("slaves", proxmox_network_api::complete_port_list),
         )
         .insert(
             "update",
             CliCommand::new(&api2::node::network::API_METHOD_UPDATE_INTERFACE)
                 .fixed_param("node", String::from("localhost"))
                 .arg_param(&["iface"])
-                .completion_cb("iface", pbs_config::network::complete_interface_name)
-                .completion_cb("bridge_ports", pbs_config::network::complete_port_list)
-                .completion_cb("slaves", pbs_config::network::complete_port_list),
+                .completion_cb("iface", proxmox_network_api::complete_interface_name)
+                .completion_cb("bridge_ports", proxmox_network_api::complete_port_list)
+                .completion_cb("slaves", proxmox_network_api::complete_port_list),
         )
         .insert(
             "remove",
             CliCommand::new(&api2::node::network::API_METHOD_DELETE_INTERFACE)
                 .fixed_param("node", String::from("localhost"))
                 .arg_param(&["iface"])
-                .completion_cb("iface", pbs_config::network::complete_interface_name),
+                .completion_cb("iface", proxmox_network_api::complete_interface_name),
         )
         .insert(
             "revert",

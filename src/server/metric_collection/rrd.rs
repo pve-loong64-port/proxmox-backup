@@ -16,7 +16,7 @@ use proxmox_sys::fs::CreateOptions;
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 
-use super::{DiskStat, HostStats};
+use super::{DiskStat, HostStats, NetdevType};
 
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 
@@ -162,11 +162,10 @@ pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: 
     }
 
     if let Some(netdev) = &host.net {
-        use pbs_config::network::is_physical_nic;
         let mut netin = 0;
         let mut netout = 0;
         for item in netdev {
-            if !is_physical_nic(&item.device) {
+            if item.ty != NetdevType::Physical {
                 continue;
             }
             netin += item.receive;
