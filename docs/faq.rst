@@ -66,6 +66,8 @@ or tape, ready.
 Although the specific upgrade steps depend on your respective setup, we provide
 general instructions and advice of how a upgrade should be performed:
 
+* `Upgrade from Proxmox Backup Server 3 to 4 <https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4>`_
+
 * `Upgrade from Proxmox Backup Server 2 to 3 <https://pbs.proxmox.com/wiki/Upgrade_from_2_to_3>`_
 
 * `Upgrade from Proxmox Backup Server 1 to 2 <https://pbs.proxmox.com/wiki/Upgrade_from_1.1_to_2.x>`_
