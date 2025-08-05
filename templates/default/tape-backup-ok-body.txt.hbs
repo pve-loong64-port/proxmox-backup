@@ -5,19 +5,21 @@ Datastore:  {{datastore}}
 Tape Pool:  {{tape-pool}}
 Tape Drive: {{tape-drive}}
 
-{{#if snapshot-list~}}
+{{#if snapshot-list}}
 Snapshots included:
+{{#each snapshot-list}}
+  {{this}}
+{{/each}}
 
-{{#each snapshot-list~}}
-{{this}}
-{{/each~}}
 {{/if}}
 Duration: {{duration job-duration}}
+
 {{#if used-tapes-list}}
 Used Tapes:
-{{#each used-tapes-list~}}
-{{this}}
-{{/each~}}
+{{#each used-tapes-list}}
+  {{this}}
+{{/each}}
+
 {{/if}}
 Tape Backup successful.
 
