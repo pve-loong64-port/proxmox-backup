@@ -210,6 +210,7 @@ Depends: fonts-font-awesome,
          ${shlibs:Depends},
 Recommends: ifupdown2,
             proxmox-mail-forward,
+            proxmox-network-interface-pinning,
             proxmox-offline-mirror-helper,
             zfsutils-linux,
 Description: Proxmox Backup Server daemon with tools and GUI
