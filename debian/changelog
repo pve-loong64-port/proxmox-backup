@@ -3,8 +3,8 @@ rust-proxmox-backup (4.0.10-1) trixie; urgency=medium
   * notifications templates: adapt to whitespace handling changes with
     new handlebars version to ensure lists are not placed on a single line.
 
-  * S3 Endpoints: allow to set quirks to adapt to provider specific behavior,
-    like not understanding the If-None-Match HTTP header.
+  * S3 Endpoints: allow one to set quirks to adapt to provider specific
+    behavior, like not understanding the If-None-Match HTTP header.
 
   * metric collection: use ip link for determining the type of interfaces.
 
