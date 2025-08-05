@@ -1,3 +1,20 @@
+rust-proxmox-backup (4.0.10-1) trixie; urgency=medium
+
+  * notifications templates: adapt to whitespace handling changes with
+    new handlebars version to ensure lists are not placed on a single line.
+
+  * S3 Endpoints: allow to set quirks to adapt to provider specific behavior,
+    like not understanding the If-None-Match HTTP header.
+
+  * metric collection: use ip link for determining the type of interfaces.
+
+  * d/control: recommend proxmox-network-interface-pinning package for the
+    Proxmox Backup Server package.
+
+  * docs: add documentation for proxmox-network-interface-pinning.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 05 Aug 2025 17:21:18 +0200
+
 rust-proxmox-backup (4.0.9-1) trixie; urgency=medium
 
   * sync: conditionally pre-filter source list by verified or encrypted state.
