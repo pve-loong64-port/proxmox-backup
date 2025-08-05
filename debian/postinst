@@ -11,11 +11,10 @@ case "$1" in
 
 	# FIXME: remove after beta is over and add hunk to actively remove the repo
 	BETA_SOURCES="/etc/apt/sources.list.d/pbs-test-for-beta.sources"
-	if test -e /proxmox_install_mode && ! test -f "$BETA_SOURCES"; then
-		echo "Adding pbs-test repo to '$BETA_SOURCES' to enable updates during Proxmox Backup Server 4.0 BETA"
-		printf 'Types: deb\nURIs: http://download.proxmox.com/debian/pbs\nSuites: trixie\nComponents: pbs-test\nSigned-By: /usr/share/keyrings/proxmox-archive-keyring.gpg\n' \
-			| tee "$BETA_SOURCES"
-	fi
+    if test -f "$BETA_SOURCES" && dpkg --compare-versions "$2" 'lt' '4.0.11-1' && dpkg --compare-versions "$2" 'gt' '4.0~~'; then
+        printf "\nNOTE: Remove the pbs-test repository, which was added during the beta phase.\nYou can (re-)add repositories on the web UI (Administration -> Repositories)\n\n"
+        rm -v "$BETA_SOURCES" || true
+    fi
 
 	# modeled after dh_systemd_start output
 	systemctl --system daemon-reload >/dev/null || true
