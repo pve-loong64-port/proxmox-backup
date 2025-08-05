@@ -119,6 +119,23 @@ Ext.define('PBS.window.S3ClientEdit', {
                 },
             },
         ],
+
+        advancedColumn1: [
+            {
+                xtype: 'proxmoxKVComboBox',
+                name: 'provider-quirks',
+                fieldLabel: gettext('Provider specific quirks'),
+                value: '__default__',
+                defaultValue: '__default__',
+                comboItems: [
+                    ['__default__', 'None (default)'],
+                    ['skip-if-none-match-header', 'Skip If-None-Match header'],
+                ],
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+        ],
     },
 
     getValues: function () {
