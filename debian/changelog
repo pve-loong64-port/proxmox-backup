@@ -1,3 +1,16 @@
+rust-proxmox-backup (3.4.4-1) bookworm; urgency=medium
+
+  * ui: do not show consent banner twice for OpenID Connect login.
+
+  * tape: increase timeout for moving medium in changer to 45 minutes.
+
+  * add pbs-network-config-commit systemd service that renames pending changes
+    to network interfaces configuration on boot.
+
+  * pbs3to4: add check for spelling of pbs-test repo.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 06 Aug 2025 12:30:16 +0200
+
 rust-proxmox-backup (3.4.3-1) bookworm; urgency=medium
 
   * proxmox-backup-client: fix static build.
