@@ -1004,6 +1004,15 @@ Ext.define('PBS.DataStoreContent', {
                 return `<span class="snapshot-comment-column ${additionalClasses}">${v}</span>
 		    <i data-qtip="${gettext('Edit')}" style="float: right; margin: 0px;" class="${icon}"></i>`;
             },
+            sorter: (aRec, bRec) => {
+                let a = aRec.data.comment || aRec.data['last-comment'] || '';
+                let b = bRec.data.comment || bRec.data['last-comment'] || '';
+
+                a = a.toLowerCase();
+                b = b.toLowerCase();
+
+                return a.localeCompare(b);
+            },
             listeners: {
                 afterrender: function (component) {
                     // a bit of a hack, but relatively easy, cheap and works out well.
