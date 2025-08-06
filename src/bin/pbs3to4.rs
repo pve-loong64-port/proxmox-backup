@@ -252,6 +252,7 @@ impl Checker {
         let mut strange_suite = false;
         let mut mismatches = Vec::new();
         let mut found_suite: Option<(String, String)> = None;
+        let mut test_repos = Vec::new();
 
         let (repo_files, _repo_errors, _digest) = repositories::repositories()?;
         for repo_file in repo_files {
@@ -259,6 +260,7 @@ impl Checker {
                 &mut found_suite,
                 &mut mismatches,
                 &mut strange_suite,
+                &mut test_repos,
                 repo_file,
             )?;
         }
@@ -280,6 +282,41 @@ impl Checker {
                 }
                 message.push('\n');
                 self.output.log_fail(message)?
+            }
+        }
+
+        // TODO remove the check in PBS 5, one cannot really update to latest 4.4 with an old test
+        // repo anyway
+        for (component, suite, location) in &test_repos {
+            self.output.log_info(format!(
+                "Found test repo for Proxmox Backup Server at {location}, checking compatibility \
+                    with updated 'pve-test' spelling.",
+            ))?;
+            match component.as_str() {
+                "pbstest" => {
+                    let message = format!(
+                        "Found legacy spelling 'pbstest' of the pbs-test repo. Change the repo to \
+                            use 'pbs-test' when updating the repos to the '{NEW_SUITE}' suite for \
+                            Proxmox Backup Server 4!"
+                    );
+                    match suite.as_str() {
+                        NEW_SUITE => self.output.log_fail(message)?,
+                        OLD_SUITE => self.output.log_warn(message)?,
+                        _ => {} // unreachable, other suites return early in check_repo_file()
+                    }
+                }
+                "pbs-test" => match suite.as_str() {
+                    NEW_SUITE => self.output.log_pass(format!(
+                        "Found modern spelling 'pbs-test' of the pbs-test repo for new suite \
+                            '{NEW_SUITE}'.",
+                    ))?,
+                    OLD_SUITE => self.output.log_fail(format!(
+                        "Found modern spelling 'pbs-test' but old suite '{OLD_SUITE}', did you \
+                            forget to update the suite?",
+                    ))?,
+                    _ => {} // unreachable, other suites return early in check_repo_file()
+                },
+                _ => {} // unreachable, only test repositories are added
             }
         }
 
@@ -331,6 +368,7 @@ impl Checker {
         found_suite: &mut Option<(String, String)>,
         mismatches: &mut Vec<(String, String)>,
         strange_suite: &mut bool,
+        test_repos: &mut Vec<(String, String, String)>,
         repo_file: APTRepositoryFile,
     ) -> Result<(), Error> {
         for repo in repo_file.repositories {
@@ -367,6 +405,13 @@ impl Checker {
                 } else {
                     let location = repo_file.path.clone().unwrap_or_default();
                     *found_suite = Some((suite.to_string(), location));
+                }
+
+                for component in &repo.components {
+                    if component == "pbstest" || component == "pbs-test" {
+                        let location = repo_file.path.clone().unwrap_or_default();
+                        test_repos.push((component.to_string(), suite.to_string(), location));
+                    }
                 }
             }
         }
