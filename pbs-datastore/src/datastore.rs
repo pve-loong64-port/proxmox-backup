@@ -1008,7 +1008,10 @@ impl DataStore {
                 let guard = backup_group.lock().with_context(|| {
                     format!("while creating new locked backup group '{backup_group:?}'")
                 })?;
-                self.set_owner(ns, backup_group.group(), auth_id, false)?;
+                if let Err(err) = self.set_owner(ns, backup_group.group(), auth_id, false) {
+                    let _ = std::fs::remove_dir(&full_path);
+                    return Err(err);
+                }
                 let owner = self.get_owner(ns, backup_group.group())?; // just to be sure
                 Ok((owner, guard))
             }
