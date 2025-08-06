@@ -114,6 +114,7 @@ Ext.define('PBS.LoginView', {
 
             let userid = data.username;
             let ticket = data.ticket;
+            let http_only = true;
             let challenge = JSON.parse(
                 decodeURIComponent(ticket.split(':')[1].slice('!tfa!'.length)),
             );
@@ -123,6 +124,7 @@ Ext.define('PBS.LoginView', {
                     userid,
                     ticket,
                     challenge,
+                    http_only,
                     onResolve: (value) => resolve(value),
                     onReject: reject,
                 }).show();
