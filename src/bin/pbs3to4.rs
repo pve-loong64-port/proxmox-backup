@@ -98,6 +98,9 @@ impl Checker {
 
                 let min_version = format!("{MIN_PBS_MAJOR}.{MIN_PBS_MINOR}.{MIN_PBS_PKGREL}");
 
+                // MIN_PBS_PKGREL is currently zero, making the comparison further below
+                // superfluous, but this might not always be the case
+                #[allow(clippy::absurd_extreme_comparisons)]
                 if maj > MIN_PBS_MAJOR {
                     self.output
                         .log_pass(format!("Already upgraded to Proxmox Backup Server {maj}"))?;
