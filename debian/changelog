@@ -1,3 +1,19 @@
+rust-proxmox-backup (4.0.12-1) trixie; urgency=medium
+
+  * update proxmox-tfa dependency to 0.6.3 to also keep old passkeys created
+    with PBS 3 or earlier working, where the backup eligible state was not yet
+    exposed.
+
+  * api: openid connect: allow users of OIDC realms to opt into the HttpOnly
+    cookies.
+
+  * ui: opt OpenID connect authentication flows into the new http only flow.
+
+  * proxy: avoid exiting connection acceptor loop in error case, like some
+    monitoring and health checks of reverse proxies or load balancer cause.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 07 Aug 2025 18:38:49 +0200
+
 rust-proxmox-backup (4.0.11-4) trixie; urgency=medium
 
   * re-build with proxmox-tfa 6.0.2 to cope with both possible states of
