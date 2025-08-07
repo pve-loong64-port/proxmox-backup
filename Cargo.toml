@@ -90,7 +90,7 @@ proxmox-sortable-macro = "1"
 proxmox-subscription = { version = "1", features = [ "api-types" ] }
 proxmox-sys = "1"
 proxmox-systemd = "1"
-proxmox-tfa = { version = "6.0.2", features = [ "api", "api-types" ] }
+proxmox-tfa = { version = "6.0.3", features = [ "api", "api-types" ] }
 proxmox-time = "2"
 proxmox-uuid = { version = "1", features = [ "serde" ] }
 proxmox-worker-task = "1"
