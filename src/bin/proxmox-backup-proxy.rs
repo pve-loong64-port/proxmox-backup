@@ -307,7 +307,7 @@ async fn run() -> Result<(), Error> {
                                 match conn {
                                     Ok(conn) => {
                                         let api_service = rest_server.api_service(&conn)?;
-                            let watcher = graceful.watcher();
+                                        let watcher = graceful.watcher();
                                         tokio::spawn(async move {
                                             api_service.serve(conn, Some(watcher)).await
                                         });
@@ -332,7 +332,7 @@ async fn run() -> Result<(), Error> {
                                 match conn {
                                     Ok(conn) => {
                                         let redirect_service = redirector.redirect_service();
-                            let watcher = graceful.watcher();
+                                        let watcher = graceful.watcher();
                                         tokio::spawn(async move {
                                             redirect_service.serve(conn, Some(watcher)).await
                                         });
