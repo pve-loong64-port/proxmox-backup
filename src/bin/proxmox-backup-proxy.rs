@@ -312,7 +312,7 @@ async fn run() -> Result<(), Error> {
                                             api_service.serve(conn, Some(watcher)).await
                                         });
                                     },
-                                    Err(err) => { log::warn!("Failed to accept insecure connection: {err:?}"); }
+                                    Err(err) => { log::warn!("Failed to accept secure connection: {err:?}"); }
                                 }
                             },
                             _shutdown = proxmox_daemon::shutdown_future() => {
