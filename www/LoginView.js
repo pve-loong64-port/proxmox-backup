@@ -197,6 +197,7 @@ Ext.define('PBS.LoginView', {
                                 state: auth.state,
                                 code: auth.code,
                                 'redirect-url': redirectURL,
+                                'http-only': true,
                             },
                             method: 'POST',
                             failure: function (response) {
