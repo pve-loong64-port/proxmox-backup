@@ -1,13 +1,16 @@
 //! OpenID redirect/login API
 use anyhow::{bail, format_err, Error};
+use hyper::http::request::Parts;
+use hyper::Response;
 use serde_json::{json, Value};
 
 use proxmox_auth_api::api::ApiTicket;
 use proxmox_auth_api::ticket::Ticket;
 use proxmox_router::{
-    http_err, list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap,
+    http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
+    Router, RpcEnvironment, SubdirMap,
 };
-use proxmox_schema::api;
+use proxmox_schema::{api, BooleanSchema, ObjectSchema, ParameterSchema, StringSchema};
 use proxmox_sortable_macro::sortable;
 
 use proxmox_openid::{OpenIdAuthenticator, OpenIdConfig};
@@ -58,167 +61,228 @@ fn openid_authenticator(
     OpenIdAuthenticator::discover(&config, redirect_url)
 }
 
-#[api(
-    input: {
-        properties: {
-            state: {
-                description: "OpenId state.",
-                type: String,
-            },
-            code: {
-                description: "OpenId authorization code.",
-                type: String,
-            },
-            "redirect-url": {
-                description: "Redirection Url. The client should set this to used server url.",
-                type: String,
-            },
-        },
-    },
-    returns: {
-        properties: {
-            username: {
-                type: String,
-                description: "User name.",
-            },
-            ticket: {
-                type: String,
-                description: "Auth ticket.",
-            },
-            CSRFPreventionToken: {
-                type: String,
-                description: "Cross Site Request Forgery Prevention Token.",
-            },
-        },
-    },
-    protected: true,
-    access: {
-        permission: &Permission::World,
-    },
-)]
-/// Verify OpenID authorization code and create a ticket
-///
-/// Returns: An authentication ticket with additional infos.
-pub fn openid_login(
-    state: String,
-    code: String,
-    redirect_url: String,
-    rpcenv: &mut dyn RpcEnvironment,
-) -> Result<Value, Error> {
-    use proxmox_rest_server::RestEnvironment;
+#[sortable]
+pub const API_METHOD_OPENID_LOGIN: ApiMethod = ApiMethod::new_full(
+    &ApiHandler::AsyncHttpBodyParameters(&create_ticket_http_only),
+    ParameterSchema::Object(&ObjectSchema::new(
+        "Get a new ticket as an HttpOnly cookie. Supports tickets via cookies.",
+        &sorted!([
+            ("state", false, &StringSchema::new("OpenId state.").schema()),
+            (
+                "code",
+                false,
+                &StringSchema::new("OpenId authorization code.").schema(),
+            ),
+            (
+                "redirect-url",
+                false,
+                &StringSchema::new(
+                    "Redirection Url. The client should set this to used server url.",
+                )
+                .schema(),
+            ),
+            (
+                "http-only",
+                true,
+                &BooleanSchema::new("Whether the HttpOnly authentication flow should be used.")
+                    .default(false)
+                    .schema(),
+            ),
+        ]),
+    )),
+)
+.returns(::proxmox_schema::ReturnType::new(
+    false,
+    &ObjectSchema::new(
+        "An authentication ticket with additional infos.",
+        &sorted!([
+            ("username", false, &StringSchema::new("User name.").schema()),
+            (
+                "ticket",
+                true,
+                &StringSchema::new(
+                    "Auth ticket, present if http-only was not provided or is false."
+                )
+                .schema()
+            ),
+            ("ticket-info",
+                true,
+                &StringSchema::new(
+                    "Informational ticket, can only be used to check if the ticket is expired. Present if http-only was true."
+                ).schema()),
+            (
+                "CSRFPreventionToken",
+                false,
+                &StringSchema::new("Cross Site Request Forgery Prevention Token.").schema(),
+            ),
+        ]),
+    )
+    .schema(),
+))
+.protected(true)
+.access(None, &Permission::World)
+.reload_timezone(true);
 
-    let env: &RestEnvironment = rpcenv
-        .as_any()
-        .downcast_ref::<RestEnvironment>()
-        .ok_or_else(|| format_err!("detected wrong RpcEnvironment type"))?;
+fn create_ticket_http_only(
+    _parts: Parts,
+    param: Value,
+    _info: &ApiMethod,
+    rpcenv: Box<dyn RpcEnvironment>,
+) -> ApiResponseFuture {
+    Box::pin(async move {
+        use proxmox_rest_server::RestEnvironment;
 
-    let user_info = CachedUserInfo::new()?;
+        let code = param["code"]
+            .as_str()
+            .ok_or_else(|| format_err!("missing non-optional parameter: code"))?
+            .to_owned();
+        let state = param["state"]
+            .as_str()
+            .ok_or_else(|| format_err!("missing non-optional parameter: state"))?
+            .to_owned();
+        let redirect_url = param["redirect-url"]
+            .as_str()
+            .ok_or_else(|| format_err!("missing non-optional parameter: redirect-url"))?
+            .to_owned();
 
-    let mut tested_username = None;
+        let env: &RestEnvironment = rpcenv
+            .as_any()
+            .downcast_ref::<RestEnvironment>()
+            .ok_or_else(|| format_err!("detected wrong RpcEnvironment type"))?;
 
-    let result = proxmox_lang::try_block!({
-        let (realm, private_auth_state) =
-            OpenIdAuthenticator::verify_public_auth_state(PROXMOX_BACKUP_RUN_DIR_M!(), &state)?;
+        let user_info = CachedUserInfo::new()?;
 
-        let (domains, _digest) = pbs_config::domains::config()?;
-        let config: OpenIdRealmConfig = domains.lookup("openid", &realm)?;
+        let mut tested_username = None;
 
-        let open_id = openid_authenticator(&config, &redirect_url)?;
+        let result = proxmox_lang::try_block!({
+            let (realm, private_auth_state) =
+                OpenIdAuthenticator::verify_public_auth_state(PROXMOX_BACKUP_RUN_DIR_M!(), &state)?;
 
-        let info = open_id.verify_authorization_code_simple(&code, &private_auth_state)?;
+            let (domains, _digest) = pbs_config::domains::config()?;
+            let config: OpenIdRealmConfig = domains.lookup("openid", &realm)?;
 
-        // eprintln!("VERIFIED {:?}", info);
+            let open_id = openid_authenticator(&config, &redirect_url)?;
 
-        let name_attr = config.username_claim.as_deref().unwrap_or("sub");
+            let info = open_id.verify_authorization_code_simple(&code, &private_auth_state)?;
 
-        // Try to be compatible with previous versions
-        let try_attr = match name_attr {
-            "subject" => Some("sub"),
-            "username" => Some("preferred_username"),
-            _ => None,
-        };
+            // eprintln!("VERIFIED {:?}", info);
 
-        let unique_name = match info[name_attr].as_str() {
-            Some(name) => name.to_owned(),
-            None => {
-                if let Some(try_attr) = try_attr {
-                    match info[try_attr].as_str() {
-                        Some(name) => name.to_owned(),
-                        None => bail!("missing claim '{}'", name_attr),
-                    }
-                } else {
-                    bail!("missing claim '{}'", name_attr);
-                }
-            }
-        };
+            let name_attr = config.username_claim.as_deref().unwrap_or("sub");
 
-        let user_id = Userid::try_from(format!("{}@{}", unique_name, realm))?;
-        tested_username = Some(unique_name);
+            // Try to be compatible with previous versions
+            let try_attr = match name_attr {
+                "subject" => Some("sub"),
+                "username" => Some("preferred_username"),
+                _ => None,
+            };
 
-        if !user_info.is_active_user_id(&user_id) {
-            if config.autocreate.unwrap_or(false) {
-                use pbs_config::user;
-                let _lock = open_backup_lockfile(user::USER_CFG_LOCKFILE, None, true)?;
-
-                let firstname = info["given_name"]
-                    .as_str()
-                    .map(|n| n.to_string())
-                    .filter(|n| FIRST_NAME_SCHEMA.parse_simple_value(n).is_ok());
-
-                let lastname = info["family_name"]
-                    .as_str()
-                    .map(|n| n.to_string())
-                    .filter(|n| LAST_NAME_SCHEMA.parse_simple_value(n).is_ok());
-
-                let email = info["email"]
-                    .as_str()
-                    .map(|n| n.to_string())
-                    .filter(|n| EMAIL_SCHEMA.parse_simple_value(n).is_ok());
-
-                let user = User {
-                    userid: user_id.clone(),
-                    comment: None,
-                    enable: None,
-                    expire: None,
-                    firstname,
-                    lastname,
-                    email,
-                };
-                let (mut config, _digest) = user::config()?;
-                if let Ok(old_user) = config.lookup::<User>("user", user.userid.as_str()) {
-                    if let Some(false) = old_user.enable {
-                        bail!("user '{}' is disabled.", user.userid);
+            let unique_name = match info[name_attr].as_str() {
+                Some(name) => name.to_owned(),
+                None => {
+                    if let Some(try_attr) = try_attr {
+                        match info[try_attr].as_str() {
+                            Some(name) => name.to_owned(),
+                            None => bail!("missing claim '{}'", name_attr),
+                        }
                     } else {
-                        bail!("autocreate user failed - '{}' already exists.", user.userid);
+                        bail!("missing claim '{}'", name_attr);
                     }
                 }
-                config.set_data(user.userid.as_str(), "user", &user)?;
-                user::save_config(&config)?;
-            } else {
-                bail!("user account '{}' missing, disabled or expired.", user_id);
+            };
+
+            let user_id = Userid::try_from(format!("{}@{}", unique_name, realm))?;
+            tested_username = Some(unique_name);
+
+            if !user_info.is_active_user_id(&user_id) {
+                if config.autocreate.unwrap_or(false) {
+                    use pbs_config::user;
+                    let _lock = open_backup_lockfile(user::USER_CFG_LOCKFILE, None, true)?;
+
+                    let firstname = info["given_name"]
+                        .as_str()
+                        .map(|n| n.to_string())
+                        .filter(|n| FIRST_NAME_SCHEMA.parse_simple_value(n).is_ok());
+
+                    let lastname = info["family_name"]
+                        .as_str()
+                        .map(|n| n.to_string())
+                        .filter(|n| LAST_NAME_SCHEMA.parse_simple_value(n).is_ok());
+
+                    let email = info["email"]
+                        .as_str()
+                        .map(|n| n.to_string())
+                        .filter(|n| EMAIL_SCHEMA.parse_simple_value(n).is_ok());
+
+                    let user = User {
+                        userid: user_id.clone(),
+                        comment: None,
+                        enable: None,
+                        expire: None,
+                        firstname,
+                        lastname,
+                        email,
+                    };
+                    let (mut config, _digest) = user::config()?;
+                    if let Ok(old_user) = config.lookup::<User>("user", user.userid.as_str()) {
+                        if let Some(false) = old_user.enable {
+                            bail!("user '{}' is disabled.", user.userid);
+                        } else {
+                            bail!("autocreate user failed - '{}' already exists.", user.userid);
+                        }
+                    }
+                    config.set_data(user.userid.as_str(), "user", &user)?;
+                    user::save_config(&config)?;
+                } else {
+                    bail!("user account '{}' missing, disabled or expired.", user_id);
+                }
             }
-        }
 
-        let api_ticket = ApiTicket::Full(user_id.clone());
-        let ticket = Ticket::new("PBS", &api_ticket)?.sign(private_auth_keyring(), None)?;
-        let token = assemble_csrf_prevention_token(csrf_secret(), &user_id);
+            let api_ticket = ApiTicket::Full(user_id.clone());
+            let ticket = Ticket::new("PBS", &api_ticket)?;
+            let token = assemble_csrf_prevention_token(csrf_secret(), &user_id);
 
-        env.log_auth(user_id.as_str());
+            env.log_auth(user_id.as_str());
 
-        Ok(json!({
-            "username": user_id,
-            "ticket": ticket,
-            "CSRFPreventionToken": token,
-        }))
-    });
+            Ok((user_id, ticket, token))
+        });
 
-    if let Err(ref err) = result {
-        let msg = err.to_string();
-        env.log_failed_auth(tested_username, &msg);
-        return Err(http_err!(UNAUTHORIZED, "{}", msg));
-    }
+        let (user_id, mut ticket, token) = result.map_err(|err| {
+            let msg = err.to_string();
+            env.log_failed_auth(tested_username, &msg);
+            http_err!(UNAUTHORIZED, "{}", msg)
+        })?;
 
-    result
+        let mut response =
+            Response::builder().header(hyper::http::header::CONTENT_TYPE, "application/json");
+
+        let data = if Value::Bool(true) == param["http-only"] {
+            let cookie = format!(
+                "{}={}; Secure; SameSite=Lax; HttpOnly; Path=/;",
+                get_auth_cookie_name(),
+                ticket.sign(private_auth_keyring(), None)?,
+            );
+
+            response = response.header(hyper::header::SET_COOKIE, cookie);
+
+            json!({
+                "username": user_id,
+                "ticket-info": ticket.ticket_info(),
+                "CSRFPreventionToken": token
+            })
+        } else {
+            json!({
+                "username": user_id,
+                "ticket": ticket.sign(private_auth_keyring(), None)?,
+                "CSRFPreventionToken": token
+            })
+        };
+
+        Ok(response.body(
+            json!({"data": data, "status": 200, "success": true })
+                .to_string()
+                .into(),
+        )?)
+    })
 }
 
 #[api(
