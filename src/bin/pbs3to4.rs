@@ -210,7 +210,7 @@ impl Checker {
             if !Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
                 self.output.log_info(
                     "systemd-boot package installed on legacy-boot system is not \
-                        necessary, consider removing it",
+                    necessary, consider removing it",
                 )?;
                 return Ok(());
             }
@@ -228,16 +228,19 @@ impl Checker {
                 return Ok(());
             }
             if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
-                self.output.log_fail( "systemd-boot meta-package installed. This will cause issues on upgrades of \
-                    boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly \
-                and remove 'systemd-boot'")?;
+                self.output.log_fail(
+                    "systemd-boot meta-package installed. This will cause issues on upgrades of \
+                    boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' \
+                    explicitly and remove 'systemd-boot'",
+                )?;
                 return Ok(());
             }
         } else {
             if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
-                self.output.log_fail( "systemd-boot meta-package installed. This will cause problems on upgrades of other \
-                        boot-related packages. Remove 'systemd-boot' See \
-                        https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
+                self.output.log_fail(
+                    "systemd-boot meta-package installed. This will cause problems on upgrades of other \
+                    boot-related packages. Remove 'systemd-boot' See \
+                    https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
                 )?;
                 boot_ok = false;
             }
@@ -262,9 +265,10 @@ impl Checker {
                 if !re.is_match(std::str::from_utf8(&output.stdout)?) {
                     self.output.log_warn(format!(
                         "Removable bootloader found at '/boot/efi/EFI/BOOT/BOOTX64.efi', but GRUB packages \
-                            not set up to update it!\nRun the following command:\n \
-                            echo 'grub-efi-amd64 grub2/force_efi_extra_removable boolean true' | debconf-set-selections -v -u\n\
-                            Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'"))?;
+                        not set up to update it!\nRun the following command:\n\
+                        echo 'grub-efi-amd64 grub2/force_efi_extra_removable boolean true' | debconf-set-selections -v -u\n\
+                        Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'"
+                    ))?;
                     boot_ok = false;
                 }
             }
