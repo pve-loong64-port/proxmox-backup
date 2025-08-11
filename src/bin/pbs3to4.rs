@@ -230,8 +230,9 @@ impl Checker {
             if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
                 self.output.log_fail(
                     "systemd-boot meta-package installed. This will cause issues on upgrades of \
-                    boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' \
-                    explicitly and remove 'systemd-boot'",
+                    boot-related packages.\n\
+                    Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly and remove \
+                    'systemd-boot'",
                 )?;
                 return Ok(());
             }
@@ -239,8 +240,9 @@ impl Checker {
             if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
                 self.output.log_fail(
                     "systemd-boot meta-package installed. This will cause problems on upgrades of other \
-                    boot-related packages. Remove 'systemd-boot' See \
-                    https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
+                    boot-related packages.\n\
+                    Remove the 'systemd-boot' package.\n\
+                    See https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
                 )?;
                 boot_ok = false;
             }
