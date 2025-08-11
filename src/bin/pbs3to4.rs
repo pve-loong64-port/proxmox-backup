@@ -207,39 +207,71 @@ impl Checker {
             .log_info("Checking bootloader configuration...")?;
 
         if !Path::new("/sys/firmware/efi").is_dir() {
+            if !Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+                self.output.log_info(
+                    "systemd-boot package installed on legacy-boot system is not \
+                        necessary, consider removing it",
+                )?;
+                return Ok(());
+            }
             self.output
-                .log_skip("System booted in legacy-mode - no need for systemd-boot")?;
+                .log_skip("System booted in legacy-mode - no need for additional pacckages.")?;
             return Ok(());
         }
 
+        let mut boot_ok = true;
         if Path::new("/etc/kernel/proxmox-boot-uuids").is_file() {
             // PBS packages version check needs to be run before
             if !self.upgraded {
                 self.output
-                    .log_skip("not yet upgraded, no need to check the presence of systemd-boot")?;
+                    .log_skip("not yet upgraded, systemd-boot still needed for bootctl")?;
                 return Ok(());
             }
             if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
-                self.output
-                    .log_pass("bootloader packages installed correctly")?;
+                self.output.log_fail( "systemd-boot meta-package installed. This will cause issues on upgrades of \
+                    boot-related packages. Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly \
+                and remove 'systemd-boot'")?;
                 return Ok(());
             }
-            self.output.log_warn(
-                "proxmox-boot-tool is used for bootloader configuration in uefi mode \
-                 but the separate systemd-boot package, is not installed.\n\
-                 initializing new ESPs will not work until the package is installed.",
-            )?;
-            return Ok(());
-        } else if !Path::new("/usr/share/doc/grub-efi-amd64/changelog.Debian.gz").is_file() {
-            self.output.log_warn(
-                "System booted in uefi mode but grub-efi-amd64 meta-package not installed, \
-             new grub versions will not be installed to /boot/efi!
-             Install grub-efi-amd64.",
-            )?;
-            return Ok(());
         } else {
-            self.output
-                .log_pass("bootloader packages installed correctly")?;
+            if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+                self.output.log_fail( "systemd-boot meta-package installed. This will cause problems on upgrades of other \
+                        boot-related packages. Remove 'systemd-boot' See \
+                        https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
+                )?;
+                boot_ok = false;
+            }
+            if !Path::new("/usr/share/doc/grub-efi-amd64/changelog.Debian.gz").is_file() {
+                self.output.log_warn(
+                    "System booted in uefi mode but grub-efi-amd64 meta-package not installed, \
+                     new grub versions will not be installed to /boot/efi!
+                     Install grub-efi-amd64.",
+                )?;
+                boot_ok = false;
+            }
+            if Path::new("/boot/efi/EFI/BOOT/BOOTX64.efi").is_file() {
+                let output = std::process::Command::new("debconf-show")
+                    .arg("--db")
+                    .arg("configdb")
+                    .arg("grub-efi-amd64")
+                    .arg("grub-pc")
+                    .output()
+                    .map_err(|err| format_err!("failed to retrieve debconf settings - {err}"))?;
+                let re = Regex::new(r"grub2/force_efi_extra_removable: +true(?:\n|$)")
+                    .expect("failed to compile dbconfig regex");
+                if !re.is_match(std::str::from_utf8(&output.stdout)?) {
+                    self.output.log_warn(format!(
+                        "Removable bootloader found at '/boot/efi/EFI/BOOT/BOOTX64.efi', but GRUB packages \
+                            not set up to update it!\nRun the following command:\n \
+                            echo 'grub-efi-amd64 grub2/force_efi_extra_removable boolean true' | debconf-set-selections -v -u\n\
+                            Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'"))?;
+                    boot_ok = false;
+                }
+            }
+            if boot_ok {
+                self.output
+                    .log_pass("bootloader packages installed correctly")?;
+            }
         }
 
         Ok(())
