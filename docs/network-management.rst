@@ -104,9 +104,9 @@ Overriding network device names
 
 When upgrading kernels, adding PCIe devices or updating your BIOS, automatically
 generated network interface names can change. To alleviate this issues, Proxmox
-Backup Server provides a tool for automatically generating .link files for
-overriding the name of network devices. It also automatically replaces the
-occurrences of the old interface name in ``/etc/network/interfaces``.
+Backup Server provides a tool for automatically generating `systemd .link`_
+files for overriding the name of network devices. It also automatically replaces
+the occurrences of the old interface name in ``/etc/network/interfaces``.
 
 The generated link files are stored in ``/usr/local/lib/systemd/network``. For
 the interfaces file a new file will be generated in the same place with a
@@ -151,3 +151,5 @@ interface should be pinned to:
 
 In order to apply the changes made by ``proxmox-network-interface-pinning`` to
 the network configuration, the host needs to be rebooted.
+
+.. _systemd .link: https://www.freedesktop.org/software/systemd/man/latest/systemd.link.html
