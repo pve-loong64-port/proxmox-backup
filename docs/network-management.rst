@@ -106,49 +106,48 @@ When upgrading kernels, adding PCIe devices or updating your BIOS, automatically
 generated network interface names can change. To alleviate this issues, Proxmox
 Backup Server provides a tool for automatically generating .link files for
 overriding the name of network devices. It also automatically replaces the
-occurences of the old interface name in `/etc/network/interfaces`.
+occurrences of the old interface name in ``/etc/network/interfaces``.
 
-The generated link files are stored in `/usr/local/lib/systemd/network`. For the
-interfaces file a new file will be generated in the same place with a `.new`
-suffix. This way you can inspect the changes made to the configuration by
-using diff (or another diff viewer of your choice):
+The generated link files are stored in ``/usr/local/lib/systemd/network``. For
+the interfaces file a new file will be generated in the same place with a
+``.new`` suffix. This way you can inspect the changes made to the configuration
+by using diff (or another diff viewer of your choice):
 
-----
-diff -y /etc/network/interfaces /etc/network/interfaces.new
-----
+.. code-block:: console
+
+  diff -y /etc/network/interfaces /etc/network/interfaces.new
 
 If you see any problematic changes or want to revert the changes made by the
-pinning tool **before rebooting**, simply delete all `.new` files and the
-respective link files from `/usr/local/lib/systemd/network`.
+pinning tool **before rebooting**, simply delete all ``.new`` files and the
+respective link files from ``/usr/local/lib/systemd/network``.
 
-The following command will generate a .link file for all physical network
-interfaces that do not yet have a .link file and update selected Proxmox VE
+The following command will generate a ``.link`` file for all physical network
+interfaces that do not yet have a ``.link`` file and update selected Proxmox VE
 configuration files (see above). The generated names will use the default prefix
-`nic`, so the resulting interface names will be `nic1`, `nic2`, ...
+``nic``, so the resulting interface names will be ``nic1``, ``nic2``, ...
 
-----
-proxmox-network-interface-pinning generate
-----
+.. code-block:: console
 
-You can override the default prefix with the `--prefix` flag:
+  proxmox-network-interface-pinning generate
 
-----
-proxmox-network-interface-pinning generate --prefix myprefix
-----
+You can override the default prefix with the ``--prefix`` flag:
+
+.. code-block:: console
+
+  proxmox-network-interface-pinning generate --prefix myprefix
 
 It is also possible to pin only a specific interface:
 
-----
-proxmox-network-interface-pinning generate --interface enp1s0
-----
+.. code-block:: console
+
+  proxmox-network-interface-pinning generate --interface enp1s0
 
 When pinning a specific interface, you can specify the exact name that the
 interface should be pinned to:
 
-----
-proxmox-network-interface-pinning generate --interface enp1s0 --target-name if42
-----
+.. code-block:: console
 
-In order to apply the changes made by `proxmox-network-interface-pinning` to the
-network configuration, the host needs to be rebooted.
+  proxmox-network-interface-pinning generate --interface enp1s0 --target-name if42
 
+In order to apply the changes made by ``proxmox-network-interface-pinning`` to
+the network configuration, the host needs to be rebooted.
