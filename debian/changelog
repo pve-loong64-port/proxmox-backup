@@ -1,3 +1,11 @@
+rust-proxmox-backup (3.4.6-1) bookworm; urgency=medium
+
+  * move from pbs-api-types to proxmox-network-api
+
+  * ui: webauthn view: make sure renderers are html encoded
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 13 Aug 2025 13:07:28 +0200
+
 rust-proxmox-backup (3.4.5-1) bookworm; urgency=medium
 
   * d/control: recommend proxmox-network-interface-pinning package
