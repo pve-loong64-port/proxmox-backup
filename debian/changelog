@@ -1,3 +1,9 @@
+rust-proxmox-backup (4.0.14-1) trixie; urgency=medium
+
+  * ui: webauthn view: make sure renderers are html encoded
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 13 Aug 2025 13:26:47 +0200
+
 rust-proxmox-backup (4.0.13-1) trixie; urgency=medium
 
   * bin: pbs3to4: adapt boot-loader checks to trixie
