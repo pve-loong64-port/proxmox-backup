@@ -17,7 +17,7 @@ pub use lexer::*;
 mod parser;
 pub use parser::*;
 
-use pbs_api_types::{
+use proxmox_network_api::{
     BondXmitHashPolicy, Interface, LinuxBondMode, NetworkConfigMethod, NetworkInterfaceType,
 };
 
