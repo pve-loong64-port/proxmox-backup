@@ -71,6 +71,10 @@ async fn send_queued_notifications() -> Result<(), Error> {
         }
     }
 
+    if notifications.is_empty() {
+        return Ok(());
+    }
+
     // Make sure that we send the oldest notification first
     notifications.sort_unstable_by_key(|n| n.timestamp());
 
