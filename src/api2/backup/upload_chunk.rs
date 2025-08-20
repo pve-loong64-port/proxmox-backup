@@ -267,7 +267,7 @@ async fn upload_to_backend(
                 let is_duplicate = s3_client
                     .upload_no_replace_with_retry(object_key, data)
                     .await
-                    .context("failed to upload chunk to s3 backend")?;
+                    .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
                 return Ok((digest, size, encoded_size, is_duplicate));
             }
 
@@ -291,7 +291,7 @@ async fn upload_to_backend(
             let is_duplicate = s3_client
                 .upload_no_replace_with_retry(object_key, data.clone())
                 .await
-                .context("failed to upload chunk to s3 backend")?;
+                .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
 
             // Only insert the chunk into the cache after it has been successufuly uploaded.
             // Although less performant than doing this in parallel, it is required for consisency
