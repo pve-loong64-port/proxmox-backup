@@ -7,7 +7,7 @@ use proxmox_http::Body;
 use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_s3_client::{
     S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3_BUCKET_NAME_SCHEMA,
-    S3_CLIENT_ID_SCHEMA,
+    S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
@@ -57,7 +57,12 @@ pub async fn check(
     let client = S3Client::new(options).context("client creation failed")?;
     client.head_bucket().await.context("head object failed")?;
     client
-        .put_object(test_object_key.clone(), Body::empty(), true)
+        .put_object(
+            test_object_key.clone(),
+            Body::empty(),
+            Some(S3_HTTP_REQUEST_TIMEOUT),
+            true,
+        )
         .await
         .context("put object failed")?;
     client

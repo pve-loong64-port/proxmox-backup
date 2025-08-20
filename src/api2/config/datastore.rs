@@ -36,7 +36,7 @@ use pbs_datastore::{
     get_datastore_mount_status, DataStore, DatastoreBackend, S3_DATASTORE_IN_USE_MARKER,
 };
 use proxmox_rest_server::WorkerTask;
-use proxmox_s3_client::S3ObjectKey;
+use proxmox_s3_client::{S3ObjectKey, S3_HTTP_REQUEST_TIMEOUT};
 
 use crate::server::jobstate;
 use crate::tools::disks::unmount_by_mountpoint;
@@ -217,6 +217,7 @@ pub(crate) fn do_create_datastore(
         proxmox_async::runtime::block_on(s3_client.put_object(
             object_key,
             hyper::body::Bytes::from(content).into(),
+            Some(S3_HTTP_REQUEST_TIMEOUT),
             true,
         ))
         .context("failed to upload in-use marker for datastore")?;
