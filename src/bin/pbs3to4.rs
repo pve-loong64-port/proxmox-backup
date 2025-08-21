@@ -209,8 +209,11 @@ impl Checker {
         self.output
             .log_info("Checking bootloader configuration...")?;
 
+        let sd_boot_installed =
+            Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file();
+
         if !Path::new("/sys/firmware/efi").is_dir() {
-            if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+            if sd_boot_installed {
                 self.output.log_info(
                     "systemd-boot package installed on legacy-boot system is not \
                     necessary, consider removing it",
@@ -230,7 +233,7 @@ impl Checker {
                     .log_skip("not yet upgraded, systemd-boot still needed for bootctl")?;
                 return Ok(());
             }
-            if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+            if sd_boot_installed {
                 self.output.log_fail(
                     "systemd-boot meta-package installed. This will cause issues on upgrades of \
                     boot-related packages.\n\
@@ -240,7 +243,7 @@ impl Checker {
                 return Ok(());
             }
         } else {
-            if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+            if sd_boot_installed {
                 self.output.log_fail(
                     "systemd-boot meta-package installed. This will cause problems on upgrades of other \
                     boot-related packages.\n\
