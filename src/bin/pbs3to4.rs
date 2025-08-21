@@ -211,7 +211,7 @@ impl Checker {
 
         if !Path::new("/sys/firmware/efi").is_dir() {
             if sd_boot_installed {
-                self.output.log_info(
+                self.output.log_warn(
                     "systemd-boot package installed on legacy-boot system is not \
                     necessary, consider removing it",
                 )?;
@@ -226,29 +226,21 @@ impl Checker {
         if Path::new("/etc/kernel/proxmox-boot-uuids").is_file() {
             // PBS packages version check needs to be run before
             if !self.upgraded {
-                self.output
-                    .log_skip("not yet upgraded, systemd-boot still needed for bootctl")?;
-                return Ok(());
-            }
-            if sd_boot_installed {
-                self.output.log_fail(
-                    "systemd-boot meta-package installed. This will cause issues on upgrades of \
-                    boot-related packages.\n\
-                    Install 'systemd-boot-efi' and 'systemd-boot-tools' explicitly and remove \
-                    'systemd-boot'",
-                )?;
-                return Ok(());
+                let output = std::process::Command::new("proxmox-boot-tool")
+                    .arg("status")
+                    .output()
+                    .map_err(|err| {
+                        format_err!("failed to retrieve proxmox-boot-tool status - {err}")
+                    })?;
+                let re = Regex::new(r"configured with:.* (uefi|systemd-boot) \(versions:")
+                    .expect("failed to proxmox-boot-tool status");
+                if re.is_match(std::str::from_utf8(&output.stdout)?) {
+                    self.output
+                        .log_skip("not yet upgraded, systemd-boot still needed for bootctl")?;
+                    return Ok(());
+                }
             }
         } else {
-            if sd_boot_installed {
-                self.output.log_fail(
-                    "systemd-boot meta-package installed. This will cause problems on upgrades of other \
-                    boot-related packages.\n\
-                    Remove the 'systemd-boot' package.\n\
-                    See https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
-                )?;
-                boot_ok = false;
-            }
             if !Path::new("/usr/share/doc/grub-efi-amd64/changelog.Debian.gz").is_file() {
                 self.output.log_warn(
                     "System booted in uefi mode but grub-efi-amd64 meta-package not installed, \
@@ -277,12 +269,20 @@ impl Checker {
                     boot_ok = false;
                 }
             }
-            if boot_ok {
-                self.output
-                    .log_pass("bootloader packages installed correctly")?;
-            }
         }
-
+        if sd_boot_installed {
+            self.output.log_fail(
+                "systemd-boot meta-package installed. This will cause problems on upgrades of other \
+                boot-related packages.\n\
+                Remove the 'systemd-boot' package.\n\
+                See https://pbs.proxmox.com/wiki/Upgrade_from_3_to_4#sd-boot-warning for more information."
+            )?;
+            boot_ok = false;
+        }
+        if boot_ok {
+            self.output
+                .log_pass("bootloader packages installed correctly")?;
+        }
         Ok(())
     }
 
