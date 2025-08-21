@@ -207,7 +207,7 @@ impl Checker {
             .log_info("Checking bootloader configuration...")?;
 
         if !Path::new("/sys/firmware/efi").is_dir() {
-            if !Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
+            if Path::new("/usr/share/doc/systemd-boot/changelog.Debian.gz").is_file() {
                 self.output.log_info(
                     "systemd-boot package installed on legacy-boot system is not \
                     necessary, consider removing it",
@@ -215,7 +215,7 @@ impl Checker {
                 return Ok(());
             }
             self.output
-                .log_skip("System booted in legacy-mode - no need for additional pacckages.")?;
+                .log_skip("System booted in legacy-mode - no need for additional packages.")?;
             return Ok(());
         }
 
