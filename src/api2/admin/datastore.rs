@@ -1532,7 +1532,9 @@ pub fn upload_backup_log(
             )
             .context("invalid client log object key")?;
             let data = hyper::body::Bytes::copy_from_slice(blob.raw_data());
-            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
+            s3_client
+                .upload_replace_with_retry(object_key, data)
+                .await
                 .context("failed to upload client log to s3 backend")?;
         };
 
