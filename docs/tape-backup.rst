@@ -624,9 +624,9 @@ GUI, or enter the following command:
 
 .. code-block:: console
 
- // proxmox-tape pool create <name> --drive <string> [OPTIONS]
+ // proxmox-tape pool create <name> [OPTIONS]
 
- # proxmox-tape pool create daily --drive mydrive
+ # proxmox-tape pool create daily
 
 
 Additional options can be set later, using the update command:
