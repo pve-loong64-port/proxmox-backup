@@ -5,7 +5,7 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{bail, Context as AnyhowContext, Error};
+use anyhow::{bail, Context as _, Error};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 
