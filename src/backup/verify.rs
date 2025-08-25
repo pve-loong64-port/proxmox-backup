@@ -292,13 +292,25 @@ impl VerifyWorker {
                 let object_key = pbs_datastore::s3::object_key_from_digest(&info.digest)?;
                 match proxmox_async::runtime::block_on(s3_client.get_object(object_key)) {
                     Ok(Some(response)) => {
-                        let bytes = proxmox_async::runtime::block_on(response.content.collect())?
-                            .to_bytes();
-                        let chunk = DataBlob::from_raw(bytes.to_vec())?;
-                        let size = info.size();
-                        *read_bytes += chunk.raw_size();
-                        decoder_pool.send((chunk, info.digest, size))?;
-                        *decoded_bytes += size;
+                        let chunk_result = proxmox_lang::try_block!({
+                            let bytes =
+                                proxmox_async::runtime::block_on(response.content.collect())?
+                                    .to_bytes();
+                            DataBlob::from_raw(bytes.to_vec())
+                        });
+
+                        match chunk_result {
+                            Ok(chunk) => {
+                                let size = info.size();
+                                *read_bytes += chunk.raw_size();
+                                decoder_pool.send((chunk, info.digest, size))?;
+                                *decoded_bytes += size;
+                            }
+                            Err(err) => {
+                                errors.fetch_add(1, Ordering::SeqCst);
+                                error!("can't verify chunk, load failed - {err}");
+                            }
+                        }
                     }
                     Ok(None) => self.add_corrupt_chunk(
                         info.digest,
@@ -308,11 +320,10 @@ impl VerifyWorker {
                             hex::encode(info.digest)
                         ),
                     ),
-                    Err(err) => self.add_corrupt_chunk(
-                        info.digest,
-                        errors,
-                        &format!("can't verify chunk, load failed - {err}"),
-                    ),
+                    Err(err) => {
+                        errors.fetch_add(1, Ordering::SeqCst);
+                        error!("can't verify chunk, load failed - {err}");
+                    }
                 }
             }
         }
