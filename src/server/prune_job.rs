@@ -7,7 +7,7 @@ use pbs_api_types::{
     print_store_and_ns, Authid, KeepOptions, Operation, PruneJobOptions, MAX_NAMESPACE_DEPTH,
     PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
 };
-use pbs_datastore::prune::compute_prune_info;
+use pbs_datastore::prune::{compute_prune_info, PruneMark};
 use pbs_datastore::DataStore;
 use proxmox_rest_server::WorkerTask;
 
@@ -72,7 +72,13 @@ pub fn prune_datastore(
                 if dry_run { "would " } else { "" },
                 group.backup_type(),
                 group.backup_id(),
-                info.backup_dir.backup_time_string()
+                info.backup_dir.backup_time_string(),
+                mark = match mark {
+                    PruneMark::Protected => "keep protected",
+                    PruneMark::Keep => "keep",
+                    PruneMark::KeepPartial => "keep partial",
+                    PruneMark::Remove => "remove",
+                }
             );
             if !keep && !dry_run {
                 if let Err(err) = datastore.remove_backup_dir(ns, info.backup_dir.as_ref(), false) {
