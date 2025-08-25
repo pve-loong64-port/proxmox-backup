@@ -265,6 +265,7 @@ proxmox-rrd-api-types.workspace = true
 [patch.crates-io]
 #pbs-api-types = { path = "../proxmox/pbs-api-types" }
 #proxmox-acme = { path = "../proxmox/proxmox-acme" }
+#proxmox-api-macro = { path = "../proxmox/proxmox-api-macro" }
 #proxmox-apt = { path = "../proxmox/proxmox-apt" }
 #proxmox-apt-api-types = { path = "../proxmox/proxmox-apt-api-types" }
 #proxmox-async = { path = "../proxmox/proxmox-async" }
@@ -274,24 +275,29 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-compression = { path = "../proxmox/proxmox-compression" }
 #proxmox-config-digest = { path = "../proxmox/proxmox-config-digest" }
 #proxmox-daemon = { path = "../proxmox/proxmox-daemon" }
-#proxmox-fuse = { path = "../proxmox-fuse" }
 #proxmox-http = { path = "../proxmox/proxmox-http" }
+#proxmox-http-error = { path = "../proxmox/proxmox-http-error" }
 #proxmox-human-byte = { path = "../proxmox/proxmox-human-byte" }
 #proxmox-io = { path = "../proxmox/proxmox-io" }
 #proxmox-lang = { path = "../proxmox/proxmox-lang" }
-#proxmox-log = { path = "../proxmox/proxmox-log" }
 #proxmox-ldap = { path = "../proxmox/proxmox-ldap" }
+#proxmox-log = { path = "../proxmox/proxmox-log" }
 #proxmox-metrics = { path = "../proxmox/proxmox-metrics" }
 #proxmox-network-api = { path = "../proxmox/proxmox-network-api" }
+#proxmox-network-types = { path = "../proxmox/proxmox-network-types" }
 #proxmox-notify = { path = "../proxmox/proxmox-notify" }
 #proxmox-openid = { path = "../proxmox/proxmox-openid" }
+#proxmox-product-config = { path = "../proxmox/proxmox-product-config" }
 #proxmox-rest-server = { path = "../proxmox/proxmox-rest-server" }
 #proxmox-router = { path = "../proxmox/proxmox-router" }
 #proxmox-rrd = { path = "../proxmox/proxmox-rrd" }
 #proxmox-rrd-api-types = { path = "../proxmox/proxmox-rrd-api-types" }
+#proxmox-s3-client = { path = "../proxmox/proxmox-s3-client" }
 #proxmox-schema = { path = "../proxmox/proxmox-schema" }
 #proxmox-section-config = { path = "../proxmox/proxmox-section-config" }
+#proxmox-sendmail = { path = "../proxmox/proxmox-sendmail" }
 #proxmox-serde = { path = "../proxmox/proxmox-serde" }
+#proxmox-shared-cache = { path = "../proxmox/proxmox-shared-cache" }
 #proxmox-shared-memory = { path = "../proxmox/proxmox-shared-memory" }
 #proxmox-sortable-macro = { path = "../proxmox/proxmox-sortable-macro" }
 #proxmox-subscription = { path = "../proxmox/proxmox-subscription" }
@@ -302,6 +308,7 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-uuid = { path = "../proxmox/proxmox-uuid" }
 #proxmox-worker-task = { path = "../proxmox/proxmox-worker-task" }
 
+#proxmox-fuse = {path = "../proxmox-fuse" }
 #pathpatterns = {path = "../pathpatterns" }
 #pxar = { path = "../pxar" }
 
