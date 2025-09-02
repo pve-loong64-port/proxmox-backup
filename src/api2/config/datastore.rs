@@ -115,7 +115,7 @@ pub(crate) fn do_create_datastore(
 ) -> Result<(), Error> {
     let path: PathBuf = datastore.absolute_path().into();
 
-    if path.parent().is_none() {
+    if path.parent().is_none() && datastore.backing_device.is_none() {
         bail!("cannot create datastore in root path");
     }
 
