@@ -28,17 +28,17 @@ use pbs_tape::{
 
 pub const FILE_MARK_COUNT_SCHEMA: Schema = IntegerSchema::new("File mark count.")
     .minimum(1)
-    .maximum(i32::MAX as isize)
+    .maximum(i32::MAX as i64)
     .schema();
 
 pub const FILE_MARK_POSITION_SCHEMA: Schema = IntegerSchema::new("File mark position (0 is BOT).")
     .minimum(0)
-    .maximum(i32::MAX as isize)
+    .maximum(i32::MAX as i64)
     .schema();
 
 pub const RECORD_COUNT_SCHEMA: Schema = IntegerSchema::new("Record count.")
     .minimum(1)
-    .maximum(i32::MAX as isize)
+    .maximum(i32::MAX as i64)
     .schema();
 
 pub const DRIVE_OPTION_SCHEMA: Schema =

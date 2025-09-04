@@ -726,7 +726,7 @@ fn spawn_catalog_upload(
                 type: Integer,
                 description: "Max number of entries to hold in memory.",
                 optional: true,
-                default: pbs_client::pxar::ENCODER_MAX_ENTRIES as isize,
+                default: pbs_client::pxar::ENCODER_MAX_ENTRIES as i64,
             },
             "dry-run": {
                 type: Boolean,

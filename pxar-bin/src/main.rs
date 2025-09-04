@@ -330,9 +330,9 @@ fn extract_archive(
             "entries-max": {
                 description: "Max number of entries loaded at once into memory",
                 optional: true,
-                default: ENCODER_MAX_ENTRIES as isize,
+                default: ENCODER_MAX_ENTRIES as i64,
                 minimum: 0,
-                maximum: isize::MAX,
+                maximum: i64::MAX,
             },
             "payload-output": {
                 description: "'ppxar' payload output data file to create split archive.",
@@ -354,7 +354,7 @@ async fn create_archive(
     no_fifos: bool,
     no_sockets: bool,
     exclude: Option<Vec<String>>,
-    entries_max: isize,
+    entries_max: i64,
     payload_output: Option<String>,
 ) -> Result<(), Error> {
     let patterns = {

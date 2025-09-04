@@ -134,10 +134,9 @@ pub const API_METHOD_UPLOAD_FIXED_CHUNK: ApiMethod = ApiMethod::new(
                 "encoded-size",
                 false,
                 &IntegerSchema::new("Encoded chunk size.")
-                    .minimum((std::mem::size_of::<DataBlobHeader>() as isize) + 1)
+                    .minimum((std::mem::size_of::<DataBlobHeader>() as i64) + 1)
                     .maximum(
-                        1024 * 1024 * 16
-                            + (std::mem::size_of::<EncryptedDataBlobHeader>() as isize)
+                        1024 * 1024 * 16 + (std::mem::size_of::<EncryptedDataBlobHeader>() as i64)
                     )
                     .schema()
             ),
@@ -197,10 +196,9 @@ pub const API_METHOD_UPLOAD_DYNAMIC_CHUNK: ApiMethod = ApiMethod::new(
                 "encoded-size",
                 false,
                 &IntegerSchema::new("Encoded chunk size.")
-                    .minimum((std::mem::size_of::<DataBlobHeader>() as isize) + 1)
+                    .minimum((std::mem::size_of::<DataBlobHeader>() as i64) + 1)
                     .maximum(
-                        1024 * 1024 * 16
-                            + (std::mem::size_of::<EncryptedDataBlobHeader>() as isize)
+                        1024 * 1024 * 16 + (std::mem::size_of::<EncryptedDataBlobHeader>() as i64)
                     )
                     .schema()
             ),
@@ -357,10 +355,9 @@ pub const API_METHOD_UPLOAD_BLOB: ApiMethod = ApiMethod::new(
                 "encoded-size",
                 false,
                 &IntegerSchema::new("Encoded blob size.")
-                    .minimum(std::mem::size_of::<DataBlobHeader>() as isize)
+                    .minimum(std::mem::size_of::<DataBlobHeader>() as i64)
                     .maximum(
-                        1024 * 1024 * 16
-                            + (std::mem::size_of::<EncryptedDataBlobHeader>() as isize)
+                        1024 * 1024 * 16 + (std::mem::size_of::<EncryptedDataBlobHeader>() as i64)
                     )
                     .schema()
             )
