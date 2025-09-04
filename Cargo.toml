@@ -81,7 +81,7 @@ proxmox-rrd = "1"
 proxmox-rrd-api-types = "1.0.2"
 proxmox-s3-client = { version = "1.0.6", features = [ "impl" ] }
 # everything but pbs-config and pbs-client use "api-macro"
-proxmox-schema = "4"
+proxmox-schema = "5"
 proxmox-section-config = "3"
 proxmox-serde = "1"
 proxmox-shared-cache = "1"
