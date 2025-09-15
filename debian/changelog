@@ -1,3 +1,33 @@
+rust-proxmox-backup (4.0.15-1) trixie; urgency=medium
+
+  * pbs3to4: sync to changes made on bookworm PBS 3 branch.
+
+  * notification: don't deserialize notification config when there is nothing
+    to send.
+
+  * api: do not block current thread during s3 backup log upload.
+
+  * s3: pass now optional default request timeout for s3 api calls.
+
+  * fix #6714: docs: remove wrong `--drive` parameter from cli example.
+
+  * fix #6624: ui: improve task log output for protected entry.
+
+  * update proxmox-s3-client to 1.2.2 to benefit from the higher request
+    timeout of 30 minutes and the new retry logic for transient client errors
+    using an exponentially increasing back-off time and a maximum of 3 tries
+    for the retries.
+
+  * api: allow creation of removable datastore at device's root.
+
+  * docs: network-management: use correct syntax for code-blocks.
+
+  * docs: network-management: link to systemd.link documentation.
+
+  * fix #6592: ui: add custom sort function to comment column.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 15 Sep 2025 21:53:05 +0200
+
 rust-proxmox-backup (4.0.14-1) trixie; urgency=medium
 
   * ui: webauthn view: make sure renderers are html encoded
