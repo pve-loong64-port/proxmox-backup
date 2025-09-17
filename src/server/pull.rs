@@ -676,7 +676,10 @@ async fn pull_group(
     let list: Vec<(BackupDir, bool)> = list
         .into_iter()
         .enumerate()
-        .filter_map(|(pos, (dir, verified))| {
+        .filter_map(|(pos, (dir, needs_resync))| {
+            if params.resync_corrupt && needs_resync {
+                return Some((dir, needs_resync));
+            }
             // Note: the snapshot represented by `last_sync_time` might be missing its backup log
             // or post-backup verification state if those were not yet available during the last
             // sync run, always resync it
@@ -688,7 +691,7 @@ async fn pull_group(
                 transfer_last_skip_info.update(dir.time);
                 return None;
             }
-            Some((dir, verified))
+            Some((dir, needs_resync))
         })
         .collect();
 
