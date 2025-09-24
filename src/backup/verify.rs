@@ -90,7 +90,17 @@ impl VerifyWorker {
             }
         }
 
-        if let Ok(DatastoreBackend::S3(s3_client)) = datastore.backend() {
+        let backend = match datastore.backend() {
+            Ok(backend) => backend,
+            Err(err) => {
+                info!(
+                    "failed to get backend while trying to rename bad chunk: {digest_str} - {err}"
+                );
+                return;
+            }
+        };
+
+        if let DatastoreBackend::S3(s3_client) = backend {
             let suffix = format!(".{}.bad", counter);
             let target_key =
                 match pbs_datastore::s3::object_key_from_digest_with_suffix(digest, &suffix) {
@@ -122,8 +132,6 @@ impl VerifyWorker {
                 // after all.
                 return;
             }
-        } else {
-            info!("failed to get s3 backend while trying to rename bad chunk: {digest_str}");
         }
 
         match std::fs::rename(&path, &new_path) {
