@@ -62,6 +62,7 @@ struct DynamicWriterState {
     offset: u64,
     chunk_count: u64,
     upload_stat: UploadStatistic,
+    closed: bool,
 }
 
 struct FixedWriterState {
@@ -73,6 +74,7 @@ struct FixedWriterState {
     small_chunk_count: usize, // allow 0..1 small chunks (last chunk may be smaller)
     upload_stat: UploadStatistic,
     incremental: bool,
+    closed: bool,
 }
 
 // key=digest, value=length
@@ -194,6 +196,13 @@ impl BackupEnvironment {
             None => bail!("fixed writer '{}' not registered", wid),
         };
 
+        if data.closed {
+            bail!(
+                "fixed writer '{}' register chunk failed - already closed",
+                data.name
+            );
+        }
+
         if size > data.chunk_size {
             bail!(
                 "fixed writer '{}' - got large chunk ({} > {}",
@@ -248,6 +257,13 @@ impl BackupEnvironment {
             None => bail!("dynamic writer '{}' not registered", wid),
         };
 
+        if data.closed {
+            bail!(
+                "dynamic writer '{}' register chunk failed - already closed",
+                data.name
+            );
+        }
+
         // record statistics
         data.upload_stat.count += 1;
         data.upload_stat.size += size as u64;
@@ -288,6 +304,7 @@ impl BackupEnvironment {
                 offset: 0,
                 chunk_count: 0,
                 upload_stat: UploadStatistic::new(),
+                closed: false,
             },
         );
 
@@ -320,6 +337,7 @@ impl BackupEnvironment {
                 small_chunk_count: 0,
                 upload_stat: UploadStatistic::new(),
                 incremental,
+                closed: false,
             },
         );
 
@@ -342,6 +360,13 @@ impl BackupEnvironment {
             Some(data) => data,
             None => bail!("dynamic writer '{}' not registered", wid),
         };
+
+        if data.closed {
+            bail!(
+                "dynamic writer '{}' append chunk failed - already closed",
+                data.name
+            );
+        }
 
         if data.offset != offset {
             bail!(
@@ -376,6 +401,13 @@ impl BackupEnvironment {
             Some(data) => data,
             None => bail!("fixed writer '{}' not registered", wid),
         };
+
+        if data.closed {
+            bail!(
+                "fixed writer '{}' append chunk failed - already closed",
+                data.name
+            );
+        }
 
         let end = (offset as usize) + (size as usize);
         let idx = data.index.check_chunk_alignment(end, size as usize)?;
@@ -449,10 +481,17 @@ impl BackupEnvironment {
 
         state.ensure_unfinished()?;
 
-        let mut data = match state.dynamic_writers.remove(&wid) {
+        let data = match state.dynamic_writers.get_mut(&wid) {
             Some(data) => data,
             None => bail!("dynamic writer '{}' not registered", wid),
         };
+        let writer_name = data.name.clone();
+        let uuid = data.index.uuid;
+        let upload_stat = data.upload_stat;
+
+        if data.closed {
+            bail!("dynamic writer '{writer_name}' close failed - already closed");
+        }
 
         if data.chunk_count != chunk_count {
             bail!(
@@ -472,9 +511,8 @@ impl BackupEnvironment {
             );
         }
 
-        let uuid = data.index.uuid;
-
         let expected_csum = data.index.close()?;
+        data.closed = true;
 
         if csum != expected_csum {
             bail!(
@@ -483,28 +521,28 @@ impl BackupEnvironment {
             );
         }
 
+        state.file_counter += 1;
+        state.backup_size += size;
+        state.backup_stat = state.backup_stat + upload_stat;
+
+        self.log_upload_stat(&writer_name, &csum, &uuid, size, chunk_count, &upload_stat);
+
+        // never hold mutex guard during s3 upload due to possible deadlocks
+        drop(state);
+
         // For S3 backends, upload the index file to the object store after closing
         if let DatastoreBackend::S3(s3_client) = &self.backend {
-            self.s3_upload_index(s3_client, &data.name)
+            self.s3_upload_index(s3_client, &writer_name)
                 .context("failed to upload dynamic index to s3 backend")?;
             self.log(format!(
-                "Uploaded dynamic index file to s3 backend: {}",
-                data.name
+                "Uploaded dynamic index file to s3 backend: {writer_name}"
             ))
         }
 
-        self.log_upload_stat(
-            &data.name,
-            &csum,
-            &uuid,
-            size,
-            chunk_count,
-            &data.upload_stat,
-        );
-
-        state.file_counter += 1;
-        state.backup_size += size;
-        state.backup_stat = state.backup_stat + data.upload_stat;
+        let mut state = self.state.lock().unwrap();
+        if state.dynamic_writers.remove(&wid).is_none() {
+            bail!("dynamic writer '{wid}' no longer registered");
+        }
 
         Ok(())
     }
@@ -521,10 +559,18 @@ impl BackupEnvironment {
 
         state.ensure_unfinished()?;
 
-        let mut data = match state.fixed_writers.remove(&wid) {
+        let data = match state.fixed_writers.get_mut(&wid) {
             Some(data) => data,
             None => bail!("fixed writer '{}' not registered", wid),
         };
+
+        let writer_name = data.name.clone();
+        let uuid = data.index.uuid;
+        let upload_stat = data.upload_stat;
+
+        if data.closed {
+            bail!("fixed writer '{writer_name}' close failed - already closed");
+        }
 
         if data.chunk_count != chunk_count {
             bail!(
@@ -557,8 +603,8 @@ impl BackupEnvironment {
             }
         }
 
-        let uuid = data.index.uuid;
         let expected_csum = data.index.close()?;
+        data.closed = true;
 
         if csum != expected_csum {
             bail!(
@@ -567,28 +613,35 @@ impl BackupEnvironment {
             );
         }
 
-        // For S3 backends, upload the index file to the object store after closing
-        if let DatastoreBackend::S3(s3_client) = &self.backend {
-            self.s3_upload_index(s3_client, &data.name)
-                .context("failed to upload fixed index to s3 backend")?;
-            self.log(format!(
-                "Uploaded fixed index file to object store: {}",
-                data.name
-            ))
-        }
+        state.file_counter += 1;
+        state.backup_size += size;
+        state.backup_stat = state.backup_stat + upload_stat;
 
         self.log_upload_stat(
-            &data.name,
+            &writer_name,
             &expected_csum,
             &uuid,
             size,
             chunk_count,
-            &data.upload_stat,
+            &upload_stat,
         );
 
-        state.file_counter += 1;
-        state.backup_size += size;
-        state.backup_stat = state.backup_stat + data.upload_stat;
+        // never hold mutex guard during s3 upload due to possible deadlocks
+        drop(state);
+
+        // For S3 backends, upload the index file to the object store after closing
+        if let DatastoreBackend::S3(s3_client) = &self.backend {
+            self.s3_upload_index(s3_client, &writer_name)
+                .context("failed to upload fixed index to s3 backend")?;
+            self.log(format!(
+                "Uploaded fixed index file to object store: {writer_name}"
+            ))
+        }
+
+        let mut state = self.state.lock().unwrap();
+        if state.fixed_writers.remove(&wid).is_none() {
+            bail!("dynamic writer '{wid}' no longer registered");
+        }
 
         Ok(())
     }
