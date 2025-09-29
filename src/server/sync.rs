@@ -107,7 +107,8 @@ pub(crate) struct RemoteSourceReader {
 }
 
 pub(crate) struct LocalSourceReader {
-    pub(crate) _dir_lock: Arc<Mutex<BackupLockGuard>>,
+    // must not be accessed/made pub, this is just a hack for Send+Sync
+    _dir_lock: Arc<Mutex<BackupLockGuard>>,
     pub(crate) path: PathBuf,
     pub(crate) datastore: Arc<DataStore>,
 }
