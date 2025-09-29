@@ -282,7 +282,13 @@ fn upgrade_to_backup_protocol(
                 };
                 if benchmark {
                     env.log("benchmark finished successfully");
-                    proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                    proxmox_async::runtime::block_in_place(|| {
+                        env.datastore.remove_backup_dir(
+                            env.backup_dir.backup_ns(),
+                            env.backup_dir.as_ref(),
+                            true,
+                        )
+                    })?;
                     return Ok(());
                 }
 
@@ -310,13 +316,25 @@ fn upgrade_to_backup_protocol(
                     (Ok(_), Err(err)) => {
                         env.log(format!("backup ended and finish failed: {}", err));
                         env.log("removing unfinished backup");
-                        proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                        proxmox_async::runtime::block_in_place(|| {
+                            env.datastore.remove_backup_dir(
+                                env.backup_dir.backup_ns(),
+                                env.backup_dir.as_ref(),
+                                true,
+                            )
+                        })?;
                         Err(err)
                     }
                     (Err(err), Err(_)) => {
                         env.log(format!("backup failed: {}", err));
                         env.log("removing failed backup");
-                        proxmox_async::runtime::block_in_place(|| env.remove_backup())?;
+                        proxmox_async::runtime::block_in_place(|| {
+                            env.datastore.remove_backup_dir(
+                                env.backup_dir.backup_ns(),
+                                env.backup_dir.as_ref(),
+                                true,
+                            )
+                        })?;
                         Err(err)
                     }
                 }

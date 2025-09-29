@@ -833,20 +833,6 @@ impl BackupEnvironment {
         state.finished == BackupState::Finished
     }
 
-    /// Remove complete backup
-    pub fn remove_backup(&self) -> Result<(), Error> {
-        let mut state = self.state.lock().unwrap();
-        state.finished = BackupState::Finished;
-
-        self.datastore.remove_backup_dir(
-            self.backup_dir.backup_ns(),
-            self.backup_dir.as_ref(),
-            true,
-        )?;
-
-        Ok(())
-    }
-
     fn s3_upload_index(&self, s3_client: &S3Client, name: &str) -> Result<(), Error> {
         let object_key =
             pbs_datastore::s3::object_key_from_path(&self.backup_dir.relative_path(), name)
