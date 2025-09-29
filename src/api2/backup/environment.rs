@@ -80,8 +80,15 @@ struct FixedWriterState {
 // key=digest, value=length
 type KnownChunksMap = HashMap<[u8; 32], u32>;
 
+#[derive(PartialEq)]
+enum BackupState {
+    Active,
+    Finishing,
+    Finished,
+}
+
 struct SharedBackupState {
-    finished: bool,
+    finished: BackupState,
     uid_counter: usize,
     file_counter: usize, // successfully uploaded files
     dynamic_writers: HashMap<usize, DynamicWriterState>,
@@ -92,12 +99,13 @@ struct SharedBackupState {
 }
 
 impl SharedBackupState {
-    // Raise error if finished flag is set
+    // Raise error if the backup is no longer in an active state.
     fn ensure_unfinished(&self) -> Result<(), Error> {
-        if self.finished {
-            bail!("backup already marked as finished.");
+        match self.finished {
+            BackupState::Active => Ok(()),
+            BackupState::Finishing => bail!("backup is already in the process of finishing."),
+            BackupState::Finished => bail!("backup already marked as finished."),
         }
-        Ok(())
     }
 
     // Get an unique integer ID
@@ -134,7 +142,7 @@ impl BackupEnvironment {
         no_cache: bool,
     ) -> Result<Self, Error> {
         let state = SharedBackupState {
-            finished: false,
+            finished: BackupState::Active,
             uid_counter: 0,
             file_counter: 0,
             dynamic_writers: HashMap::new(),
@@ -712,18 +720,29 @@ impl BackupEnvironment {
             }
         }
 
-        // check for valid manifest and store stats
         let stats = serde_json::to_value(state.backup_stat)?;
+
+        // make sure no other api calls can modify the backup state anymore
+        state.finished = BackupState::Finishing;
+
+        // never hold mutex guard during s3 upload due to possible deadlocks
+        drop(state);
+
+        // check for valid manifest and store stats
         self.backup_dir
             .update_manifest(&self.backend, |manifest| {
                 manifest.unprotected["chunk_upload_stats"] = stats;
             })
             .map_err(|err| format_err!("unable to update manifest blob - {err}"))?;
 
+        let mut state = self.state.lock().unwrap();
+        if state.finished != BackupState::Finishing {
+            bail!("backup not in finishing state after manifest update");
+        }
         self.datastore.try_ensure_sync_level()?;
 
         // marks the backup as successful
-        state.finished = true;
+        state.finished = BackupState::Finished;
 
         Ok(())
     }
@@ -800,25 +819,24 @@ impl BackupEnvironment {
         self.formatter.format_result(result, self)
     }
 
-    /// Raise error if finished flag is not set
+    /// Raise error if finished state is not set
     pub fn ensure_finished(&self) -> Result<(), Error> {
-        let state = self.state.lock().unwrap();
-        if !state.finished {
-            bail!("backup ended but finished flag is not set.");
+        if !self.finished() {
+            bail!("backup ended but finished state is not set.");
         }
         Ok(())
     }
 
-    /// Return true if the finished flag is set
+    /// Return true if the finished state is set
     pub fn finished(&self) -> bool {
         let state = self.state.lock().unwrap();
-        state.finished
+        state.finished == BackupState::Finished
     }
 
     /// Remove complete backup
     pub fn remove_backup(&self) -> Result<(), Error> {
         let mut state = self.state.lock().unwrap();
-        state.finished = true;
+        state.finished = BackupState::Finished;
 
         self.datastore.remove_backup_dir(
             self.backup_dir.backup_ns(),
