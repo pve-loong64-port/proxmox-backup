@@ -144,7 +144,7 @@ fn upgrade_to_backup_protocol(
         };
 
         // lock backup group to only allow one backup per group at a time
-        let (owner, _group_guard) = datastore.create_locked_backup_group(
+        let (owner, group_guard) = datastore.create_locked_backup_group(
             backup_group.backup_ns(),
             backup_group.as_ref(),
             &auth_id,
@@ -183,7 +183,7 @@ fn upgrade_to_backup_protocol(
 
         let backup_dir = backup_group.backup_dir(backup_dir_arg.time)?;
 
-        let _last_guard = if let Some(last) = &last_backup {
+        let last_guard = if let Some(last) = &last_backup {
             if backup_dir.backup_time() <= last.backup_dir.backup_time() {
                 bail!("backup timestamp is older than last backup.");
             }
@@ -210,6 +210,12 @@ fn upgrade_to_backup_protocol(
             auth_id.to_string(),
             true,
             move |worker| async move {
+                // Keep flock for the backup runtime by storing guards in backup env shared state.
+                // Drop them on successful backup finish or when dropping the env after cleanup in
+                // case of errors. The former is required for immediate subsequent backups (e.g.
+                // during a push sync) to be able to lock the group and snapshots.
+                let backup_lock_guards = BackupLockGuards::new(last_guard, group_guard, snap_guard);
+
                 let mut env = BackupEnvironment::new(
                     env_type,
                     auth_id,
@@ -217,6 +223,7 @@ fn upgrade_to_backup_protocol(
                     datastore,
                     backup_dir,
                     no_cache,
+                    backup_lock_guards,
                 )?;
 
                 env.debug = debug;
@@ -271,11 +278,6 @@ fn upgrade_to_backup_protocol(
                     });
                 let mut abort_future = abort_future.map(|_| Err(format_err!("task aborted")));
 
-                // keep flock until task ends
-                let _group_guard = _group_guard;
-                let snap_guard = snap_guard;
-                let _last_guard = _last_guard;
-
                 let res = select! {
                     req = req_fut => req,
                     abrt = abort_future => abrt,
@@ -293,7 +295,7 @@ fn upgrade_to_backup_protocol(
                 }
 
                 let verify = |env: BackupEnvironment| {
-                    if let Err(err) = env.verify_after_complete(snap_guard) {
+                    if let Err(err) = env.verify_after_complete() {
                         env.log(format!(
                             "backup finished, but starting the requested verify task failed: {}",
                             err

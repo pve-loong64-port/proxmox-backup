@@ -96,6 +96,27 @@ struct SharedBackupState {
     known_chunks: KnownChunksMap,
     backup_size: u64, // sums up size of all files
     backup_stat: UploadStatistic,
+    backup_lock_guards: BackupLockGuards,
+}
+
+pub struct BackupLockGuards {
+    previous_snapshot: Option<BackupLockGuard>,
+    group: Option<BackupLockGuard>,
+    snapshot: Option<BackupLockGuard>,
+}
+
+impl BackupLockGuards {
+    pub(crate) fn new(
+        previous_snapshot: Option<BackupLockGuard>,
+        group: BackupLockGuard,
+        snapshot: BackupLockGuard,
+    ) -> Self {
+        Self {
+            previous_snapshot,
+            group: Some(group),
+            snapshot: Some(snapshot),
+        }
+    }
 }
 
 impl SharedBackupState {
@@ -140,6 +161,7 @@ impl BackupEnvironment {
         datastore: Arc<DataStore>,
         backup_dir: BackupDir,
         no_cache: bool,
+        backup_lock_guards: BackupLockGuards,
     ) -> Result<Self, Error> {
         let state = SharedBackupState {
             finished: BackupState::Active,
@@ -150,6 +172,7 @@ impl BackupEnvironment {
             known_chunks: HashMap::new(),
             backup_size: 0,
             backup_stat: UploadStatistic::new(),
+            backup_lock_guards,
         };
 
         let backend = datastore.backend()?;
@@ -719,6 +742,8 @@ impl BackupEnvironment {
                 );
             }
         }
+        // drop previous snapshot lock
+        state.backup_lock_guards.previous_snapshot.take();
 
         let stats = serde_json::to_value(state.backup_stat)?;
 
@@ -744,13 +769,17 @@ impl BackupEnvironment {
         // marks the backup as successful
         state.finished = BackupState::Finished;
 
+        // drop snapshot and group lock only here so any error above will lead to
+        // the locks still being held in the env for the backup cleanup.
+        state.backup_lock_guards.snapshot.take();
+        state.backup_lock_guards.group.take();
+
         Ok(())
     }
 
     /// If verify-new is set on the datastore, this will run a new verify task
-    /// for the backup. If not, this will return and also drop the passed lock
-    /// immediately.
-    pub fn verify_after_complete(&self, excl_snap_lock: BackupLockGuard) -> Result<(), Error> {
+    /// for the backup. If not, this will return.
+    pub fn verify_after_complete(&self) -> Result<(), Error> {
         self.ensure_finished()?;
 
         if !self.datastore.verify_new() {
@@ -758,8 +787,7 @@ impl BackupEnvironment {
             return Ok(());
         }
 
-        // Downgrade to shared lock, the backup itself is finished
-        drop(excl_snap_lock);
+        // Get shared lock, the backup itself is finished
         let snap_lock = self.backup_dir.lock_shared().with_context(|| {
             format!(
                 "while trying to verify snapshot '{:?}' after completion",
