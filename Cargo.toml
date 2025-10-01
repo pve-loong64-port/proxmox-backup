@@ -56,7 +56,7 @@ path = "src/lib.rs"
 proxmox-apt = { version = "0.11", features = [ "cache" ] }
 proxmox-apt-api-types = "1.0.1"
 proxmox-async = "0.4"
-proxmox-auth-api = "0.4"
+proxmox-auth-api = "0.4.9"
 proxmox-borrow = "1"
 proxmox-compression = "0.2"
 proxmox-config-digest = "0.1.0"
