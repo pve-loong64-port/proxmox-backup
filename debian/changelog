@@ -1,3 +1,17 @@
+rust-proxmox-backup (4.0.16-1) trixie; urgency=medium
+
+  * sync: pull: fix regression in resync of corrupt snapshots
+
+  * fix #6750: api: avoid possible deadlock on datastores with s3 backend
+
+  * fix #6566: backup: api: conditionally drop group and snapshot locks
+
+  * GC: rework locking logic to avoid deadlock with s3 backend
+
+  * verify: silence incorrect backend error message for filesystem stores
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 02 Oct 2025 14:31:26 +0200
+
 rust-proxmox-backup (4.0.15-1) trixie; urgency=medium
 
   * pbs3to4: sync to changes made on bookworm PBS 3 branch.
