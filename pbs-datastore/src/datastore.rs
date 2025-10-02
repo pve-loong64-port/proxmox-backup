@@ -1670,6 +1670,8 @@ impl DataStore {
                     }
                 }
 
+                drop(lock);
+
                 if !delete_list.is_empty() {
                     let delete_objects_result =
                         proxmox_async::runtime::block_on(s3_client.delete_objects(&delete_list))?;
@@ -1678,8 +1680,6 @@ impl DataStore {
                     }
                     delete_list.clear();
                 }
-
-                drop(lock);
 
                 // Process next batch of chunks if there is more
                 if list_bucket_result.is_truncated {
