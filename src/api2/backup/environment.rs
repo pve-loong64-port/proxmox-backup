@@ -1,5 +1,6 @@
 use anyhow::{bail, format_err, Context, Error};
 use pbs_config::BackupLockGuard;
+use proxmox_sys::process_locker::ProcessLockSharedGuard;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -103,6 +104,7 @@ pub struct BackupLockGuards {
     previous_snapshot: Option<BackupLockGuard>,
     group: Option<BackupLockGuard>,
     snapshot: Option<BackupLockGuard>,
+    chunk_store: Option<ProcessLockSharedGuard>,
 }
 
 impl BackupLockGuards {
@@ -110,11 +112,13 @@ impl BackupLockGuards {
         previous_snapshot: Option<BackupLockGuard>,
         group: BackupLockGuard,
         snapshot: BackupLockGuard,
+        chunk_store: ProcessLockSharedGuard,
     ) -> Self {
         Self {
             previous_snapshot,
             group: Some(group),
             snapshot: Some(snapshot),
+            chunk_store: Some(chunk_store),
         }
     }
 }
@@ -744,6 +748,7 @@ impl BackupEnvironment {
         }
         // drop previous snapshot lock
         state.backup_lock_guards.previous_snapshot.take();
+        state.backup_lock_guards.chunk_store.take();
 
         let stats = serde_json::to_value(state.backup_stat)?;
 

@@ -214,7 +214,9 @@ fn upgrade_to_backup_protocol(
                 // Drop them on successful backup finish or when dropping the env after cleanup in
                 // case of errors. The former is required for immediate subsequent backups (e.g.
                 // during a push sync) to be able to lock the group and snapshots.
-                let backup_lock_guards = BackupLockGuards::new(last_guard, group_guard, snap_guard);
+                let chunk_store_guard = datastore.try_shared_chunk_store_lock()?;
+                let backup_lock_guards =
+                    BackupLockGuards::new(last_guard, group_guard, snap_guard, chunk_store_guard);
 
                 let mut env = BackupEnvironment::new(
                     env_type,
