@@ -20,7 +20,7 @@ use proxmox_schema::ApiType;
 use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::linux::procfs::MountInfo;
-use proxmox_sys::process_locker::ProcessLockSharedGuard;
+use proxmox_sys::process_locker::{ProcessLockExclusiveGuard, ProcessLockSharedGuard};
 use proxmox_time::TimeSpan;
 use proxmox_worker_task::WorkerTaskContext;
 
@@ -136,7 +136,7 @@ pub fn ensure_datastore_is_mounted(config: &DataStoreConfig) -> Result<(), Error
 /// management interface for backup.
 pub struct DataStoreImpl {
     chunk_store: Arc<ChunkStore>,
-    gc_mutex: Mutex<()>,
+    gc_mutex: Mutex<Option<ProcessLockExclusiveGuard>>,
     last_gc_status: Mutex<GarbageCollectionStatus>,
     verify_new: bool,
     chunk_order: ChunkOrder,
@@ -152,7 +152,7 @@ impl DataStoreImpl {
     pub(crate) unsafe fn new_test() -> Arc<Self> {
         Arc::new(Self {
             chunk_store: Arc::new(unsafe { ChunkStore::panic_store() }),
-            gc_mutex: Mutex::new(()),
+            gc_mutex: Mutex::new(None),
             last_gc_status: Mutex::new(GarbageCollectionStatus::default()),
             verify_new: false,
             chunk_order: Default::default(),
@@ -513,7 +513,7 @@ impl DataStore {
 
         Ok(DataStoreImpl {
             chunk_store,
-            gc_mutex: Mutex::new(()),
+            gc_mutex: Mutex::new(None),
             last_gc_status: Mutex::new(gc_status),
             verify_new: config.verify_new.unwrap_or(false),
             chunk_order: tuning.chunk_order.unwrap_or_default(),
@@ -1505,7 +1505,10 @@ impl DataStore {
     }
 
     pub fn garbage_collection_running(&self) -> bool {
-        self.inner.gc_mutex.try_lock().is_err()
+        let lock = self.inner.gc_mutex.try_lock();
+
+        // Mutex currently locked or contains an exclusive lock
+        lock.is_err() || lock.unwrap().is_some()
     }
 
     pub fn garbage_collection(
@@ -1513,263 +1516,281 @@ impl DataStore {
         worker: &dyn WorkerTaskContext,
         upid: &UPID,
     ) -> Result<(), Error> {
-        if let Ok(ref mut _mutex) = self.inner.gc_mutex.try_lock() {
+        if let Ok(mut mutex) = self.inner.gc_mutex.try_lock() {
             // avoids that we run GC if an old daemon process has still a
             // running backup writer, which is not save as we have no "oldest
             // writer" information and thus no safe atime cutoff
-            let _exclusive_lock = self.inner.chunk_store.try_exclusive_lock()?;
+            let exclusive_lock = self.inner.chunk_store.try_exclusive_lock()?;
+            // keep the exclusive lock around for the duration of GC
+            if mutex.is_some() {
+                bail!("Obtained exclusive lock on datastore twice - this should never happen!");
+            }
+            *mutex = Some(exclusive_lock);
+            drop(mutex);
 
-            let (config, _digest) = pbs_config::datastore::config()?;
-            let gc_store_config: DataStoreConfig = config.lookup("datastore", self.name())?;
-            let all_stores = config.convert_to_typed_array("datastore")?;
-            if let Err(err) = gc_store_config.ensure_not_nested(&all_stores) {
-                info!(
-                    "Current datastore path: {path}",
-                    path = gc_store_config.absolute_path()
-                );
-                bail!("Aborting GC for safety reasons: {err}");
+            let res = self.garbage_collection_impl(worker, upid);
+
+            // and now drop it again
+            let mut mutex = self.inner.gc_mutex.lock().unwrap();
+            if mutex.take().is_none() {
+                warn!("Lost exclusive datastore lock during GC - this should never happen!");
             }
 
-            let phase1_start_time = proxmox_time::epoch_i64();
-            let oldest_writer = self
-                .inner
-                .chunk_store
-                .oldest_writer()
-                .unwrap_or(phase1_start_time);
-
-            let mut gc_status = GarbageCollectionStatus {
-                upid: Some(upid.to_string()),
-                cache_stats: Some(GarbageCollectionCacheStats::default()),
-                ..Default::default()
-            };
-            let tuning: DatastoreTuning = serde_json::from_value(
-                DatastoreTuning::API_SCHEMA
-                    .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
-            )?;
-
-            let s3_client = match self.backend()? {
-                DatastoreBackend::Filesystem => None,
-                DatastoreBackend::S3(s3_client) => {
-                    proxmox_async::runtime::block_on(s3_client.head_bucket())
-                        .context("failed to reach bucket")?;
-                    Some(s3_client)
-                }
-            };
-
-            if tuning.gc_atime_safety_check.unwrap_or(true) {
-                self.inner
-                    .chunk_store
-                    .check_fs_atime_updates(true, s3_client.clone())
-                    .context("atime safety check failed")?;
-                info!("Access time update check successful, proceeding with GC.");
-            } else {
-                info!("Access time update check disabled by datastore tuning options.");
-            };
-
-            // Fallback to default 24h 5m if not set
-            let cutoff = tuning
-                .gc_atime_cutoff
-                .map(|cutoff| cutoff * 60)
-                .unwrap_or(3600 * 24 + 300);
-
-            let mut min_atime = phase1_start_time - cutoff as i64;
-            info!(
-                "Using access time cutoff {}, minimum access time is {}",
-                TimeSpan::from(Duration::from_secs(cutoff as u64)),
-                proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
-            );
-            if oldest_writer < min_atime {
-                min_atime = oldest_writer - 300; // account for 5 min safety gap
-                info!(
-                    "Oldest backup writer started at {}, extending minimum access time to {}",
-                    TimeSpan::from(Duration::from_secs(oldest_writer as u64)),
-                    proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
-                );
-            }
-
-            let tuning: DatastoreTuning = serde_json::from_value(
-                DatastoreTuning::API_SCHEMA
-                    .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
-            )?;
-            let gc_cache_capacity = if let Some(capacity) = tuning.gc_cache_capacity {
-                info!("Using chunk digest cache capacity of {capacity}.");
-                capacity
-            } else {
-                1024 * 1024
-            };
-
-            info!("Start GC phase1 (mark used chunks)");
-
-            self.mark_used_chunks(
-                &mut gc_status,
-                worker,
-                gc_cache_capacity,
-                s3_client.as_ref().cloned(),
-            )
-            .context("marking used chunks failed")?;
-
-            info!("Start GC phase2 (sweep unused chunks)");
-
-            if let Some(ref s3_client) = s3_client {
-                let mut chunk_count = 0;
-                let prefix = S3PathPrefix::Some(".chunks/".to_string());
-                // Operates in batches of 1000 objects max per request
-                let mut list_bucket_result =
-                    proxmox_async::runtime::block_on(s3_client.list_objects_v2(&prefix, None))
-                        .context("failed to list chunk in s3 object store")?;
-
-                let mut delete_list = Vec::with_capacity(1000);
-                loop {
-                    let lock = self.inner.chunk_store.mutex().lock().unwrap();
-
-                    for content in list_bucket_result.contents {
-                        if self
-                            .mark_chunk_for_object_key(
-                                &content.key,
-                                content.size,
-                                min_atime,
-                                oldest_writer,
-                                &mut delete_list,
-                                &mut gc_status,
-                            )
-                            .with_context(|| {
-                                format!("failed to mark chunk for object key {}", content.key)
-                            })?
-                        {
-                            chunk_count += 1;
-                        }
-                    }
-
-                    if !delete_list.is_empty() {
-                        let delete_objects_result = proxmox_async::runtime::block_on(
-                            s3_client.delete_objects(&delete_list),
-                        )?;
-                        if let Some(_err) = delete_objects_result.error {
-                            bail!("failed to delete some objects");
-                        }
-                        delete_list.clear();
-                    }
-
-                    drop(lock);
-
-                    // Process next batch of chunks if there is more
-                    if list_bucket_result.is_truncated {
-                        list_bucket_result =
-                            proxmox_async::runtime::block_on(s3_client.list_objects_v2(
-                                &prefix,
-                                list_bucket_result.next_continuation_token.as_deref(),
-                            ))?;
-                        continue;
-                    }
-
-                    break;
-                }
-                info!("processed {chunk_count} total chunks");
-
-                // Phase 2 GC of Filesystem backed storage is phase 3 for S3 backed GC
-                info!("Start GC phase3 (sweep unused chunk markers)");
-
-                let mut tmp_gc_status = GarbageCollectionStatus {
-                    upid: Some(upid.to_string()),
-                    ..Default::default()
-                };
-                self.inner.chunk_store.sweep_unused_chunks(
-                    oldest_writer,
-                    min_atime,
-                    &mut tmp_gc_status,
-                    worker,
-                )?;
-            } else {
-                self.inner.chunk_store.sweep_unused_chunks(
-                    oldest_writer,
-                    min_atime,
-                    &mut gc_status,
-                    worker,
-                )?;
-            }
-
-            if let Some(cache_stats) = &gc_status.cache_stats {
-                let total_cache_counts = cache_stats.hits + cache_stats.misses;
-                if total_cache_counts > 0 {
-                    let cache_hit_ratio =
-                        (cache_stats.hits as f64 * 100.) / total_cache_counts as f64;
-                    info!(
-                        "Chunk cache: hits {}, misses {} (hit ratio {cache_hit_ratio:.2}%)",
-                        cache_stats.hits, cache_stats.misses,
-                    );
-                }
-            }
-            info!(
-                "Removed garbage: {}",
-                HumanByte::from(gc_status.removed_bytes),
-            );
-            info!("Removed chunks: {}", gc_status.removed_chunks);
-            if gc_status.pending_bytes > 0 {
-                info!(
-                    "Pending removals: {} (in {} chunks)",
-                    HumanByte::from(gc_status.pending_bytes),
-                    gc_status.pending_chunks,
-                );
-            }
-            if gc_status.removed_bad > 0 {
-                info!("Removed bad chunks: {}", gc_status.removed_bad);
-            }
-
-            if gc_status.still_bad > 0 {
-                info!("Leftover bad chunks: {}", gc_status.still_bad);
-            }
-
-            info!(
-                "Original data usage: {}",
-                HumanByte::from(gc_status.index_data_bytes),
-            );
-
-            if gc_status.index_data_bytes > 0 {
-                let comp_per =
-                    (gc_status.disk_bytes as f64 * 100.) / gc_status.index_data_bytes as f64;
-                info!(
-                    "On-Disk usage: {} ({comp_per:.2}%)",
-                    HumanByte::from(gc_status.disk_bytes)
-                );
-            }
-
-            info!("On-Disk chunks: {}", gc_status.disk_chunks);
-
-            let deduplication_factor = if gc_status.disk_bytes > 0 {
-                (gc_status.index_data_bytes as f64) / (gc_status.disk_bytes as f64)
-            } else {
-                1.0
-            };
-
-            info!("Deduplication factor: {deduplication_factor:.2}");
-
-            if gc_status.disk_chunks > 0 {
-                let avg_chunk = gc_status.disk_bytes / (gc_status.disk_chunks as u64);
-                info!("Average chunk size: {}", HumanByte::from(avg_chunk));
-            }
-
-            if let Ok(serialized) = serde_json::to_string(&gc_status) {
-                let mut path = self.base_path();
-                path.push(".gc-status");
-
-                let backup_user = pbs_config::backup_user()?;
-                let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
-                // set the correct owner/group/permissions while saving file
-                // owner(rw) = backup, group(r)= backup
-                let options = CreateOptions::new()
-                    .perm(mode)
-                    .owner(backup_user.uid)
-                    .group(backup_user.gid);
-
-                // ignore errors
-                let _ = replace_file(path, serialized.as_bytes(), options, false);
-            }
-
-            *self.inner.last_gc_status.lock().unwrap() = gc_status;
+            res
         } else {
             bail!("Start GC failed - (already running/locked)");
         }
+    }
 
+    fn garbage_collection_impl(
+        &self,
+        worker: &dyn WorkerTaskContext,
+        upid: &UPID,
+    ) -> Result<(), Error> {
+        let (config, _digest) = pbs_config::datastore::config()?;
+        let gc_store_config: DataStoreConfig = config.lookup("datastore", self.name())?;
+        let all_stores = config.convert_to_typed_array("datastore")?;
+        if let Err(err) = gc_store_config.ensure_not_nested(&all_stores) {
+            info!(
+                "Current datastore path: {path}",
+                path = gc_store_config.absolute_path()
+            );
+            bail!("Aborting GC for safety reasons: {err}");
+        }
+
+        let phase1_start_time = proxmox_time::epoch_i64();
+        let oldest_writer = self
+            .inner
+            .chunk_store
+            .oldest_writer()
+            .unwrap_or(phase1_start_time);
+
+        let mut gc_status = GarbageCollectionStatus {
+            upid: Some(upid.to_string()),
+            cache_stats: Some(GarbageCollectionCacheStats::default()),
+            ..Default::default()
+        };
+        let tuning: DatastoreTuning = serde_json::from_value(
+            DatastoreTuning::API_SCHEMA
+                .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
+        )?;
+
+        let s3_client = match self.backend()? {
+            DatastoreBackend::Filesystem => None,
+            DatastoreBackend::S3(s3_client) => {
+                proxmox_async::runtime::block_on(s3_client.head_bucket())
+                    .context("failed to reach bucket")?;
+                Some(s3_client)
+            }
+        };
+
+        if tuning.gc_atime_safety_check.unwrap_or(true) {
+            self.inner
+                .chunk_store
+                .check_fs_atime_updates(true, s3_client.clone())
+                .context("atime safety check failed")?;
+            info!("Access time update check successful, proceeding with GC.");
+        } else {
+            info!("Access time update check disabled by datastore tuning options.");
+        };
+
+        // Fallback to default 24h 5m if not set
+        let cutoff = tuning
+            .gc_atime_cutoff
+            .map(|cutoff| cutoff * 60)
+            .unwrap_or(3600 * 24 + 300);
+
+        let mut min_atime = phase1_start_time - cutoff as i64;
+        info!(
+            "Using access time cutoff {}, minimum access time is {}",
+            TimeSpan::from(Duration::from_secs(cutoff as u64)),
+            proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
+        );
+        if oldest_writer < min_atime {
+            min_atime = oldest_writer - 300; // account for 5 min safety gap
+            info!(
+                "Oldest backup writer started at {}, extending minimum access time to {}",
+                TimeSpan::from(Duration::from_secs(oldest_writer as u64)),
+                proxmox_time::epoch_to_rfc3339_utc(min_atime)?,
+            );
+        }
+
+        let tuning: DatastoreTuning = serde_json::from_value(
+            DatastoreTuning::API_SCHEMA
+                .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
+        )?;
+        let gc_cache_capacity = if let Some(capacity) = tuning.gc_cache_capacity {
+            info!("Using chunk digest cache capacity of {capacity}.");
+            capacity
+        } else {
+            1024 * 1024
+        };
+
+        info!("Start GC phase1 (mark used chunks)");
+
+        self.mark_used_chunks(
+            &mut gc_status,
+            worker,
+            gc_cache_capacity,
+            s3_client.as_ref().cloned(),
+        )
+        .context("marking used chunks failed")?;
+
+        info!("Start GC phase2 (sweep unused chunks)");
+
+        if let Some(ref s3_client) = s3_client {
+            let mut chunk_count = 0;
+            let prefix = S3PathPrefix::Some(".chunks/".to_string());
+            // Operates in batches of 1000 objects max per request
+            let mut list_bucket_result =
+                proxmox_async::runtime::block_on(s3_client.list_objects_v2(&prefix, None))
+                    .context("failed to list chunk in s3 object store")?;
+
+            let mut delete_list = Vec::with_capacity(1000);
+            loop {
+                let lock = self.inner.chunk_store.mutex().lock().unwrap();
+
+                for content in list_bucket_result.contents {
+                    if self
+                        .mark_chunk_for_object_key(
+                            &content.key,
+                            content.size,
+                            min_atime,
+                            oldest_writer,
+                            &mut delete_list,
+                            &mut gc_status,
+                        )
+                        .with_context(|| {
+                            format!("failed to mark chunk for object key {}", content.key)
+                        })?
+                    {
+                        chunk_count += 1;
+                    }
+                }
+
+                if !delete_list.is_empty() {
+                    let delete_objects_result =
+                        proxmox_async::runtime::block_on(s3_client.delete_objects(&delete_list))?;
+                    if let Some(_err) = delete_objects_result.error {
+                        bail!("failed to delete some objects");
+                    }
+                    delete_list.clear();
+                }
+
+                drop(lock);
+
+                // Process next batch of chunks if there is more
+                if list_bucket_result.is_truncated {
+                    list_bucket_result =
+                        proxmox_async::runtime::block_on(s3_client.list_objects_v2(
+                            &prefix,
+                            list_bucket_result.next_continuation_token.as_deref(),
+                        ))?;
+                    continue;
+                }
+
+                break;
+            }
+            info!("processed {chunk_count} total chunks");
+
+            // Phase 2 GC of Filesystem backed storage is phase 3 for S3 backed GC
+            info!("Start GC phase3 (sweep unused chunk markers)");
+
+            let mut tmp_gc_status = GarbageCollectionStatus {
+                upid: Some(upid.to_string()),
+                ..Default::default()
+            };
+            self.inner.chunk_store.sweep_unused_chunks(
+                oldest_writer,
+                min_atime,
+                &mut tmp_gc_status,
+                worker,
+            )?;
+        } else {
+            self.inner.chunk_store.sweep_unused_chunks(
+                oldest_writer,
+                min_atime,
+                &mut gc_status,
+                worker,
+            )?;
+        }
+
+        if let Some(cache_stats) = &gc_status.cache_stats {
+            let total_cache_counts = cache_stats.hits + cache_stats.misses;
+            if total_cache_counts > 0 {
+                let cache_hit_ratio = (cache_stats.hits as f64 * 100.) / total_cache_counts as f64;
+                info!(
+                    "Chunk cache: hits {}, misses {} (hit ratio {cache_hit_ratio:.2}%)",
+                    cache_stats.hits, cache_stats.misses,
+                );
+            }
+        }
+        info!(
+            "Removed garbage: {}",
+            HumanByte::from(gc_status.removed_bytes),
+        );
+        info!("Removed chunks: {}", gc_status.removed_chunks);
+        if gc_status.pending_bytes > 0 {
+            info!(
+                "Pending removals: {} (in {} chunks)",
+                HumanByte::from(gc_status.pending_bytes),
+                gc_status.pending_chunks,
+            );
+        }
+        if gc_status.removed_bad > 0 {
+            info!("Removed bad chunks: {}", gc_status.removed_bad);
+        }
+
+        if gc_status.still_bad > 0 {
+            info!("Leftover bad chunks: {}", gc_status.still_bad);
+        }
+
+        info!(
+            "Original data usage: {}",
+            HumanByte::from(gc_status.index_data_bytes),
+        );
+
+        if gc_status.index_data_bytes > 0 {
+            let comp_per = (gc_status.disk_bytes as f64 * 100.) / gc_status.index_data_bytes as f64;
+            info!(
+                "On-Disk usage: {} ({comp_per:.2}%)",
+                HumanByte::from(gc_status.disk_bytes)
+            );
+        }
+
+        info!("On-Disk chunks: {}", gc_status.disk_chunks);
+
+        let deduplication_factor = if gc_status.disk_bytes > 0 {
+            (gc_status.index_data_bytes as f64) / (gc_status.disk_bytes as f64)
+        } else {
+            1.0
+        };
+
+        info!("Deduplication factor: {deduplication_factor:.2}");
+
+        if gc_status.disk_chunks > 0 {
+            let avg_chunk = gc_status.disk_bytes / (gc_status.disk_chunks as u64);
+            info!("Average chunk size: {}", HumanByte::from(avg_chunk));
+        }
+
+        if let Ok(serialized) = serde_json::to_string(&gc_status) {
+            let mut path = self.base_path();
+            path.push(".gc-status");
+
+            let backup_user = pbs_config::backup_user()?;
+            let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
+            // set the correct owner/group/permissions while saving file
+            // owner(rw) = backup, group(r)= backup
+            let options = CreateOptions::new()
+                .perm(mode)
+                .owner(backup_user.uid)
+                .group(backup_user.gid);
+
+            // ignore errors
+            let _ = replace_file(path, serialized.as_bytes(), options, false);
+        }
+
+        *self.inner.last_gc_status.lock().unwrap() = gc_status;
         Ok(())
     }
 
