@@ -9,7 +9,6 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Error};
 
 use proxmox_io::ReadExt;
-use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_uuid::Uuid;
 
 use crate::chunk_stat::ChunkStat;
@@ -218,7 +217,6 @@ impl IndexFile for FixedIndexReader {
 pub struct FixedIndexWriter {
     store: Arc<ChunkStore>,
     file: File,
-    _lock: ProcessLockSharedGuard,
     filename: PathBuf,
     tmp_filename: PathBuf,
     chunk_size: usize,
@@ -243,14 +241,13 @@ impl Drop for FixedIndexWriter {
 
 impl FixedIndexWriter {
     #[allow(clippy::cast_ptr_alignment)]
+    // Requires obtaining a shared chunk store lock beforehand
     pub fn create(
         store: Arc<ChunkStore>,
         path: &Path,
         size: usize,
         chunk_size: usize,
     ) -> Result<Self, Error> {
-        let shared_lock = store.try_shared_lock()?;
-
         let full_path = store.relative_path(path);
         let mut tmp_path = full_path.clone();
         tmp_path.set_extension("tmp_fidx");
@@ -307,7 +304,6 @@ impl FixedIndexWriter {
         Ok(Self {
             store,
             file,
-            _lock: shared_lock,
             filename: full_path,
             tmp_filename: tmp_path,
             chunk_size,

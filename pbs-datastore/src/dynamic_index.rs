@@ -11,7 +11,6 @@ use anyhow::{bail, format_err, Error};
 
 use proxmox_io::ReadExt;
 use proxmox_sys::mmap::Mmap;
-use proxmox_sys::process_locker::ProcessLockSharedGuard;
 use proxmox_uuid::Uuid;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
@@ -277,7 +276,6 @@ impl IndexFile for DynamicIndexReader {
 /// Create dynamic index files (`.dixd`)
 pub struct DynamicIndexWriter {
     store: Arc<ChunkStore>,
-    _lock: ProcessLockSharedGuard,
     writer: BufWriter<File>,
     closed: bool,
     filename: PathBuf,
@@ -294,9 +292,8 @@ impl Drop for DynamicIndexWriter {
 }
 
 impl DynamicIndexWriter {
+    // Requires obtaining a shared chunk store lock beforehand
     pub fn create(store: Arc<ChunkStore>, path: &Path) -> Result<Self, Error> {
-        let shared_lock = store.try_shared_lock()?;
-
         let full_path = store.relative_path(path);
         let mut tmp_path = full_path.clone();
         tmp_path.set_extension("tmp_didx");
@@ -325,7 +322,6 @@ impl DynamicIndexWriter {
 
         Ok(Self {
             store,
-            _lock: shared_lock,
             writer,
             closed: false,
             filename: full_path,

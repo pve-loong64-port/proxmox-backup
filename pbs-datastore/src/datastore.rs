@@ -533,6 +533,7 @@ impl DataStore {
         self.inner.chunk_store.get_chunk_iterator()
     }
 
+    // Requires obtaining a shared chunk store lock beforehand
     pub fn create_fixed_writer<P: AsRef<Path>>(
         &self,
         filename: P,
@@ -560,6 +561,7 @@ impl DataStore {
         Ok(index)
     }
 
+    // Requires obtaining a shared chunk store lock beforehand
     pub fn create_dynamic_writer<P: AsRef<Path>>(
         &self,
         filename: P,
