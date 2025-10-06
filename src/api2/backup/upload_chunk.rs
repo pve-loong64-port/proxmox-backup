@@ -1,12 +1,11 @@
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use anyhow::{bail, format_err, Error};
 use futures::*;
 use hex::FromHex;
 use http_body_util::{BodyDataStream, BodyExt};
-use hyper::body::Incoming;
+use hyper::body::{Bytes, Incoming};
 use hyper::http::request::Parts;
 use serde_json::{json, Value};
 
@@ -16,14 +15,13 @@ use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{BACKUP_ARCHIVE_NAME_SCHEMA, CHUNK_DIGEST_SCHEMA};
 use pbs_datastore::file_formats::{DataBlobHeader, EncryptedDataBlobHeader};
-use pbs_datastore::{DataBlob, DataStore, DatastoreBackend};
+use pbs_datastore::{DataBlob, DatastoreBackend};
 use pbs_tools::json::{required_integer_param, required_string_param};
 
 use super::environment::*;
 
 pub struct UploadChunk {
     stream: BodyDataStream<Incoming>,
-    store: Arc<DataStore>,
     digest: [u8; 32],
     size: u32,
     encoded_size: u32,
@@ -33,14 +31,12 @@ pub struct UploadChunk {
 impl UploadChunk {
     pub fn new(
         stream: BodyDataStream<Incoming>,
-        store: Arc<DataStore>,
         digest: [u8; 32],
         size: u32,
         encoded_size: u32,
     ) -> Self {
         Self {
             stream,
-            store,
             size,
             encoded_size,
             raw_data: Some(vec![]),
@@ -50,7 +46,7 @@ impl UploadChunk {
 }
 
 impl Future for UploadChunk {
-    type Output = Result<([u8; 32], u32, u32, bool), Error>;
+    type Output = Result<([u8; 32], u32, DataBlob), Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -74,7 +70,7 @@ impl Future for UploadChunk {
                             break format_err!("uploaded chunk has unexpected size.");
                         }
 
-                        let (is_duplicate, compressed_size) = match proxmox_lang::try_block! {
+                        let chunk = match proxmox_lang::try_block! {
                             let mut chunk = DataBlob::from_raw(raw_data)?;
 
                             proxmox_async::runtime::block_in_place(|| {
@@ -82,21 +78,14 @@ impl Future for UploadChunk {
 
                                 // always comput CRC at server side
                                 chunk.set_crc(chunk.compute_crc());
-
-                                this.store.insert_chunk(&chunk, &this.digest)
+                                Ok(chunk)
                             })
-
                         } {
                             Ok(res) => res,
                             Err(err) => break err,
                         };
 
-                        return Poll::Ready(Ok((
-                            this.digest,
-                            this.size,
-                            compressed_size as u32,
-                            is_duplicate,
-                        )));
+                        return Poll::Ready(Ok((this.digest, this.size, chunk)));
                     } else {
                         break format_err!("poll upload chunk stream failed - already finished.");
                     }
@@ -240,30 +229,23 @@ async fn upload_to_backend(
     let digest_str = required_string_param(&param, "digest")?;
     let digest = <[u8; 32]>::from_hex(digest_str)?;
 
+    let (digest, size, chunk) =
+        UploadChunk::new(BodyDataStream::new(req_body), digest, size, encoded_size).await?;
+
     match &env.backend {
         DatastoreBackend::Filesystem => {
-            UploadChunk::new(
-                BodyDataStream::new(req_body),
-                env.datastore.clone(),
-                digest,
-                size,
-                encoded_size,
-            )
-            .await
+            let (is_duplicate, compressed_size) = proxmox_async::runtime::block_in_place(|| {
+                env.datastore.insert_chunk(&chunk, &digest)
+            })?;
+            Ok((digest, size, compressed_size as u32, is_duplicate))
         }
         DatastoreBackend::S3(s3_client) => {
-            let data = req_body.collect().await?.to_bytes();
-            if encoded_size != data.len() as u32 {
-                bail!(
-                    "got blob with unexpected length ({encoded_size} != {})",
-                    data.len()
-                );
-            }
+            let chunk_data: Bytes = chunk.raw_data().to_vec().into();
 
             if env.no_cache {
                 let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
                 let is_duplicate = s3_client
-                    .upload_no_replace_with_retry(object_key, data)
+                    .upload_no_replace_with_retry(object_key, chunk_data)
                     .await
                     .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
                 return Ok((digest, size, encoded_size, is_duplicate));
@@ -287,7 +269,7 @@ async fn upload_to_backend(
             tracing::info!("Upload of new chunk {}", hex::encode(digest));
             let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
             let is_duplicate = s3_client
-                .upload_no_replace_with_retry(object_key, data.clone())
+                .upload_no_replace_with_retry(object_key, chunk_data)
                 .await
                 .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
 
@@ -297,11 +279,8 @@ async fn upload_to_backend(
             // cache store.
             let datastore = env.datastore.clone();
             tracing::info!("Caching of chunk {}", hex::encode(digest));
-            let _ = tokio::task::spawn_blocking(move || {
-                let chunk = DataBlob::from_raw(data.to_vec())?;
-                datastore.cache_insert(&digest, &chunk)
-            })
-            .await?;
+            let _ = tokio::task::spawn_blocking(move || datastore.cache_insert(&digest, &chunk))
+                .await?;
 
             Ok((digest, size, encoded_size, is_duplicate))
         }
