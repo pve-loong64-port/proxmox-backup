@@ -86,8 +86,16 @@ impl LocalDatastoreLruCache {
 
     /// Remove a chunk from the local datastore cache.
     ///
+    /// Callers to this method must assure that:
+    /// - no concurrent insert is being performed, the chunk store's mutex must be held.
+    /// - the chunk to be removed is no longer referenced by an index file.
+    /// - the chunk to be removed has not been inserted by an active writer (atime newer than
+    ///   writer start time).
+    /// - there is no active writer in an old process, which could have inserted the chunk to be
+    ///   deleted.
+    ///
     /// Fails if the chunk cannot be deleted successfully.
-    pub fn remove(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    pub(crate) unsafe fn remove(&self, digest: &[u8; 32]) -> Result<(), Error> {
         self.cache.remove(*digest);
         let (path, _digest_str) = self.store.chunk_path(digest);
         std::fs::remove_file(path).map_err(Error::from)

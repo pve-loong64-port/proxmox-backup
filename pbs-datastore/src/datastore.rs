@@ -1686,7 +1686,7 @@ impl DataStore {
                         |_status| {
                             if let Some(cache) = self.cache() {
                                 // ignore errors, phase 3 will retry cleanup anyways
-                                let _ = cache.remove(&digest);
+                                let _ = unsafe { cache.remove(&digest) };
                             }
                             delete_list.push(content.key);
                             Ok(())
