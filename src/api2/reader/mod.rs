@@ -327,28 +327,20 @@ fn download_chunk(
 
         let body = match &env.backend {
             DatastoreBackend::Filesystem => load_from_filesystem(env, &digest)?,
-            DatastoreBackend::S3(s3_client) => {
-                match env.datastore.cache() {
-                    None => fetch_from_object_store(s3_client, &digest).await?,
-                    Some(cache) => {
-                        let mut cacher = env
-                            .datastore
-                            .cacher()?
-                            .ok_or(format_err!("no cacher for datastore"))?;
-                        // Download from object store, insert to local cache store and read from
-                        // file. Can this be optimized?
-                        let chunk =
-                            cache
-                                .access(&digest, &mut cacher)
-                                .await?
-                                .ok_or(format_err!(
-                                    "unable to access chunk with digest {}",
-                                    hex::encode(digest)
-                                ))?;
-                        Body::from(chunk.raw_data().to_owned())
-                    }
+            DatastoreBackend::S3(s3_client) => match env.datastore.cache() {
+                None => fetch_from_object_store(s3_client, &digest).await?,
+                Some(cache) => {
+                    let chunk =
+                        cache
+                            .access(&digest, s3_client.clone())
+                            .await?
+                            .ok_or(format_err!(
+                                "unable to access chunk with digest {}",
+                                hex::encode(digest)
+                            ))?;
+                    Body::from(chunk.raw_data().to_owned())
                 }
-            }
+            },
         };
 
         // fixme: set other headers ?

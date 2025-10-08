@@ -70,13 +70,11 @@ impl ReadChunk for LocalChunkReader {
             DatastoreBackend::S3(s3_client) => match self.store.cache() {
                 None => proxmox_async::runtime::block_on(fetch(Arc::clone(s3_client), digest))?,
                 Some(cache) => {
-                    let mut cacher = self
-                        .store
-                        .cacher()?
-                        .ok_or(format_err!("no cacher for datastore"))?;
-                    proxmox_async::runtime::block_on(cache.access(digest, &mut cacher))?.ok_or(
-                        format_err!("unable to access chunk with digest {}", hex::encode(digest)),
-                    )?
+                    proxmox_async::runtime::block_on(cache.access(digest, s3_client.clone()))?
+                        .ok_or(format_err!(
+                            "unable to access chunk with digest {}",
+                            hex::encode(digest)
+                        ))?
                 }
             },
         };
@@ -109,14 +107,13 @@ impl AsyncReadChunk for LocalChunkReader {
                 DatastoreBackend::S3(s3_client) => match self.store.cache() {
                     None => fetch(Arc::clone(s3_client), digest).await?,
                     Some(cache) => {
-                        let mut cacher = self
-                            .store
-                            .cacher()?
-                            .ok_or(format_err!("no cacher for datastore"))?;
-                        cache.access(digest, &mut cacher).await?.ok_or(format_err!(
-                            "unable to access chunk with digest {}",
-                            hex::encode(digest)
-                        ))?
+                        cache
+                            .access(digest, s3_client.clone())
+                            .await?
+                            .ok_or(format_err!(
+                                "unable to access chunk with digest {}",
+                                hex::encode(digest)
+                            ))?
                     }
                 },
             };

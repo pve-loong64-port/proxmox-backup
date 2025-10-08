@@ -41,7 +41,6 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
-use crate::local_datastore_lru_cache::S3Cacher;
 use crate::s3::S3_CONTENT_PREFIX;
 use crate::task_tracking::{self, update_active_operations};
 use crate::{DataBlob, LocalDatastoreLruCache};
@@ -289,17 +288,6 @@ impl DataStore {
             return cache.insert(digest, chunk);
         }
         Ok(())
-    }
-
-    /// Returns the cacher for datastores backed by S3 object stores.
-    /// This allows to fetch chunks to the local cache store on-demand.
-    pub fn cacher(&self) -> Result<Option<S3Cacher>, Error> {
-        self.backend().map(|backend| match backend {
-            DatastoreBackend::S3(s3_client) => {
-                Some(S3Cacher::new(s3_client, self.inner.chunk_store.clone()))
-            }
-            DatastoreBackend::Filesystem => None,
-        })
     }
 
     pub fn lookup_datastore(
