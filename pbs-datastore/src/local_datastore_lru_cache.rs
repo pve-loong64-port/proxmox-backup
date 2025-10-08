@@ -115,18 +115,8 @@ impl LocalDatastoreLruCache {
                     // Expected chunk to be present since LRU cache has it, but it is missing
                     // locally, try to fetch again
                     if err.kind() == std::io::ErrorKind::NotFound {
-                        let object_key = crate::s3::object_key_from_digest(digest)?;
-                        match cacher.client.get_object(object_key).await? {
-                            None => {
-                                bail!("could not fetch object with key {}", hex::encode(digest))
-                            }
-                            Some(response) => {
-                                let bytes = response.content.collect().await?.to_bytes();
-                                let chunk = DataBlob::from_raw(bytes.to_vec())?;
-                                self.store.insert_chunk(&chunk, digest)?;
-                                return Ok(Some(chunk));
-                            }
-                        }
+                        let chunk = self.fetch_and_insert(cacher.client.clone(), digest).await?;
+                        return Ok(Some(chunk));
                     } else {
                         return Err(Error::from(err));
                     }
@@ -138,18 +128,8 @@ impl LocalDatastoreLruCache {
                     use std::io::Seek;
                     // Check if file is empty marker file, try fetching content if so
                     if file.seek(std::io::SeekFrom::End(0))? == 0 {
-                        let object_key = crate::s3::object_key_from_digest(digest)?;
-                        match cacher.client.get_object(object_key).await? {
-                            None => {
-                                bail!("could not fetch object with key {}", hex::encode(digest))
-                            }
-                            Some(response) => {
-                                let bytes = response.content.collect().await?.to_bytes();
-                                let chunk = DataBlob::from_raw(bytes.to_vec())?;
-                                self.store.insert_chunk(&chunk, digest)?;
-                                return Ok(Some(chunk));
-                            }
-                        }
+                        let chunk = self.fetch_and_insert(cacher.client.clone(), digest).await?;
+                        return Ok(Some(chunk));
                     } else {
                         return Err(err);
                     }
@@ -164,5 +144,24 @@ impl LocalDatastoreLruCache {
     /// Checks if the given digest is stored in the datastores LRU cache
     pub fn contains(&self, digest: &[u8; 32]) -> bool {
         self.cache.contains(*digest)
+    }
+
+    async fn fetch_and_insert(
+        &self,
+        client: Arc<S3Client>,
+        digest: &[u8; 32],
+    ) -> Result<DataBlob, Error> {
+        let object_key = crate::s3::object_key_from_digest(digest)?;
+        match client.get_object(object_key).await? {
+            None => {
+                bail!("could not fetch object with key {}", hex::encode(digest))
+            }
+            Some(response) => {
+                let bytes = response.content.collect().await?.to_bytes();
+                let chunk = DataBlob::from_raw(bytes.to_vec())?;
+                self.store.insert_chunk(&chunk, digest)?;
+                Ok(chunk)
+            }
+        }
     }
 }
