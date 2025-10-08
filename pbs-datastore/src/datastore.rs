@@ -1653,21 +1653,56 @@ impl DataStore {
                 let lock = self.inner.chunk_store.mutex().lock().unwrap();
 
                 for content in list_bucket_result.contents {
-                    if self
-                        .mark_chunk_for_object_key(
-                            &content.key,
-                            content.size,
-                            min_atime,
-                            oldest_writer,
-                            &mut delete_list,
-                            &mut gc_status,
-                        )
-                        .with_context(|| {
-                            format!("failed to mark chunk for object key {}", content.key)
-                        })?
-                    {
-                        chunk_count += 1;
+                    let (chunk_path, digest) = match self.chunk_path_from_object_key(&content.key) {
+                        Some(path) => path,
+                        None => continue,
+                    };
+
+                    // Check local markers (created or atime updated during phase1) and
+                    // keep or delete chunk based on that.
+                    let atime = match std::fs::metadata(&chunk_path) {
+                        Ok(stat) => stat.accessed()?,
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                            // File not found, delete by setting atime to unix epoch
+                            info!("Not found, mark for deletion: {}", content.key);
+                            SystemTime::UNIX_EPOCH
+                        }
+                        Err(err) => return Err(err.into()),
+                    };
+                    let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
+
+                    let bad = chunk_path
+                        .as_path()
+                        .extension()
+                        .is_some_and(|ext| ext == "bad");
+
+                    if atime < min_atime {
+                        if let Some(cache) = self.cache() {
+                            // ignore errors, phase 3 will retry cleanup anyways
+                            let _ = cache.remove(&digest);
+                        }
+                        delete_list.push(content.key);
+                        if bad {
+                            gc_status.removed_bad += 1;
+                        } else {
+                            gc_status.removed_chunks += 1;
+                        }
+                        gc_status.removed_bytes += content.size;
+                    } else if atime < oldest_writer {
+                        if bad {
+                            gc_status.still_bad += 1;
+                        } else {
+                            gc_status.pending_chunks += 1;
+                        }
+                        gc_status.pending_bytes += content.size;
+                    } else {
+                        if !bad {
+                            gc_status.disk_chunks += 1;
+                        }
+                        gc_status.disk_bytes += content.size;
                     }
+
+                    chunk_count += 1;
                 }
 
                 drop(lock);
@@ -1794,70 +1829,6 @@ impl DataStore {
 
         *self.inner.last_gc_status.lock().unwrap() = gc_status;
         Ok(())
-    }
-
-    // Mark the chunk marker in the local cache store for the given object key as in use
-    // by updating it's atime.
-    // Returns Ok(true) if the chunk was updated and Ok(false) if the object was not a chunk.
-    fn mark_chunk_for_object_key(
-        &self,
-        object_key: &S3ObjectKey,
-        size: u64,
-        min_atime: i64,
-        oldest_writer: i64,
-        delete_list: &mut Vec<S3ObjectKey>,
-        gc_status: &mut GarbageCollectionStatus,
-    ) -> Result<bool, Error> {
-        let (chunk_path, digest) = match self.chunk_path_from_object_key(object_key) {
-            Some(path) => path,
-            None => return Ok(false),
-        };
-
-        // Check local markers (created or atime updated during phase1) and
-        // keep or delete chunk based on that.
-        let atime = match std::fs::metadata(&chunk_path) {
-            Ok(stat) => stat.accessed()?,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                // File not found, delete by setting atime to unix epoch
-                info!("Not found, mark for deletion: {object_key}");
-                SystemTime::UNIX_EPOCH
-            }
-            Err(err) => return Err(err.into()),
-        };
-        let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
-
-        let bad = chunk_path
-            .as_path()
-            .extension()
-            .is_some_and(|ext| ext == "bad");
-
-        if atime < min_atime {
-            if let Some(cache) = self.cache() {
-                // ignore errors, phase 3 will retry cleanup anyways
-                let _ = cache.remove(&digest);
-            }
-            delete_list.push(object_key.clone());
-            if bad {
-                gc_status.removed_bad += 1;
-            } else {
-                gc_status.removed_chunks += 1;
-            }
-            gc_status.removed_bytes += size;
-        } else if atime < oldest_writer {
-            if bad {
-                gc_status.still_bad += 1;
-            } else {
-                gc_status.pending_chunks += 1;
-            }
-            gc_status.pending_bytes += size;
-        } else {
-            if !bad {
-                gc_status.disk_chunks += 1;
-            }
-            gc_status.disk_bytes += size;
-        }
-
-        Ok(true)
     }
 
     // Check and generate a chunk path from given object key
