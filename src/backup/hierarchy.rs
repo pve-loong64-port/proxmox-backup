@@ -68,19 +68,21 @@ pub fn check_ns_privs_full(
     );
 }
 
-pub fn can_access_any_namespace(
+/// Checks if the given user has read/access rights on any namespace on the given datastore,
+/// beginning with `start_ns` up to `max_depth` below.
+pub fn can_access_any_namespace_below(
     store: Arc<DataStore>,
     auth_id: &Authid,
     user_info: &CachedUserInfo,
+    parent_ns: Option<BackupNamespace>,
+    max_depth: Option<usize>,
 ) -> bool {
+    let ns = parent_ns.unwrap_or_default();
     // NOTE: traversing the datastore could be avoided if we had an "ACL tree: is there any priv
     // below /datastore/{store}" helper
-    let mut iter =
-        if let Ok(iter) = store.recursive_iter_backup_ns_ok(BackupNamespace::root(), None) {
-            iter
-        } else {
-            return false;
-        };
+    let Ok(mut iter) = store.recursive_iter_backup_ns_ok(ns, max_depth) else {
+        return false;
+    };
     let wanted =
         PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_MODIFY | PRIV_DATASTORE_READ | PRIV_DATASTORE_BACKUP;
     let name = store.name();
@@ -88,6 +90,15 @@ pub fn can_access_any_namespace(
         let user_privs = user_info.lookup_privs(auth_id, &["datastore", name, &ns.to_string()]);
         user_privs & wanted != 0
     })
+}
+
+/// Checks if the given user has read/access rights on any namespace on given datastore
+pub fn can_access_any_namespace(
+    store: Arc<DataStore>,
+    auth_id: &Authid,
+    user_info: &CachedUserInfo,
+) -> bool {
+    can_access_any_namespace_below(store, auth_id, user_info, None, None)
 }
 
 /// A privilege aware iterator for all backup groups in all Namespaces below an anchor namespace,
