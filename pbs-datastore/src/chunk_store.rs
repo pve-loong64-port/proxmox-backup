@@ -408,41 +408,71 @@ impl ChunkStore {
 
                 chunk_count += 1;
 
-                if stat.st_atime < min_atime {
-                    //let age = now - stat.st_atime;
-                    //println!("UNLINK {}  {:?}", age/(3600*24), filename);
-                    if let Err(err) = unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir) {
-                        if bad {
-                            status.still_bad += 1;
+                Self::check_atime_and_update_gc_status(
+                    stat.st_atime,
+                    min_atime,
+                    oldest_writer,
+                    stat.st_size as u64,
+                    bad,
+                    status,
+                    |status| {
+                        if let Err(err) =
+                            unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir)
+                        {
+                            if bad {
+                                status.still_bad += 1;
+                            }
+                            bail!(
+                                "unlinking chunk {filename:?} failed on store '{}' - {err}",
+                                self.name,
+                            );
                         }
-                        bail!(
-                            "unlinking chunk {filename:?} failed on store '{}' - {err}",
-                            self.name,
-                        );
-                    }
-                    if bad {
-                        status.removed_bad += 1;
-                    } else {
-                        status.removed_chunks += 1;
-                    }
-                    status.removed_bytes += stat.st_size as u64;
-                } else if stat.st_atime < oldest_writer {
-                    if bad {
-                        status.still_bad += 1;
-                    } else {
-                        status.pending_chunks += 1;
-                    }
-                    status.pending_bytes += stat.st_size as u64;
-                } else {
-                    if !bad {
-                        status.disk_chunks += 1;
-                    }
-                    status.disk_bytes += stat.st_size as u64;
-                }
+                        Ok(())
+                    },
+                )?;
             }
             drop(lock);
         }
 
+        Ok(())
+    }
+
+    /// Check within what range the provided chunks atime falls and update the garbage collection
+    /// status accordingly.
+    ///
+    /// If the chunk should be removed, the [`remove_callback`] is executed.
+    pub(super) fn check_atime_and_update_gc_status<
+        T: FnOnce(&mut GarbageCollectionStatus) -> Result<(), Error>,
+    >(
+        atime: i64,
+        min_atime: i64,
+        oldest_writer: i64,
+        size: u64,
+        bad: bool,
+        gc_status: &mut GarbageCollectionStatus,
+        remove_callback: T,
+    ) -> Result<(), Error> {
+        if atime < min_atime {
+            remove_callback(gc_status)?;
+            if bad {
+                gc_status.removed_bad += 1;
+            } else {
+                gc_status.removed_chunks += 1;
+            }
+            gc_status.removed_bytes += size;
+        } else if atime < oldest_writer {
+            if bad {
+                gc_status.still_bad += 1;
+            } else {
+                gc_status.pending_chunks += 1;
+            }
+            gc_status.pending_bytes += size;
+        } else {
+            if !bad {
+                gc_status.disk_chunks += 1;
+            }
+            gc_status.disk_bytes += size;
+        }
         Ok(())
     }
 

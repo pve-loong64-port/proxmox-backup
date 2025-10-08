@@ -1676,31 +1676,22 @@ impl DataStore {
                         .extension()
                         .is_some_and(|ext| ext == "bad");
 
-                    if atime < min_atime {
-                        if let Some(cache) = self.cache() {
-                            // ignore errors, phase 3 will retry cleanup anyways
-                            let _ = cache.remove(&digest);
-                        }
-                        delete_list.push(content.key);
-                        if bad {
-                            gc_status.removed_bad += 1;
-                        } else {
-                            gc_status.removed_chunks += 1;
-                        }
-                        gc_status.removed_bytes += content.size;
-                    } else if atime < oldest_writer {
-                        if bad {
-                            gc_status.still_bad += 1;
-                        } else {
-                            gc_status.pending_chunks += 1;
-                        }
-                        gc_status.pending_bytes += content.size;
-                    } else {
-                        if !bad {
-                            gc_status.disk_chunks += 1;
-                        }
-                        gc_status.disk_bytes += content.size;
-                    }
+                    ChunkStore::check_atime_and_update_gc_status(
+                        atime,
+                        min_atime,
+                        oldest_writer,
+                        content.size,
+                        bad,
+                        &mut gc_status,
+                        |_status| {
+                            if let Some(cache) = self.cache() {
+                                // ignore errors, phase 3 will retry cleanup anyways
+                                let _ = cache.remove(&digest);
+                            }
+                            delete_list.push(content.key);
+                            Ok(())
+                        },
+                    )?;
 
                     chunk_count += 1;
                 }
