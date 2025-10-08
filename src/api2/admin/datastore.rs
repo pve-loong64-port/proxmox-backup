@@ -142,57 +142,74 @@ pub fn list_groups(
         .try_fold(Vec::new(), |mut group_info, group| {
             let group = group?;
 
-            let owner = match datastore.get_owner(&ns, group.as_ref()) {
-                Ok(auth_id) => auth_id,
-                Err(err) => {
-                    eprintln!(
-                        "Failed to get owner of group '{}' in {} - {}",
-                        group.group(),
-                        print_store_and_ns(&store, &ns),
-                        err
-                    );
-                    return Ok(group_info);
-                }
-            };
-            if !list_all && check_backup_owner(&owner, &auth_id).is_err() {
-                return Ok(group_info);
+            let item =
+                backup_group_to_group_list_item(datastore.clone(), group, &ns, &auth_id, list_all);
+
+            if let Some(item) = item {
+                group_info.push(item);
             }
-
-            let snapshots = match group.list_backups() {
-                Ok(snapshots) => snapshots,
-                Err(_) => return Ok(group_info),
-            };
-
-            let backup_count: u64 = snapshots.len() as u64;
-            if backup_count == 0 {
-                return Ok(group_info);
-            }
-
-            let last_backup = snapshots
-                .iter()
-                .fold(&snapshots[0], |a, b| {
-                    if a.is_finished() && a.backup_dir.backup_time() > b.backup_dir.backup_time() {
-                        a
-                    } else {
-                        b
-                    }
-                })
-                .to_owned();
-
-            let notes_path = datastore.group_notes_path(&ns, group.as_ref());
-            let comment = file_read_firstline(notes_path).ok();
-
-            group_info.push(GroupListItem {
-                backup: group.into(),
-                last_backup: last_backup.backup_dir.backup_time(),
-                owner: Some(owner),
-                backup_count,
-                files: last_backup.files,
-                comment,
-            });
 
             Ok(group_info)
         })
+}
+
+fn backup_group_to_group_list_item(
+    datastore: Arc<DataStore>,
+    group: pbs_datastore::BackupGroup,
+    ns: &BackupNamespace,
+    auth_id: &Authid,
+    list_all: bool,
+) -> Option<GroupListItem> {
+    let owner = match datastore.get_owner(ns, group.as_ref()) {
+        Ok(auth_id) => auth_id,
+        Err(err) => {
+            eprintln!(
+                "Failed to get owner of group '{}' in {} - {}",
+                group.group(),
+                print_store_and_ns(datastore.name(), ns),
+                err
+            );
+            return None;
+        }
+    };
+    if !list_all && check_backup_owner(&owner, auth_id).is_err() {
+        return None;
+    }
+
+    let snapshots = match group.list_backups() {
+        Ok(snapshots) => snapshots,
+        Err(_) => return None,
+    };
+
+    let backup_count: u64 = snapshots.len() as u64;
+    if backup_count == 0 {
+        return None;
+    }
+
+    let last_backup = snapshots
+        .iter()
+        .fold(&snapshots[0], |a, b| {
+            if a.is_finished() && a.backup_dir.backup_time() > b.backup_dir.backup_time() {
+                a
+            } else {
+                b
+            }
+        })
+        .to_owned();
+
+    let notes_path = datastore.group_notes_path(ns, group.as_ref());
+    let comment = file_read_firstline(notes_path).ok();
+
+    let item = GroupListItem {
+        backup: group.into(),
+        last_backup: last_backup.backup_dir.backup_time(),
+        owner: Some(owner),
+        backup_count,
+        files: last_backup.files,
+        comment,
+    };
+
+    Some(item)
 }
 
 #[api(
