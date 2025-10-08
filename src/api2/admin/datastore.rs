@@ -166,36 +166,38 @@ fn backup_group_to_group_list_item(
         return None;
     }
 
-    let snapshots = match group.list_backups() {
-        Ok(snapshots) => snapshots,
+    let mut snapshots: Vec<_> = match group.iter_snapshots() {
+        Ok(snapshots) => snapshots.collect::<Result<Vec<_>, Error>>().ok()?,
         Err(_) => return None,
     };
 
     let backup_count: u64 = snapshots.len() as u64;
-    if backup_count == 0 {
-        return None;
-    }
+    let last = if backup_count == 1 {
+        // we may have only one unfinished snapshot
+        snapshots.pop().and_then(|dir| BackupInfo::new(dir).ok())
+    } else {
+        // we either have no snapshots, or at least one finished one, since we cannot have
+        // multiple unfinished ones
+        snapshots.sort_by_key(|b| std::cmp::Reverse(b.backup_time()));
+        snapshots
+            .iter()
+            .filter_map(|backup| BackupInfo::new(backup.clone()).ok())
+            .find(|info| info.is_finished())
+    };
 
-    let last_backup = snapshots
-        .iter()
-        .fold(&snapshots[0], |a, b| {
-            if a.is_finished() && a.backup_dir.backup_time() > b.backup_dir.backup_time() {
-                a
-            } else {
-                b
-            }
-        })
-        .to_owned();
+    let (last_backup, files) = last
+        .map(|info| (info.backup_dir.backup_time(), info.files))
+        .unwrap_or((0, Vec::new()));
 
     let notes_path = datastore.group_notes_path(ns, group.as_ref());
     let comment = file_read_firstline(notes_path).ok();
 
     let item = GroupListItem {
         backup: group.into(),
-        last_backup: last_backup.backup_dir.backup_time(),
+        last_backup,
         owner: Some(owner),
         backup_count,
-        files: last_backup.files,
+        files,
         comment,
     };
 
