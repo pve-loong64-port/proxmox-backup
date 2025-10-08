@@ -102,42 +102,36 @@ impl LocalDatastoreLruCache {
         digest: &[u8; 32],
         cacher: &mut S3Cacher,
     ) -> Result<Option<DataBlob>, Error> {
-        if self
-            .cache
-            .access(*digest, cacher, |digest| self.store.clear_chunk(&digest))
-            .await?
-            .is_some()
-        {
-            let (path, _digest_str) = self.store.chunk_path(digest);
-            let mut file = match std::fs::File::open(&path) {
-                Ok(file) => file,
-                Err(err) => {
-                    // Expected chunk to be present since LRU cache has it, but it is missing
-                    // locally, try to fetch again
-                    if err.kind() == std::io::ErrorKind::NotFound {
-                        let chunk = self.fetch_and_insert(cacher.client.clone(), digest).await?;
-                        return Ok(Some(chunk));
-                    } else {
-                        return Err(Error::from(err));
-                    }
+        let (path, _digest_str) = self.store.chunk_path(digest);
+        match std::fs::File::open(&path) {
+            Ok(mut file) => match DataBlob::load_from_reader(&mut file) {
+                // File was still cached with contents, load response from file
+                Ok(chunk) => {
+                    self.cache
+                        .insert(*digest, (), |digest| self.store.clear_chunk(&digest))?;
+                    Ok(Some(chunk))
                 }
-            };
-            let chunk = match DataBlob::load_from_reader(&mut file) {
-                Ok(chunk) => chunk,
+                // File was empty, might have been evicted since
                 Err(err) => {
                     use std::io::Seek;
                     // Check if file is empty marker file, try fetching content if so
                     if file.seek(std::io::SeekFrom::End(0))? == 0 {
                         let chunk = self.fetch_and_insert(cacher.client.clone(), digest).await?;
-                        return Ok(Some(chunk));
+                        Ok(Some(chunk))
                     } else {
-                        return Err(err);
+                        Err(err)
                     }
                 }
-            };
-            Ok(Some(chunk))
-        } else {
-            Ok(None)
+            },
+            Err(err) => {
+                // Failed to open file, missing
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    let chunk = self.fetch_and_insert(cacher.client.clone(), digest).await?;
+                    Ok(Some(chunk))
+                } else {
+                    Err(Error::from(err))
+                }
+            }
         }
     }
 
@@ -159,7 +153,7 @@ impl LocalDatastoreLruCache {
             Some(response) => {
                 let bytes = response.content.collect().await?.to_bytes();
                 let chunk = DataBlob::from_raw(bytes.to_vec())?;
-                self.store.insert_chunk(&chunk, digest)?;
+                self.insert(digest, &chunk)?;
                 Ok(chunk)
             }
         }
