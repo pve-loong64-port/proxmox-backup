@@ -124,7 +124,7 @@ impl LocalDatastoreLruCache {
                                 let bytes = response.content.collect().await?.to_bytes();
                                 let chunk = DataBlob::from_raw(bytes.to_vec())?;
                                 self.store.insert_chunk(&chunk, digest)?;
-                                std::fs::File::open(&path)?
+                                return Ok(Some(chunk));
                             }
                         }
                     } else {
@@ -147,8 +147,7 @@ impl LocalDatastoreLruCache {
                                 let bytes = response.content.collect().await?.to_bytes();
                                 let chunk = DataBlob::from_raw(bytes.to_vec())?;
                                 self.store.insert_chunk(&chunk, digest)?;
-                                let mut file = std::fs::File::open(&path)?;
-                                DataBlob::load_from_reader(&mut file)?
+                                return Ok(Some(chunk));
                             }
                         }
                     } else {
