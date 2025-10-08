@@ -83,12 +83,10 @@ pub fn can_access_any_namespace_below(
     let Ok(mut iter) = store.recursive_iter_backup_ns_ok(ns, max_depth) else {
         return false;
     };
-    let wanted =
-        PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_MODIFY | PRIV_DATASTORE_READ | PRIV_DATASTORE_BACKUP;
     let name = store.name();
     iter.any(|ns| -> bool {
         let user_privs = user_info.lookup_privs(auth_id, &["datastore", name, &ns.to_string()]);
-        user_privs & wanted != 0
+        user_privs & NS_PRIVS_OK != 0
     })
 }
 
