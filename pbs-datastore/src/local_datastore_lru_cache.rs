@@ -71,17 +71,8 @@ impl LocalDatastoreLruCache {
     /// Fails if the chunk cannot be inserted successfully.
     pub fn insert(&self, digest: &[u8; 32], chunk: &DataBlob) -> Result<(), Error> {
         self.store.insert_chunk(chunk, digest)?;
-        self.cache.insert(*digest, (), |digest| {
-            let (path, _digest_str) = self.store.chunk_path(&digest);
-            // Truncate to free up space but keep the inode around, since that
-            // is used as marker for chunks in use by garbage collection.
-            if let Err(err) = nix::unistd::truncate(&path, 0) {
-                if err != nix::errno::Errno::ENOENT {
-                    return Err(Error::from(err));
-                }
-            }
-            Ok(())
-        })
+        self.cache
+            .insert(*digest, (), |digest| self.store.clear_chunk(&digest))
     }
 
     /// Remove a chunk from the local datastore cache.
@@ -113,17 +104,7 @@ impl LocalDatastoreLruCache {
     ) -> Result<Option<DataBlob>, Error> {
         if self
             .cache
-            .access(*digest, cacher, |digest| {
-                let (path, _digest_str) = self.store.chunk_path(&digest);
-                // Truncate to free up space but keep the inode around, since that
-                // is used as marker for chunks in use by garbage collection.
-                if let Err(err) = nix::unistd::truncate(&path, 0) {
-                    if err != nix::errno::Errno::ENOENT {
-                        return Err(Error::from(err));
-                    }
-                }
-                Ok(())
-            })
+            .access(*digest, cacher, |digest| self.store.clear_chunk(&digest))
             .await?
             .is_some()
         {

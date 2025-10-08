@@ -658,6 +658,26 @@ impl ChunkStore {
         (chunk_path, digest_str)
     }
 
+    /// Replace a chunk file with a zero size file in the chunk store.
+    ///
+    /// Used to evict chunks from the local datastore cache, while keeping them as in-use markers
+    /// for garbage collection. Returns with success also if chunk file is not pre-existing.
+    pub fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+        let (chunk_path, digest_str) = self.chunk_path(digest);
+        let mut create_options = CreateOptions::new();
+        if nix::unistd::Uid::effective().is_root() {
+            let uid = pbs_config::backup_user()?.uid;
+            let gid = pbs_config::backup_group()?.gid;
+            create_options = create_options.owner(uid).group(gid);
+        }
+
+        let _lock = self.mutex.lock();
+
+        proxmox_sys::fs::replace_file(&chunk_path, &[], create_options, false)
+            .map_err(|err| format_err!("clear chunk failed for {digest_str} - {err}"))?;
+        Ok(())
+    }
+
     pub fn relative_path(&self, path: &Path) -> PathBuf {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
