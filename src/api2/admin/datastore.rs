@@ -160,18 +160,8 @@ fn backup_group_to_group_list_item(
     auth_id: &Authid,
     list_all: bool,
 ) -> Option<GroupListItem> {
-    let owner = match datastore.get_owner(ns, group.as_ref()) {
-        Ok(auth_id) => auth_id,
-        Err(err) => {
-            eprintln!(
-                "Failed to get owner of group '{}' in {} - {}",
-                group.group(),
-                print_store_and_ns(datastore.name(), ns),
-                err
-            );
-            return None;
-        }
-    };
+    let owner = get_group_owner(datastore.name(), ns, &group)?;
+
     if !list_all && check_backup_owner(&owner, auth_id).is_err() {
         return None;
     }
@@ -439,6 +429,25 @@ pub async fn list_snapshots(
     .map_err(|err| format_err!("failed to await blocking task: {err}"))?
 }
 
+fn get_group_owner(
+    store: &str,
+    ns: &BackupNamespace,
+    group: &pbs_datastore::BackupGroup,
+) -> Option<Authid> {
+    match group.get_owner() {
+        Ok(auth_id) => Some(auth_id),
+        Err(err) => {
+            log::warn!(
+                "Failed to get owner of group '{}' in {} - {}",
+                group.group(),
+                print_store_and_ns(store, ns),
+                err
+            );
+            None
+        }
+    }
+}
+
 /// This must not run in a main worker thread as it potentially does tons of I/O.
 unsafe fn list_snapshots_blocking(
     store: String,
@@ -482,17 +491,9 @@ unsafe fn list_snapshots_blocking(
     };
 
     groups.iter().try_fold(Vec::new(), |mut snapshots, group| {
-        let owner = match group.get_owner() {
-            Ok(auth_id) => auth_id,
-            Err(err) => {
-                eprintln!(
-                    "Failed to get owner of group '{}' in {} - {}",
-                    group.group(),
-                    print_store_and_ns(&store, &ns),
-                    err
-                );
-                return Ok(snapshots);
-            }
+        let owner = match get_group_owner(&store, &ns, group) {
+            Some(auth_id) => auth_id,
+            None => return Ok(snapshots),
         };
 
         if !list_all && check_backup_owner(&owner, &auth_id).is_err() {
