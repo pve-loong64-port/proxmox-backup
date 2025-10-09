@@ -274,7 +274,7 @@ impl SyncSource for RemoteSource {
         max_depth: &mut Option<usize>,
         filter_callback: NamespaceFilter,
     ) -> Result<Vec<BackupNamespace>, Error> {
-        if self.ns.is_root() && max_depth.map_or(false, |depth| depth == 0) {
+        if self.ns.is_root() && *max_depth == Some(0) {
             return Ok(vec![self.ns.clone()]);
         }
 
