@@ -232,7 +232,7 @@ async fn pull_index_chunks<I: IndexFile>(
 
     drop(verify_and_write_channel);
 
-    verify_pool.complete()?;
+    tokio::task::spawn_blocking(|| verify_pool.complete()).await??;
 
     let elapsed = start_time.elapsed()?;
 
