@@ -1664,22 +1664,24 @@ impl DataStore {
                         .extension()
                         .is_some_and(|ext| ext == "bad");
 
-                    self.inner.chunk_store.cond_sweep_chunk(
-                        atime,
-                        min_atime,
-                        oldest_writer,
-                        content.size,
-                        bad,
-                        &mut gc_status,
-                        || {
-                            if let Some(cache) = self.cache() {
-                                // ignore errors, phase 3 will retry cleanup anyways
-                                let _ = unsafe { cache.remove(&digest) };
-                            }
-                            delete_list.push(content.key);
-                            Ok(())
-                        },
-                    )?;
+                    unsafe {
+                        self.inner.chunk_store.cond_sweep_chunk(
+                            atime,
+                            min_atime,
+                            oldest_writer,
+                            content.size,
+                            bad,
+                            &mut gc_status,
+                            || {
+                                if let Some(cache) = self.cache() {
+                                    // ignore errors, phase 3 will retry cleanup anyways
+                                    let _ = cache.remove(&digest);
+                                }
+                                delete_list.push(content.key);
+                                Ok(())
+                            },
+                        )?;
+                    }
 
                     chunk_count += 1;
                 }

@@ -408,22 +408,26 @@ impl ChunkStore {
 
                 chunk_count += 1;
 
-                self.cond_sweep_chunk(
-                    stat.st_atime,
-                    min_atime,
-                    oldest_writer,
-                    stat.st_size as u64,
-                    bad,
-                    status,
-                    || {
-                        unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(|err| {
-                            format_err!(
-                                "unlinking chunk {filename:?} failed on store '{}' - {err}",
-                                self.name,
+                unsafe {
+                    self.cond_sweep_chunk(
+                        stat.st_atime,
+                        min_atime,
+                        oldest_writer,
+                        stat.st_size as u64,
+                        bad,
+                        status,
+                        || {
+                            unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(
+                                |err| {
+                                    format_err!(
+                                        "unlinking chunk {filename:?} failed on store '{}' - {err}",
+                                        self.name,
+                                    )
+                                },
                             )
-                        })
-                    },
-                )?;
+                        },
+                    )?;
+                }
             }
             drop(lock);
         }
@@ -435,7 +439,10 @@ impl ChunkStore {
     /// status accordingly.
     ///
     /// If the chunk should be removed, the [`remove_callback`] is executed.
-    pub(super) fn cond_sweep_chunk<T: FnOnce() -> Result<(), Error>>(
+    ///
+    /// Unsafe: requires locking and GC checks to be called
+    /// FIXME: make this internal with further refactoring
+    pub(super) unsafe fn cond_sweep_chunk<T: FnOnce() -> Result<(), Error>>(
         &self,
         atime: i64,
         min_atime: i64,
