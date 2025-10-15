@@ -1664,7 +1664,7 @@ impl DataStore {
                         .extension()
                         .is_some_and(|ext| ext == "bad");
 
-                    ChunkStore::check_atime_and_update_gc_status(
+                    self.inner.chunk_store.cond_sweep_chunk(
                         atime,
                         min_atime,
                         oldest_writer,

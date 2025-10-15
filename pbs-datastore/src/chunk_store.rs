@@ -408,7 +408,7 @@ impl ChunkStore {
 
                 chunk_count += 1;
 
-                Self::check_atime_and_update_gc_status(
+                self.cond_sweep_chunk(
                     stat.st_atime,
                     min_atime,
                     oldest_writer,
@@ -435,7 +435,8 @@ impl ChunkStore {
     /// status accordingly.
     ///
     /// If the chunk should be removed, the [`remove_callback`] is executed.
-    pub(super) fn check_atime_and_update_gc_status<T: FnOnce() -> Result<(), Error>>(
+    pub(super) fn cond_sweep_chunk<T: FnOnce() -> Result<(), Error>>(
+        &self,
         atime: i64,
         min_atime: i64,
         oldest_writer: i64,
