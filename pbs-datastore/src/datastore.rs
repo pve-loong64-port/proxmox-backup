@@ -1671,7 +1671,7 @@ impl DataStore {
                         content.size,
                         bad,
                         &mut gc_status,
-                        |_status| {
+                        || {
                             if let Some(cache) = self.cache() {
                                 // ignore errors, phase 3 will retry cleanup anyways
                                 let _ = unsafe { cache.remove(&digest) };

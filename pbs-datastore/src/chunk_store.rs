@@ -415,19 +415,13 @@ impl ChunkStore {
                     stat.st_size as u64,
                     bad,
                     status,
-                    |status| {
-                        if let Err(err) =
-                            unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir)
-                        {
-                            if bad {
-                                status.still_bad += 1;
-                            }
-                            bail!(
+                    || {
+                        unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(|err| {
+                            format_err!(
                                 "unlinking chunk {filename:?} failed on store '{}' - {err}",
                                 self.name,
-                            );
-                        }
-                        Ok(())
+                            )
+                        })
                     },
                 )?;
             }
@@ -441,9 +435,7 @@ impl ChunkStore {
     /// status accordingly.
     ///
     /// If the chunk should be removed, the [`remove_callback`] is executed.
-    pub(super) fn check_atime_and_update_gc_status<
-        T: FnOnce(&mut GarbageCollectionStatus) -> Result<(), Error>,
-    >(
+    pub(super) fn check_atime_and_update_gc_status<T: FnOnce() -> Result<(), Error>>(
         atime: i64,
         min_atime: i64,
         oldest_writer: i64,
@@ -453,7 +445,12 @@ impl ChunkStore {
         remove_callback: T,
     ) -> Result<(), Error> {
         if atime < min_atime {
-            remove_callback(gc_status)?;
+            if let Err(err) = remove_callback() {
+                if bad {
+                    gc_status.still_bad += 1;
+                }
+                return Err(err);
+            }
             if bad {
                 gc_status.removed_bad += 1;
             } else {
