@@ -1,3 +1,23 @@
+rust-proxmox-backup (4.0.17-1) trixie; urgency=medium
+
+  * fix #6665: never rename chunks on s3 client fetch errors
+
+  * fix #6398: api: allow non-pam users to access shell
+
+  * api: admin: datastore: optimize `groups` api call
+
+  * sync job: pull: avoid blocking future during thread pool completion
+
+  * refactor GC helpers
+
+  * S3 chunk cache: rework fetching and caching logic
+
+  * fix #6906: s3-client: conditionally set Content-Length header
+
+  * GC: refactor chunk removal helper
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 15 Oct 2025 14:58:11 +0200
+
 rust-proxmox-backup (4.0.16-1) trixie; urgency=medium
 
   * sync: pull: fix regression in resync of corrupt snapshots
