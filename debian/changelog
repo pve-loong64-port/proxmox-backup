@@ -1,3 +1,9 @@
+rust-proxmox-backup (4.0.18-1) trixie; urgency=medium
+
+  * api: chunk upload: extend consistency checks for s3 backend
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 22 Oct 2025 13:23:12 +0200
+
 rust-proxmox-backup (4.0.17-1) trixie; urgency=medium
 
   * fix #6665: never rename chunks on s3 client fetch errors
