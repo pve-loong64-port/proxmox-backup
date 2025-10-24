@@ -82,10 +82,14 @@ fn commands() -> Vec<(&'static str, Vec<&'static str>)> {
                 "+HOTPLUG,ROTA,PHY-SEC,FSTYPE,MODEL,TRAN",
             ],
         ),
-        ("ls", vec!["-l", "/dev/disk/by-id", "/dev/disk/by-path"]),
+        ("bash", vec!["-c", "ls -l /dev/disk/by-*/"]),
         ("zpool", vec!["status"]),
         ("zfs", vec!["list"]),
         ("arcstat", vec![]),
+        ("dmidecode", vec!["-t", "bios"]),
+        ("lscpu", vec![]),
+        ("lspci", vec!["-nnk"]),
+        ("ip", vec!["-details", "-statistics", "a"]),
     ]
 }
 
