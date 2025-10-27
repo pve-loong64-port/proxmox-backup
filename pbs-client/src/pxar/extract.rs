@@ -1089,6 +1089,17 @@ where
                     );
                     zip.add_entry::<FileContents<T>>(entry, None).await?;
                 }
+                EntryKind::Symlink(target) => {
+                    debug!("adding '{}' to zip", path.display());
+                    let entry = ZipEntry::new(
+                        path,
+                        metadata.stat.mtime.secs,
+                        metadata.stat.mode as u16,
+                        FileType::Symlink,
+                    );
+                    let target = io::Cursor::<&[u8]>::new(target.as_ref());
+                    zip.add_entry(entry, Some(target)).await?;
+                }
                 _ => {} // ignore all else
             };
         }
