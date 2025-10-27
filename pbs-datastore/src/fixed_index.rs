@@ -11,9 +11,7 @@ use anyhow::{bail, format_err, Error};
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
 
-use crate::chunk_stat::ChunkStat;
 use crate::chunk_store::ChunkStore;
-use crate::data_blob::ChunkInfo;
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
 
@@ -215,7 +213,6 @@ impl IndexFile for FixedIndexReader {
 }
 
 pub struct FixedIndexWriter {
-    store: Arc<ChunkStore>,
     file: File,
     filename: PathBuf,
     tmp_filename: PathBuf,
@@ -302,7 +299,6 @@ impl FixedIndexWriter {
         .cast::<u8>();
 
         Ok(Self {
-            store,
             file,
             filename: full_path,
             tmp_filename: tmp_path,
@@ -386,40 +382,6 @@ impl FixedIndexWriter {
         }
 
         Ok(pos / self.chunk_size)
-    }
-
-    // Note: We want to add data out of order, so do not assume any order here.
-    pub fn add_chunk(&mut self, chunk_info: &ChunkInfo, stat: &mut ChunkStat) -> Result<(), Error> {
-        let chunk_len = chunk_info.chunk_len as usize;
-        let offset = chunk_info.offset as usize; // end of chunk
-
-        let idx = self.check_chunk_alignment(offset, chunk_len)?;
-
-        let (is_duplicate, compressed_size) = self
-            .store
-            .insert_chunk(&chunk_info.chunk, &chunk_info.digest)?;
-
-        stat.chunk_count += 1;
-        stat.compressed_size += compressed_size;
-
-        let digest = &chunk_info.digest;
-
-        log::info!(
-            "ADD CHUNK {} {} {}% {} {}",
-            idx,
-            chunk_len,
-            (compressed_size * 100) / (chunk_len as u64),
-            is_duplicate,
-            hex::encode(digest)
-        );
-
-        if is_duplicate {
-            stat.duplicate_chunks += 1;
-        } else {
-            stat.disk_size += compressed_size;
-        }
-
-        self.add_digest(idx, digest)
     }
 
     pub fn add_digest(&mut self, index: usize, digest: &[u8; 32]) -> Result<(), Error> {
