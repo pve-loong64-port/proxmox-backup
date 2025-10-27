@@ -6,7 +6,8 @@ rust-proxmox-backup (3.4.7-1) bookworm; urgency=medium
 
   * pbs3to4: bootloader: only allow systemd-boot before upgrade when used
 
-  * update to proxmox-auth-api 0.4.9
+  * update proxmox-auth-api to version 0.4.9 to avoid signaling that the
+    HTTP-only auth flow is supported.
 
  -- Proxmox Support Team <support@proxmox.com>  Wed, 01 Oct 2025 13:53:02 +0200
 
