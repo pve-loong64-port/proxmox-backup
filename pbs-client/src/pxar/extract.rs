@@ -26,7 +26,7 @@ use proxmox_log::{debug, error, info};
 use proxmox_sys::c_result;
 use proxmox_sys::fs::{create_path, CreateOptions};
 
-use proxmox_compression::zip::{ZipEncoder, ZipEntry};
+use proxmox_compression::zip::{FileType, ZipEncoder, ZipEntry};
 
 use crate::pxar::dir_stack::PxarDirStack;
 use crate::pxar::metadata;
@@ -1034,7 +1034,7 @@ where
                 path,
                 metadata.stat.mtime.secs,
                 metadata.stat.mode as u16,
-                false,
+                FileType::Directory,
             );
             zip.add_entry::<FileContents<T>>(entry, None).await?;
         }
@@ -1053,7 +1053,7 @@ where
                         path,
                         metadata.stat.mtime.secs,
                         metadata.stat.mode as u16,
-                        true,
+                        FileType::Regular,
                     );
                     let contents = decoder.contents().await?;
                     zip.add_entry(entry, contents)
@@ -1072,7 +1072,7 @@ where
                         path,
                         metadata.stat.mtime.secs,
                         metadata.stat.mode as u16,
-                        true,
+                        FileType::Regular,
                     );
                     let contents = decoder.contents().await?;
                     zip.add_entry(entry, contents)
@@ -1085,7 +1085,7 @@ where
                         path,
                         metadata.stat.mtime.secs,
                         metadata.stat.mode as u16,
-                        false,
+                        FileType::Directory,
                     );
                     zip.add_entry::<FileContents<T>>(entry, None).await?;
                 }
