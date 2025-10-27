@@ -1,3 +1,15 @@
+rust-proxmox-backup (3.4.8-1) bookworm; urgency=medium
+
+  * fix #6566: backup api: conditionally drop group and snapshot locks to
+    avoid that an immediate subsequent backup of the client to the same group
+    can fail. This manifests in, e.g., a push sync job failing.
+
+  * api: datastore: optimize `groups` api call to avoid reading all snapshots
+    information during iterating over them while only needing that information
+    from the most recent snapshot.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 27 Oct 2025 17:54:11 +0100
+
 rust-proxmox-backup (3.4.7-1) bookworm; urgency=medium
 
   * pbs3to4: fix logic error and typo in log message
