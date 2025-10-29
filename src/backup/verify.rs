@@ -265,8 +265,7 @@ impl VerifyWorker {
 
     fn add_corrupt_chunk(&self, digest: [u8; 32], errors: Arc<AtomicUsize>, message: &str) {
         // Panic on poisoned mutex
-        let mut corrupt_chunks = self.corrupt_chunks.lock().unwrap();
-        corrupt_chunks.insert(digest);
+        self.corrupt_chunks.lock().unwrap().insert(digest);
         error!(message);
         errors.fetch_add(1, Ordering::SeqCst);
         match self.datastore.rename_corrupt_chunk(&digest) {
