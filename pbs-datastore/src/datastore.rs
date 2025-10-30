@@ -1206,7 +1206,7 @@ impl DataStore {
                 bail!("cannot continue garbage-collection safely, permission denied on: {path:?}");
             } else if inner.kind() == io::ErrorKind::NotFound {
                 log::info!("ignoring vanished file: {path:?}");
-                return Ok(());
+                Ok(())
             } else {
                 bail!("unexpected error on datastore traversal: {inner} - {path:?}");
             }
