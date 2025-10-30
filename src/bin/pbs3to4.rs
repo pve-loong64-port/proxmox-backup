@@ -261,12 +261,10 @@ impl Checker {
                 let re = Regex::new(r"grub2/force_efi_extra_removable: +true(?:\n|$)")
                     .expect("failed to compile dbconfig regex");
                 if !re.is_match(std::str::from_utf8(&output.stdout)?) {
-                    self.output.log_warn(format!(
-                        "Removable bootloader found at '/boot/efi/EFI/BOOT/BOOTX64.efi', but GRUB packages \
+                    self.output.log_warn("Removable bootloader found at '/boot/efi/EFI/BOOT/BOOTX64.efi', but GRUB packages \
                         not set up to update it!\nRun the following command:\n\
                         echo 'grub-efi-amd64 grub2/force_efi_extra_removable boolean true' | debconf-set-selections -v -u\n\
-                        Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'"
-                    ))?;
+                        Then reinstall GRUB with 'apt install --reinstall grub-efi-amd64'")?;
                     boot_ok = false;
                 }
             }
