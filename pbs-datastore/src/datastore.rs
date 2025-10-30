@@ -513,15 +513,6 @@ impl DataStore {
         })
     }
 
-    pub fn get_chunk_iterator(
-        &self,
-    ) -> Result<
-        impl Iterator<Item = (Result<proxmox_sys::fs::ReadDirEntry, Error>, usize, bool)>,
-        Error,
-    > {
-        self.inner.chunk_store.get_chunk_iterator()
-    }
-
     // Requires obtaining a shared chunk store lock beforehand
     pub fn create_fixed_writer<P: AsRef<Path>>(
         &self,
