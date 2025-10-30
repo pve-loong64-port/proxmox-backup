@@ -10,7 +10,7 @@ use pbs_tools::nom::{
 
 // Recognizes one line
 fn next_line(i: &str) -> IResult<&str, &str> {
-    let (i, line) = take_while(|c| (c != '\n'))(i)?;
+    let (i, line) = take_while(|c| c != '\n')(i)?;
     if i.is_empty() {
         Ok((i, line))
     } else {
