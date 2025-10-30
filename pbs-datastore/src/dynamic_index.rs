@@ -498,10 +498,7 @@ impl Write for DynamicChunkWriter {
             self.chunk_offset += pos;
 
             if let Err(err) = self.write_chunk_buffer() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    err.to_string(),
-                ));
+                return Err(std::io::Error::other(err.to_string()));
             }
             Ok(pos)
         } else {
@@ -512,8 +509,7 @@ impl Write for DynamicChunkWriter {
     }
 
     fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(std::io::Error::other(
             "please use close() instead of flush()",
         ))
     }
@@ -649,11 +645,11 @@ impl<S: ReadChunk> BufferedDynamicReader<S> {
 
 impl<S: ReadChunk> std::io::Read for BufferedDynamicReader<S> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
-        use std::io::{Error, ErrorKind};
+        use std::io::Error;
 
         let data = match self.buffered_read(self.read_offset) {
             Ok(v) => v,
-            Err(err) => return Err(Error::new(ErrorKind::Other, err.to_string())),
+            Err(err) => return Err(Error::other(err.to_string())),
         };
 
         let n = if data.len() > buf.len() {
@@ -678,15 +674,12 @@ impl<S: ReadChunk> std::io::Seek for BufferedDynamicReader<S> {
             SeekFrom::Current(offset) => (self.read_offset as i64) + offset,
         };
 
-        use std::io::{Error, ErrorKind};
+        use std::io::Error;
         if (new_offset < 0) || (new_offset > (self.archive_size as i64)) {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "seek is out of range {} ([0..{}])",
-                    new_offset, self.archive_size
-                ),
-            ));
+            return Err(Error::other(format!(
+                "seek is out of range {} ([0..{}])",
+                new_offset, self.archive_size
+            )));
         }
         self.read_offset = new_offset as u64;
 

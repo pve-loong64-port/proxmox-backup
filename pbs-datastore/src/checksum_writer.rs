@@ -49,12 +49,9 @@ impl<W: Write> Write for ChecksumWriter<W> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
         self.hasher.update(buf);
         if let Some(ref mut signer) = self.signer {
-            signer.update(buf).map_err(|err| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("hmac update failed - {}", err),
-                )
-            })?;
+            signer
+                .update(buf)
+                .map_err(|err| std::io::Error::other(format!("hmac update failed - {}", err)))?;
         }
         self.writer.write(buf)
     }

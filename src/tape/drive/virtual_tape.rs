@@ -173,7 +173,7 @@ impl VirtualTapeHandle {
             }) => {
                 let index = self
                     .load_tape_index(name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 let new_pos = *pos + count;
                 if new_pos <= index.files {
@@ -183,7 +183,7 @@ impl VirtualTapeHandle {
                 }
 
                 self.store_status(&status)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 Ok(())
             }
@@ -204,7 +204,7 @@ impl VirtualTapeHandle {
                 }
 
                 self.store_status(&status)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 Ok(())
             }
@@ -251,7 +251,7 @@ impl TapeDriver for VirtualTapeHandle {
             }) => {
                 let index = self
                     .load_tape_index(name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 if file as usize > index.files {
                     bail!("invalid file nr");
@@ -260,7 +260,7 @@ impl TapeDriver for VirtualTapeHandle {
                 *pos = file as usize;
 
                 self.store_status(&status)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 Ok(())
             }
@@ -269,18 +269,18 @@ impl TapeDriver for VirtualTapeHandle {
     }
 
     fn read_next_file(&mut self) -> Result<Box<dyn TapeRead>, BlockReadError> {
-        let mut status = self.load_status().map_err(|err| {
-            BlockReadError::Error(io::Error::new(io::ErrorKind::Other, err.to_string()))
-        })?;
+        let mut status = self
+            .load_status()
+            .map_err(|err| BlockReadError::Error(io::Error::other(err.to_string())))?;
 
         match status.current_tape {
             Some(VirtualTapeStatus {
                 ref name,
                 ref mut pos,
             }) => {
-                let index = self.load_tape_index(name).map_err(|err| {
-                    BlockReadError::Error(io::Error::new(io::ErrorKind::Other, err.to_string()))
-                })?;
+                let index = self
+                    .load_tape_index(name)
+                    .map_err(|err| BlockReadError::Error(io::Error::other(err.to_string())))?;
 
                 if *pos >= index.files {
                     return Err(BlockReadError::EndOfStream);
@@ -290,9 +290,8 @@ impl TapeDriver for VirtualTapeHandle {
                 let file = std::fs::OpenOptions::new().read(true).open(path)?;
 
                 *pos += 1;
-                self.store_status(&status).map_err(|err| {
-                    BlockReadError::Error(io::Error::new(io::ErrorKind::Other, err.to_string()))
-                })?;
+                self.store_status(&status)
+                    .map_err(|err| BlockReadError::Error(io::Error::other(err.to_string())))?;
 
                 let reader = EmulateTapeReader::new(file);
                 let reader = BlockedReader::open(reader)?;
@@ -307,7 +306,7 @@ impl TapeDriver for VirtualTapeHandle {
     fn write_file(&mut self) -> Result<Box<dyn TapeWrite>, io::Error> {
         let mut status = self
             .load_status()
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+            .map_err(|err| io::Error::other(err.to_string()))?;
 
         match status.current_tape {
             Some(VirtualTapeStatus {
@@ -316,7 +315,7 @@ impl TapeDriver for VirtualTapeHandle {
             }) => {
                 let mut index = self
                     .load_tape_index(name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 for i in *pos..index.files {
                     let path = self.tape_file_path(name, i);
@@ -331,7 +330,7 @@ impl TapeDriver for VirtualTapeHandle {
                 index.files = *pos + 1;
 
                 self.store_tape_index(name, &index)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 let path = self.tape_file_path(name, *pos);
                 let file = std::fs::OpenOptions::new()
@@ -343,7 +342,7 @@ impl TapeDriver for VirtualTapeHandle {
                 *pos = index.files;
 
                 self.store_status(&status)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 let mut free_space = 0;
                 if used_space < self.max_size {
@@ -368,12 +367,12 @@ impl TapeDriver for VirtualTapeHandle {
             }) => {
                 let index = self
                     .load_tape_index(name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 *pos = index.files;
 
                 self.store_status(&status)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+                    .map_err(|err| io::Error::other(err.to_string()))?;
 
                 Ok(())
             }
