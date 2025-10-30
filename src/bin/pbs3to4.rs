@@ -77,6 +77,7 @@ impl Checker {
         Ok(())
     }
 
+    #[allow(clippy::absurd_extreme_comparisons)]
     fn check_meta_package_version(
         &mut self,
         pkg_versions: &[pbs_api_types::APTUpdateInfo],
