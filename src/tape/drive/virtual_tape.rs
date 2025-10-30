@@ -500,7 +500,7 @@ impl MediaChange for VirtualTapeHandle {
 
         let mut slots = Vec::new();
         let label_texts = self.online_media_label_texts()?;
-        let max_slots = ((label_texts.len() + 7) / 8) * 8;
+        let max_slots = label_texts.len().div_ceil(8) * 8;
 
         for i in 0..max_slots {
             let status = if let Some(label_text) = label_texts.get(i) {
