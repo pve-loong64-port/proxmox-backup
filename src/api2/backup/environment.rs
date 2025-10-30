@@ -480,11 +480,7 @@ impl BackupEnvironment {
         ));
 
         // account for zero chunk, which might be uploaded but never used
-        let client_side_duplicates = if chunk_count < upload_stat.count {
-            0
-        } else {
-            chunk_count - upload_stat.count
-        };
+        let client_side_duplicates = chunk_count.saturating_sub(upload_stat.count);
 
         let server_side_duplicates = upload_stat.duplicates;
 
