@@ -203,7 +203,7 @@ impl DirEntry {
 
     /// Check if DirEntry is a symlink
     pub fn is_symlink(&self) -> bool {
-        matches!(self.attr, DirEntryAttribute::Symlink { .. })
+        matches!(self.attr, DirEntryAttribute::Symlink)
     }
 }
 
