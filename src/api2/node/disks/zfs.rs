@@ -198,7 +198,7 @@ pub fn create_zpool(
     };
 
     // Sanity checks
-    if raidlevel == ZfsRaidLevel::Raid10 && devices.len() % 2 != 0 {
+    if raidlevel == ZfsRaidLevel::Raid10 && !devices.len().is_multiple_of(2) {
         bail!("Raid10 needs an even number of disks.");
     }
 
