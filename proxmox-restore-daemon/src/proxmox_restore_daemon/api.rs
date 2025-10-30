@@ -255,7 +255,7 @@ pub const API_METHOD_EXTRACT: ApiMethod = ApiMethod::new(
             (
                 "zstd",
                 true,
-                &BooleanSchema::new(concat!("if true, zstd compresses the result.",))
+                &BooleanSchema::new("if true, zstd compresses the result.")
                     .default(false)
                     .schema()
             ),
