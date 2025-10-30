@@ -25,7 +25,7 @@ fn main() {
         }
     };
 
-    let addr = format!("{}:8007", nodename);
+    let addr = format!("{nodename}:8007");
 
     let mut banner = format!(
         "
@@ -42,7 +42,7 @@ configure this server - connect to:
         Ok(saddrs) => {
             let saddrs: Vec<_> = saddrs
                 .filter_map(|s| match !s.ip().is_loopback() {
-                    true => Some(format!(" https://{}/", s)),
+                    true => Some(format!(" https://{s}/")),
                     false => None,
                 })
                 .collect();
@@ -51,12 +51,11 @@ configure this server - connect to:
                 saddrs.join("\n")
             } else {
                 format!(
-                    "hostname '{}' does not resolves to any non-loopback address",
-                    nodename
+                    "hostname '{nodename}' does not resolves to any non-loopback address"
                 )
             }
         }
-        Err(e) => format!("could not resolve hostname '{}': {}", nodename, e),
+        Err(e) => format!("could not resolve hostname '{nodename}': {e}"),
     };
     banner += &msg;
 

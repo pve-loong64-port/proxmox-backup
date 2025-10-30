@@ -85,7 +85,7 @@ pub fn complete_acl_path(_arg: &str, _param: &HashMap<String, String>) -> Vec<St
 
     if let Ok((data, _digest)) = config() {
         for id in data.sections.keys() {
-            list.push(format!("/datastore/{}", id));
+            list.push(format!("/datastore/{id}"));
         }
     }
 

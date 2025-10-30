@@ -46,7 +46,7 @@ fn main() -> Result<(), Error> {
             "config::acl::Role" => dump_enum_properties(&pbs_api_types::Role::API_SCHEMA)?,
             _ => bail!("docgen: got unknown type"),
         };
-        println!("{}", text);
+        println!("{text}");
     }
 
     Ok(())
@@ -346,13 +346,13 @@ pub fn dump_api_schema(router: &Router, path: &str) -> Value {
         }
         Some(SubRoute::MatchAll { router, param_name }) => {
             let sub_path = if path == "." {
-                format!("/{{{}}}", param_name)
+                format!("/{{{param_name}}}")
             } else {
-                format!("{}/{{{}}}", path, param_name)
+                format!("{path}/{{{param_name}}}")
             };
             let mut child = dump_api_schema(router, &sub_path);
             child["path"] = sub_path.into();
-            child["text"] = format!("{{{}}}", param_name).into();
+            child["text"] = format!("{{{param_name}}}").into();
 
             let children = vec![child];
             data["children"] = children.into();
@@ -363,9 +363,9 @@ pub fn dump_api_schema(router: &Router, path: &str) -> Value {
 
             for (key, sub_router) in dirmap.iter() {
                 let sub_path = if path == "." {
-                    format!("/{}", key)
+                    format!("/{key}")
                 } else {
-                    format!("{}/{}", path, key)
+                    format!("{path}/{key}")
                 };
                 let mut child = dump_api_schema(sub_router, &sub_path);
                 child["path"] = sub_path.into();

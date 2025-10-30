@@ -97,7 +97,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin> FuseLoopSession<R> {
     fn write_pidfile(path: &Path) -> Result<(), Error> {
         let pid = unsafe { libc::getpid() };
         let mut file = File::create(path)?;
-        write!(file, "{}", pid)?;
+        write!(file, "{pid}")?;
         Ok(())
     }
 
@@ -267,8 +267,7 @@ fn get_backing_file(loopdev: &str) -> Result<String, Error> {
     })?;
 
     let block_path = PathBuf::from(format!(
-        "/sys/devices/virtual/block/loop{}/loop/backing_file",
-        num
+        "/sys/devices/virtual/block/loop{num}/loop/backing_file"
     ));
     let backing_file = read_to_string(block_path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::NotFound {

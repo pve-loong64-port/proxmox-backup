@@ -138,12 +138,12 @@ pub async fn status(driver: Option<BlockDriverType>, param: Value) -> Result<(),
             continue;
         }
 
-        let drv_name = format!("{:?}", dt);
+        let drv_name = format!("{dt:?}");
         let drv = dt.resolve();
         match drv.status().await {
             Ok(data) if data.is_empty() => {
                 if text {
-                    println!("{}: no mappings", drv_name);
+                    println!("{drv_name}: no mappings");
                 } else {
                     ret[drv_name] = json!({});
                 }

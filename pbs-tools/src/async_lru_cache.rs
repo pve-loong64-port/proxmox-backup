@@ -126,7 +126,7 @@ mod test {
             key: i32,
         ) -> Box<dyn Future<Output = Result<Option<String>, Error>> + Send> {
             let x = self.prefix;
-            Box::new(async move { Ok(Some(format!("{}{}", x, key))) })
+            Box::new(async move { Ok(Some(format!("{x}{key}"))) })
         }
     }
 

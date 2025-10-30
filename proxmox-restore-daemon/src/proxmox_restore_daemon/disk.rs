@@ -394,7 +394,7 @@ impl DiskState {
             drive_info.insert(name.to_owned(), fidx.clone());
 
             // attempt to mount device directly
-            let dev_node = format!("/dev/{}", name);
+            let dev_node = format!("/dev/{name}");
             let size = Self::make_dev_node(&dev_node, sys_path)?;
             let mut dfs_bucket = Bucket::RawFs(PartitionBucketData {
                 dev_node: dev_node.clone(),
@@ -541,7 +541,7 @@ impl DiskState {
                     let metadata = metadata.trim_matches(&['[', ']'][..]);
                     info!("LVM: attempting to activate thinpool '{}'", metadata);
                     let mut cmd = Command::new("/sbin/lvchange");
-                    cmd.args(["-ay", "-y", &format!("{}/{}", vg_name, metadata)].iter());
+                    cmd.args(["-ay", "-y", &format!("{vg_name}/{metadata}")].iter());
                     if let Err(err) = run_command(cmd, None) {
                         // not critical, will simply mean its children can't be loaded
                         warn!("LVM: activating thinpool failed: {err}");

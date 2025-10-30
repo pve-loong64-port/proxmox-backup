@@ -33,7 +33,7 @@ pub(crate) fn perms_from_metadata(meta: &Metadata) -> Result<Mode, Error> {
         .context("couldn't narrow permission bits")
         .and_then(|mode| {
             Mode::from_bits(mode)
-                .with_context(|| format!("mode contains illegal bits: 0x{:x} (0o{:o})", mode, mode))
+                .with_context(|| format!("mode contains illegal bits: 0x{mode:x} (0o{mode:o})"))
         })
 }
 

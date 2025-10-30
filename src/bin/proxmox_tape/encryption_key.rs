@@ -244,7 +244,7 @@ async fn restore_key(
                 .ok_or_else(|| format_err!("cannot find key end marker below start marker"))?;
             &data_remain[..end]
         };
-        println!("key to import: {}", key);
+        println!("key to import: {key}");
         param["key"] = key.into();
     }
 
@@ -299,7 +299,7 @@ fn create_key(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), E
         _ => unreachable!(),
     };
 
-    println!("{}", fingerprint);
+    println!("{fingerprint}");
 
     Ok(())
 }

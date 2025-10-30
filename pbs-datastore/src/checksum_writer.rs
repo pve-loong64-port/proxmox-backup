@@ -51,7 +51,7 @@ impl<W: Write> Write for ChecksumWriter<W> {
         if let Some(ref mut signer) = self.signer {
             signer
                 .update(buf)
-                .map_err(|err| std::io::Error::other(format!("hmac update failed - {}", err)))?;
+                .map_err(|err| std::io::Error::other(format!("hmac update failed - {err}")))?;
         }
         self.writer.write(buf)
     }

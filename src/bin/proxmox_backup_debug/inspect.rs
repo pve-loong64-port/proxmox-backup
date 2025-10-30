@@ -210,7 +210,7 @@ fn inspect_chunk(
         if let Some(refs) = val["referenced-by"].as_array() {
             println!("referenced by:");
             for reference in refs {
-                println!("  {}", reference);
+                println!("  {reference}");
             }
         }
     } else {
@@ -313,15 +313,15 @@ fn inspect_file(
     if output_format == "text" {
         println!("size: {}", val["size"]);
         if let Some(encryption) = val["encryption"].as_str() {
-            println!("encryption: {}", encryption);
+            println!("encryption: {encryption}");
         }
         if let Some(ctime) = val["ctime"].as_str() {
-            println!("creation time: {}", ctime);
+            println!("creation time: {ctime}");
         }
         if let Some(chunks) = val["chunk-digests"].as_array() {
             println!("chunks:");
             for chunk in chunks {
-                println!("  {}", chunk);
+                println!("  {chunk}");
             }
         }
     } else {

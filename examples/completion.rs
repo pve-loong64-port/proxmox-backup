@@ -18,7 +18,7 @@ use proxmox_schema::*;
 ///
 /// Returns: nothing
 fn echo_command(text: String) -> Result<(), Error> {
-    println!("{}", text);
+    println!("{text}");
     Ok(())
 }
 

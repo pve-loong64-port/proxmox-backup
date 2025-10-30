@@ -5,7 +5,7 @@ use anyhow::Error;
 use pbs_client::pxar::*;
 
 fn run_test(dir_name: &str) -> Result<(), Error> {
-    println!("run pxar test {}", dir_name);
+    println!("run pxar test {dir_name}");
 
     Command::new("casync")
         .arg("make")
@@ -71,7 +71,7 @@ fn run_all_tests() -> Result<(), Error> {
 #[ignore]
 fn catar_simple() {
     if let Err(err) = run_all_tests() {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {err}");
         std::process::exit(1);
     }
 }

@@ -124,7 +124,7 @@ pub fn load_media(
     label_text: String,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
-    let job_id = format!("{}:{}", drive, label_text);
+    let job_id = format!("{drive}:{label_text}");
 
     let upid_str = run_drive_worker(
         rpcenv,
@@ -164,7 +164,7 @@ pub fn load_media(
 pub async fn load_slot(drive: String, source_slot: u64) -> Result<(), Error> {
     run_drive_blocking_task(
         drive.clone(),
-        format!("load from slot {}", source_slot),
+        format!("load from slot {source_slot}"),
         move |config| {
             let (mut changer, _) = required_media_changer(&config, &drive)?;
             changer.load_media_from_slot(source_slot)?;
@@ -198,7 +198,7 @@ pub async fn load_slot(drive: String, source_slot: u64) -> Result<(), Error> {
 pub async fn export_media(drive: String, label_text: String) -> Result<u64, Error> {
     run_drive_blocking_task(
         drive.clone(),
-        format!("export media {}", label_text),
+        format!("export media {label_text}"),
         move |config| {
             let (mut changer, changer_name) = required_media_changer(&config, &drive)?;
             match changer.export_media(&label_text)? {

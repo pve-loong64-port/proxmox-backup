@@ -135,7 +135,7 @@ impl ChunkStore {
 
         for i in 0..64 * 1024 {
             let mut l1path = chunk_dir.clone();
-            l1path.push(format!("{:04x}", i));
+            l1path.push(format!("{i:04x}"));
             if let Err(err) = create_dir(&l1path, options) {
                 bail!(
                     "unable to create chunk store '{}' subdir {:?} - {}",
@@ -320,7 +320,7 @@ impl ChunkStore {
                     return None;
                 }
 
-                let subdir: &str = &format!("{:04x}", at);
+                let subdir: &str = &format!("{at:04x}");
                 percentage = (at * 100) / 0x10000;
                 at += 1;
                 match proxmox_sys::fs::read_subdir(base_handle.as_raw_fd(), subdir) {
@@ -750,7 +750,7 @@ impl ChunkStore {
         // Check all .chunks subdirectories
         for i in 0..64 * 1024 {
             let mut l1path = chunk_dir.clone();
-            l1path.push(format!("{:04x}", i));
+            l1path.push(format!("{i:04x}"));
             ChunkStore::check_permissions(&l1path, 0o750)?;
         }
 

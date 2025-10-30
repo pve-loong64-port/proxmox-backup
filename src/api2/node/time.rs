@@ -88,7 +88,7 @@ fn get_time(_param: Value) -> Result<Value, Error> {
 )]
 /// Set time zone
 fn set_timezone(timezone: String, _param: Value) -> Result<Value, Error> {
-    let path = std::path::PathBuf::from(format!("/usr/share/zoneinfo/{}", timezone));
+    let path = std::path::PathBuf::from(format!("/usr/share/zoneinfo/{timezone}"));
 
     if !path.exists() {
         bail!("No such timezone.");

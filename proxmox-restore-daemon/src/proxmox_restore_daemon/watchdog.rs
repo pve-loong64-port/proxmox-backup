@@ -13,7 +13,7 @@ fn handle_expired() -> ! {
     use nix::sys::reboot;
     println!("watchdog expired, shutting down");
     let err = reboot::reboot(reboot::RebootMode::RB_POWER_OFF).unwrap_err();
-    println!("'reboot' syscall failed: {}", err);
+    println!("'reboot' syscall failed: {err}");
     std::process::exit(1);
 }
 

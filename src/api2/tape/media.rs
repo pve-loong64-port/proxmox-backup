@@ -134,7 +134,7 @@ pub async fn list_media(
             if let Err(err) =
                 update_online_status(TAPE_STATUS_DIR, update_status_changer.as_deref())
             {
-                eprintln!("{}", err);
+                eprintln!("{err}");
                 eprintln!("update online media status failed - using old state");
             }
         }

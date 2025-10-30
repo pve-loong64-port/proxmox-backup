@@ -110,7 +110,7 @@ fn paperkey_html<W: Write>(
     writeln!(output, "<body>")?;
 
     if let Some(subject) = subject {
-        writeln!(output, "<p>Subject: {}</p>", subject)?;
+        writeln!(output, "<p>Subject: {subject}</p>")?;
     }
 
     if is_master {
@@ -136,10 +136,9 @@ fn paperkey_html<W: Write>(
             writeln!(output, "<img")?;
             writeln!(
                 output,
-                "width=\"{}pt\" height=\"{}pt\"",
-                img_size_pt, img_size_pt
+                "width=\"{img_size_pt}pt\" height=\"{img_size_pt}pt\""
             )?;
-            writeln!(output, "src=\"data:image/svg+xml;base64,{}\"/>", qr_code)?;
+            writeln!(output, "src=\"data:image/svg+xml;base64,{qr_code}\"/>")?;
             writeln!(output, "</center>")?;
             writeln!(output, "</div>")?;
         }
@@ -156,7 +155,7 @@ fn paperkey_html<W: Write>(
     writeln!(output, "-----BEGIN PROXMOX BACKUP KEY-----")?;
 
     for line in lines {
-        writeln!(output, "{}", line)?;
+        writeln!(output, "{line}")?;
     }
 
     writeln!(output, "-----END PROXMOX BACKUP KEY-----")?;
@@ -170,10 +169,9 @@ fn paperkey_html<W: Write>(
     writeln!(output, "<img")?;
     writeln!(
         output,
-        "width=\"{}pt\" height=\"{}pt\"",
-        img_size_pt, img_size_pt
+        "width=\"{img_size_pt}pt\" height=\"{img_size_pt}pt\""
     )?;
-    writeln!(output, "src=\"data:image/svg+xml;base64,{}\"/>", qr_code)?;
+    writeln!(output, "src=\"data:image/svg+xml;base64,{qr_code}\"/>")?;
     writeln!(output, "</center>")?;
 
     writeln!(output, "</div>")?;
@@ -191,7 +189,7 @@ fn paperkey_text<W: Write>(
     is_private: bool,
 ) -> Result<(), Error> {
     if let Some(subject) = subject {
-        writeln!(output, "Subject: {}\n", subject)?;
+        writeln!(output, "Subject: {subject}\n")?;
     }
 
     if is_private {
@@ -204,7 +202,7 @@ fn paperkey_text<W: Write>(
             let qr_code = generate_qr_code("utf8i", block)?;
             let qr_code = String::from_utf8(qr_code)
                 .map_err(|_| format_err!("Failed to read qr code (got non-utf8 data)"))?;
-            writeln!(output, "{}", qr_code)?;
+            writeln!(output, "{qr_code}")?;
             writeln!(output, "{}", char::from(12u8))?; // page break
         }
         return Ok(());
@@ -212,7 +210,7 @@ fn paperkey_text<W: Write>(
 
     writeln!(output, "-----BEGIN PROXMOX BACKUP KEY-----")?;
     for line in lines {
-        writeln!(output, "{}", line)?;
+        writeln!(output, "{line}")?;
     }
     writeln!(output, "-----END PROXMOX BACKUP KEY-----")?;
 
@@ -220,7 +218,7 @@ fn paperkey_text<W: Write>(
     let qr_code = String::from_utf8(qr_code)
         .map_err(|_| format_err!("Failed to read qr code (got non-utf8 data)"))?;
 
-    writeln!(output, "{}", qr_code)?;
+    writeln!(output, "{qr_code}")?;
 
     Ok(())
 }

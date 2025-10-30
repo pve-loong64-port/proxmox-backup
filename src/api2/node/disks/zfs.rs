@@ -235,7 +235,7 @@ pub fn create_zpool(
             command.args([
                 "create",
                 "-o",
-                &format!("ashift={}", ashift),
+                &format!("ashift={ashift}"),
                 "-m",
                 &mount_point,
                 &name,

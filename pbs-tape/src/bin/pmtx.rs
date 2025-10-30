@@ -290,11 +290,11 @@ fn status(param: Value) -> Result<(), Error> {
 
     for (i, drive) in status.drives.iter().enumerate() {
         let loaded_txt = match drive.loaded_slot {
-            Some(slot) => format!(", Source: {}", slot),
+            Some(slot) => format!(", Source: {slot}"),
             None => String::new(),
         };
         let serial_txt = match drive.drive_serial_number {
-            Some(ref serial) => format!(", Serial: {}", serial),
+            Some(ref serial) => format!(", Serial: {serial}"),
             None => String::new(),
         };
 
@@ -441,7 +441,7 @@ fn main() -> Result<(), Error> {
         );
 
     let mut rpcenv = CliEnvironment::new();
-    rpcenv.set_auth_id(Some(format!("{}@pam", username)));
+    rpcenv.set_auth_id(Some(format!("{username}@pam")));
 
     run_cli_command(cmd_def, rpcenv, None);
 

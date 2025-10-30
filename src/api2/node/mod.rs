@@ -302,7 +302,7 @@ fn upgrade_to_websocket(
                 _ => bail!("error"),
             };
 
-            let local = tokio::net::TcpStream::connect(format!("localhost:{}", port)).await?;
+            let local = tokio::net::TcpStream::connect(format!("localhost:{port}")).await?;
             ws.serve_connection(TokioIo::new(conn), local).await
         });
 

@@ -96,7 +96,7 @@ pub fn linux_tape_changer_list() -> Vec<TapeDeviceInfo> {
             .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
-        let dev_path = format!("/dev/tape/by-id/scsi-{}", serial);
+        let dev_path = format!("/dev/tape/by-id/scsi-{serial}");
 
         if PathBuf::from(&dev_path).exists() {
             list.push(TapeDeviceInfo {
@@ -194,7 +194,7 @@ pub fn lto_tape_device_list() -> Vec<TapeDeviceInfo> {
             .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
-        let dev_path = format!("/dev/tape/by-id/scsi-{}-sg", serial);
+        let dev_path = format!("/dev/tape/by-id/scsi-{serial}-sg");
 
         if PathBuf::from(&dev_path).exists() {
             list.push(TapeDeviceInfo {

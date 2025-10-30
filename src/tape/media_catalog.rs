@@ -505,7 +505,7 @@ impl MediaCatalog {
         };
 
         if self.log_to_stdout {
-            println!("L|{}|{}", file_number, uuid);
+            println!("L|{file_number}|{uuid}");
         }
 
         self.pending.push(b'L');
@@ -605,7 +605,7 @@ impl MediaCatalog {
         };
 
         if self.log_to_stdout {
-            println!("A|{}|{}|{}", file_number, uuid, store);
+            println!("A|{file_number}|{uuid}|{store}");
         }
 
         self.pending.push(b'A');
@@ -652,7 +652,7 @@ impl MediaCatalog {
                 };
 
                 if self.log_to_stdout {
-                    println!("E|{}|{}\n", file_number, uuid);
+                    println!("E|{file_number}|{uuid}\n");
                 }
 
                 self.pending.push(b'E');
@@ -717,7 +717,7 @@ impl MediaCatalog {
         };
 
         if self.log_to_stdout {
-            println!("S|{}|{}|{}:{}", file_number, uuid, store, path,);
+            println!("S|{file_number}|{uuid}|{store}:{path}",);
         }
 
         self.pending.push(b'S');

@@ -89,7 +89,7 @@ pub struct TfaUserChallengeData {
 }
 
 fn challenge_data_path_str(userid: &str) -> PathBuf {
-    PathBuf::from(format!("{}/{}", CHALLENGE_DATA_PATH, userid))
+    PathBuf::from(format!("{CHALLENGE_DATA_PATH}/{userid}"))
 }
 
 impl TfaUserChallengeData {
@@ -236,8 +236,7 @@ impl proxmox_tfa::api::OpenUserChallengeData for UserAccess {
                 Ok(inner) => inner,
                 Err(err) => {
                     eprintln!(
-                        "failed to parse challenge data for user {}: {}",
-                        userid, err
+                        "failed to parse challenge data for user {userid}: {err}"
                     );
                     Default::default()
                 }

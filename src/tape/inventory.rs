@@ -785,7 +785,7 @@ impl Inventory {
 /// Lock a media pool
 pub fn lock_media_pool<P: AsRef<Path>>(base_path: P, name: &str) -> Result<BackupLockGuard, Error> {
     let mut path = base_path.as_ref().to_owned();
-    path.push(format!(".pool-{}", name));
+    path.push(format!(".pool-{name}"));
     path.set_extension("lck");
 
     open_backup_lockfile(&path, None, true)
@@ -806,7 +806,7 @@ pub fn lock_media_set<P: AsRef<Path>>(
     timeout: Option<Duration>,
 ) -> Result<BackupLockGuard, Error> {
     let mut path = base_path.as_ref().to_owned();
-    path.push(format!(".media-set-{}", media_set_uuid));
+    path.push(format!(".media-set-{media_set_uuid}"));
     path.set_extension("lck");
 
     open_backup_lockfile(&path, timeout, true)
@@ -881,7 +881,7 @@ pub fn complete_media_set_snapshots(_arg: &str, param: &HashMap<String, String>)
 
         for (store, content) in catalog.content() {
             for snapshot in content.snapshot_index.keys() {
-                res.push(format!("{}:{}", store, snapshot));
+                res.push(format!("{store}:{snapshot}"));
             }
         }
     }

@@ -189,26 +189,26 @@ pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: 
 
 fn update_disk_metrics(disk: &DiskStat, rrd_prefix: &str) {
     if let Some(status) = &disk.usage {
-        let rrd_key = format!("{}/total", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/total");
         update_gauge(&rrd_key, status.total as f64);
-        let rrd_key = format!("{}/used", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/used");
         update_gauge(&rrd_key, status.used as f64);
-        let rrd_key = format!("{}/available", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/available");
         update_gauge(&rrd_key, status.available as f64);
     }
 
     if let Some(stat) = &disk.dev {
-        let rrd_key = format!("{}/read_ios", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/read_ios");
         update_derive(&rrd_key, stat.read_ios as f64);
-        let rrd_key = format!("{}/read_bytes", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/read_bytes");
         update_derive(&rrd_key, (stat.read_sectors * 512) as f64);
 
-        let rrd_key = format!("{}/write_ios", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/write_ios");
         update_derive(&rrd_key, stat.write_ios as f64);
-        let rrd_key = format!("{}/write_bytes", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/write_bytes");
         update_derive(&rrd_key, (stat.write_sectors * 512) as f64);
 
-        let rrd_key = format!("{}/io_ticks", rrd_prefix);
+        let rrd_key = format!("{rrd_prefix}/io_ticks");
         update_derive(&rrd_key, (stat.io_ticks as f64) / 1000.0);
     }
 }

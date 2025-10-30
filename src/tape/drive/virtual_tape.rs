@@ -78,13 +78,13 @@ impl VirtualTapeHandle {
 
     fn tape_index_path(&self, tape_name: &str) -> std::path::PathBuf {
         let mut path = self.path.clone();
-        path.push(format!("tape-{}.json", tape_name));
+        path.push(format!("tape-{tape_name}.json"));
         path
     }
 
     fn tape_file_path(&self, tape_name: &str, pos: usize) -> std::path::PathBuf {
         let mut path = self.path.clone();
-        path.push(format!("tapefile-{}-{}.json", pos, tape_name));
+        path.push(format!("tapefile-{pos}-{tape_name}.json"));
         path
     }
 
@@ -549,11 +549,11 @@ impl MediaChange for VirtualTapeHandle {
     /// We automatically create an empty virtual tape here (if it does
     /// not exist already)
     fn load_media(&mut self, label: &str) -> Result<MtxStatus, Error> {
-        let name = format!("tape-{}.json", label);
+        let name = format!("tape-{label}.json");
         let mut path = self.path.clone();
         path.push(&name);
         if !path.exists() {
-            eprintln!("unable to find tape {} - creating file {:?}", label, path);
+            eprintln!("unable to find tape {label} - creating file {path:?}");
             let index = TapeIndex { files: 0 };
             self.store_tape_index(label, &index)?;
         }

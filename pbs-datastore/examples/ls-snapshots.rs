@@ -21,7 +21,7 @@ fn run() -> Result<(), Error> {
     let store = unsafe { DataStore::open_path("", base, None)? };
 
     for ns in store.recursive_iter_backup_ns_ok(Default::default(), max_depth)? {
-        println!("found namespace store:/{}", ns);
+        println!("found namespace store:/{ns}");
 
         for group in store.iter_backup_groups(ns)? {
             let group = group?;
@@ -41,7 +41,7 @@ fn main() {
     std::process::exit(match run() {
         Ok(_) => 0,
         Err(err) => {
-            eprintln!("error: {}", err);
+            eprintln!("error: {err}");
             1
         }
     });

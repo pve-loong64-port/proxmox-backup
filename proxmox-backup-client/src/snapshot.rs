@@ -321,7 +321,7 @@ async fn show_notes(param: Value) -> Result<Value, Error> {
 
     if output_format == "text" {
         if let Some(notes) = notes.as_str() {
-            println!("{}", notes);
+            println!("{notes}");
         }
     } else {
         format_and_print_result(
@@ -420,7 +420,7 @@ async fn show_protection(param: Value) -> Result<(), Error> {
 
     if output_format == "text" {
         if let Some(protected) = protected.as_bool() {
-            println!("{}", protected);
+            println!("{protected}");
         }
     } else {
         format_and_print_result(

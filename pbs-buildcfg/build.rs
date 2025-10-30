@@ -8,10 +8,10 @@ fn main() {
         Err(_) => match Command::new("git").args(["rev-parse", "HEAD"]).output() {
             Ok(output) => String::from_utf8(output.stdout).unwrap(),
             Err(err) => {
-                panic!("git rev-parse failed: {}", err);
+                panic!("git rev-parse failed: {err}");
             }
         },
     };
 
-    println!("cargo:rustc-env=REPOID={}", repoid);
+    println!("cargo:rustc-env=REPOID={repoid}");
 }

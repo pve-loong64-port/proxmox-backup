@@ -463,7 +463,7 @@ impl Shell {
         )
         .await?;
         let path = Self::format_path_stack(&stack);
-        println!("{:?}", path);
+        println!("{path:?}");
         Ok(())
     }
 
@@ -862,9 +862,9 @@ impl Shell {
         let path = Self::format_path_stack(&stack);
         let entry = MatchEntry::include(MatchPattern::Literal(path.as_bytes().to_vec()));
         if self.selected.insert(path.clone(), entry).is_some() {
-            println!("path already selected: {:?}", path);
+            println!("path already selected: {path:?}");
         } else {
-            println!("added path: {:?}", path);
+            println!("added path: {path:?}");
         }
 
         Ok(())
@@ -883,9 +883,9 @@ impl Shell {
         let path = Self::format_path_stack(&stack);
 
         if self.selected.remove(&path).is_some() {
-            println!("removed path from selection: {:?}", path);
+            println!("removed path from selection: {path:?}");
         } else {
-            println!("path not selected: {:?}", path);
+            println!("path not selected: {path:?}");
         }
 
         Ok(())
@@ -907,7 +907,7 @@ impl Shell {
 
     async fn list_selected_patterns(&self) -> Result<(), Error> {
         for entry in self.selected.keys() {
-            println!("{:?}", entry);
+            println!("{entry:?}");
         }
         Ok(())
     }

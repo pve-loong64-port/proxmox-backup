@@ -501,7 +501,7 @@ impl AcmeClient {
         } else {
             req_builder.body(Body::empty())
         }
-        .map_err(|err| Error::Custom(format!("failed to create http request: {}", err)))?;
+        .map_err(|err| Error::Custom(format!("failed to create http request: {err}")))?;
 
         let response = http_client
             .request(http_request)
@@ -513,14 +513,13 @@ impl AcmeClient {
         let body = body
             .collect()
             .await
-            .map_err(|err| Error::Custom(format!("failed to retrieve response body: {}", err)))?
+            .map_err(|err| Error::Custom(format!("failed to retrieve response body: {err}")))?
             .to_bytes();
 
         let got_nonce = if let Some(new_nonce) = parts.headers.get(proxmox_acme::REPLAY_NONCE) {
             let new_nonce = new_nonce.to_str().map_err(|err| {
                 Error::Client(format!(
-                    "received invalid replay-nonce header from ACME server: {}",
-                    err
+                    "received invalid replay-nonce header from ACME server: {err}"
                 ))
             })?;
             *nonce = Some(new_nonce.to_owned());
@@ -543,8 +542,7 @@ impl AcmeClient {
                 .map(|header| {
                     header.to_str().map(str::to_owned).map_err(|err| {
                         Error::Client(format!(
-                            "received invalid location header from ACME server: {}",
-                            err
+                            "received invalid location header from ACME server: {err}"
                         ))
                     })
                 })
@@ -559,8 +557,7 @@ impl AcmeClient {
 
         let error: ErrorResponse = serde_json::from_slice(&body).map_err(|err| {
             Error::Client(format!(
-                "error status with improper error ACME response: {}",
-                err
+                "error status with improper error ACME response: {err}"
             ))
         })?;
 

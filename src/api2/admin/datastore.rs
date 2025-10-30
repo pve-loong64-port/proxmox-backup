@@ -898,7 +898,7 @@ pub fn prune(
         &group,
     )?;
 
-    let worker_id = format!("{}:{}:{}", store, ns, group);
+    let worker_id = format!("{store}:{ns}:{group}");
     let group = datastore.backup_group(ns.clone(), group);
 
     #[derive(Debug, serde::Serialize)]
@@ -1077,7 +1077,7 @@ pub fn prune_datastore(
 
     let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
     let ns = prune_options.ns.clone().unwrap_or_default();
-    let worker_id = format!("{}:{}", store, ns);
+    let worker_id = format!("{store}:{ns}");
 
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
@@ -1430,7 +1430,7 @@ pub fn download_file_decoded(
                     .context("creating local chunk reader failed")?;
                 let reader = CachedChunkReader::new(chunk_reader, index, 1).seekable();
                 Body::wrap_stream(AsyncReaderStream::new(reader).map_err(move |err| {
-                    eprintln!("error during streaming of '{:?}' - {}", path, err);
+                    eprintln!("error during streaming of '{path:?}' - {err}");
                     err
                 }))
             }
@@ -1448,7 +1448,7 @@ pub fn download_file_decoded(
                 Body::wrap_stream(
                     AsyncReaderStream::with_buffer_size(reader, 4 * 1024 * 1024).map_err(
                         move |err| {
-                            eprintln!("error during streaming of '{:?}' - {}", path, err);
+                            eprintln!("error during streaming of '{path:?}' - {err}");
                             err
                         },
                     ),
@@ -1463,7 +1463,7 @@ pub fn download_file_decoded(
                 Body::wrap_stream(
                     WrappedReaderStream::new(DataBlobReader::new(file, None)?).map_err(
                         move |err| {
-                            eprintln!("error during streaming of '{:?}' - {}", path, err);
+                            eprintln!("error during streaming of '{path:?}' - {err}");
                             err
                         },
                     ),
@@ -1802,14 +1802,14 @@ pub fn pxar_file_download(
         let body = match file.kind() {
             EntryKind::File { .. } => Body::wrap_stream(
                 AsyncReaderStream::new(file.contents().await?).map_err(move |err| {
-                    eprintln!("error during streaming of file '{:?}' - {}", filepath, err);
+                    eprintln!("error during streaming of file '{filepath:?}' - {err}");
                     err
                 }),
             ),
             EntryKind::Hardlink(_) => Body::wrap_stream(
                 AsyncReaderStream::new(decoder.follow_hardlink(&file).await?.contents().await?)
                     .map_err(move |err| {
-                        eprintln!("error during streaming of hardlink '{:?}' - {}", path, err);
+                        eprintln!("error during streaming of hardlink '{path:?}' - {err}");
                         err
                     }),
             ),
@@ -1897,7 +1897,7 @@ pub fn get_rrd_stats(
         _ => rrd_fields.push("io_ticks"),
     };
 
-    create_value_from_rrd(&format!("datastore/{}", store), &rrd_fields, timeframe, cf)
+    create_value_from_rrd(&format!("datastore/{store}"), &rrd_fields, timeframe, cf)
 }
 
 #[api(

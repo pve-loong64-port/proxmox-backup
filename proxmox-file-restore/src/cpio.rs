@@ -76,7 +76,7 @@ pub async fn append_trailer<W: AsyncWrite + Unpin>(target: W) -> Result<(), Erro
 
 async fn print_cpio_hex<W: AsyncWrite + Unpin>(target: &mut W, value: u64) -> Result<(), Error> {
     target
-        .write_all(format!("{:08x}", value).as_bytes())
+        .write_all(format!("{value:08x}").as_bytes())
         .await
         .map_err(|e| e.into())
 }

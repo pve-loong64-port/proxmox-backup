@@ -85,7 +85,7 @@ mod test {
  timeframe fri 9:00-12:00
 ";
         let data = CONFIG.parse(TRAFFIC_CONTROL_CFG_FILENAME, content)?;
-        eprintln!("GOT {:?}", data);
+        eprintln!("GOT {data:?}");
 
         Ok(())
     }

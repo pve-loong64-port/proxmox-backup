@@ -381,7 +381,7 @@ fn test_parse(output: &str) -> Result<(), Error> {
     let mut found_config = false;
 
     for (k, v) in parse_zpool_status(output)? {
-        println!("<{}> => '{}'", k, v);
+        println!("<{k}> => '{v}'");
         if k == "config" {
             let vdev_list = parse_zpool_status_config_tree(&v)?;
             let _tree = vdev_list_to_tree(&vdev_list);

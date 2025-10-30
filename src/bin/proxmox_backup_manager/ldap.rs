@@ -102,7 +102,7 @@ pub async fn sync_ldap_realm(param: Value) -> Result<Value, Error> {
     let realm = required_string_param(&param, "realm")?;
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/access/domains/{}/sync", realm);
+    let path = format!("api2/json/access/domains/{realm}/sync");
     let result = client.post(&path, Some(param)).await?;
     view_task_result(&client, result, "text").await?;
 

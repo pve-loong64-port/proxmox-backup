@@ -101,7 +101,7 @@ fn stop() {
     use nix::sys::reboot;
     println!("/stop called, shutting down");
     let err = reboot::reboot(reboot::RebootMode::RB_POWER_OFF).unwrap_err();
-    println!("'reboot' syscall failed: {}", err);
+    println!("'reboot' syscall failed: {err}");
     std::process::exit(1);
 }
 

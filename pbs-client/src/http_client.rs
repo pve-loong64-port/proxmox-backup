@@ -380,8 +380,8 @@ fn build_uri(server: &str, port: u16, path: &str, query: Option<String>) -> Resu
         .scheme("https")
         .authority(build_authority(server, port)?)
         .path_and_query(match query {
-            Some(query) => format!("/{}?{}", path, query),
-            None => format!("/{}", path),
+            Some(query) => format!("/{path}?{query}"),
+            None => format!("/{path}"),
         })
         .build()
         .map_err(|err| format_err!("error building uri - {}", err))
@@ -635,7 +635,7 @@ impl HttpClient {
     fn get_password(username: &Userid, interactive: bool) -> Result<String, Error> {
         // If we're on a TTY, query the user for a password
         if interactive && std::io::stdin().is_terminal() {
-            let msg = format!("Password for \"{}\": ", username);
+            let msg = format!("Password for \"{username}\": ");
             return Ok(String::from_utf8(tty::read_password(&msg)?)?);
         }
 

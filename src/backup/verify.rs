@@ -82,7 +82,7 @@ impl VerifyWorker {
         let mut counter = 0;
         let mut new_path = path.clone();
         loop {
-            new_path.set_file_name(format!("{}.{}.bad", digest_str, counter));
+            new_path.set_file_name(format!("{digest_str}.{counter}.bad"));
             if new_path.exists() && counter < 9 {
                 counter += 1;
             } else {
@@ -101,7 +101,7 @@ impl VerifyWorker {
         };
 
         if let DatastoreBackend::S3(s3_client) = backend {
-            let suffix = format!(".{}.bad", counter);
+            let suffix = format!(".{counter}.bad");
             let target_key =
                 match pbs_datastore::s3::object_key_from_digest_with_suffix(digest, &suffix) {
                     Ok(target_key) => target_key,

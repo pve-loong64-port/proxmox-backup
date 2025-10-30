@@ -67,7 +67,7 @@ async fn run() -> Result<(), Error> {
 
 fn main() {
     if let Err(err) = proxmox_async::runtime::main(run()) {
-        eprintln!("ERROR: {}", err);
+        eprintln!("ERROR: {err}");
     }
     println!("DONE");
 }

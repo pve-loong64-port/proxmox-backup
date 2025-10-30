@@ -83,7 +83,7 @@ pub fn list_datastore_mounts() -> Result<Vec<DatastoreMountInfo>, Error> {
         let item = item?;
         let name = item.file_name().to_string_lossy().to_string();
 
-        let unitfile = format!("{}/{}", basedir, name);
+        let unitfile = format!("{basedir}/{name}");
         let config = systemd::config::parse_systemd_mount(&unitfile)?;
         let data: SystemdMountSection = config.lookup("Mount", "Mount")?;
 
@@ -227,7 +227,7 @@ pub fn create_datastore_disk(
             create_file_system(&partition, filesystem)?;
 
             let uuid = get_fs_uuid(&partition)?;
-            let uuid_path = format!("/dev/disk/by-uuid/{}", uuid);
+            let uuid_path = format!("/dev/disk/by-uuid/{uuid}");
 
             if !removable_datastore {
                 let mount_unit_name =
@@ -283,7 +283,7 @@ pub fn create_datastore_disk(
 )]
 /// Remove a Filesystem mounted under `/mnt/datastore/<name>`.
 pub fn delete_datastore_disk(name: String) -> Result<(), Error> {
-    let path = format!("{}/{}", DATASTORE_MOUNT_DIR, name);
+    let path = format!("{DATASTORE_MOUNT_DIR}/{name}");
     // path of datastore cannot be changed
     let (config, _) = pbs_config::datastore::config()?;
     let datastores: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
@@ -304,7 +304,7 @@ pub fn delete_datastore_disk(name: String) -> Result<(), Error> {
     crate::tools::systemd::disable_unit(&mount_unit_name)?;
 
     // delete .mount-file
-    let mount_unit_path = format!("/etc/systemd/system/{}", mount_unit_name);
+    let mount_unit_path = format!("/etc/systemd/system/{mount_unit_name}");
     let full_path = std::path::Path::new(&mount_unit_path);
     log::info!("removing systemd mount unit {:?}", full_path);
     std::fs::remove_file(full_path)?;
@@ -349,8 +349,7 @@ fn create_datastore_mount_unit(
 
     let unit = SystemdUnitSection {
         Description: format!(
-            "Mount datatstore '{}' under '{}'",
-            datastore_name, mount_point
+            "Mount datatstore '{datastore_name}' under '{mount_point}'"
         ),
         ..Default::default()
     };

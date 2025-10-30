@@ -105,7 +105,7 @@ pub fn apply(
     path_info: &Path,
     on_error: &mut (dyn FnMut(Error) -> Result<(), Error> + Send),
 ) -> Result<(), Error> {
-    let c_proc_path = CString::new(format!("/proc/self/fd/{}", fd)).unwrap();
+    let c_proc_path = CString::new(format!("/proc/self/fd/{fd}")).unwrap();
     apply_ownership(flags, c_proc_path.as_ptr(), metadata, &mut *on_error)?;
 
     let mut skip_xattrs = false;

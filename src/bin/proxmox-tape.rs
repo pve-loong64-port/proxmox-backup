@@ -41,7 +41,7 @@ use proxmox_tape::*;
 async fn get_backup_groups(store: &str) -> Result<Vec<GroupListItem>, Error> {
     let client = connect_to_localhost()?;
     let api_res = client
-        .get(&format!("api2/json/admin/datastore/{}/groups", store), None)
+        .get(&format!("api2/json/admin/datastore/{store}/groups"), None)
         .await?;
 
     match api_res.get("data") {
@@ -134,7 +134,7 @@ async fn format_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/format-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/format-media");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -166,7 +166,7 @@ async fn rewind(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/rewind", drive);
+    let path = format!("api2/json/tape/drive/{drive}/rewind");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -198,7 +198,7 @@ async fn eject_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/eject-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/eject-media");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -233,7 +233,7 @@ async fn load_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/load-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/load-media");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -262,7 +262,7 @@ async fn export_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/export-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/export-media");
     client.put(&path, Some(param)).await?;
 
     Ok(())
@@ -291,7 +291,7 @@ async fn load_media_from_slot(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/load-slot", drive);
+    let path = format!("api2/json/tape/drive/{drive}/load-slot");
     client.post(&path, Some(param)).await?;
 
     Ok(())
@@ -327,7 +327,7 @@ async fn unload_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/unload", drive);
+    let path = format!("api2/json/tape/drive/{drive}/unload");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -366,7 +366,7 @@ async fn label_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/label-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/label-media");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -403,7 +403,7 @@ async fn read_label(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/read-label", drive);
+    let path = format!("api2/json/tape/drive/{drive}/read-label");
     let mut result = client.get(&path, Some(param)).await?;
     let mut data = result["data"].take();
 
@@ -471,7 +471,7 @@ async fn inventory(
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/inventory", drive);
+    let path = format!("api2/json/tape/drive/{drive}/inventory");
 
     if do_read {
         let mut param = json!({});
@@ -524,7 +524,7 @@ async fn barcode_label_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/barcode-label-media", drive);
+    let path = format!("api2/json/tape/drive/{drive}/barcode-label-media");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -590,7 +590,7 @@ fn debug_scan(mut param: Value) -> Result<(), Error> {
 
         match drive.read_next_file() {
             Err(BlockReadError::EndOfFile) => {
-                println!("filemark number {}", file_number);
+                println!("filemark number {file_number}");
                 continue;
             }
             Err(BlockReadError::EndOfStream) => {
@@ -601,7 +601,7 @@ fn debug_scan(mut param: Value) -> Result<(), Error> {
                 return Err(err.into());
             }
             Ok(mut reader) => {
-                println!("got file number {}", file_number);
+                println!("got file number {file_number}");
 
                 let header: Result<MediaContentHeader, _> = unsafe { reader.read_le_value() };
                 match header {
@@ -613,7 +613,7 @@ fn debug_scan(mut param: Value) -> Result<(), Error> {
                             );
                         } else if let Some(name) = proxmox_tape_magic_to_text(&header.content_magic)
                         {
-                            println!("got content header: {}", name);
+                            println!("got content header: {name}");
                             println!("  uuid:  {}", header.content_uuid());
                             println!("  ctime: {}", strftime_local("%c", header.ctime)?);
                             println!("  hsize: {}", HumanByte::from(header.size as usize));
@@ -623,7 +623,7 @@ fn debug_scan(mut param: Value) -> Result<(), Error> {
                         }
                     }
                     Err(err) => {
-                        println!("unable to read content header - {}", err);
+                        println!("unable to read content header - {err}");
                     }
                 }
                 let bytes = reader.skip_data()?;
@@ -664,7 +664,7 @@ async fn cartridge_memory(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/cartridge-memory", drive);
+    let path = format!("api2/json/tape/drive/{drive}/cartridge-memory");
     let mut result = client.get(&path, Some(param)).await?;
     let mut data = result["data"].take();
 
@@ -703,7 +703,7 @@ async fn volume_statistics(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/volume-statistics", drive);
+    let path = format!("api2/json/tape/drive/{drive}/volume-statistics");
     let mut result = client.get(&path, Some(param)).await?;
     let mut data = result["data"].take();
 
@@ -740,7 +740,7 @@ async fn status(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/status", drive);
+    let path = format!("api2/json/tape/drive/{drive}/status");
     let mut result = client.get(&path, Some(param)).await?;
     let mut data = result["data"].take();
 
@@ -798,7 +798,7 @@ async fn clean_drive(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/clean", drive);
+    let path = format!("api2/json/tape/drive/{drive}/clean");
     let result = client.put(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;
@@ -988,7 +988,7 @@ async fn catalog_media(mut param: Value) -> Result<(), Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/tape/drive/{}/catalog", drive);
+    let path = format!("api2/json/tape/drive/{drive}/catalog");
     let result = client.post(&path, Some(param)).await?;
 
     view_task_result(&client, result, &output_format).await?;

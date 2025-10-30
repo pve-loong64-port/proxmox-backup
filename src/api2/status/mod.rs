@@ -104,7 +104,7 @@ pub async fn datastore_status(
             gc_status: Some(datastore.last_gc_status()),
         };
 
-        let rrd_dir = format!("datastore/{}", store);
+        let rrd_dir = format!("datastore/{store}");
 
         let get_rrd =
             |what: &str| extract_rrd_data(&rrd_dir, what, RrdTimeframe::Month, RrdMode::Average);

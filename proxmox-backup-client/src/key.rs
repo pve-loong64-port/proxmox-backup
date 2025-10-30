@@ -296,7 +296,7 @@ fn show_key(path: Option<String>, param: Value) -> Result<(), Error> {
     let output_format = get_output_format(&param);
 
     let mut info: KeyInfo = (&config).into();
-    info.path = Some(format!("{:?}", path));
+    info.path = Some(format!("{path:?}"));
 
     let options = proxmox_router::cli::default_table_format_options()
         .column(ColumnConfig::new("path"))

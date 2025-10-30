@@ -32,10 +32,10 @@ impl std::fmt::Display for SenseInfo {
             .unwrap_or_else(|| format!("Invalid sense {:02X}", self.sense_key));
 
         if self.asc == 0 && self.ascq == 0 {
-            write!(f, "{}", sense_text)
+            write!(f, "{sense_text}")
         } else {
             let additional_sense_text = get_asc_ascq_string(self.asc, self.ascq);
-            write!(f, "{}, {}", sense_text, additional_sense_text)
+            write!(f, "{sense_text}, {additional_sense_text}")
         }
     }
 }
@@ -429,7 +429,7 @@ pub fn get_asc_ascq_string(asc: u8, ascq: u8) -> String {
         }
         Ok(unsafe { CStr::from_ptr(res) }.to_str()?.to_owned())
     })
-    .unwrap_or_else(|_err: Error| format!("ASC={:02x}x, ASCQ={:02x}x", asc, ascq))
+    .unwrap_or_else(|_err: Error| format!("ASC={asc:02x}x, ASCQ={ascq:02x}x"))
 }
 
 /// Allocate a page aligned buffer

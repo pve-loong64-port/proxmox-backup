@@ -51,7 +51,7 @@ async fn start_garbage_collection(param: Value) -> Result<Value, Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/admin/datastore/{}/gc", store);
+    let path = format!("api2/json/admin/datastore/{store}/gc");
 
     let result = client.post(&path, None).await?;
 
@@ -81,7 +81,7 @@ async fn garbage_collection_status(param: Value) -> Result<Value, Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/admin/datastore/{}/gc", store);
+    let path = format!("api2/json/admin/datastore/{store}/gc");
 
     let mut result = client.get(&path, None).await?;
     let mut data = result["data"].take();
@@ -594,7 +594,7 @@ async fn verify(store: String, mut param: Value) -> Result<Value, Error> {
 
     let args = json!(param);
 
-    let path = format!("api2/json/admin/datastore/{}/verify", store);
+    let path = format!("api2/json/admin/datastore/{store}/verify");
 
     let result = client.post(&path, Some(args)).await?;
 
@@ -758,7 +758,7 @@ async fn run_job(job_type: &str, param: Value) -> Result<Value, Error> {
 
     let client = connect_to_localhost()?;
 
-    let path = format!("api2/json/admin/{}/{}/run", job_type, id);
+    let path = format!("api2/json/admin/{job_type}/{id}/run");
     let result = client.post(&path, None).await?;
     view_task_result(&client, result, &output_format).await?;
 
@@ -951,7 +951,7 @@ pub fn complete_remote_datastore_group_filter(
     list.extend(
         complete_remote_datastore_group(_arg, param)
             .iter()
-            .map(|group| format!("group:{}", group)),
+            .map(|group| format!("group:{group}")),
     );
 
     list

@@ -74,7 +74,7 @@ fn get_journal(
 
     if let Some(lastentries) = lastentries {
         args.push(String::from("-n"));
-        args.push(format!("{}", lastentries));
+        args.push(format!("{lastentries}"));
     }
 
     if let Some(since) = since {

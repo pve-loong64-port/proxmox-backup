@@ -260,7 +260,7 @@ fn decode_mam_attributes(data: &[u8]) -> Result<Vec<MamAttribute>, Error> {
                             // Tape Alert Flags
                             let value = u64::from_be_bytes(data[0..8].try_into()?);
                             let flags = TapeAlertFlags::from_bits_truncate(value);
-                            format!("{:?}", flags)
+                            format!("{flags:?}")
                         } else {
                             format!("{}", u64::from_be_bytes(data[0..8].try_into()?))
                         }

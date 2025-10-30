@@ -345,10 +345,10 @@ impl std::fmt::Display for TapeRequestError {
                 write!(f, "no error")
             }
             TapeRequestError::OpenFailed(reason) => {
-                write!(f, "tape open failed - {}", reason)
+                write!(f, "tape open failed - {reason}")
             }
             TapeRequestError::WrongLabel(label) => {
-                write!(f, "wrong media label {}", label)
+                write!(f, "wrong media label {label}")
             }
             TapeRequestError::EmptyTape => {
                 write!(
@@ -357,10 +357,10 @@ impl std::fmt::Display for TapeRequestError {
                 )
             }
             TapeRequestError::ReadFailed(reason) => {
-                write!(f, "tape read failed - {}", reason)
+                write!(f, "tape read failed - {reason}")
             }
             TapeRequestError::LoadingFailed(reason) => {
-                write!(f, "could not load tape into drive - {}", reason)
+                write!(f, "could not load tape into drive - {reason}")
             }
         }
     }

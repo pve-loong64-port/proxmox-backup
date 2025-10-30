@@ -93,7 +93,7 @@ async fn run_tape_backup_job(mut param: Value) -> Result<(), Error> {
     let client = connect_to_localhost()?;
 
     let result = client
-        .post(&format!("api2/json/tape/backup/{}", id), Some(param))
+        .post(&format!("api2/json/tape/backup/{id}"), Some(param))
         .await?;
 
     view_task_result(&client, result, &output_format).await?;

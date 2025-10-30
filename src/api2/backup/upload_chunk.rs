@@ -149,7 +149,7 @@ fn upload_fixed_chunk(
 
         env.register_fixed_chunk(wid, digest, size, compressed_size, is_duplicate)?;
         let digest_str = hex::encode(digest);
-        env.debug(format!("upload_chunk done: {} bytes, {}", size, digest_str));
+        env.debug(format!("upload_chunk done: {size} bytes, {digest_str}"));
 
         let result = Ok(json!(digest_str));
 
@@ -211,7 +211,7 @@ fn upload_dynamic_chunk(
 
         env.register_dynamic_chunk(wid, digest, size, compressed_size, is_duplicate)?;
         let digest_str = hex::encode(digest);
-        env.debug(format!("upload_chunk done: {} bytes, {}", size, digest_str));
+        env.debug(format!("upload_chunk done: {size} bytes, {digest_str}"));
 
         let result = Ok(json!(digest_str));
         Ok(env.format_response(result))
@@ -311,10 +311,10 @@ fn upload_speedtest(
 
         match result {
             Ok(size) => {
-                println!("UPLOAD END {} bytes", size);
+                println!("UPLOAD END {size} bytes");
             }
             Err(err) => {
-                println!("Upload error: {}", err);
+                println!("Upload error: {err}");
             }
         }
         let env: &BackupEnvironment = rpcenv.as_ref();

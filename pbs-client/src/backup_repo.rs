@@ -27,7 +27,7 @@ impl BackupRepository {
         store: String,
     ) -> Self {
         let host = match host {
-            Some(host) if (IP_V6_REGEX.regex_obj)().is_match(&host) => Some(format!("[{}]", host)),
+            Some(host) if (IP_V6_REGEX.regex_obj)().is_match(&host) => Some(format!("[{host}]")),
             other => other,
         };
         Self {

@@ -36,7 +36,7 @@ fn list_acls(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Err
         if ugid_type == "user" {
             Ok(ugid.to_string())
         } else if ugid_type == "group" {
-            Ok(format!("@{}", ugid))
+            Ok(format!("@{ugid}"))
         } else {
             bail!("render_ugid: got unknown ugid_type");
         }

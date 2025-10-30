@@ -143,13 +143,12 @@ async fn register_account(
     };
 
     println!(
-        "Attempting to fetch Terms of Service from {:?}",
-        directory_url
+        "Attempting to fetch Terms of Service from {directory_url:?}"
     );
     let mut client = AcmeClient::new(directory_url.clone());
     let directory = client.directory().await?;
     let tos_agreed = if let Some(tos_url) = directory.terms_of_service_url() {
-        println!("Terms of Service: {}", tos_url);
+        println!("Terms of Service: {tos_url}");
         print!("Do you agree to the above terms? [y|N]: ");
         std::io::stdout().flush()?;
         let mut input = String::new();
@@ -189,7 +188,7 @@ async fn register_account(
         None
     };
 
-    println!("Attempting to register account with {:?}...", directory_url);
+    println!("Attempting to register account with {directory_url:?}...");
 
     let account = api2::config::acme::do_register_account(
         &mut client,

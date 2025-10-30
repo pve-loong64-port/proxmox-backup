@@ -396,7 +396,7 @@ fn unmap(
 
     // allow loop device number alone
     if let Ok(num) = name.parse::<u8>() {
-        name = format!("/dev/loop{}", num);
+        name = format!("/dev/loop{num}");
     }
 
     if name.starts_with("/dev/loop") {

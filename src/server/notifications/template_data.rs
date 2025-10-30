@@ -89,7 +89,7 @@ impl GcOkTemplateData {
         } else {
             1.0
         };
-        let deduplication_factor = format!("{:.2}", deduplication_factor);
+        let deduplication_factor = format!("{deduplication_factor:.2}");
 
         Self {
             common: CommonData::new(),

@@ -113,7 +113,7 @@ fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
         Err(NotPresent) => {}
     };
 
-    let env_name = format!("{}_FD", base_name);
+    let env_name = format!("{base_name}_FD");
     match std::env::var(&env_name) {
         Ok(fd_str) => {
             let fd: i32 = fd_str.parse().map_err(|err| {
@@ -130,7 +130,7 @@ fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
         Err(NotPresent) => {}
     }
 
-    let env_name = format!("{}_FILE", base_name);
+    let env_name = format!("{base_name}_FILE");
     match std::env::var(&env_name) {
         Ok(filename) => {
             let mut file = std::fs::File::open(filename)
@@ -141,7 +141,7 @@ fn get_secret_from_env(base_name: &str) -> Result<Option<String>, Error> {
         Err(NotPresent) => {}
     }
 
-    let env_name = format!("{}_CMD", base_name);
+    let env_name = format!("{base_name}_CMD");
     match std::env::var(&env_name) {
         Ok(ref command) => {
             let args = shellword_split(command)?;
@@ -345,7 +345,7 @@ pub async fn complete_backup_group_do(param: &HashMap<String, String>) -> Vec<St
             if let (Some(backup_id), Some(backup_type)) =
                 (item["backup-id"].as_str(), item["backup-type"].as_str())
             {
-                result.push(format!("{}/{}", backup_type, backup_id));
+                result.push(format!("{backup_type}/{backup_id}"));
             }
         }
     }
@@ -366,7 +366,7 @@ pub async fn complete_group_or_snapshot_do(
         let mut result = vec![];
         for group in groups {
             result.push(group.to_string());
-            result.push(format!("{}/", group));
+            result.push(format!("{group}/"));
         }
         return result;
     }
@@ -647,7 +647,7 @@ pub fn find_xdg_file(
     let file_name = file_name.as_ref();
     base_directories()
         .map(|base| base.find_config_file(file_name))
-        .with_context(|| format!("error searching for {}", description))
+        .with_context(|| format!("error searching for {description}"))
 }
 
 pub fn place_xdg_file(
@@ -657,7 +657,7 @@ pub fn place_xdg_file(
     let file_name = file_name.as_ref();
     base_directories()
         .and_then(|base| base.place_config_file(file_name).map_err(Error::from))
-        .with_context(|| format!("failed to place {} in xdg home", description))
+        .with_context(|| format!("failed to place {description} in xdg home"))
 }
 
 pub fn get_pxar_archive_names(

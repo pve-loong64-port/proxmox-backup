@@ -30,7 +30,7 @@ fn list_network_devices(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Re
 
     if let Value::String(ref diff) = rpcenv["changes"] {
         if output_format == "text" {
-            eprintln!("pending changes:\n{}\n", diff);
+            eprintln!("pending changes:\n{diff}\n");
         }
     }
 
@@ -123,7 +123,7 @@ fn pending_network_changes(
     };
 
     if let Value::String(ref diff) = rpcenv["changes"] {
-        println!("{}", diff);
+        println!("{diff}");
     }
 
     Ok(Value::Null)

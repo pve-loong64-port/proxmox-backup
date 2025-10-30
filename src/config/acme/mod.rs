@@ -54,7 +54,7 @@ pub const KNOWN_ACME_DIRECTORIES: &[KnownAcmeDirectory] = &[
 pub const DEFAULT_ACME_DIRECTORY_ENTRY: &KnownAcmeDirectory = &KNOWN_ACME_DIRECTORIES[0];
 
 pub fn account_path(name: &str) -> String {
-    format!("{}/{}", ACME_ACCOUNT_DIR, name)
+    format!("{ACME_ACCOUNT_DIR}/{name}")
 }
 
 pub fn foreach_acme_account<F>(mut func: F) -> Result<(), Error>
@@ -90,7 +90,7 @@ where
 pub fn mark_account_deactivated(name: &str) -> Result<(), Error> {
     let from = account_path(name);
     for i in 0..100 {
-        let to = account_path(&format!("_deactivated_{}_{}", name, i));
+        let to = account_path(&format!("_deactivated_{name}_{i}"));
         if !Path::new(&to).exists() {
             return std::fs::rename(&from, &to).map_err(|err| {
                 format_err!(

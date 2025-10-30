@@ -145,7 +145,7 @@ async fn api_datastore_list_snapshots(
     ns: &BackupNamespace,
     group: Option<&BackupGroup>,
 ) -> Result<Value, Error> {
-    let path = format!("api2/json/admin/datastore/{}/snapshots", store);
+    let path = format!("api2/json/admin/datastore/{store}/snapshots");
 
     let mut args = match group {
         Some(group) => serde_json::to_value(group)?,
@@ -537,7 +537,7 @@ async fn api_version(param: Value) -> Result<(), Error> {
         if let Some(server) = version_info["server"].as_object() {
             let server_version = server["version"].as_str().unwrap();
             let server_release = server["release"].as_str().unwrap();
-            println!("server version: {}.{}", server_version, server_release);
+            println!("server version: {server_version}.{server_release}");
         }
     } else {
         format_and_print_result(&version_info, &output_format);
@@ -1917,8 +1917,8 @@ async fn status(param: Value) -> Result<Value, Error> {
         let total = record["total"].as_u64().unwrap();
         let roundup = total / 200;
         if let Some(per) = ((v + roundup) * 100).checked_div(total) {
-            let info = format!(" ({} %)", per);
-            Ok(format!("{} {:>8}", v, info))
+            let info = format!(" ({per} %)");
+            Ok(format!("{v} {info:>8}"))
         } else {
             bail!("Cannot render total percentage: denominator is zero");
         }

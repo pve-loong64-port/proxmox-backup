@@ -398,8 +398,8 @@ impl BackupWriter {
             bail!("requested encryption without a crypt config");
         }
 
-        let index_path = format!("{}_index", prefix);
-        let close_path = format!("{}_close", prefix);
+        let index_path = format!("{prefix}_index");
+        let close_path = format!("{prefix}_close");
 
         if let Some(manifest) = options.previous_manifest {
             if !manifest

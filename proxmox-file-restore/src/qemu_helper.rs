@@ -334,13 +334,11 @@ pub async fn start_vm(
         qemu_cmd.args(&drives);
         qemu_cmd.arg("-device");
         qemu_cmd.arg(format!(
-            "vhost-vsock-pci,guest-cid={},disable-legacy=on",
-            cid
+            "vhost-vsock-pci,guest-cid={cid},disable-legacy=on"
         ));
         qemu_cmd.arg("-chardev");
         qemu_cmd.arg(format!(
-            "socket,id=qmp,path={}{}.sock,server=on,wait=off",
-            QMP_SOCKET_PREFIX, cid
+            "socket,id=qmp,path={QMP_SOCKET_PREFIX}{cid}.sock,server=on,wait=off"
         ));
         qemu_cmd.arg("-mon");
         qemu_cmd.arg("chardev=qmp,mode=control");
@@ -349,8 +347,7 @@ pub async fn start_vm(
             let debug_args = [
                 "-chardev",
                 &format!(
-                    "socket,id=debugser,path=/run/proxmox-backup/file-restore-serial-{}.sock,server=on,wait=off",
-                    cid
+                    "socket,id=debugser,path=/run/proxmox-backup/file-restore-serial-{cid}.sock,server=on,wait=off"
                 ),
                 "-serial",
                 "chardev:debugser",

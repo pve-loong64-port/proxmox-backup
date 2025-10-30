@@ -58,7 +58,7 @@ fn test_prune_protected() -> Result<(), Error> {
         create_info_protected("host/elsa/2019-11-15T10:59:15Z", false),
     ];
 
-    eprintln!("{:?}", orig_list);
+    eprintln!("{orig_list:?}");
 
     let mut options = PruneJobOptions::default();
     options.keep.keep_last = Some(1);

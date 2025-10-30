@@ -141,7 +141,7 @@ fn check_job_store(upid: &UPID, store: &str) -> bool {
         | ("prunejob", Some(workerid))
         | ("backup", Some(workerid))
         | ("garbage_collection", Some(workerid)) => {
-            return workerid == store || workerid.starts_with(&format!("{}:", store));
+            return workerid == store || workerid.starts_with(&format!("{store}:"));
         }
         _ => {}
     };

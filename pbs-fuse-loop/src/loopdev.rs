@@ -65,7 +65,7 @@ use loop_ioctl::*;
 pub fn get_or_create_free_dev() -> Result<String, Error> {
     let ctrl_file = File::open(LOOP_CONTROL)?;
     let free_num = unsafe { ioctl_ctrl_get_free(ctrl_file.as_raw_fd())? };
-    let loop_file_path = format!("{}{}", LOOP_NAME, free_num);
+    let loop_file_path = format!("{LOOP_NAME}{free_num}");
     Ok(loop_file_path)
 }
 

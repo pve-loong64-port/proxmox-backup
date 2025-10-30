@@ -16,13 +16,13 @@ fn cert_info() -> Result<(), Error> {
     if let Some(san) = cert.subject_alt_names() {
         for name in san.iter() {
             if let Some(v) = name.dnsname() {
-                println!("    DNS:{}", v);
+                println!("    DNS:{v}");
             } else if let Some(v) = name.ipaddress() {
-                println!("    IP:{:?}", v);
+                println!("    IP:{v:?}");
             } else if let Some(v) = name.email() {
-                println!("    EMAIL:{}", v);
+                println!("    EMAIL:{v}");
             } else if let Some(v) = name.uri() {
-                println!("    URI:{}", v);
+                println!("    URI:{v}");
             }
         }
     }

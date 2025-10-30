@@ -463,11 +463,11 @@ impl BackupEnvironment {
         chunk_count: u64,
         upload_stat: &UploadStatistic,
     ) {
-        self.log(format!("Upload statistics for '{}'", archive_name));
+        self.log(format!("Upload statistics for '{archive_name}'"));
         self.log(format!("UUID: {}", hex::encode(uuid)));
         self.log(format!("Checksum: {}", hex::encode(csum)));
-        self.log(format!("Size: {}", size));
-        self.log(format!("Chunk count: {}", chunk_count));
+        self.log(format!("Size: {size}"));
+        self.log(format!("Chunk count: {chunk_count}"));
 
         if size == 0 || chunk_count == 0 {
             return;
@@ -487,8 +487,7 @@ impl BackupEnvironment {
         if (client_side_duplicates + server_side_duplicates) > 0 {
             let per = (client_side_duplicates + server_side_duplicates) * 100 / chunk_count;
             self.log(format!(
-                "Duplicates: {}+{} ({}%)",
-                client_side_duplicates, server_side_duplicates, per
+                "Duplicates: {client_side_duplicates}+{server_side_duplicates} ({per}%)"
             ));
         }
 
@@ -706,8 +705,7 @@ impl BackupEnvironment {
         replace_file(&path, raw_data, CreateOptions::new(), false)?;
 
         self.log(format!(
-            "add blob {:?} ({} bytes, comp: {})",
-            path, orig_len, blob_len
+            "add blob {path:?} ({orig_len} bytes, comp: {blob_len})"
         ));
 
         let mut state = self.state.lock().unwrap();

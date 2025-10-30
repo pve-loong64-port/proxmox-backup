@@ -15,7 +15,7 @@ use proxmox_human_byte::HumanByte;
 
 fn main() {
     if let Err(err) = proxmox_async::runtime::main(run()) {
-        panic!("ERROR: {}", err);
+        panic!("ERROR: {err}");
     }
 }
 

@@ -169,8 +169,7 @@ fn upgrade_to_backup_reader_protocol(
                 env.debug = debug;
 
                 env.log(format!(
-                    "starting new backup reader datastore '{}': {:?}",
-                    store, path
+                    "starting new backup reader datastore '{store}': {path:?}"
                 ));
 
                 let service =
@@ -276,8 +275,7 @@ fn download_file(
 
         if let Some(index) = index {
             env.log(format!(
-                "register chunks in '{}' as downloadable.",
-                file_name
+                "register chunks in '{file_name}' as downloadable."
             ));
 
             for pos in 0..index.index_count() {
@@ -315,8 +313,7 @@ fn download_chunk(
 
         if !env.check_chunk_access(digest) {
             env.log(format!(
-                "attempted to download chunk {} which is not in registered chunk list",
-                digest_str
+                "attempted to download chunk {digest_str} which is not in registered chunk list"
             ));
             return Err(http_err!(
                 UNAUTHORIZED,

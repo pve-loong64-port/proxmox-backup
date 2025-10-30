@@ -19,7 +19,7 @@ use anyhow::{bail, Error};
 // Error: detected shrunk file "./dyntest1/testfile0.dat" (22020096 < 12679380992)
 
 fn create_large_file(path: PathBuf) {
-    println!("TEST {:?}", path);
+    println!("TEST {path:?}");
 
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -47,7 +47,7 @@ fn main() -> Result<(), Error> {
     for i in 0..20 {
         let base = base.clone();
         handles.push(thread::spawn(move || {
-            create_large_file(base.join(format!("testfile{}.dat", i)));
+            create_large_file(base.join(format!("testfile{i}.dat")));
         }));
     }
 

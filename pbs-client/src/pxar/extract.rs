@@ -1064,7 +1064,7 @@ where
                     let entry = root
                         .lookup(&path)
                         .await?
-                        .with_context(|| format!("error looking up {:?}", path))?;
+                        .with_context(|| format!("error looking up {path:?}"))?;
                     let realfile = accessor.follow_hardlink(&entry).await?;
                     let metadata = realfile.entry().metadata();
                     debug!("adding '{}' to zip", path.display());
@@ -1095,7 +1095,7 @@ where
     }
 
     zip.finish().await.map_err(|err| {
-        eprintln!("error during finishing of zip: {}", err);
+        eprintln!("error during finishing of zip: {err}");
         err
     })
 }

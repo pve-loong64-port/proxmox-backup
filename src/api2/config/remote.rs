@@ -428,7 +428,7 @@ pub async fn scan_remote_namespaces(
     let client = remote_client(&remote, None).await.map_err(map_remote_err)?;
     let api_res = client
         .get(
-            &format!("api2/json/admin/datastore/{}/namespace", store),
+            &format!("api2/json/admin/datastore/{store}/namespace"),
             None,
         )
         .await
@@ -491,7 +491,7 @@ pub async fn scan_remote_groups(
     let args = namespace.map(|ns| json!({ "ns": ns }));
 
     let api_res = client
-        .get(&format!("api2/json/admin/datastore/{}/groups", store), args)
+        .get(&format!("api2/json/admin/datastore/{store}/groups"), args)
         .await
         .map_err(map_remote_err)?;
     let parse_res = match api_res.get("data") {

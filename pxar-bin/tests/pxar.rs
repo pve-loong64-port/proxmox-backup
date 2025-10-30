@@ -15,16 +15,16 @@ fn pxar_create_and_extract() {
         format!("../target/{target_subdir}/release/pxar")
     };
 
-    println!("run '{} create archive.pxar {}'", exec_path, src_dir);
+    println!("run '{exec_path} create archive.pxar {src_dir}'");
 
     Command::new(&exec_path)
         .arg("create")
         .arg("./tests/archive.pxar")
         .arg(src_dir)
         .status()
-        .unwrap_or_else(|err| panic!("Failed to invoke '{}': {}", exec_path, err));
+        .unwrap_or_else(|err| panic!("Failed to invoke '{exec_path}': {err}"));
 
-    println!("run '{} extract archive.pxar {}'", exec_path, dest_dir);
+    println!("run '{exec_path} extract archive.pxar {dest_dir}'");
 
     Command::new(&exec_path)
         .arg("extract")
@@ -32,11 +32,10 @@ fn pxar_create_and_extract() {
         .arg("--target")
         .arg(dest_dir)
         .status()
-        .unwrap_or_else(|err| panic!("Failed to invoke '{}': {}", exec_path, err));
+        .unwrap_or_else(|err| panic!("Failed to invoke '{exec_path}': {err}"));
 
     println!(
-        "run 'rsync --dry-run --itemize-changes --archive {} {}' to verify'",
-        src_dir, dest_dir
+        "run 'rsync --dry-run --itemize-changes --archive {src_dir} {dest_dir}' to verify'"
     );
     /* Use rsync with --dry-run and --itemize-changes to compare
     src_dir and dest_dir */
@@ -56,23 +55,23 @@ fn pxar_create_and_extract() {
     let line_iter = reader.lines().map(|l| l.unwrap());
     let mut linecount = 0;
     for curr in line_iter {
-        println!("{}", curr);
+        println!("{curr}");
         linecount += 1;
     }
-    println!("Rsync listed {} differences to address", linecount);
+    println!("Rsync listed {linecount} differences to address");
 
     // Cleanup archive
     Command::new("rm")
         .arg("./tests/archive.pxar")
         .status()
-        .unwrap_or_else(|err| panic!("Failed to invoke 'rm': {}", err));
+        .unwrap_or_else(|err| panic!("Failed to invoke 'rm': {err}"));
 
     // Cleanup destination dir
     Command::new("rm")
         .arg("-r")
         .arg(dest_dir)
         .status()
-        .unwrap_or_else(|err| panic!("Failed to invoke 'rm': {}", err));
+        .unwrap_or_else(|err| panic!("Failed to invoke 'rm': {err}"));
 
     // If source and destination folder contain the same content,
     // the output of the rsync invocation should yield no lines.

@@ -139,7 +139,7 @@ pub(crate) fn backup_info_to_snapshot_list_item(
             let fingerprint = match manifest.fingerprint() {
                 Ok(fp) => fp,
                 Err(err) => {
-                    eprintln!("error parsing fingerprint: '{}'", err);
+                    eprintln!("error parsing fingerprint: '{err}'");
                     None
                 }
             };

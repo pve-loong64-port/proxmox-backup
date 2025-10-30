@@ -3,7 +3,7 @@ use anyhow::Error;
 //  chacha20-poly1305
 
 fn rate_test(name: &str, bench: &dyn Fn() -> usize) {
-    print!("{:<20} ", name);
+    print!("{name:<20} ");
 
     let start = std::time::SystemTime::now();
     let duration = std::time::Duration::new(1, 0);

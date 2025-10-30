@@ -42,9 +42,9 @@ pub enum KeySource {
 
 pub fn format_key_source(source: &KeySource, key_type: &str) -> String {
     match source {
-        KeySource::DefaultKey => format!("Using default {} key..", key_type),
-        KeySource::Fd => format!("Using {} key from file descriptor..", key_type),
-        KeySource::Path(path) => format!("Using {} key from '{}'..", key_type, path),
+        KeySource::DefaultKey => format!("Using default {key_type} key.."),
+        KeySource::Fd => format!("Using {key_type} key from file descriptor.."),
+        KeySource::Path(path) => format!("Using {key_type} key from '{path}'.."),
     }
 }
 
@@ -386,9 +386,9 @@ fn test_crypto_parameters_handling() -> Result<(), Error> {
 
     let testdir = create_testdir("key_source")?;
 
-    let keypath = format!("{}/keyfile.test", testdir);
-    let master_keypath = format!("{}/masterkeyfile.test", testdir);
-    let invalid_keypath = format!("{}/invalid_keyfile.test", testdir);
+    let keypath = format!("{testdir}/keyfile.test");
+    let master_keypath = format!("{testdir}/masterkeyfile.test");
+    let invalid_keypath = format!("{testdir}/invalid_keyfile.test");
 
     let no_key_res = CryptoParams {
         enc_key: None,

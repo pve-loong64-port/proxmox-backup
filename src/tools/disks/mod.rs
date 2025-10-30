@@ -109,13 +109,13 @@ impl DiskManage {
 
     /// Get a `Disk` for a name in `/sys/block/<name>`.
     pub fn disk_by_name(self: Arc<Self>, name: &str) -> io::Result<Disk> {
-        let syspath = format!("/sys/block/{}", name);
+        let syspath = format!("/sys/block/{name}");
         self.disk_by_sys_path(syspath)
     }
 
     /// Get a `Disk` for a name in `/sys/class/block/<name>`.
     pub fn partition_by_name(self: Arc<Self>, name: &str) -> io::Result<Disk> {
-        let syspath = format!("/sys/class/block/{}", name);
+        let syspath = format!("/sys/class/block/{name}");
         self.disk_by_sys_path(syspath)
     }
 
@@ -951,7 +951,7 @@ fn get_disks(
 
     let zfs_devices =
         zfs_devices(&lsblk_info, None).or_else(|err| -> Result<HashSet<u64>, Error> {
-            eprintln!("error getting zfs devices: {}", err);
+            eprintln!("error getting zfs devices: {err}");
             Ok(HashSet::new())
         })?;
 
@@ -976,7 +976,7 @@ fn get_disks(
             }
         }
 
-        let sys_path = format!("/sys/block/{}", name);
+        let sys_path = format!("/sys/block/{name}");
 
         if let Ok(target) = std::fs::read_link(&sys_path) {
             if let Some(target) = target.to_str() {
@@ -1224,9 +1224,9 @@ pub fn change_parttype(part_disk: &Disk, part_type: &str) -> Result<(), Error> {
         let mut sgdisk_command = std::process::Command::new("sgdisk");
         let major = unsafe { libc::major(stat.st_rdev) };
         let minor = unsafe { libc::minor(stat.st_rdev) };
-        let partnum_path = &format!("/sys/dev/block/{}:{}/partition", major, minor);
+        let partnum_path = &format!("/sys/dev/block/{major}:{minor}/partition");
         let partnum: u32 = std::fs::read_to_string(partnum_path)?.trim_end().parse()?;
-        sgdisk_command.arg(format!("-t{}:{}", partnum, part_type));
+        sgdisk_command.arg(format!("-t{partnum}:{part_type}"));
         let part_disk_parent = match part_disk.parent() {
             Some(disk) => disk,
             None => bail!("disk {:?} has no node in /dev", part_disk.syspath()),

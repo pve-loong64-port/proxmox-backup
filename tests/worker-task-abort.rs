@@ -49,12 +49,12 @@ fn worker_task_abort() -> Result<(), Error> {
         });
 
         if let Err(err) = init_result {
-            eprintln!("unable to start daemon - {}", err);
+            eprintln!("unable to start daemon - {err}");
             return;
         }
 
         if let Err(err) = commando_sock.spawn(proxmox_rest_server::last_worker_future()) {
-            eprintln!("unable to spawn command socket - {}", err);
+            eprintln!("unable to spawn command socket - {err}");
             return;
         }
 
@@ -65,13 +65,13 @@ fn worker_task_abort() -> Result<(), Error> {
             Authid::root_auth_id().to_string(),
             true,
             move |worker| {
-                println!("WORKER {}", worker);
+                println!("WORKER {worker}");
 
                 let result = garbage_collection(&worker);
                 proxmox_daemon::request_shutdown();
 
                 if let Err(err) = result {
-                    println!("got expected error: {}", err);
+                    println!("got expected error: {err}");
                 } else {
                     let mut data = errmsg.lock().unwrap();
                     *data = Some(String::from(
@@ -85,10 +85,10 @@ fn worker_task_abort() -> Result<(), Error> {
 
         match res {
             Err(err) => {
-                println!("unable to start worker - {}", err);
+                println!("unable to start worker - {err}");
             }
             Ok(wid) => {
-                println!("WORKER: {}", wid);
+                println!("WORKER: {wid}");
                 proxmox_rest_server::abort_worker_nowait(wid.parse::<UPID>().unwrap());
                 proxmox_rest_server::wait_for_local_worker(&wid)
                     .await

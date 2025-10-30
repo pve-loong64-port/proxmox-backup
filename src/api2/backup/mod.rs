@@ -299,8 +299,7 @@ fn upgrade_to_backup_protocol(
                 let verify = |env: BackupEnvironment| {
                     if let Err(err) = env.verify_after_complete() {
                         env.log(format!(
-                            "backup finished, but starting the requested verify task failed: {}",
-                            err
+                            "backup finished, but starting the requested verify task failed: {err}"
                         ));
                     }
                 };
@@ -313,12 +312,12 @@ fn upgrade_to_backup_protocol(
                     }
                     (Err(err), Ok(())) => {
                         // ignore errors after finish
-                        env.log(format!("backup had errors but finished: {}", err));
+                        env.log(format!("backup had errors but finished: {err}"));
                         verify(env);
                         Ok(())
                     }
                     (Ok(_), Err(err)) => {
-                        env.log(format!("backup ended and finish failed: {}", err));
+                        env.log(format!("backup ended and finish failed: {err}"));
                         env.log("removing unfinished backup");
                         proxmox_async::runtime::block_in_place(|| {
                             env.datastore.remove_backup_dir(
@@ -330,7 +329,7 @@ fn upgrade_to_backup_protocol(
                         Err(err)
                     }
                     (Err(err), Err(_)) => {
-                        env.log(format!("backup failed: {}", err));
+                        env.log(format!("backup failed: {err}"));
                         env.log("removing failed backup");
                         proxmox_async::runtime::block_in_place(|| {
                             env.datastore.remove_backup_dir(
@@ -443,7 +442,7 @@ fn create_dynamic_index(
     let index = env.datastore.create_dynamic_writer(&path)?;
     let wid = env.register_dynamic_writer(index, name)?;
 
-    env.log(format!("created new dynamic index {} ({:?})", wid, path));
+    env.log(format!("created new dynamic index {wid} ({path:?})"));
 
     Ok(json!(wid))
 }
@@ -537,7 +536,7 @@ fn create_fixed_index(
 
     let wid = env.register_fixed_writer(writer, name, size, chunk_size as u32, incremental)?;
 
-    env.log(format!("created new fixed index {} ({:?})", wid, path));
+    env.log(format!("created new fixed index {wid} ({path:?})"));
 
     Ok(json!(wid))
 }
@@ -608,8 +607,7 @@ fn dynamic_append(
         env.dynamic_writer_append_chunk(wid, offset, size, &digest)?;
 
         env.debug(format!(
-            "successfully added chunk {} to dynamic index {} (offset {}, size {})",
-            digest_str, wid, offset, size
+            "successfully added chunk {digest_str} to dynamic index {wid} (offset {offset}, size {size})"
         ));
     }
 
@@ -682,8 +680,7 @@ fn fixed_append(
         env.fixed_writer_append_chunk(wid, offset, size, &digest)?;
 
         env.debug(format!(
-            "successfully added chunk {} to fixed index {} (offset {}, size {})",
-            digest_str, wid, offset, size
+            "successfully added chunk {digest_str} to fixed index {wid} (offset {offset}, size {size})"
         ));
     }
 
@@ -746,7 +743,7 @@ fn close_dynamic_index(
 
     env.dynamic_writer_close(wid, chunk_count, size, csum)?;
 
-    env.log(format!("successfully closed dynamic index {}", wid));
+    env.log(format!("successfully closed dynamic index {wid}"));
 
     Ok(Value::Null)
 }
@@ -799,7 +796,7 @@ fn close_fixed_index(
 
     env.fixed_writer_close(wid, chunk_count, size, csum)?;
 
-    env.log(format!("successfully closed fixed index {}", wid));
+    env.log(format!("successfully closed fixed index {wid}"));
 
     Ok(Value::Null)
 }

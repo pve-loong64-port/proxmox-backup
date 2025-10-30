@@ -102,13 +102,11 @@ impl Checker {
                     self.upgraded = true;
                 } else if maj >= MIN_PBS_MAJOR && min >= MIN_PBS_MINOR && pkgrel >= MIN_PBS_PKGREL {
                     self.output.log_pass(format!(
-                        "'{}' has version >= {}.{}-{}",
-                        PROXMOX_BACKUP_META, MIN_PBS_MAJOR, MIN_PBS_MINOR, MIN_PBS_PKGREL,
+                        "'{PROXMOX_BACKUP_META}' has version >= {MIN_PBS_MAJOR}.{MIN_PBS_MINOR}-{MIN_PBS_PKGREL}",
                     ))?;
                 } else {
                     self.output.log_fail(format!(
-                        "'{}' package is too old, please upgrade to >= {}.{}-{}",
-                        PROXMOX_BACKUP_META, MIN_PBS_MAJOR, MIN_PBS_MINOR, MIN_PBS_PKGREL,
+                        "'{PROXMOX_BACKUP_META}' package is too old, please upgrade to >= {MIN_PBS_MAJOR}.{MIN_PBS_MINOR}-{MIN_PBS_PKGREL}",
                     ))?;
                 }
             } else {
@@ -534,29 +532,29 @@ impl ConsoleOutput {
             LogLevel::Pass => {
                 self.counters.pass += 1;
                 self.set_color(Color::Green, false)?;
-                writeln!(&mut self.stream, "PASS: {}", message)?;
+                writeln!(&mut self.stream, "PASS: {message}")?;
             }
             LogLevel::Info => {
-                writeln!(&mut self.stream, "INFO: {}", message)?;
+                writeln!(&mut self.stream, "INFO: {message}")?;
             }
             LogLevel::Skip => {
                 self.counters.skip += 1;
-                writeln!(&mut self.stream, "SKIP: {}", message)?;
+                writeln!(&mut self.stream, "SKIP: {message}")?;
             }
             LogLevel::Notice => {
                 self.counters.notice += 1;
                 self.set_color(Color::White, true)?;
-                writeln!(&mut self.stream, "NOTICE: {}", message)?;
+                writeln!(&mut self.stream, "NOTICE: {message}")?;
             }
             LogLevel::Warn => {
                 self.counters.warn += 1;
                 self.set_color(Color::Yellow, false)?;
-                writeln!(&mut self.stream, "WARN: {}", message)?;
+                writeln!(&mut self.stream, "WARN: {message}")?;
             }
             LogLevel::Fail => {
                 self.counters.fail += 1;
                 self.set_color(Color::Red, true)?;
-                writeln!(&mut self.stream, "FAIL: {}", message)?;
+                writeln!(&mut self.stream, "FAIL: {message}")?;
             }
         }
         self.reset()?;

@@ -54,7 +54,7 @@ impl<W: Write> Write for CryptWriter<W> {
         let count = self
             .crypter
             .update(&buf[..write_size], self.encr_buf.as_mut())
-            .map_err(|err| std::io::Error::other(format!("crypter update failed - {}", err)))?;
+            .map_err(|err| std::io::Error::other(format!("crypter update failed - {err}")))?;
 
         self.writer.write_all(&self.encr_buf[..count])?;
 

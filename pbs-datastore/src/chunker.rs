@@ -363,13 +363,13 @@ fn test_chunker1() {
         for (_offset, len) in &chunks1 {
             size1 += len;
         }
-        println!("Chunks1:{}\n{:?}\n", size1, chunks1);
+        println!("Chunks1:{size1}\n{chunks1:?}\n");
 
         let mut size2 = 0;
         for (_offset, len) in &chunks2 {
             size2 += len;
         }
-        println!("Chunks2:{}\n{:?}\n", size2, chunks2);
+        println!("Chunks2:{size2}\n{chunks2:?}\n");
 
         if size1 != 256 * 4 * 1024 {
             panic!("wrong size for chunks1");

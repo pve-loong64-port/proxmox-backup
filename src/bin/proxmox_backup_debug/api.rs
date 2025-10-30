@@ -54,7 +54,7 @@ async fn complete_api_path_do(mut complete_me: &str, capability: Option<&str>) -
         _ => "root@pam".to_string(),
     };
     let mut rpcenv = CliEnvironment::new();
-    rpcenv.set_auth_id(Some(format!("{}@pam", username)));
+    rpcenv.set_auth_id(Some(format!("{username}@pam")));
 
     while let Ok(children) = get_api_children(lookup_path.clone(), &mut rpcenv).await {
         let old_len = list.len();
@@ -63,7 +63,7 @@ async fn complete_api_path_do(mut complete_me: &str, capability: Option<&str>) -
             let caps = entry.capabilities;
 
             if filter.is_empty() || name.starts_with(filter) {
-                let mut path = format!("{}{}", lookup_path, name);
+                let mut path = format!("{lookup_path}{name}");
                 if caps.contains('D') {
                     path.push('/');
                     list.push(path.clone());
@@ -354,7 +354,7 @@ async fn usage(
         let skip_params: Vec<&str> = uri_params.keys().map(|s| &**s).collect();
 
         let cmd = CliCommand::new(info);
-        let prefix = format!("USAGE: {} {} {}", PROG_NAME, command, path);
+        let prefix = format!("USAGE: {PROG_NAME} {command} {path}");
 
         print!(
             "{}",
@@ -387,7 +387,7 @@ async fn get_api_children(
 ) -> Result<Vec<ApiDirEntry>, Error> {
     let mut res = Vec::new();
     for link in get_child_links(&path, rpcenv).await? {
-        let path = format!("{}/{}", path, link);
+        let path = format!("{path}/{link}");
         let (path, _) = normalize_path_with_components(&path)?;
         let mut cap = String::new();
 

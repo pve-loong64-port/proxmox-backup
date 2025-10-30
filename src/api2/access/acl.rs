@@ -73,7 +73,7 @@ fn extract_acl_node_data(
         return;
     }
     for (comp, child) in &node.children {
-        let new_path = format!("{}/{}", path, comp);
+        let new_path = format!("{path}/{comp}");
         extract_acl_node_data(child, &new_path, list, exact, auth_id_filter);
     }
 }

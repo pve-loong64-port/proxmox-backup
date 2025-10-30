@@ -190,7 +190,7 @@ fn create_ticket_http_only(
                 }
             };
 
-            let user_id = Userid::try_from(format!("{}@{}", unique_name, realm))?;
+            let user_id = Userid::try_from(format!("{unique_name}@{realm}"))?;
             tested_username = Some(unique_name);
 
             if !user_info.is_active_user_id(&user_id) {

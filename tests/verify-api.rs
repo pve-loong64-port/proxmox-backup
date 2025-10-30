@@ -17,7 +17,7 @@ fn verify_object_schema(schema: &ObjectSchema) -> Result<(), Error> {
         for i in 1..map.len() {
             if map[i].0 <= map[i - 1].0 {
                 for (name, _, _) in map.iter() {
-                    eprintln!("{}", name);
+                    eprintln!("{name}");
                 }
                 bail!(
                     "found unsorted property map ({} <= {})",
@@ -147,7 +147,7 @@ fn verify_dirmap(path: &str, dirmap: SubdirMap) -> Result<(), Error> {
         for i in 1..dirmap.len() {
             if dirmap[i].0 <= dirmap[i - 1].0 {
                 for (name, _) in dirmap.iter() {
-                    eprintln!("{}/{}", path, name);
+                    eprintln!("{path}/{name}");
                 }
                 bail!(
                     "found unsorted dirmap at {:?} ({} <= {})",
@@ -160,7 +160,7 @@ fn verify_dirmap(path: &str, dirmap: SubdirMap) -> Result<(), Error> {
     }
 
     for (name, router) in dirmap.iter() {
-        let sub_path = format!("{}/{}", path, name);
+        let sub_path = format!("{path}/{name}");
         verify_router(&sub_path, router)?;
     }
 
@@ -168,7 +168,7 @@ fn verify_dirmap(path: &str, dirmap: SubdirMap) -> Result<(), Error> {
 }
 
 fn verify_router(path: &str, router: &Router) -> Result<(), Error> {
-    println!("Verify {}", path);
+    println!("Verify {path}");
 
     if let Some(api_method) = router.get {
         verify_api_method("GET", path, api_method)?;
@@ -188,7 +188,7 @@ fn verify_router(path: &str, router: &Router) -> Result<(), Error> {
             verify_dirmap(path, dirmap)?;
         }
         Some(SubRoute::MatchAll { router, param_name }) => {
-            let path = format!("{}/{{{}}}", path, param_name);
+            let path = format!("{path}/{{{param_name}}}");
             verify_router(&path, router)?;
         }
         None => {}

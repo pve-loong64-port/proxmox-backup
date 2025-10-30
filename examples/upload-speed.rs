@@ -40,10 +40,10 @@ async fn upload_speed() -> Result<f64, Error> {
 fn main() {
     match proxmox_async::runtime::main(upload_speed()) {
         Ok(mbs) => {
-            println!("average upload speed: {} MB/s", mbs);
+            println!("average upload speed: {mbs} MB/s");
         }
         Err(err) => {
-            eprintln!("ERROR: {}", err);
+            eprintln!("ERROR: {err}");
         }
     }
 }

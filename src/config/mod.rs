@@ -120,7 +120,7 @@ pub fn update_self_signed_cert(force: bool) -> Result<(), Error> {
 
     let mut subject_name = openssl::x509::X509NameBuilder::new()?;
     subject_name.append_entry_by_text("O", "Proxmox Backup Server")?;
-    subject_name.append_entry_by_text("OU", &format!("{:X}", uuid))?;
+    subject_name.append_entry_by_text("OU", &format!("{uuid:X}"))?;
     subject_name.append_entry_by_text("CN", &fqdn)?;
     let subject_name = subject_name.build();
 

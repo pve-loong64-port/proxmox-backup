@@ -74,7 +74,7 @@ impl<I: Send + 'static> ParallelHandler<I> {
 
             handles.push(
                 std::thread::Builder::new()
-                    .name(format!("{} ({})", name, i))
+                    .name(format!("{name} ({i})"))
                     .spawn(move || loop {
                         let data = match input_rx.recv() {
                             Ok(data) => data,

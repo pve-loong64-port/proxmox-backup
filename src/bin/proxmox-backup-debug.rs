@@ -24,7 +24,7 @@ fn main() {
         _ => "root@pam".to_string(),
     };
     let mut rpcenv = CliEnvironment::new();
-    rpcenv.set_auth_id(Some(format!("{}@pam", username)));
+    rpcenv.set_auth_id(Some(format!("{username}@pam")));
 
     run_cli_command(
         cmd_def,

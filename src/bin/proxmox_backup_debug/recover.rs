@@ -121,7 +121,7 @@ fn recover_index(
                 .ok_or_else(|| format_err!("Couldn't read chunk info from index at {pos}"))?;
             let size = info.size();
 
-            eprintln!("WARN: chunk {:?} {}", chunk_path, msg);
+            eprintln!("WARN: chunk {chunk_path:?} {msg}");
             eprintln!("WARN: replacing output file {:?} with '\\0'", info.range,);
 
             Ok((

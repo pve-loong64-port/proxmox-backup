@@ -965,7 +965,7 @@ impl DataStore {
             .open(&path)
             .map_err(|err| format_err!("unable to create owner file {:?} - {}", path, err))?;
 
-        writeln!(file, "{}", auth_id)
+        writeln!(file, "{auth_id}")
             .map_err(|err| format_err!("unable to write owner file  {:?} - {}", path, err))?;
 
         Ok(())
@@ -1311,7 +1311,7 @@ impl DataStore {
                         // rewritten correctly they will be removed automatically, as well as if no index
                         // file requires the chunk anymore (won't get to this loop then)
                         for i in 0..=9 {
-                            let bad_ext = format!("{}.bad", i);
+                            let bad_ext = format!("{i}.bad");
                             let mut bad_path = PathBuf::new();
                             bad_path.push(self.chunk_path(digest).0);
                             bad_path.set_extension(bad_ext);

@@ -134,7 +134,7 @@ fn list_permissions(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Val
         let mut paths: Vec<String> = data.keys().cloned().collect();
         paths.sort_unstable();
         for path in paths {
-            println!("Path: {}", path);
+            println!("Path: {path}");
             let priv_map = data.get(&path).unwrap();
             let mut privs: Vec<String> = priv_map.keys().cloned().collect();
             if privs.is_empty() {
@@ -143,9 +143,9 @@ fn list_permissions(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Val
                 privs.sort_unstable();
                 for privilege in privs {
                     if *priv_map.get(&privilege).unwrap() {
-                        println!("- {} (*)", privilege);
+                        println!("- {privilege} (*)");
                     } else {
-                        println!("- {}", privilege);
+                        println!("- {privilege}");
                     }
                 }
             }

@@ -80,7 +80,7 @@ impl NewChunksIterator {
             });
             if let Err(err) = result {
                 if let Err(err) = tx.send(Err(err)) {
-                    eprintln!("error sending result to reader thread: {}", err);
+                    eprintln!("error sending result to reader thread: {err}");
                 }
             }
         });

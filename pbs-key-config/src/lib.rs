@@ -270,7 +270,7 @@ pub fn load_and_decrypt_key(
     passphrase: &dyn Fn() -> Result<Vec<u8>, Error>,
 ) -> Result<([u8; 32], i64, Fingerprint), Error> {
     decrypt_key(&file_get_contents(path)?, passphrase)
-        .with_context(|| format!("failed to load decryption key from {:?}", path))
+        .with_context(|| format!("failed to load decryption key from {path:?}"))
 }
 
 /// Decrypt a KeyConfig from raw keydata.

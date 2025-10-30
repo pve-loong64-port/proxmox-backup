@@ -61,7 +61,7 @@ pub fn read_etc_resolv_conf() -> Result<Value, Error> {
                 continue;
             };
             let nameserver = &caps[1];
-            let id = format!("dns{}", nscount);
+            let id = format!("dns{nscount}");
             result[id] = Value::from(nameserver);
         } else {
             if !options.is_empty() {
@@ -174,11 +174,11 @@ pub fn update_dns(
 
     use std::fmt::Write as _;
     if let Some(search) = config["search"].as_str() {
-        let _ = writeln!(data, "search {}", search);
+        let _ = writeln!(data, "search {search}");
     }
     for opt in &["dns1", "dns2", "dns3"] {
         if let Some(server) = config[opt].as_str() {
-            let _ = writeln!(data, "nameserver {}", server);
+            let _ = writeln!(data, "nameserver {server}");
         }
     }
     if let Some(options) = config["options"].as_str() {

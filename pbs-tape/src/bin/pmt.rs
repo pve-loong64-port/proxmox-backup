@@ -280,7 +280,7 @@ fn tape_alert_flags(param: Value) -> Result<(), Error> {
     let mut handle = get_tape_handle(&param)?;
     let result = handle
         .tape_alert_flags()
-        .map(|flags| format!("{:?}", flags));
+        .map(|flags| format!("{flags:?}"));
 
     if output_format == "json-pretty" {
         let result = result.map_err(|err: Error| err.to_string());
@@ -299,7 +299,7 @@ fn tape_alert_flags(param: Value) -> Result<(), Error> {
     }
 
     let flags = result?;
-    println!("Tape Alert Flags: {}", flags);
+    println!("Tape Alert Flags: {flags}");
 
     Ok(())
 }
@@ -842,7 +842,7 @@ fn main() -> Result<(), Error> {
         .insert("weof", std_cmd(&API_METHOD_WEOF).arg_param(&["count"]));
 
     let mut rpcenv = CliEnvironment::new();
-    rpcenv.set_auth_id(Some(format!("{}@pam", username)));
+    rpcenv.set_auth_id(Some(format!("{username}@pam")));
 
     run_cli_command(cmd_def, rpcenv, None);
 

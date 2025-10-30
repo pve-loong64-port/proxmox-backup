@@ -9,7 +9,7 @@ fn main() -> Result<(), Error> {
     match catalog_shell_cli() {
         CommandLineInterface::Nested(map) => {
             let usage = generate_nested_usage("", &map, DocumentationFormat::ReST);
-            println!("{}", usage);
+            println!("{usage}");
         }
         _ => unreachable!(),
     }

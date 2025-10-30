@@ -1098,7 +1098,7 @@ impl SgTape {
 
         let alert_flags = if !is_moving {
             self.tape_alert_flags()
-                .map(|flags| format!("{:?}", flags))
+                .map(|flags| format!("{flags:?}"))
                 .ok()
         } else {
             None

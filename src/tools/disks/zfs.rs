@@ -116,7 +116,7 @@ static ZFS_DATASET_OBJSET_MAP: LazyLock<Mutex<HashMap<String, (String, String)>>
 //
 // we are only interested in the dataset_name, writes, nwrites, reads and nread
 fn parse_objset_stat(pool: &str, objset_id: &str) -> Result<(String, BlockDevStat), Error> {
-    let path = PathBuf::from(format!("{}/{}/{}", ZFS_KSTAT_BASE_PATH, pool, objset_id));
+    let path = PathBuf::from(format!("{ZFS_KSTAT_BASE_PATH}/{pool}/{objset_id}"));
 
     let text = match proxmox_sys::fs::file_read_optional_string(path)? {
         Some(text) => text,
@@ -166,7 +166,7 @@ fn get_mapping(dataset: &str) -> Option<(String, String)> {
 pub(crate) fn update_zfs_objset_map(pool: &str) -> Result<(), Error> {
     let mut map = ZFS_DATASET_OBJSET_MAP.lock().unwrap();
     map.clear();
-    let path = PathBuf::from(format!("{}/{}", ZFS_KSTAT_BASE_PATH, pool));
+    let path = PathBuf::from(format!("{ZFS_KSTAT_BASE_PATH}/{pool}"));
 
     proxmox_sys::fs::scandir(
         libc::AT_FDCWD,
