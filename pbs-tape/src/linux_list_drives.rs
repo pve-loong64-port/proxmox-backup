@@ -78,13 +78,8 @@ pub fn linux_tape_changer_list() -> Vec<TapeDeviceInfo> {
         let serial = match device
             .property_value("ID_SCSI_SERIAL")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            }) {
+            .and_then(|s| s.into_string().ok())
+        {
             None => continue,
             Some(serial) => serial,
         };
@@ -92,25 +87,13 @@ pub fn linux_tape_changer_list() -> Vec<TapeDeviceInfo> {
         let vendor = device
             .property_value("ID_VENDOR")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
+            .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
         let model = device
             .property_value("ID_MODEL")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
+            .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
         let dev_path = format!("/dev/tape/by-id/scsi-{}", serial);
@@ -193,13 +176,8 @@ pub fn lto_tape_device_list() -> Vec<TapeDeviceInfo> {
         let serial = match device
             .property_value("ID_SCSI_SERIAL")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            }) {
+            .and_then(|s| s.into_string().ok())
+        {
             None => continue,
             Some(serial) => serial,
         };
@@ -207,25 +185,13 @@ pub fn lto_tape_device_list() -> Vec<TapeDeviceInfo> {
         let vendor = device
             .property_value("ID_VENDOR")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
+            .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
         let model = device
             .property_value("ID_MODEL")
             .map(std::ffi::OsString::from)
-            .and_then(|s| {
-                if let Ok(s) = s.into_string() {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
+            .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("unknown"));
 
         let dev_path = format!("/dev/tape/by-id/scsi-{}-sg", serial);
