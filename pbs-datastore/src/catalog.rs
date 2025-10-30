@@ -974,7 +974,7 @@ impl ArchiveEntry {
     ) -> Self {
         Self {
             filepath: proxmox_base64::encode(filepath),
-            text: String::from_utf8_lossy(filepath.split(|x| *x == b'/').last().unwrap())
+            text: String::from_utf8_lossy(filepath.split(|x| *x == b'/').next_back().unwrap())
                 .to_string(),
             entry_type: match entry_type {
                 Some(entry_type) => CatalogEntryType::from(entry_type).to_string(),
