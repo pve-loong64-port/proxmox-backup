@@ -54,10 +54,7 @@ async fn forget_group(group: String, mut param: Value) -> Result<(), Error> {
     let snapshots = result["data"].as_array().unwrap().len();
 
     let confirmation = Confirmation::query_with_default(
-        format!(
-            "Delete group \"{backup_group}\" with {snapshots} snapshot(s)?"
-        )
-        .as_str(),
+        format!("Delete group \"{backup_group}\" with {snapshots} snapshot(s)?").as_str(),
         Confirmation::No,
     )?;
     if confirmation.is_yes() {

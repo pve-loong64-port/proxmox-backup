@@ -34,9 +34,7 @@ fn pxar_create_and_extract() {
         .status()
         .unwrap_or_else(|err| panic!("Failed to invoke '{exec_path}': {err}"));
 
-    println!(
-        "run 'rsync --dry-run --itemize-changes --archive {src_dir} {dest_dir}' to verify'"
-    );
+    println!("run 'rsync --dry-run --itemize-changes --archive {src_dir} {dest_dir}' to verify'");
     /* Use rsync with --dry-run and --itemize-changes to compare
     src_dir and dest_dir */
     let stdout = Command::new("rsync")

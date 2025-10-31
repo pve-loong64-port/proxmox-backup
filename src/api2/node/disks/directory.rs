@@ -348,9 +348,7 @@ fn create_datastore_mount_unit(
     let (mount_unit_path, mount_unit_name) = datastore_mount_unit_path_info(mount_point);
 
     let unit = SystemdUnitSection {
-        Description: format!(
-            "Mount datatstore '{datastore_name}' under '{mount_point}'"
-        ),
+        Description: format!("Mount datatstore '{datastore_name}' under '{mount_point}'"),
         ..Default::default()
     };
 

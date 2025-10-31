@@ -274,9 +274,7 @@ fn download_file(
         };
 
         if let Some(index) = index {
-            env.log(format!(
-                "register chunks in '{file_name}' as downloadable."
-            ));
+            env.log(format!("register chunks in '{file_name}' as downloadable."));
 
             for pos in 0..index.index_count() {
                 let info = index.chunk_info(pos).unwrap();

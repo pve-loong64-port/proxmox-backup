@@ -142,9 +142,7 @@ async fn register_account(
         }
     };
 
-    println!(
-        "Attempting to fetch Terms of Service from {directory_url:?}"
-    );
+    println!("Attempting to fetch Terms of Service from {directory_url:?}");
     let mut client = AcmeClient::new(directory_url.clone());
     let directory = client.directory().await?;
     let tos_agreed = if let Some(tos_url) = directory.terms_of_service_url() {

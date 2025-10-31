@@ -235,9 +235,7 @@ impl proxmox_tfa::api::OpenUserChallengeData for UserAccess {
             match serde_json::from_slice(&data) {
                 Ok(inner) => inner,
                 Err(err) => {
-                    eprintln!(
-                        "failed to parse challenge data for user {userid}: {err}"
-                    );
+                    eprintln!("failed to parse challenge data for user {userid}: {err}");
                     Default::default()
                 }
             }

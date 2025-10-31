@@ -51,9 +51,9 @@ impl<R: Read> Read for ChecksumReader<R> {
         if count > 0 {
             self.hasher.update(&buf[..count]);
             if let Some(ref mut signer) = self.signer {
-                signer.update(&buf[..count]).map_err(|err| {
-                    std::io::Error::other(format!("hmac update failed - {err}"))
-                })?;
+                signer
+                    .update(&buf[..count])
+                    .map_err(|err| std::io::Error::other(format!("hmac update failed - {err}")))?;
             }
         }
         Ok(count)

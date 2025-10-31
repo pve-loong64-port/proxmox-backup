@@ -278,9 +278,7 @@ fn tape_alert_flags(param: Value) -> Result<(), Error> {
     let output_format = get_output_format(&param);
 
     let mut handle = get_tape_handle(&param)?;
-    let result = handle
-        .tape_alert_flags()
-        .map(|flags| format!("{flags:?}"));
+    let result = handle.tape_alert_flags().map(|flags| format!("{flags:?}"));
 
     if output_format == "json-pretty" {
         let result = result.map_err(|err: Error| err.to_string());
