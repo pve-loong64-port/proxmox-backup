@@ -84,7 +84,7 @@ impl CryptConfig {
     }
 
     /// Returns an openssl Signer using SHA256
-    pub fn data_signer(&self) -> openssl::sign::Signer {
+    pub fn data_signer(&'_ self) -> openssl::sign::Signer<'_> {
         openssl::sign::Signer::new(MessageDigest::sha256(), &self.id_pkey).unwrap()
     }
 

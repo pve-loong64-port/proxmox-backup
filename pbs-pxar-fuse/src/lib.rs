@@ -406,7 +406,7 @@ impl SessionImpl {
         }
     }
 
-    fn get_lookup(&self, inode: u64) -> Result<LookupRef, Error> {
+    fn get_lookup(&'_ self, inode: u64) -> Result<LookupRef<'_>, Error> {
         let lookups = self.lookups.read().unwrap();
         if let Some(lookup) = lookups.get(&inode) {
             return Ok(lookup.get_ref(self));
@@ -447,7 +447,12 @@ impl SessionImpl {
         }
     }
 
-    fn make_lookup(&self, parent: u64, inode: u64, entry: &FileEntry) -> Result<LookupRef, Error> {
+    fn make_lookup(
+        &'_ self,
+        parent: u64,
+        inode: u64,
+        entry: &FileEntry,
+    ) -> Result<LookupRef<'_>, Error> {
         let lookups = self.lookups.read().unwrap();
         if let Some(lookup) = lookups.get(&inode) {
             return Ok(lookup.get_ref(self));

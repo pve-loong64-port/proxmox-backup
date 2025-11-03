@@ -122,9 +122,9 @@ impl SnapshotReader {
 
     /// Returns an iterator for all chunks not skipped by `skip_fn`.
     pub fn chunk_iterator<F: Fn(&[u8; 32]) -> bool>(
-        &self,
+        &'_ self,
         skip_fn: F,
-    ) -> Result<SnapshotChunkIterator<F>, Error> {
+    ) -> Result<SnapshotChunkIterator<'_, F>, Error> {
         SnapshotChunkIterator::new(self, skip_fn)
     }
 }

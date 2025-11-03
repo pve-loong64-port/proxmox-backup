@@ -848,12 +848,12 @@ impl SgTape {
         Ok(transfer_len)
     }
 
-    pub fn open_writer(&mut self) -> BlockedWriter<SgTapeWriter> {
+    pub fn open_writer(&'_ mut self) -> BlockedWriter<SgTapeWriter<'_>> {
         let writer = SgTapeWriter::new(self);
         BlockedWriter::new(writer)
     }
 
-    pub fn open_reader(&mut self) -> Result<BlockedReader<SgTapeReader>, BlockReadError> {
+    pub fn open_reader(&'_ mut self) -> Result<BlockedReader<SgTapeReader<'_>>, BlockReadError> {
         let reader = SgTapeReader::new(self);
         BlockedReader::open(reader)
     }

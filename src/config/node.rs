@@ -252,7 +252,7 @@ impl NodeConfig {
         AcmeClient::load(&account).await
     }
 
-    pub fn acme_domains(&self) -> AcmeDomainIter {
+    pub fn acme_domains(&'_ self) -> AcmeDomainIter<'_> {
         AcmeDomainIter::new(self)
     }
 
