@@ -2235,6 +2235,8 @@ impl DataStore {
         if ok {
             info!("Removing datastore from config...");
             let _lock = pbs_config::datastore::lock_config()?;
+            // read again to avoid loosing concurrent modifications
+            let (mut config, _digest) = pbs_config::datastore::config()?;
             let _ = config.sections.remove(name);
             pbs_config::datastore::save_config(&config)?;
         }
