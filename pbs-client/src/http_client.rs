@@ -425,11 +425,11 @@ impl HttpClient {
                 ) {
                     Ok(None) => true,
                     Ok(Some(fingerprint)) => {
-                        if fingerprint_cache && prefix.is_some() {
-                            if let Err(err) =
-                                store_fingerprint(prefix.as_ref().unwrap(), &server, &fingerprint)
-                            {
-                                error!("{}", err);
+                        if fingerprint_cache {
+                            if let Some(ref prefix) = prefix {
+                                if let Err(err) = store_fingerprint(prefix, &server, &fingerprint) {
+                                    error!("{}", err);
+                                }
                             }
                         }
                         *verified_fingerprint.lock().unwrap() = Some(fingerprint);
@@ -535,16 +535,18 @@ impl HttpClient {
                 .await
                 {
                     Ok(auth) => {
-                        if use_ticket_cache && prefix2.is_some() {
-                            if let Err(err) = store_ticket_info(
-                                prefix2.as_ref().unwrap(),
-                                &server2,
-                                &auth.auth_id.to_string(),
-                                &auth.ticket,
-                                &auth.token,
-                            ) {
-                                if std::io::stdout().is_terminal() {
-                                    error!("storing login ticket failed: {}", err);
+                        if use_ticket_cache {
+                            if let Some(ref prefix) = prefix2 {
+                                if let Err(err) = store_ticket_info(
+                                    prefix,
+                                    &server2,
+                                    &auth.auth_id.to_string(),
+                                    &auth.ticket,
+                                    &auth.token,
+                                ) {
+                                    if std::io::stdout().is_terminal() {
+                                        error!("storing login ticket failed: {}", err);
+                                    }
                                 }
                             }
                         }
@@ -572,19 +574,22 @@ impl HttpClient {
             let authinfo = auth.clone();
 
             move |auth| {
-                if use_ticket_cache && prefix.is_some() {
-                    if let Err(err) = store_ticket_info(
-                        prefix.as_ref().unwrap(),
-                        &server,
-                        &auth.auth_id.to_string(),
-                        &auth.ticket,
-                        &auth.token,
-                    ) {
-                        if std::io::stdout().is_terminal() {
-                            error!("storing login ticket failed: {}", err);
+                if use_ticket_cache {
+                    if let Some(ref prefix) = prefix {
+                        if let Err(err) = store_ticket_info(
+                            prefix,
+                            &server,
+                            &auth.auth_id.to_string(),
+                            &auth.ticket,
+                            &auth.token,
+                        ) {
+                            if std::io::stdout().is_terminal() {
+                                error!("storing login ticket failed: {}", err);
+                            }
                         }
                     }
                 }
+
                 *authinfo.write().unwrap() = auth;
                 tokio::spawn(renewal_future);
             }
