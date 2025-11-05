@@ -2476,4 +2476,15 @@ impl DataStore {
         replace_file(&path, blob.raw_data(), CreateOptions::new(), false)?;
         Ok(())
     }
+
+    /// Set the notes for given snapshots.
+    pub fn set_notes(self: &Arc<Self>, notes: String, snapshot: BackupDir) -> Result<(), Error> {
+        let backend = self.backend().context("failed to get backend")?;
+        snapshot
+            .update_manifest(&backend, |manifest| {
+                manifest.unprotected["notes"] = notes.into();
+            })
+            .map_err(|err| format_err!("unable to update manifest blob - {err}"))?;
+        Ok(())
+    }
 }

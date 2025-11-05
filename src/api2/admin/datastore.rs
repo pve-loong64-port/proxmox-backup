@@ -2093,12 +2093,7 @@ pub fn set_notes(
     )?;
 
     let backup_dir = datastore.backup_dir(ns, backup_dir)?;
-
-    backup_dir
-        .update_manifest(&datastore.backend()?, |manifest| {
-            manifest.unprotected["notes"] = notes.into();
-        })
-        .map_err(|err| format_err!("unable to update manifest blob - {}", err))?;
+    datastore.set_notes(notes, backup_dir)?;
 
     Ok(())
 }
