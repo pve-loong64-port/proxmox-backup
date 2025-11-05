@@ -2009,19 +2009,10 @@ pub fn set_group_notes(
         &backup_group,
     )?;
 
-    if let DatastoreBackend::S3(s3_client) = datastore.backend()? {
-        let mut path = ns.path();
-        path.push(backup_group.to_string());
-        let object_key = pbs_datastore::s3::object_key_from_path(&path, "notes")
-            .context("invalid owner file object key")?;
-        let data = hyper::body::Bytes::copy_from_slice(notes.as_bytes());
-        let _is_duplicate =
-            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
-                .context("failed to set notes on s3 backend")?;
-    }
-    let notes_path = datastore.group_notes_path(&ns, &backup_group);
-    replace_file(notes_path, notes.as_bytes(), CreateOptions::new(), false)?;
-
+    let backup_group = datastore.backup_group(ns, backup_group);
+    datastore
+        .set_group_notes(notes, backup_group)
+        .map_err(|err| format_err!("failed to set group notes - {err:#?}"))?;
     Ok(())
 }
 

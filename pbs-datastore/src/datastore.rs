@@ -2418,4 +2418,30 @@ impl DataStore {
             .map_err(|err| format_err!("{err:#}"))?;
         Ok((backend_type, Some(s3_client)))
     }
+
+    /// Creates or updates the notes associated with a backup group.
+    /// Acquires exclusive lock on the backup group.
+    pub fn set_group_notes(
+        self: &Arc<Self>,
+        notes: String,
+        backup_group: BackupGroup,
+    ) -> Result<(), Error> {
+        let _lock = backup_group.lock().context("failed to lock backup group")?;
+
+        if let DatastoreBackend::S3(s3_client) = self.backend()? {
+            let mut path = backup_group.backup_ns().path();
+            path.push(backup_group.group().to_string());
+            let object_key = crate::s3::object_key_from_path(&path, "notes")
+                .context("invalid owner file object key")?;
+            let data = hyper::body::Bytes::copy_from_slice(notes.as_bytes());
+            let _is_duplicate = proxmox_async::runtime::block_on(
+                s3_client.upload_replace_with_retry(object_key, data),
+            )
+            .context("failed to set notes on s3 backend")?;
+        }
+        let notes_path = self.group_notes_path(backup_group.backup_ns(), backup_group.group());
+        replace_file(notes_path, notes.as_bytes(), CreateOptions::new(), false)
+            .context("failed to replace group notes file")?;
+        Ok(())
+    }
 }
