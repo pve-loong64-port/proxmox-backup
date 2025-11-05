@@ -76,7 +76,7 @@ impl VerifyWorker {
         }
     }
 
-    fn rename_corrupted_chunk(datastore: Arc<DataStore>, digest: &[u8; 32]) {
+    fn rename_corrupt_chunk(datastore: Arc<DataStore>, digest: &[u8; 32]) {
         let (path, digest_str) = datastore.chunk_path(digest);
 
         let mut counter = 0;
@@ -106,14 +106,14 @@ impl VerifyWorker {
                 match pbs_datastore::s3::object_key_from_digest_with_suffix(digest, &suffix) {
                     Ok(target_key) => target_key,
                     Err(err) => {
-                        info!("could not generate target key for corrupted chunk {path:?} - {err}");
+                        info!("could not generate target key for corrupt chunk {path:?} - {err}");
                         return;
                     }
                 };
             let object_key = match pbs_datastore::s3::object_key_from_digest(digest) {
                 Ok(object_key) => object_key,
                 Err(err) => {
-                    info!("could not generate object key for corrupted chunk {path:?} - {err}");
+                    info!("could not generate object key for corrupt chunk {path:?} - {err}");
                     return;
                 }
             };
@@ -136,12 +136,12 @@ impl VerifyWorker {
 
         match std::fs::rename(&path, &new_path) {
             Ok(_) => {
-                info!("corrupted chunk renamed to {:?}", &new_path);
+                info!("corrupt chunk renamed to {:?}", &new_path);
             }
             Err(err) => {
                 match err.kind() {
                     std::io::ErrorKind::NotFound => { /* ignored */ }
-                    _ => info!("could not rename corrupted chunk {:?} - {err}", &path),
+                    _ => info!("could not rename corrupt chunk {:?} - {err}", &path),
                 }
             }
         };
@@ -189,7 +189,7 @@ impl VerifyWorker {
                     corrupt_chunks2.lock().unwrap().insert(digest);
                     info!("{err}");
                     errors2.fetch_add(1, Ordering::SeqCst);
-                    Self::rename_corrupted_chunk(datastore2.clone(), &digest);
+                    Self::rename_corrupt_chunk(datastore2.clone(), &digest);
                 } else {
                     verified_chunks2.lock().unwrap().insert(digest);
                 }
@@ -336,7 +336,7 @@ impl VerifyWorker {
         corrupt_chunks.insert(digest);
         error!(message);
         errors.fetch_add(1, Ordering::SeqCst);
-        Self::rename_corrupted_chunk(self.datastore.clone(), &digest);
+        Self::rename_corrupt_chunk(self.datastore.clone(), &digest);
     }
 
     fn verify_fixed_index(&self, backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
