@@ -378,9 +378,9 @@ pub async fn delete_snapshot(
         )?;
 
         let snapshot = datastore.backup_dir(ns, backup_dir)?;
-
-        snapshot.destroy(false, &datastore.backend()?)?;
-
+        datastore
+            .delete_snapshot(&snapshot)
+            .map_err(|err| format_err!("failed to delete snapshot - {err:#?}"))?;
         Ok(Value::Null)
     })
     .await?
@@ -986,21 +986,12 @@ pub fn prune(
             });
 
             if !keep {
-                match datastore.backend() {
-                    Ok(backend) => {
-                        if let Err(err) = backup_dir.destroy(false, &backend) {
-                            warn!(
-                                "failed to remove dir {:?}: {}",
-                                backup_dir.relative_path(),
-                                err,
-                            );
-                        }
-                    }
-                    Err(err) => warn!(
-                        "failed to remove dir {:?}: {err}",
+                if let Err(err) = datastore.delete_snapshot(backup_dir) {
+                    warn!(
+                        "failed to remove dir {:?}: {err:#?}",
                         backup_dir.relative_path()
-                    ),
-                };
+                    );
+                }
             }
         }
         prune_result

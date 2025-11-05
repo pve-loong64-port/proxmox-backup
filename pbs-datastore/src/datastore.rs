@@ -2444,4 +2444,13 @@ impl DataStore {
             .context("failed to replace group notes file")?;
         Ok(())
     }
+
+    /// Delete a backup snapshot from the datastore.
+    /// Acquires exclusive lock on the backup snapshot.
+    pub fn delete_snapshot(self: &Arc<Self>, snapshot: &BackupDir) -> Result<(), Error> {
+        let backend = self.backend().context("failed to get backend")?;
+        // acquires exclusive lock on snapshot before removal
+        snapshot.destroy(false, &backend)?;
+        Ok(())
+    }
 }
