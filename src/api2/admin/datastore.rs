@@ -28,9 +28,7 @@ use proxmox_router::{
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::fs::{
-    file_read_firstline, file_read_optional_string, replace_file, CreateOptions,
-};
+use proxmox_sys::fs::{file_read_firstline, file_read_optional_string, CreateOptions};
 use proxmox_time::CalendarEvent;
 use proxmox_worker_task::WorkerTaskContext;
 
@@ -63,7 +61,7 @@ use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
     check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, DataStore,
-    DatastoreBackend, LocalChunkReader, StoreProgress,
+    LocalChunkReader, StoreProgress,
 };
 use pbs_tools::json::required_string_param;
 use proxmox_rest_server::{formatter, worker_is_active, WorkerTask};
@@ -1536,20 +1534,14 @@ pub fn upload_backup_log(
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
 
-        if let DatastoreBackend::S3(s3_client) = datastore.backend()? {
-            let object_key = pbs_datastore::s3::object_key_from_path(
-                &backup_dir.relative_path(),
-                file_name.as_ref(),
-            )
-            .context("invalid client log object key")?;
-            let data = hyper::body::Bytes::copy_from_slice(blob.raw_data());
-            s3_client
-                .upload_replace_with_retry(object_key, data)
-                .await
-                .context("failed to upload client log to s3 backend")?;
-        };
-
-        replace_file(&path, blob.raw_data(), CreateOptions::new(), false)?;
+        tokio::task::spawn_blocking(move || {
+            let backend = datastore
+                .backend()
+                .context("failed to get datastore backend")?;
+            datastore.add_blob(file_name.as_ref(), backup_dir, blob, &backend)
+        })
+        .await
+        .map_err(|err| format_err!("{err:#?}"))??;
 
         // fixme: use correct formatter
         Ok(formatter::JSON_FORMATTER.format_data(Value::Null, &*rpcenv))

@@ -2453,4 +2453,27 @@ impl DataStore {
         snapshot.destroy(false, &backend)?;
         Ok(())
     }
+
+    /// Adds the blob to the given snapshot.
+    /// Requires the caller to hold the exclusive lock.
+    pub fn add_blob(
+        self: &Arc<Self>,
+        filename: &str,
+        snapshot: BackupDir,
+        blob: DataBlob,
+        backend: &DatastoreBackend,
+    ) -> Result<(), Error> {
+        if let DatastoreBackend::S3(s3_client) = backend {
+            let object_key = crate::s3::object_key_from_path(&snapshot.relative_path(), filename)
+                .context("invalid blob object key")?;
+            let data = hyper::body::Bytes::copy_from_slice(blob.raw_data());
+            proxmox_async::runtime::block_on(s3_client.upload_replace_with_retry(object_key, data))
+                .context("failed to upload blob to s3 backend")?;
+        };
+
+        let mut path = snapshot.full_path();
+        path.push(filename);
+        replace_file(&path, blob.raw_data(), CreateOptions::new(), false)?;
+        Ok(())
+    }
 }
