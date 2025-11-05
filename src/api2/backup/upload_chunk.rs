@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Error};
 use futures::*;
 use hex::FromHex;
 use http_body_util::{BodyDataStream, BodyExt};
-use hyper::body::{Bytes, Incoming};
+use hyper::body::Incoming;
 use hyper::http::request::Parts;
 use serde_json::{json, Value};
 
@@ -15,7 +15,7 @@ use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{BACKUP_ARCHIVE_NAME_SCHEMA, CHUNK_DIGEST_SCHEMA};
 use pbs_datastore::file_formats::{DataBlobHeader, EncryptedDataBlobHeader};
-use pbs_datastore::{DataBlob, DatastoreBackend};
+use pbs_datastore::DataBlob;
 use pbs_tools::json::{required_integer_param, required_string_param};
 
 use super::environment::*;
@@ -232,59 +232,15 @@ async fn upload_to_backend(
     let (digest, size, chunk) =
         UploadChunk::new(BodyDataStream::new(req_body), digest, size, encoded_size).await?;
 
-    match &env.backend {
-        DatastoreBackend::Filesystem => {
-            let (is_duplicate, compressed_size) = proxmox_async::runtime::block_in_place(|| {
-                env.datastore.insert_chunk(&chunk, &digest)
-            })?;
-            Ok((digest, size, compressed_size as u32, is_duplicate))
-        }
-        DatastoreBackend::S3(s3_client) => {
-            let chunk_data: Bytes = chunk.raw_data().to_vec().into();
-
-            if env.no_cache {
-                let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
-                let is_duplicate = s3_client
-                    .upload_no_replace_with_retry(object_key, chunk_data)
-                    .await
-                    .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
-                return Ok((digest, size, encoded_size, is_duplicate));
-            }
-
-            // Avoid re-upload to S3 if the chunk is either present in the LRU cache or the chunk
-            // file exists on filesystem. The latter means that the chunk has been present in the
-            // past an was not cleaned up by garbage collection, so contained in the S3 object store.
-            if env.datastore.cache_contains(&digest) {
-                tracing::info!("Skip upload of cached chunk {}", hex::encode(digest));
-                return Ok((digest, size, encoded_size, true));
-            }
-            if let Ok(true) = env.datastore.cond_touch_chunk(&digest, false) {
-                tracing::info!(
-                    "Skip upload of already encountered chunk {}",
-                    hex::encode(digest)
-                );
-                return Ok((digest, size, encoded_size, true));
-            }
-
-            tracing::info!("Upload of new chunk {}", hex::encode(digest));
-            let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
-            let is_duplicate = s3_client
-                .upload_no_replace_with_retry(object_key, chunk_data)
-                .await
-                .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
-
-            // Only insert the chunk into the cache after it has been successufuly uploaded.
-            // Although less performant than doing this in parallel, it is required for consisency
-            // since chunks are considered as present on the backend if the file exists in the local
-            // cache store.
-            let datastore = env.datastore.clone();
-            tracing::info!("Caching of chunk {}", hex::encode(digest));
-            let _ = tokio::task::spawn_blocking(move || datastore.cache_insert(&digest, &chunk))
-                .await?;
-
-            Ok((digest, size, encoded_size, is_duplicate))
-        }
+    if env.no_cache {
+        let (is_duplicate, chunk_size) =
+            env.datastore
+                .insert_chunk_no_cache(&chunk, &digest, &env.backend)?;
+        return Ok((digest, size, chunk_size as u32, is_duplicate));
     }
+
+    let (is_duplicate, chunk_size) = env.datastore.insert_chunk(&chunk, &digest, &env.backend)?;
+    Ok((digest, size, chunk_size as u32, is_duplicate))
 }
 
 pub const API_METHOD_UPLOAD_SPEEDTEST: ApiMethod = ApiMethod::new(

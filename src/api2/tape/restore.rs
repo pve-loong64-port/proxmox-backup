@@ -1151,6 +1151,7 @@ fn restore_partial_chunk_archive<'a>(
     let bytes = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let bytes2 = bytes.clone();
 
+    let backend = datastore.backend()?;
     let writer_pool = ParallelHandler::new(
         "tape restore chunk writer",
         4,
@@ -1162,7 +1163,7 @@ fn restore_partial_chunk_archive<'a>(
                     chunk.decode(None, Some(&digest))?; // verify digest
                 }
 
-                datastore.insert_chunk(&chunk, &digest)?;
+                datastore.insert_chunk(&chunk, &digest, &backend)?;
             }
             Ok(())
         },
@@ -1544,6 +1545,7 @@ fn restore_chunk_archive<'a>(
     let bytes = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let bytes2 = bytes.clone();
 
+    let backend = datastore.backend()?;
     let writer_pool = ParallelHandler::new(
         "tape restore chunk writer",
         4,
@@ -1560,7 +1562,7 @@ fn restore_chunk_archive<'a>(
                     chunk.decode(None, Some(&digest))?; // verify digest
                 }
 
-                datastore.insert_chunk(&chunk, &digest)?;
+                datastore.insert_chunk(&chunk, &digest, &backend)?;
             } else if verbose {
                 info!("Found existing chunk: {}", hex::encode(digest));
             }

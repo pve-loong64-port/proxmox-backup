@@ -171,24 +171,7 @@ async fn pull_index_chunks<I: IndexFile>(
         move |(chunk, digest, size): (DataBlob, [u8; 32], u64)| {
             // println!("verify and write {}", hex::encode(&digest));
             chunk.verify_unencrypted(size as usize, &digest)?;
-            match &backend {
-                DatastoreBackend::Filesystem => {
-                    target2.insert_chunk(&chunk, &digest)?;
-                }
-                DatastoreBackend::S3(s3_client) => {
-                    if target2.cache_contains(&digest) {
-                        return Ok(());
-                    }
-                    target2.cache_insert(&digest, &chunk)?;
-                    let data = chunk.raw_data().to_vec();
-                    let upload_data = hyper::body::Bytes::from(data);
-                    let object_key = pbs_datastore::s3::object_key_from_digest(&digest)?;
-                    let _is_duplicate = proxmox_async::runtime::block_on(
-                        s3_client.upload_no_replace_with_retry(object_key, upload_data),
-                    )
-                    .context("failed to upload chunk to s3 backend")?;
-                }
-            }
+            target2.insert_chunk(&chunk, &digest, &backend)?;
             Ok(())
         },
     );

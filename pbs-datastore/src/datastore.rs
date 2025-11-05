@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{bail, format_err, Context, Error};
 use http_body_util::BodyExt;
+use hyper::body::Bytes;
 use nix::unistd::{unlinkat, UnlinkatFlags};
 use pbs_tools::lru_cache::LruCache;
 use tokio::io::AsyncWriteExt;
@@ -1855,8 +1856,88 @@ impl DataStore {
             .cond_touch_chunk(digest, assert_exists)
     }
 
-    pub fn insert_chunk(&self, chunk: &DataBlob, digest: &[u8; 32]) -> Result<(bool, u64), Error> {
-        self.inner.chunk_store.insert_chunk(chunk, digest)
+    /// Inserts the chunk with given digest in the chunk store based on the given backend.
+    ///
+    /// The backend is passed along in order to reuse an active connection to the backend, created
+    /// on environment instantiation, e.g. an s3 client which lives for the whole backup session.
+    /// This calls into async code, so callers must assure to never hold a Mutex lock.
+    pub fn insert_chunk(
+        &self,
+        chunk: &DataBlob,
+        digest: &[u8; 32],
+        backend: &DatastoreBackend,
+    ) -> Result<(bool, u64), Error> {
+        match backend {
+            DatastoreBackend::Filesystem => self.inner.chunk_store.insert_chunk(chunk, digest),
+            DatastoreBackend::S3(s3_client) => self.insert_chunk_cached(chunk, digest, &s3_client),
+        }
+    }
+
+    /// Inserts the chunk with given digest in the chunk store based on the given backend, but
+    /// always bypasses the local datastore cache.
+    ///
+    /// The backend is passed along in order to reuse an active connection to the backend, created
+    /// on environment instantiation, e.g. an s3 client which lives for the whole backup session.
+    /// This calls into async code, so callers must assure to never hold a Mutex lock.
+    ///
+    /// FIXME: refactor into insert_chunk() once the backend instance is cacheable on the datastore
+    /// itself.
+    pub fn insert_chunk_no_cache(
+        &self,
+        chunk: &DataBlob,
+        digest: &[u8; 32],
+        backend: &DatastoreBackend,
+    ) -> Result<(bool, u64), Error> {
+        match backend {
+            DatastoreBackend::Filesystem => self.inner.chunk_store.insert_chunk(chunk, digest),
+            DatastoreBackend::S3(s3_client) => {
+                let chunk_data: Bytes = chunk.raw_data().to_vec().into();
+                let chunk_size = chunk_data.len() as u64;
+                let object_key = crate::s3::object_key_from_digest(digest)?;
+                let is_duplicate = proxmox_async::runtime::block_on(
+                    s3_client.upload_no_replace_with_retry(object_key, chunk_data),
+                )
+                .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
+                Ok((is_duplicate, chunk_size))
+            }
+        }
+    }
+
+    fn insert_chunk_cached(
+        &self,
+        chunk: &DataBlob,
+        digest: &[u8; 32],
+        s3_client: &Arc<S3Client>,
+    ) -> Result<(bool, u64), Error> {
+        let chunk_data = chunk.raw_data();
+        let chunk_size = chunk_data.len() as u64;
+
+        // Avoid re-upload to S3 if the chunk is either present in the in-memory LRU cache
+        // or the chunk marker file exists on filesystem. The latter means the chunk has
+        // been uploaded in the past, but was evicted from the LRU cache since but was not
+        // cleaned up by garbage collection, so contained in the S3 object store.
+        if self.cache_contains(&digest) {
+            tracing::info!("Skip upload of cached chunk {}", hex::encode(digest));
+            return Ok((true, chunk_size));
+        }
+        if let Ok(true) = self.cond_touch_chunk(digest, false) {
+            tracing::info!(
+                "Skip upload of already encountered chunk {}",
+                hex::encode(digest),
+            );
+            return Ok((true, chunk_size));
+        }
+
+        tracing::info!("Upload new chunk {}", hex::encode(digest));
+        let object_key = crate::s3::object_key_from_digest(digest)?;
+        let chunk_data: Bytes = chunk_data.to_vec().into();
+        let is_duplicate = proxmox_async::runtime::block_on(
+            s3_client.upload_no_replace_with_retry(object_key, chunk_data),
+        )
+        .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
+        tracing::info!("Caching of chunk {}", hex::encode(digest));
+        self.cache_insert(&digest, &chunk)?;
+        Ok((is_duplicate, chunk_size))
     }
 
     pub fn stat_chunk(&self, digest: &[u8; 32]) -> Result<std::fs::Metadata, Error> {
