@@ -11,7 +11,6 @@ use serde_json::{json, Value};
 
 use proxmox_http::Body;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
-use proxmox_sys::fs::{replace_file, CreateOptions};
 
 use pbs_api_types::Authid;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
@@ -686,24 +685,8 @@ impl BackupEnvironment {
 
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
-
-        let raw_data = blob.raw_data();
-        if let DatastoreBackend::S3(s3_client) = &self.backend {
-            let object_key = pbs_datastore::s3::object_key_from_path(
-                &self.backup_dir.relative_path(),
-                file_name,
-            )
-            .context("invalid blob object key")?;
-            let data = hyper::body::Bytes::copy_from_slice(raw_data);
-            proxmox_async::runtime::block_on(
-                s3_client.upload_replace_with_retry(object_key.clone(), data),
-            )
-            .context("failed to upload blob to s3 backend")?;
-            self.log(format!("Uploaded blob to object store: {object_key}"))
-        }
-
-        replace_file(&path, raw_data, CreateOptions::new(), false)?;
-
+        self.datastore
+            .add_blob(file_name, self.backup_dir.clone(), blob, &self.backend)?;
         self.log(format!(
             "add blob {path:?} ({orig_len} bytes, comp: {blob_len})"
         ));
