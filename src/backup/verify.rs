@@ -76,77 +76,6 @@ impl VerifyWorker {
         }
     }
 
-    fn rename_corrupt_chunk(datastore: Arc<DataStore>, digest: &[u8; 32]) {
-        let (path, digest_str) = datastore.chunk_path(digest);
-
-        let mut counter = 0;
-        let mut new_path = path.clone();
-        loop {
-            new_path.set_file_name(format!("{digest_str}.{counter}.bad"));
-            if new_path.exists() && counter < 9 {
-                counter += 1;
-            } else {
-                break;
-            }
-        }
-
-        let backend = match datastore.backend() {
-            Ok(backend) => backend,
-            Err(err) => {
-                info!(
-                    "failed to get backend while trying to rename bad chunk: {digest_str} - {err}"
-                );
-                return;
-            }
-        };
-
-        if let DatastoreBackend::S3(s3_client) = backend {
-            let suffix = format!(".{counter}.bad");
-            let target_key =
-                match pbs_datastore::s3::object_key_from_digest_with_suffix(digest, &suffix) {
-                    Ok(target_key) => target_key,
-                    Err(err) => {
-                        info!("could not generate target key for corrupt chunk {path:?} - {err}");
-                        return;
-                    }
-                };
-            let object_key = match pbs_datastore::s3::object_key_from_digest(digest) {
-                Ok(object_key) => object_key,
-                Err(err) => {
-                    info!("could not generate object key for corrupt chunk {path:?} - {err}");
-                    return;
-                }
-            };
-            if proxmox_async::runtime::block_on(
-                s3_client.copy_object(object_key.clone(), target_key),
-            )
-            .is_ok()
-            {
-                if proxmox_async::runtime::block_on(s3_client.delete_object(object_key)).is_err() {
-                    info!("failed to delete corrupt chunk on s3 backend: {digest_str}");
-                }
-            } else {
-                info!("failed to copy corrupt chunk on s3 backend: {digest_str}");
-                // Early return to leave the potentially locally cached chunk in the same state as
-                // on the object store. Verification might have failed because of connection issue
-                // after all.
-                return;
-            }
-        }
-
-        match std::fs::rename(&path, &new_path) {
-            Ok(_) => {
-                info!("corrupt chunk renamed to {:?}", &new_path);
-            }
-            Err(err) => {
-                match err.kind() {
-                    std::io::ErrorKind::NotFound => { /* ignored */ }
-                    _ => info!("could not rename corrupt chunk {:?} - {err}", &path),
-                }
-            }
-        };
-    }
-
     fn verify_index_chunks(
         &self,
         index: Box<dyn IndexFile + Send>,
@@ -189,7 +118,7 @@ impl VerifyWorker {
                     corrupt_chunks2.lock().unwrap().insert(digest);
                     info!("{err}");
                     errors2.fetch_add(1, Ordering::SeqCst);
-                    Self::rename_corrupt_chunk(datastore2.clone(), &digest);
+                    datastore2.rename_corrupt_chunk(&digest);
                 } else {
                     verified_chunks2.lock().unwrap().insert(digest);
                 }
@@ -336,7 +265,7 @@ impl VerifyWorker {
         corrupt_chunks.insert(digest);
         error!(message);
         errors.fetch_add(1, Ordering::SeqCst);
-        Self::rename_corrupt_chunk(self.datastore.clone(), &digest);
+        self.datastore.rename_corrupt_chunk(&digest);
     }
 
     fn verify_fixed_index(&self, backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
