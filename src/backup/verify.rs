@@ -118,7 +118,11 @@ impl VerifyWorker {
                     corrupt_chunks2.lock().unwrap().insert(digest);
                     info!("{err}");
                     errors2.fetch_add(1, Ordering::SeqCst);
-                    datastore2.rename_corrupt_chunk(&digest);
+                    match datastore2.rename_corrupt_chunk(&digest) {
+                        Ok(Some(new_path)) => info!("corrupt chunk renamed to {new_path:?}"),
+                        Err(err) => info!("{err}"),
+                        _ => (),
+                    }
                 } else {
                     verified_chunks2.lock().unwrap().insert(digest);
                 }
@@ -265,7 +269,11 @@ impl VerifyWorker {
         corrupt_chunks.insert(digest);
         error!(message);
         errors.fetch_add(1, Ordering::SeqCst);
-        self.datastore.rename_corrupt_chunk(&digest);
+        match self.datastore.rename_corrupt_chunk(&digest) {
+            Ok(Some(new_path)) => info!("corrupt chunk renamed to {new_path:?}"),
+            Err(err) => info!("{err}"),
+            _ => (),
+        }
     }
 
     fn verify_fixed_index(&self, backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
