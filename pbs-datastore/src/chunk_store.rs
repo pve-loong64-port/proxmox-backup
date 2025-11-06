@@ -204,15 +204,28 @@ impl ChunkStore {
         })
     }
 
-    fn touch_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    fn touch_chunk_no_lock(&self, digest: &[u8; 32]) -> Result<(), Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
 
-        self.cond_touch_chunk(digest, true)?;
+        self.cond_touch_chunk_no_lock(digest, true)?;
         Ok(())
     }
 
+    /// Update the chunk files atime if it exists.
+    ///
+    /// If the chunk file does not exist, return with error if assert_exists is true, with
+    /// Ok(false) otherwise.
     pub(super) fn cond_touch_chunk(
+        &self,
+        digest: &[u8; 32],
+        assert_exists: bool,
+    ) -> Result<bool, Error> {
+        let _lock = self.mutex.lock();
+        self.cond_touch_chunk_no_lock(digest, assert_exists)
+    }
+
+    fn cond_touch_chunk_no_lock(
         &self,
         digest: &[u8; 32],
         assert_exists: bool,
@@ -587,7 +600,7 @@ impl ChunkStore {
             }
             let old_size = metadata.len();
             if encoded_size == old_size {
-                self.touch_chunk(digest)?;
+                self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else if old_size == 0 {
                 log::warn!("found empty chunk '{digest_str}' in store {name}, overwriting");
@@ -612,11 +625,11 @@ impl ChunkStore {
                 // compressed, the size mismatch could be caused by different zstd versions
                 // so let's keep the one that was uploaded first, bit-rot is hopefully detected by
                 // verification at some point..
-                self.touch_chunk(digest)?;
+                self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else if old_size < encoded_size {
                 log::debug!("Got another copy of chunk with digest '{digest_str}', existing chunk is smaller, discarding uploaded one.");
-                self.touch_chunk(digest)?;
+                self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else {
                 log::debug!("Got another copy of chunk with digest '{digest_str}', existing chunk is bigger, replacing with uploaded one.");
