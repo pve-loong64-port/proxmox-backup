@@ -444,6 +444,7 @@ async fn pull_snapshot<'a>(
         return Ok(sync_stats);
     }
 
+    let backend = &params.target.backend;
     for item in manifest.files() {
         let mut path = snapshot.full_path();
         path.push(&item.filename);
@@ -489,7 +490,7 @@ async fn pull_snapshot<'a>(
             snapshot,
             item,
             downloaded_chunks.clone(),
-            &params.target.backend,
+            backend,
         )
         .await?;
         sync_stats.add(stats);
@@ -498,7 +499,7 @@ async fn pull_snapshot<'a>(
     if let Err(err) = std::fs::rename(&tmp_manifest_name, &manifest_name) {
         bail!("Atomic rename file {:?} failed - {}", manifest_name, err);
     }
-    if let DatastoreBackend::S3(s3_client) = &params.target.backend {
+    if let DatastoreBackend::S3(s3_client) = backend {
         let object_key = pbs_datastore::s3::object_key_from_path(
             &snapshot.relative_path(),
             MANIFEST_BLOB_NAME.as_ref(),
@@ -515,7 +516,7 @@ async fn pull_snapshot<'a>(
     if !client_log_name.exists() {
         reader.try_download_client_log(&client_log_name).await?;
         if client_log_name.exists() {
-            if let DatastoreBackend::S3(s3_client) = &params.target.backend {
+            if let DatastoreBackend::S3(s3_client) = backend {
                 let object_key = pbs_datastore::s3::object_key_from_path(
                     &snapshot.relative_path(),
                     CLIENT_LOG_BLOB_NAME.as_ref(),
