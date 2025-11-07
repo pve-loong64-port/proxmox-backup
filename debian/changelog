@@ -1,3 +1,31 @@
+rust-proxmox-backup (4.0.19-1) trixie; urgency=medium
+
+  * sync: pull: instantiate backend only once per sync job to avoid
+    establishing a new connection for each chunk that gets inserted.
+
+  * api, datastore: ensure that the exclusive lock on the backup group is
+    acquired before updating the notes, in order to avoid possible race
+    conditions, e.g. with backup group destruction.
+
+  * backup log upload: avoid calling a blocking function in async context.
+
+  * verify: improve logs and behavior on errors.
+
+  * datastore: avoid potential loss of concurrent config changes that happened
+    during datastore deletion.
+
+  * fix #4995: pxar: Include symlinks in zip file creation.
+
+  * chunk store: fix theoretical race window between chunk stat and GC
+    cleanup, for a case where a chunk must be older than the cutoff time and
+    not be referenced by any index file and also uploaded at the exact same
+    time that the GC passed over it in phase 2.
+
+  * various code style fixes, partially automated through rust clippy,
+    upgrading from rust 1.85 to 1.90..
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 07 Nov 2025 16:32:39 +0100
+
 rust-proxmox-backup (4.0.18-1) trixie; urgency=medium
 
   * api: chunk upload: extend consistency checks for s3 backend
