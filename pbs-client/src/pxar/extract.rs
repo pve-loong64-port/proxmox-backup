@@ -1333,15 +1333,12 @@ where
         }
         .await
         {
-            let display_string = entry.path().display().to_string();
             error!(
-                "error extracting {}: {}",
-                if matches!(entry.kind(), EntryKind::GoodbyeTable) {
-                    "<directory>"
-                } else {
-                    &display_string
+                "error extracting {}: {err}",
+                match entry.kind() {
+                    EntryKind::GoodbyeTable => "<directory>",
+                    _ => &entry.path().display().to_string(),
                 },
-                err
             );
         }
 
