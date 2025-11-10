@@ -221,7 +221,10 @@ impl BackupGroup {
     ///
     /// Returns `BackupGroupDeleteStats`, containing the number of deleted snapshots
     /// and number of protected snaphsots, which therefore were not removed.
-    pub fn destroy(&self, backend: &DatastoreBackend) -> Result<BackupGroupDeleteStats, Error> {
+    pub(crate) fn destroy(
+        &self,
+        backend: &DatastoreBackend,
+    ) -> Result<BackupGroupDeleteStats, Error> {
         let _guard = self
             .lock()
             .with_context(|| format!("while destroying group '{self:?}'"))?;
@@ -611,7 +614,7 @@ impl BackupDir {
     /// Destroy the whole snapshot, bails if it's protected
     ///
     /// Setting `force` to true skips locking and thus ignores if the backup is currently in use.
-    pub fn destroy(&self, force: bool, backend: &DatastoreBackend) -> Result<(), Error> {
+    pub(crate) fn destroy(&self, force: bool, backend: &DatastoreBackend) -> Result<(), Error> {
         let (_guard, _manifest_guard);
         if !force {
             _guard = self
