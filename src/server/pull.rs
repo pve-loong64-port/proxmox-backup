@@ -342,19 +342,11 @@ async fn pull_single_archive<'a>(
     if let Err(err) = std::fs::rename(&tmp_path, &path) {
         bail!("Atomic rename file {:?} failed - {}", path, err);
     }
-    if let DatastoreBackend::S3(s3_client) = backend {
-        let object_key =
-            pbs_datastore::s3::object_key_from_path(&snapshot.relative_path(), archive_name)
-                .context("invalid archive object key")?;
 
-        let data = tokio::fs::read(&path)
-            .await
-            .context("failed to read archive contents")?;
-        let contents = hyper::body::Bytes::from(data);
-        let _is_duplicate = s3_client
-            .upload_replace_with_retry(object_key, contents)
-            .await?;
-    }
+    backend
+        .upload_index_to_backend(snapshot, archive_name)
+        .await?;
+
     Ok(sync_stats)
 }
 

@@ -224,6 +224,36 @@ pub enum DatastoreBackend {
     S3(Arc<S3Client>),
 }
 
+impl DatastoreBackend {
+    /// Reads the index file and uploads it to the backend.
+    ///
+    /// Returns with true if the backend was updated, false if no action needed to be performed
+    pub async fn upload_index_to_backend(
+        &self,
+        backup_dir: &BackupDir,
+        name: &str,
+    ) -> Result<bool, Error> {
+        match self {
+            Self::Filesystem => Ok(false),
+            Self::S3(s3_client) => {
+                let object_key = crate::s3::object_key_from_path(&backup_dir.relative_path(), name)
+                    .context("invalid index file object key")?;
+
+                let mut full_path = backup_dir.full_path();
+                full_path.push(name);
+                let data = tokio::fs::read(&full_path)
+                    .await
+                    .context("failed to read index contents")?;
+                let contents = hyper::body::Bytes::from(data);
+                let _is_duplicate = s3_client
+                    .upload_replace_with_retry(object_key, contents)
+                    .await?;
+                Ok(true)
+            }
+        }
+    }
+}
+
 impl DataStore {
     // This one just panics on everything
     #[doc(hidden)]
