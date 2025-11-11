@@ -25,7 +25,7 @@ use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fd::fd_change_cloexec;
 
-use pbs_api_types::{Userid, NODE_SCHEMA, PRIV_SYS_CONSOLE};
+use pbs_api_types::{NodeShellTicket, NODE_SCHEMA, PRIV_SYS_CONSOLE};
 use tracing::{info, warn};
 
 use crate::auth::{private_auth_keyring, public_auth_keyring};
@@ -70,26 +70,7 @@ pub const SHELL_CMD_SCHEMA: Schema = StringSchema::new("The command to run.")
         },
     },
     returns: {
-        type: Object,
-        description: "Object with the user, ticket, port and upid",
-        properties: {
-            user: {
-                description: "",
-                type: String,
-            },
-            ticket: {
-                description: "",
-                type: String,
-            },
-            port: {
-                description: "",
-                type: String,
-            },
-            upid: {
-                description: "",
-                type: String,
-            },
-        }
+        type: NodeShellTicket,
     },
     access: {
         description: "The user needs Sys.Console on /system.",
@@ -97,7 +78,10 @@ pub const SHELL_CMD_SCHEMA: Schema = StringSchema::new("The command to run.")
     }
 )]
 /// Call termproxy and return shell ticket
-async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+async fn termproxy(
+    cmd: Option<String>,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<NodeShellTicket, Error> {
     let root_auth_id = Authid::root_auth_id();
 
     // intentionally user only for now
@@ -228,12 +212,12 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
         },
     )?;
 
-    Ok(json!({
-        "user": auth_id,
-        "ticket": ticket,
-        "port": port,
-        "upid": upid,
-    }))
+    Ok(NodeShellTicket {
+        user: auth_id,
+        ticket,
+        port,
+        upid,
+    })
 }
 
 #[sortable]
