@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use proxmox_auth_api::api::API_METHOD_CREATE_TICKET_HTTP_ONLY;
+use proxmox_auth_api::api::{API_METHOD_CREATE_TICKET_HTTP_ONLY, API_METHOD_VERIFY_VNC_TICKET};
 use proxmox_auth_api::types::{CreateTicket, CreateTicketResponse};
 use proxmox_router::{
     http_bail, http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture,
@@ -280,6 +280,10 @@ const SUBDIRS: SubdirMap = &sorted!([
         &Router::new()
             .post(&API_METHOD_CREATE_TICKET_TOGGLE)
             .delete(&proxmox_auth_api::api::API_METHOD_LOGOUT)
+    ),
+    (
+        "vncticket",
+        &Router::new().post(&API_METHOD_VERIFY_VNC_TICKET)
     ),
     ("openid", &openid::ROUTER),
     ("domains", &domain::ROUTER),
