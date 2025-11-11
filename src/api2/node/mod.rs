@@ -98,19 +98,13 @@ pub const SHELL_CMD_SCHEMA: Schema = StringSchema::new("The command to run.")
 )]
 /// Call termproxy and return shell ticket
 async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
-    let root_user = Userid::root_userid();
+    let root_auth_id = Authid::root_auth_id();
 
     // intentionally user only for now
     let auth_id: Authid = rpcenv
         .get_auth_id()
         .ok_or_else(|| format_err!("no authid available"))?
         .parse()?;
-
-    if auth_id.is_token() {
-        bail!("API tokens cannot access this API endpoint");
-    }
-
-    let userid = auth_id.user();
 
     let path = "/system";
 
@@ -120,21 +114,21 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
 
     let ticket = Ticket::new(crate::auth::TERM_PREFIX, &Empty)?.sign(
         private_auth_keyring(),
-        Some(&tools::ticket::term_aad(userid, path, port)),
+        Some(&tools::ticket::term_aad(&auth_id, path, port)),
     )?;
 
     let mut command = Vec::new();
     match cmd.as_deref() {
         Some("login") | None => {
             command.push("login");
-            if userid == root_user {
+            if auth_id == *root_auth_id {
                 command.push("-f");
                 command.push("root");
             }
         }
         Some("upgrade") => {
-            if userid != root_user {
-                bail!("only {root_user} can upgrade");
+            if auth_id != *root_auth_id {
+                bail!("only {root_auth_id} can upgrade");
             }
             // TODO: add nicer/safer wrapper like in PVE instead
             command.push("sh");
@@ -144,7 +138,6 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
         _ => bail!("invalid command"),
     };
 
-    let username = userid.name().to_owned();
     let upid = WorkerTask::spawn(
         "termproxy",
         None,
@@ -166,6 +159,7 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
                 "--authport",
                 "82",
                 "--port-as-fd",
+                "--vncticket-endpoint",
                 "--",
             ]);
             arguments.extend_from_slice(&command);
@@ -234,9 +228,8 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
         },
     )?;
 
-    // FIXME: We're returning the user NAME only?
     Ok(json!({
-        "user": username,
+        "user": auth_id,
         "ticket": ticket,
         "port": port,
         "upid": upid,
@@ -278,11 +271,6 @@ fn upgrade_to_websocket(
             .ok_or_else(|| format_err!("no authid available"))?
             .parse()?;
 
-        if auth_id.is_token() {
-            bail!("API tokens cannot access this API endpoint");
-        }
-
-        let userid = auth_id.user();
         let ticket = pbs_tools::json::required_string_param(&param, "vncticket")?;
         let port: u16 = pbs_tools::json::required_integer_param(&param, "port")? as u16;
 
@@ -290,7 +278,7 @@ fn upgrade_to_websocket(
         Ticket::<Empty>::parse(ticket)?.verify(
             public_auth_keyring(),
             crate::auth::TERM_PREFIX,
-            Some(&tools::ticket::term_aad(userid, "/system", port)),
+            Some(&tools::ticket::term_aad(&auth_id, "/system", port)),
         )?;
 
         let (ws, response) = WebSocket::new(parts.headers.clone())?;
