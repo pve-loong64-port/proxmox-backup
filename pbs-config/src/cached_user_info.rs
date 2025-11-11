@@ -137,7 +137,7 @@ impl CachedUserInfo {
     }
 
     pub fn is_superuser(&self, auth_id: &Authid) -> bool {
-        !auth_id.is_token() && auth_id.user() == "root@pam"
+        !auth_id.is_token() && auth_id.user() == Userid::root_userid()
     }
 
     pub fn is_group_member(&self, _userid: &Userid, _group: &str) -> bool {
@@ -208,7 +208,7 @@ impl CachedUserInfo {
 
 impl UserInformation for CachedUserInfo {
     fn is_superuser(&self, userid: &str) -> bool {
-        userid == "root@pam"
+        userid == Userid::root_userid().as_str()
     }
 
     fn is_group_member(&self, _userid: &str, _group: &str) -> bool {

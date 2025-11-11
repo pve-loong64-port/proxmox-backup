@@ -25,7 +25,7 @@ use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fd::fd_change_cloexec;
 
-use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_CONSOLE};
+use pbs_api_types::{Userid, NODE_SCHEMA, PRIV_SYS_CONSOLE};
 use tracing::{info, warn};
 
 use crate::auth::{private_auth_keyring, public_auth_keyring};
@@ -98,6 +98,8 @@ pub const SHELL_CMD_SCHEMA: Schema = StringSchema::new("The command to run.")
 )]
 /// Call termproxy and return shell ticket
 async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let root_user = Userid::root_userid();
+
     // intentionally user only for now
     let auth_id: Authid = rpcenv
         .get_auth_id()
@@ -125,14 +127,14 @@ async fn termproxy(cmd: Option<String>, rpcenv: &mut dyn RpcEnvironment) -> Resu
     match cmd.as_deref() {
         Some("login") | None => {
             command.push("login");
-            if userid == "root@pam" {
+            if userid == root_user {
                 command.push("-f");
                 command.push("root");
             }
         }
         Some("upgrade") => {
-            if userid != "root@pam" {
-                bail!("only root@pam can upgrade");
+            if userid != root_user {
+                bail!("only {root_user} can upgrade");
             }
             // TODO: add nicer/safer wrapper like in PVE instead
             command.push("sh");

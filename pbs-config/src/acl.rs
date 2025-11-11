@@ -449,7 +449,7 @@ impl AclTree {
 
         for (auth_id, roles) in &node.users {
             // no need to save, because root is always 'Administrator'
-            if !auth_id.is_token() && auth_id.user() == "root@pam" {
+            if !auth_id.is_token() && auth_id.user() == Userid::root_userid() {
                 continue;
             }
             for (role, propagate) in roles {

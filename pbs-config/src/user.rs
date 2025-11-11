@@ -53,8 +53,9 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 
     let digest = openssl::sha::sha256(content.as_bytes());
     let mut data = CONFIG.parse(USER_CFG_FILENAME, &content)?;
+    let root_user = Userid::root_userid().as_str();
 
-    if !data.sections.contains_key("root@pam") {
+    if !data.sections.contains_key(root_user) {
         let user: User = User {
             userid: Userid::root_userid().clone(),
             comment: Some("Superuser".to_string()),
@@ -64,7 +65,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
             lastname: None,
             email: None,
         };
-        data.set_data("root@pam", "user", &user).unwrap();
+        data.set_data(root_user, "user", &user).unwrap();
     }
 
     Ok((data, digest))
