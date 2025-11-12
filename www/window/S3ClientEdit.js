@@ -122,6 +122,20 @@ Ext.define('PBS.window.S3ClientEdit', {
 
         advancedColumn1: [
             {
+                xtype: 'pmxBandwidthField',
+                name: 'rate-in',
+                fieldLabel: gettext('Rate In'),
+                emptyText: gettext('Unlimited'),
+                submitAutoScaledSizeUnit: true,
+            },
+            {
+                xtype: 'pmxBandwidthField',
+                name: 'rate-out',
+                fieldLabel: gettext('Rate Out'),
+                emptyText: gettext('Unlimited'),
+                submitAutoScaledSizeUnit: true,
+            },
+            {
                 xtype: 'proxmoxKVComboBox',
                 name: 'provider-quirks',
                 fieldLabel: gettext('Provider Quirks'),
@@ -136,6 +150,22 @@ Ext.define('PBS.window.S3ClientEdit', {
                 },
             },
         ],
+        advancedColumn2: [
+            {
+                xtype: 'pmxBandwidthField',
+                name: 'burst-in',
+                fieldLabel: gettext('Burst In'),
+                emptyText: gettext('Same as Rate'),
+                submitAutoScaledSizeUnit: true,
+            },
+            {
+                xtype: 'pmxBandwidthField',
+                name: 'burst-out',
+                fieldLabel: gettext('Burst Out'),
+                emptyText: gettext('Same as Rate'),
+                submitAutoScaledSizeUnit: true,
+            },
+        ],
     },
 
     getValues: function () {
@@ -146,6 +176,10 @@ Ext.define('PBS.window.S3ClientEdit', {
             values.delete = values.delete.split(',');
         }
         PBS.Utils.delete_if_default(values, 'path-style', false, me.isCreate);
+        PBS.Utils.delete_if_default(values, 'rate-in', undefined, me.isCreate);
+        PBS.Utils.delete_if_default(values, 'burst-in', undefined, me.isCreate);
+        PBS.Utils.delete_if_default(values, 'rate-out', undefined, me.isCreate);
+        PBS.Utils.delete_if_default(values, 'burst-out', undefined, me.isCreate);
 
         let https_scheme_prefix = 'https://';
         if (values.endpoint.startsWith(https_scheme_prefix)) {
