@@ -341,6 +341,8 @@ pub enum DeletableProperty {
     VerifiedOnly,
     /// Delete the run_on_mount property,
     RunOnMount,
+    /// Delete the unmount_on_done property,
+    UnmountOnDone,
     /// Delete the sync_direction property,
     SyncDirection,
 }
@@ -463,6 +465,9 @@ pub fn update_sync_job(
                 DeletableProperty::RunOnMount => {
                     data.run_on_mount = None;
                 }
+                DeletableProperty::UnmountOnDone => {
+                    data.unmount_on_done = None;
+                }
                 DeletableProperty::SyncDirection => {
                     data.sync_direction = None;
                 }
@@ -514,6 +519,12 @@ pub fn update_sync_job(
     }
     if let Some(run_on_mount) = update.run_on_mount {
         data.run_on_mount = Some(run_on_mount);
+    }
+    if let Some(unmount_on_done) = update.unmount_on_done {
+        if unmount_on_done && data.run_on_mount != Some(true) {
+            bail!("'unmount-on-done' can only be set when 'run-on-mount' is enabled");
+        }
+        data.unmount_on_done = Some(unmount_on_done);
     }
     if let Some(sync_direction) = update.sync_direction {
         data.sync_direction = Some(sync_direction);
@@ -692,6 +703,7 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         encrypted_only: None,
         verified_only: None,
         run_on_mount: None,
+        unmount_on_done: None,
         sync_direction: None, // use default
     };
 
