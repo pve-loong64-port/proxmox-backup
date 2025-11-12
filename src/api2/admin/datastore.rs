@@ -2466,6 +2466,7 @@ async fn do_sync_jobs(
             }
         }
     }
+
     Ok(())
 }
 
@@ -2527,30 +2528,44 @@ pub fn mount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Er
                 warn!("unable to parse sync job config, won't run any sync jobs");
                 return Ok(());
             };
-            let mut jobs_to_run: Vec<SyncJobConfig> = list
-                .into_iter()
-                .filter(|job: &SyncJobConfig| {
-                    // add job iff (running on mount is enabled and) any of these apply
-                    //   - the jobs is local and we are source or target
-                    //   - we are the source of a push to a remote
-                    //   - we are the target of a pull from a remote
-                    //
-                    // `job.store == datastore.name` iff we are the target for pull from remote or we
-                    // are the source for push to remote, therefore we don't have to check for the
-                    // direction of the job.
-                    job.run_on_mount.unwrap_or(false)
-                        && (job.remote.is_none() && job.remote_store == name || job.store == name)
-                })
-                .collect();
+            let (unmount_on_done, mut jobs_to_run): (bool, Vec<SyncJobConfig>) =
+                list.into_iter().fold(
+                    (false, Vec::new()),
+                    |(mut unmount, mut jobs), job: SyncJobConfig| {
+                        // add job iff (running on mount is enabled and) any of these apply
+                        //   - the jobs is local and we are source or target
+                        //   - we are the source of a push to a remote
+                        //   - we are the target of a pull from a remote
+                        //
+                        // `job.store == datastore.name` iff we are the target for pull from remote or we
+                        // are the source for push to remote, therefore we don't have to check for the
+                        // direction of the job.
+                        let should_run = job.run_on_mount.unwrap_or(false)
+                            && (job.remote.is_none() && job.remote_store == name
+                                || job.store == name);
+                        if should_run {
+                            unmount |= job.unmount_on_done.unwrap_or_default();
+                            jobs.push(job);
+                        };
+                        (unmount, jobs)
+                    },
+                );
             jobs_to_run.sort_by(|j1, j2| j1.id.cmp(&j2.id));
             if !jobs_to_run.is_empty() {
                 info!("starting {} sync jobs", jobs_to_run.len());
                 let _ = WorkerTask::spawn(
                     "mount-sync-jobs",
-                    Some(store),
+                    Some(store.clone()),
                     auth_id.to_string(),
                     false,
-                    move |worker| async move { do_sync_jobs(jobs_to_run, worker).await },
+                    move |worker| async move {
+                        let res = do_sync_jobs(jobs_to_run, worker).await;
+                        if unmount_on_done {
+                            info!("start unmounting...");
+                            do_unmount(store, auth_id, false).await?;
+                        }
+                        res
+                    },
                 );
             }
             Ok(())
@@ -2603,25 +2618,7 @@ fn do_unmount_device(
     })
 }
 
-#[api(
-    protected: true,
-    input: {
-        properties: {
-            store: { schema: DATASTORE_SCHEMA },
-        },
-    },
-    returns: {
-        schema: UPID_SCHEMA,
-    },
-    access: {
-        permission: &Permission::And(&[
-            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, true),
-            &Permission::Privilege(&["system", "disks"], PRIV_SYS_MODIFY, false)
-        ]),
-    }
-)]
-/// Unmount a removable device that is associated with the datastore
-pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+async fn do_unmount(store: String, auth_id: Authid, to_stdout: bool) -> Result<Value, Error> {
     let _lock = pbs_config::datastore::lock_config()?;
     let (mut section_config, _digest) = pbs_config::datastore::config()?;
     let mut datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
@@ -2640,9 +2637,6 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
     pbs_config::datastore::save_config(&section_config)?;
 
     drop(_lock);
-
-    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
-    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
     if let Ok(proxy_pid) = proxmox_rest_server::read_pid(pbs_buildcfg::PROXMOX_BACKUP_PROXY_PID_FN)
     {
@@ -2666,6 +2660,30 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
     )?;
 
     Ok(json!(upid))
+}
+
+#[api(
+    protected: true,
+    input: {
+        properties: {
+            store: { schema: DATASTORE_SCHEMA },
+        },
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::And(&[
+            &Permission::Privilege(&["datastore", "{store}"], PRIV_DATASTORE_MODIFY, true),
+            &Permission::Privilege(&["system", "disks"], PRIV_SYS_MODIFY, false)
+        ]),
+    }
+)]
+/// Unmount a removable device that is associated with the datastore
+pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+    do_unmount(store, auth_id, to_stdout).await
 }
 
 #[api(
