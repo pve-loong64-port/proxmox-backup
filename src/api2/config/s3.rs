@@ -139,6 +139,14 @@ pub enum DeletableProperty {
     Fingerprint,
     /// Delete the path-style property.
     PathStyle,
+    /// Delete the rate-in property.
+    RateIn,
+    /// Delete the burst-in property.
+    BurstIn,
+    /// Delete the rate-out property.
+    RateOut,
+    /// Delete the burst-out property.
+    BurstOut,
     /// Delete the provider quirks property.
     ProviderQuirks,
 }
@@ -213,6 +221,18 @@ pub fn update_s3_client_config(
                 DeletableProperty::PathStyle => {
                     data.config.path_style = None;
                 }
+                DeletableProperty::RateIn => {
+                    data.config.rate_in = None;
+                }
+                DeletableProperty::BurstIn => {
+                    data.config.burst_in = None;
+                }
+                DeletableProperty::RateOut => {
+                    data.config.rate_out = None;
+                }
+                DeletableProperty::BurstOut => {
+                    data.config.burst_out = None;
+                }
                 DeletableProperty::ProviderQuirks => {
                     data.config.provider_quirks = None;
                 }
@@ -237,6 +257,18 @@ pub fn update_s3_client_config(
     }
     if let Some(path_style) = update.path_style {
         data.config.path_style = Some(path_style);
+    }
+    if let Some(rate_in) = update.rate_in {
+        data.config.rate_in = Some(rate_in);
+    }
+    if let Some(burst_in) = update.burst_in {
+        data.config.burst_in = Some(burst_in);
+    }
+    if let Some(rate_out) = update.rate_out {
+        data.config.rate_out = Some(rate_out);
+    }
+    if let Some(burst_out) = update.burst_out {
+        data.config.burst_out = Some(burst_out);
     }
     if let Some(provider_quirks) = update.provider_quirks {
         data.config.provider_quirks = Some(provider_quirks);
