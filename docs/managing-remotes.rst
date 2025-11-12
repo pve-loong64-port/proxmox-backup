@@ -150,6 +150,10 @@ relevant removable datastore is mounted. If mounting a removable datastore would
 multiple sync jobs, these jobs will be run sequentially in alphabetical order based on
 their ID.
 
+If the ``unmount-on-done`` flag is set, the datastore will be automatically unmounted
+after the sync job finishes. This option is only available for sync jobs triggered by
+mounting (``run-on-mount``), enabling fully automated external drive workflows.
+
 Namespace Support
 ^^^^^^^^^^^^^^^^^
 
