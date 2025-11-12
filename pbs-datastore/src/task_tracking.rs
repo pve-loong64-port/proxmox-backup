@@ -108,6 +108,7 @@ pub fn update_active_operations(
         Operation::Write => ActiveOperationStats { read: 0, write: 1 },
         Operation::Lookup => ActiveOperationStats { read: 0, write: 0 },
     };
+    let mut found_entry = false;
     let mut updated_tasks: Vec<TaskOperations> = match file_read_optional_string(&path)? {
         Some(data) => serde_json::from_str::<Vec<TaskOperations>>(&data)?
             .iter_mut()
@@ -116,6 +117,7 @@ pub fn update_active_operations(
                     Some(stat) if pid == task.pid && stat.starttime != task.starttime => None,
                     Some(_) => {
                         if pid == task.pid {
+                            found_entry = true;
                             match operation {
                                 Operation::Read => task.active_operations.read += count,
                                 Operation::Write => task.active_operations.write += count,
@@ -132,7 +134,7 @@ pub fn update_active_operations(
         None => Vec::new(),
     };
 
-    if updated_tasks.is_empty() {
+    if !found_entry {
         updated_tasks.push(TaskOperations {
             pid,
             starttime,
