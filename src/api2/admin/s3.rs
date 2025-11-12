@@ -49,8 +49,13 @@ pub async fn check(
         .context("config lookup failed")?;
 
     let store_prefix = store_prefix.unwrap_or_default();
-    let options =
-        S3ClientOptions::from_config(config.config, config.secret_key, Some(bucket), store_prefix);
+    let options = S3ClientOptions::from_config(
+        config.config,
+        config.secret_key,
+        Some(bucket),
+        store_prefix,
+        None,
+    );
 
     let test_object_key =
         S3ObjectKey::try_from(".s3-client-test").context("failed to generate s3 object key")?;

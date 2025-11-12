@@ -15,7 +15,9 @@ use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
-use proxmox_s3_client::{S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix};
+use proxmox_s3_client::{
+    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix, S3RateLimiterOptions,
+};
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
@@ -55,6 +57,7 @@ pub const GROUP_NOTES_FILE_NAME: &str = "notes";
 pub const GROUP_OWNER_FILE_NAME: &str = "owner";
 /// Filename for in-use marker stored on S3 object store backend
 pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
+const S3_CLIENT_RATE_LIMITER_BASE_PATH: &str = pbs_buildcfg::rundir!("/s3/shmem/tbf");
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 // s3 put request times out after upload_size / 1 Kib/s, so about 2.3 hours for 8 MiB
 const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
@@ -290,12 +293,18 @@ impl DataStore {
 
                 let (config, _config_digest) = pbs_config::s3::config()?;
                 let config: S3ClientConf = config.lookup(S3_CFG_TYPE_ID, s3_client_id)?;
+                let rate_limiter_options = S3RateLimiterOptions {
+                    id: s3_client_id.to_string(),
+                    user: pbs_config::backup_user()?,
+                    base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
+                };
 
                 let options = S3ClientOptions::from_config(
                     config.config,
                     config.secret_key,
                     Some(bucket),
                     self.name().to_owned(),
+                    Some(rate_limiter_options),
                 );
                 let s3_client = S3Client::new(options)?;
                 DatastoreBackend::S3(Arc::new(s3_client))
@@ -2552,11 +2561,18 @@ impl DataStore {
         let client_config: S3ClientConf = config
             .lookup(S3_CFG_TYPE_ID, s3_client_id)
             .with_context(|| format!("no '{s3_client_id}' in config"))?;
+        let rate_limiter_options = S3RateLimiterOptions {
+            id: s3_client_id.to_string(),
+            user: pbs_config::backup_user()?,
+            base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
+        };
+
         let options = S3ClientOptions::from_config(
             client_config.config,
             client_config.secret_key,
             Some(bucket),
             datastore_config.name.to_owned(),
+            Some(rate_limiter_options),
         );
         let s3_client = S3Client::new(options)
             .context("failed to create s3 client")
