@@ -122,6 +122,7 @@ Ext.define('PBS.window.SyncJobEdit', {
                     }
                     if (!me.isCreate) {
                         PBS.Utils.delete_if_default(values, 'run-on-mount', false);
+                        PBS.Utils.delete_if_default(values, 'unmount-on-done', false);
                         PBS.Utils.delete_if_default(values, 'rate-in');
                         PBS.Utils.delete_if_default(values, 'rate-out');
                         PBS.Utils.delete_if_default(values, 'remote');
@@ -499,8 +500,33 @@ Ext.define('PBS.window.SyncJobEdit', {
                                 'Run this job when a relevant removable datastore gets mounted.',
                             ),
                         },
+                        listeners: {
+                            change: function (field, runOnMount) {
+                                let me = this;
+                                let view = me.up('pbsSyncJobEdit');
+                                let unmountOnDoneCb = view.down('field[name=unmount-on-done]');
+                                unmountOnDoneCb.setDisabled(!runOnMount);
+                                if (!runOnMount) {
+                                    unmountOnDoneCb.setValue(false);
+                                }
+                            },
+                        },
                         uncheckedValue: false,
                         value: false,
+                    },
+                    {
+                        xtype: 'proxmoxcheckbox',
+                        name: 'unmount-on-done',
+                        fieldLabel: gettext('Unmount when done'),
+                        autoEl: {
+                            tag: 'div',
+                            'data-qtip': gettext(
+                                'Unmount relevant removable datastore once sync job finishes.',
+                            ),
+                        },
+                        uncheckedValue: false,
+                        value: false,
+                        disabled: true,
                     },
                 ],
             },
