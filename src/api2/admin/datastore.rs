@@ -2548,7 +2548,7 @@ pub fn mount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Er
     Ok(json!(upid))
 }
 
-fn expect_maintanance_unmounting(
+fn expect_maintenance_unmounting(
     store: &str,
 ) -> Result<(pbs_config::BackupLockGuard, DataStoreConfig), Error> {
     let lock = pbs_config::datastore::lock_config()?;
@@ -2590,7 +2590,7 @@ fn do_unmount_device(
     let mut aborted = false;
     while active_operations.read + active_operations.write > 0 {
         if let Some(worker) = worker {
-            if worker.abort_requested() || expect_maintanance_unmounting(&datastore.name).is_err() {
+            if worker.abort_requested() || expect_maintenance_unmounting(&datastore.name).is_err() {
                 aborted = true;
                 break;
             }
@@ -2608,7 +2608,7 @@ fn do_unmount_device(
     }
 
     if aborted || worker.is_some_and(|w| w.abort_requested()) {
-        let _ = expect_maintanance_unmounting(&datastore.name)
+        let _ = expect_maintenance_unmounting(&datastore.name)
             .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
             .and_then(|(lock, config)| {
                 unset_maintenance(lock, config)
@@ -2616,7 +2616,7 @@ fn do_unmount_device(
             });
         bail!("aborted, due to user request");
     } else {
-        let (lock, config) = expect_maintanance_unmounting(&datastore.name)?;
+        let (lock, config) = expect_maintenance_unmounting(&datastore.name)?;
         crate::tools::disks::unmount_by_mountpoint(Path::new(&mount_point))?;
         unset_maintenance(lock, config)
             .map_err(|e| format_err!("could not reset maintenance mode: {e}"))?;
