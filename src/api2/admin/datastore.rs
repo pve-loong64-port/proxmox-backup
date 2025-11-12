@@ -2548,8 +2548,9 @@ pub fn mount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Er
     Ok(json!(upid))
 }
 
-fn expect_maintenance_unmounting(
+fn expect_maintenance_type(
     store: &str,
+    maintenance_type: MaintenanceType,
 ) -> Result<(pbs_config::BackupLockGuard, DataStoreConfig), Error> {
     let lock = pbs_config::datastore::lock_config()?;
     let (section_config, _digest) = pbs_config::datastore::config()?;
@@ -2557,9 +2558,9 @@ fn expect_maintenance_unmounting(
 
     if store_config
         .get_maintenance_mode()
-        .is_none_or(|m| m.ty != MaintenanceType::Unmount)
+        .is_none_or(|m| m.ty != maintenance_type)
     {
-        bail!("maintenance mode is not 'Unmount'");
+        bail!("maintenance mode is not '{maintenance_type}'");
     }
 
     Ok((lock, store_config))
@@ -2590,7 +2591,9 @@ fn do_unmount_device(
     let mut aborted = false;
     while active_operations.read + active_operations.write > 0 {
         if let Some(worker) = worker {
-            if worker.abort_requested() || expect_maintenance_unmounting(&datastore.name).is_err() {
+            if worker.abort_requested()
+                || expect_maintenance_type(&datastore.name, MaintenanceType::Unmount).is_err()
+            {
                 aborted = true;
                 break;
             }
@@ -2608,7 +2611,7 @@ fn do_unmount_device(
     }
 
     if aborted || worker.is_some_and(|w| w.abort_requested()) {
-        let _ = expect_maintenance_unmounting(&datastore.name)
+        let _ = expect_maintenance_type(&datastore.name, MaintenanceType::Unmount)
             .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
             .and_then(|(lock, config)| {
                 unset_maintenance(lock, config)
@@ -2616,7 +2619,7 @@ fn do_unmount_device(
             });
         bail!("aborted, due to user request");
     } else {
-        let (lock, config) = expect_maintenance_unmounting(&datastore.name)?;
+        let (lock, config) = expect_maintenance_type(&datastore.name, MaintenanceType::Unmount)?;
         crate::tools::disks::unmount_by_mountpoint(Path::new(&mount_point))?;
         unset_maintenance(lock, config)
             .map_err(|e| format_err!("could not reset maintenance mode: {e}"))?;
