@@ -74,6 +74,7 @@ proxmox-network-api = "1"
 proxmox-notify = "1"
 proxmox-openid = "1"
 proxmox-product-config = "1"
+proxmox-rate-limiter = "1.0.0"
 proxmox-rest-server = { version = "1.0.1", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "3.2.2", default-features = false }
@@ -227,6 +228,7 @@ proxmox-network-api = { workspace = true, features = [ "impl" ] }
 proxmox-notify = { workspace = true, features = [ "pbs-context" ] }
 proxmox-openid.workspace = true
 proxmox-product-config.workspace = true
+proxmox-rate-limiter = { workspace = true, features = [ "shared-rate-limiter" ] }
 proxmox-rest-server = { workspace = true, features = [ "rate-limited-stream" ] }
 proxmox-router = { workspace = true, features = [ "cli", "server"] }
 proxmox-s3-client.workspace = true
@@ -288,6 +290,7 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-notify = { path = "../proxmox/proxmox-notify" }
 #proxmox-openid = { path = "../proxmox/proxmox-openid" }
 #proxmox-product-config = { path = "../proxmox/proxmox-product-config" }
+#proxmox-rate-limiter = { path = "../proxmox/proxmox-rate-limiter" }
 #proxmox-rest-server = { path = "../proxmox/proxmox-rest-server" }
 #proxmox-router = { path = "../proxmox/proxmox-router" }
 #proxmox-rrd = { path = "../proxmox/proxmox-rrd" }

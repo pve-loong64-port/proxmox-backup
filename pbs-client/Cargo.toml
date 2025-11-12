@@ -36,10 +36,11 @@ pathpatterns.workspace = true
 proxmox-async.workspace = true
 proxmox-auth-api.workspace = true
 proxmox-compression.workspace = true
-proxmox-http = { workspace = true, features = [ "body", "rate-limiter" ] }
+proxmox-http = { workspace = true, features = [ "body" ] }
 proxmox-human-byte.workspace = true
 proxmox-io = { workspace = true, features = [ "tokio" ] }
 proxmox-log = { workspace = true }
+proxmox-rate-limiter = { workspace = true, features = [ "rate-limiter" ] }
 proxmox-router = { workspace = true, features = [ "cli", "server" ] }
 proxmox-schema.workspace = true
 proxmox-sys.workspace = true

@@ -16,10 +16,6 @@ use pbs_datastore::manifest::BackupManifest;
 pub mod config;
 pub mod disks;
 pub mod fs;
-
-mod shared_rate_limiter;
-pub use shared_rate_limiter::SharedRateLimiter;
-
 pub mod statistics;
 pub mod systemd;
 pub mod ticket;

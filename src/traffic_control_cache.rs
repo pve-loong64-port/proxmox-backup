@@ -8,7 +8,7 @@ use std::time::Instant;
 use anyhow::Error;
 use cidr::IpInet;
 
-use proxmox_http::{RateLimiter, ShareableRateLimit};
+use proxmox_rate_limiter::{RateLimiter, ShareableRateLimit, SharedRateLimiter};
 use proxmox_section_config::SectionConfigData;
 
 use proxmox_time::{parse_daily_duration, DailyDuration, TmEditor};
@@ -16,8 +16,6 @@ use proxmox_time::{parse_daily_duration, DailyDuration, TmEditor};
 use pbs_api_types::{TrafficControlRule, Userid};
 
 use pbs_config::ConfigVersionCache;
-
-use crate::tools::SharedRateLimiter;
 
 pub type SharedRateLimit = Arc<dyn ShareableRateLimit>;
 
@@ -116,7 +114,9 @@ fn create_limiter(
     burst: u64,
 ) -> Result<SharedRateLimit, Error> {
     if use_shared_memory {
-        let limiter = SharedRateLimiter::mmap_shmem(name, rate, burst)?;
+        let user = pbs_config::backup_user()?;
+        let base_path = pbs_buildcfg::rundir!("/shmem/tbf");
+        let limiter = SharedRateLimiter::mmap_shmem(name, rate, burst, user, base_path)?;
         Ok(Arc::new(limiter))
     } else {
         Ok(Arc::new(Mutex::new(RateLimiter::new(rate, burst))))

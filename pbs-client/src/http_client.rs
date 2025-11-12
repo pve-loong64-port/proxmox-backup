@@ -31,8 +31,9 @@ use proxmox_async::broadcast_future::BroadcastFuture;
 use proxmox_http::client::HttpsConnector;
 use proxmox_http::uri::{build_authority, json_object_to_query};
 use proxmox_http::Body;
-use proxmox_http::{ProxyConfig, RateLimiter};
+use proxmox_http::ProxyConfig;
 use proxmox_log::{error, info, warn};
+use proxmox_rate_limiter::RateLimiter;
 
 use pbs_api_types::percent_encoding::DEFAULT_ENCODE_SET;
 use pbs_api_types::{Authid, RateLimitConfig, Userid};
