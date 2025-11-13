@@ -2674,7 +2674,6 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
 )]
 /// Refresh datastore contents from S3 to local cache store.
 pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Lookup))?;
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
@@ -2696,15 +2695,19 @@ pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
         Some(store.clone()),
         auth_id.to_string(),
         to_stdout,
-        move |_worker| {
-            proxmox_async::runtime::block_on(datastore.s3_refresh())?;
-
-            let (_lock, config) = expect_maintenance_type(&store, MaintenanceType::S3Refresh)?;
-            unset_maintenance(_lock, config).context("failed to clear maintenance mode")
-        },
+        move |worker| do_s3_refresh(&store, &worker),
     )?;
 
     Ok(json!(upid))
+}
+
+/// Performs an s3 refresh for given datastore. Expects the store to already be in maintenance mode
+/// s3-refresh.
+pub(crate) fn do_s3_refresh(store: &str, worker: &dyn WorkerTaskContext) -> Result<(), Error> {
+    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Lookup))?;
+    run_maintenance_locked(&store, MaintenanceType::S3Refresh, worker, || {
+        proxmox_async::runtime::block_on(datastore.s3_refresh())
+    })
 }
 
 /// Wait for no more active operations on the given datastore and run the provided callback in
