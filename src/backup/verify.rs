@@ -1,6 +1,6 @@
 use pbs_config::BackupLockGuard;
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -32,6 +32,34 @@ pub struct VerifyWorker {
     verified_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     backend: DatastoreBackend,
+}
+
+struct IndexVerifyState {
+    read_bytes: AtomicU64,
+    decoded_bytes: AtomicU64,
+    errors: AtomicUsize,
+    datastore: Arc<DataStore>,
+    corrupt_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    verified_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    start_time: Instant,
+}
+
+impl IndexVerifyState {
+    fn new(
+        datastore: &Arc<DataStore>,
+        corrupt_chunks: &Arc<Mutex<HashSet<[u8; 32]>>>,
+        verified_chunks: &Arc<Mutex<HashSet<[u8; 32]>>>,
+    ) -> Self {
+        Self {
+            read_bytes: AtomicU64::new(0),
+            decoded_bytes: AtomicU64::new(0),
+            errors: AtomicUsize::new(0),
+            datastore: Arc::clone(datastore),
+            corrupt_chunks: Arc::clone(corrupt_chunks),
+            verified_chunks: Arc::clone(verified_chunks),
+            start_time: Instant::now(),
+        }
+    }
 }
 
 impl VerifyWorker {
