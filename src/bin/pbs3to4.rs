@@ -89,9 +89,9 @@ impl Checker {
             .iter()
             .find(|pkg| pkg.package.as_str() == PROXMOX_BACKUP_META);
 
-        if let Some(pbs_meta_pkg) = pbs_meta_pkg {
+        if let Some(old_version) = pbs_meta_pkg.and_then(|m| m.old_version.as_ref()) {
             let pkg_version = Regex::new(r"^(\d+)\.(\d+)[.-](\d+)")?;
-            let captures = pkg_version.captures(&pbs_meta_pkg.old_version);
+            let captures = pkg_version.captures(old_version);
             if let Some(captures) = captures {
                 let maj = Self::extract_version_from_captures(1, &captures)?;
                 let min = Self::extract_version_from_captures(2, &captures)?;

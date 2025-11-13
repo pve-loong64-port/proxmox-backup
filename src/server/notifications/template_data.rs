@@ -154,7 +154,7 @@ pub struct UpgradablePackage {
     /// The new version which can be installed.
     available_version: String,
     /// The currently installed version.
-    installed_version: String,
+    installed_version: Option<String>,
 }
 
 /// Template data for the package-updates template.

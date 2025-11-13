@@ -1,6 +1,6 @@
 Proxmox Backup Server has the following updates available:
 {{#each available-updates}}
-    {{this.package-name}}: {{this.installed-version}} -> {{this.available-version}}
+    {{this.package-name}}: {{#if this.installed-version}}{{this.installed-version}} ->{{else}}NEW,{{/if}} {{this.available-version}}
 {{/each}}
 
 To upgrade visit the web interface:
