@@ -2584,45 +2584,11 @@ fn do_unmount_device(
     if datastore.backing_device.is_none() {
         bail!("can't unmount non-removable datastore");
     }
+
     let mount_point = datastore.absolute_path();
-
-    let mut active_operations = task_tracking::get_active_operations(&datastore.name)?;
-    let mut old_status = String::new();
-    let mut aborted = false;
-    while active_operations.read + active_operations.write > 0 {
-        if worker.abort_requested()
-            || expect_maintenance_type(&datastore.name, MaintenanceType::Unmount).is_err()
-        {
-            aborted = true;
-            break;
-        }
-        let status = format!(
-            "cannot unmount yet, still {} read and {} write operations active",
-            active_operations.read, active_operations.write
-        );
-        if status != old_status {
-            info!("{status}");
-            old_status = status;
-        }
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        active_operations = task_tracking::get_active_operations(&datastore.name)?;
-    }
-
-    if aborted || worker.abort_requested() {
-        let _ = expect_maintenance_type(&datastore.name, MaintenanceType::Unmount)
-            .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
-            .and_then(|(lock, config)| {
-                unset_maintenance(lock, config)
-                    .inspect_err(|e| warn!("could not reset maintenance mode: {e}"))
-            });
-        bail!("aborted, due to user request");
-    } else {
-        let (lock, config) = expect_maintenance_type(&datastore.name, MaintenanceType::Unmount)?;
-        crate::tools::disks::unmount_by_mountpoint(Path::new(&mount_point))?;
-        unset_maintenance(lock, config)
-            .map_err(|e| format_err!("could not reset maintenance mode: {e}"))?;
-    }
-    Ok(())
+    run_maintenance_locked(&datastore.name, MaintenanceType::Unmount, worker, || {
+        crate::tools::disks::unmount_by_mountpoint(Path::new(&mount_point))
+    })
 }
 
 #[api(
@@ -2721,6 +2687,54 @@ pub async fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Resul
     )?;
 
     Ok(json!(upid))
+}
+
+/// Wait for no more active operations on the given datastore and run the provided callback in
+/// a datastore locked context, protecting against maintenance mode changes.
+fn run_maintenance_locked(
+    store: &str,
+    maintenance_expected: MaintenanceType,
+    worker: &dyn WorkerTaskContext,
+    callback: impl Fn() -> Result<(), Error>,
+) -> Result<(), Error> {
+    let mut active_operations = task_tracking::get_active_operations(store)?;
+    let mut old_status = String::new();
+    let mut aborted = false;
+
+    while active_operations.read + active_operations.write > 0 {
+        if worker.abort_requested() || expect_maintenance_type(store, maintenance_expected).is_err()
+        {
+            aborted = true;
+            break;
+        }
+        let status = format!(
+            "waiting for active operations to finsish before continuing: read {}, write {}",
+            active_operations.read, active_operations.write,
+        );
+        if status != old_status {
+            info!("{status}");
+            old_status = status;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        active_operations = task_tracking::get_active_operations(store)?;
+    }
+
+    if aborted || worker.abort_requested() {
+        let _ = expect_maintenance_type(store, maintenance_expected)
+            .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
+            .and_then(|(lock, config)| {
+                unset_maintenance(lock, config)
+                    .inspect_err(|e| warn!("could not reset maintenance mode: {e}"))
+            });
+        bail!("aborted, due to user request");
+    }
+
+    let (lock, config) = expect_maintenance_type(store, maintenance_expected)?;
+    callback()?;
+    unset_maintenance(lock, config)
+        .map_err(|e| format_err!("could not reset maintenance mode: {e}"))?;
+
+    Ok(())
 }
 
 #[sortable]
