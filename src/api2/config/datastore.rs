@@ -32,9 +32,7 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
-use pbs_datastore::{
-    get_datastore_mount_status, DataStore, DatastoreBackend, S3_DATASTORE_IN_USE_MARKER,
-};
+use pbs_datastore::{get_datastore_mount_status, DataStore, S3_DATASTORE_IN_USE_MARKER};
 use proxmox_rest_server::WorkerTask;
 use proxmox_s3_client::{S3ObjectKey, S3_HTTP_REQUEST_TIMEOUT};
 
@@ -338,9 +336,8 @@ pub fn create_datastore(
 
     let store_name = config.name.to_string();
 
-    if let (_backend, Some(s3_client)) =
-        DataStore::s3_client_and_backend_from_datastore_config(&config)?
-    {
+    let (backend, s3_client) = DataStore::s3_client_and_backend_from_datastore_config(&config)?;
+    if let Some(s3_client) = s3_client {
         proxmox_async::runtime::block_on(s3_client.head_bucket())
             .context("failed to access bucket")
             .map_err(|err| format_err!("{err:#}"))?;
@@ -370,15 +367,9 @@ pub fn create_datastore(
                     Some(Operation::Lookup),
                 )
                 .context("failed to lookup datastore")?;
-                match datastore
-                    .backend()
-                    .context("failed to get datastore backend")?
-                {
-                    DatastoreBackend::Filesystem => (),
-                    DatastoreBackend::S3(_s3_client) => {
-                        proxmox_async::runtime::block_on(datastore.s3_refresh())
-                            .context("S3 refresh failed")?;
-                    }
+                if backend == DatastoreBackendType::S3 {
+                    proxmox_async::runtime::block_on(datastore.s3_refresh())
+                        .context("S3 refresh failed")?;
                 }
             }
             Ok(())
