@@ -15,7 +15,8 @@ use pbs_api_types::{
     GROUP_FILTER_LIST_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA,
     REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA,
     SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA, TRANSFER_LAST_SCHEMA, UPID_SCHEMA,
-    VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    VERIFICATION_OUTDATED_AFTER_SCHEMA, VERIFY_JOB_READ_THREADS_SCHEMA,
+    VERIFY_JOB_VERIFY_THREADS_SCHEMA,
 };
 use pbs_client::{display_task_log, view_task_result};
 use pbs_config::sync;
@@ -581,6 +582,14 @@ async fn push_datastore(
             },
             "output-format": {
                 schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+            "read-threads": {
+                schema: VERIFY_JOB_READ_THREADS_SCHEMA,
+                optional: true,
+            },
+            "verify-threads": {
+                schema: VERIFY_JOB_VERIFY_THREADS_SCHEMA,
                 optional: true,
             },
         }
