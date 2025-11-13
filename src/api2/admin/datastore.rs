@@ -2678,12 +2678,30 @@ pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
+    let _lock = pbs_config::datastore::lock_config()?;
+    let (mut section_config, _digest) = pbs_config::datastore::config()?;
+    let mut datastore_config: DataStoreConfig = section_config.lookup("datastore", &store)?;
+
+    datastore_config.set_maintenance_mode(Some(MaintenanceMode {
+        ty: MaintenanceType::S3Refresh,
+        message: None,
+    }))?;
+
+    section_config.set_data(&store, "datastore", &datastore_config)?;
+    pbs_config::datastore::save_config(&section_config)?;
+    drop(_lock);
+
     let upid = WorkerTask::new_thread(
         "s3-refresh",
-        Some(store),
+        Some(store.clone()),
         auth_id.to_string(),
         to_stdout,
-        move |_worker| proxmox_async::runtime::block_on(datastore.s3_refresh()),
+        move |_worker| {
+            proxmox_async::runtime::block_on(datastore.s3_refresh())?;
+
+            let (_lock, config) = expect_maintenance_type(&store, MaintenanceType::S3Refresh)?;
+            unset_maintenance(_lock, config).context("failed to clear maintenance mode")
+        },
     )?;
 
     Ok(json!(upid))

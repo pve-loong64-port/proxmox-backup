@@ -2305,23 +2305,12 @@ impl DataStore {
         *OLD_LOCKING
     }
 
-    /// Set the datastore's maintenance mode to `S3Refresh`, fetch from S3 object store, clear and
-    /// replace the local cache store contents. Once finished disable the maintenance mode again.
-    /// Returns with error for other datastore backends without setting the maintenance mode.
+    /// Fetch contents from S3 object store, clear and replace the local cache store contents.
+    /// Returns with error for non-S3 datastore backends.
     pub async fn s3_refresh(self: &Arc<Self>) -> Result<(), Error> {
         match self.backend()? {
             DatastoreBackend::Filesystem => bail!("store '{}' not backed by S3", self.name()),
             DatastoreBackend::S3(s3_client) => {
-                let self_clone = Arc::clone(self);
-                tokio::task::spawn_blocking(move || {
-                    self_clone.maintenance_mode(Some(MaintenanceMode {
-                        ty: MaintenanceType::S3Refresh,
-                        message: None,
-                    }))
-                })
-                .await?
-                .context("failed to set maintenance mode")?;
-
                 let tmp_base = proxmox_sys::fs::make_tmp_dir(self.base_path(), None)
                     .context("failed to create temporary content folder in {store_base}")?;
 
@@ -2335,24 +2324,8 @@ impl DataStore {
                     let _ = std::fs::remove_dir_all(&tmp_base);
                     return Err(err);
                 }
-
-                let self_clone = Arc::clone(self);
-                tokio::task::spawn_blocking(move || self_clone.maintenance_mode(None))
-                    .await?
-                    .context("failed to clear maintenance mode")?;
             }
         }
-        Ok(())
-    }
-
-    // Set or clear the datastores maintenance mode by locking and updating the datastore config
-    fn maintenance_mode(&self, maintenance_mode: Option<MaintenanceMode>) -> Result<(), Error> {
-        let _lock = pbs_config::datastore::lock_config()?;
-        let (mut section_config, _digest) = pbs_config::datastore::config()?;
-        let mut datastore: DataStoreConfig = section_config.lookup("datastore", self.name())?;
-        datastore.set_maintenance_mode(maintenance_mode)?;
-        section_config.set_data(self.name(), "datastore", &datastore)?;
-        pbs_config::datastore::save_config(&section_config)?;
         Ok(())
     }
 
