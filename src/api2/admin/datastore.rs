@@ -2673,17 +2673,17 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
     },
 )]
 /// Refresh datastore contents from S3 to local cache store.
-pub async fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
     let datastore = DataStore::lookup_datastore(&store, Some(Operation::Lookup))?;
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
 
-    let upid = WorkerTask::spawn(
+    let upid = WorkerTask::new_thread(
         "s3-refresh",
         Some(store),
         auth_id.to_string(),
         to_stdout,
-        move |_worker| async move { datastore.s3_refresh().await },
+        move |_worker| proxmox_async::runtime::block_on(datastore.s3_refresh()),
     )?;
 
     Ok(json!(upid))
