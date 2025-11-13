@@ -177,6 +177,20 @@ impl VerifyWorker {
             .datastore
             .get_chunks_in_order(&*index, skip_chunk, check_abort)?;
 
+        let reader_pool = ParallelHandler::new("read chunks", 1, {
+            let decoder_pool = decoder_pool.channel();
+            let verify_state = Arc::clone(&verify_state);
+            let backend = self.backend.clone();
+
+            move |info: ChunkReadInfo| {
+                Self::verify_chunk_by_backend(
+                    &backend,
+                    Arc::clone(&verify_state),
+                    &decoder_pool,
+                    &info,
+                )
+            }
+        });
         for (pos, _) in chunk_list {
             self.worker.check_abort()?;
             self.worker.fail_on_shutdown()?;
@@ -188,15 +202,10 @@ impl VerifyWorker {
                 continue; // already verified or marked corrupt
             }
 
-            Self::verify_chunk_by_backend(
-                &self.backend,
-                Arc::clone(&verify_state),
-                &decoder_pool.channel(),
-                &info,
-            )?;
+            reader_pool.send(info)?;
         }
 
-        decoder_pool.complete()?;
+        reader_pool.complete()?;
 
         let elapsed = verify_state.start_time.elapsed().as_secs_f64();
 
