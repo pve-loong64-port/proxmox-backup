@@ -46,6 +46,7 @@ use pbs_api_types::{
     IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT,
     PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ,
     PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    VERIFY_JOB_READ_THREADS_SCHEMA, VERIFY_JOB_VERIFY_THREADS_SCHEMA,
 };
 use pbs_client::pxar::{create_tar, create_zip};
 use pbs_config::CachedUserInfo;
@@ -675,6 +676,14 @@ pub async fn status(
                 schema: NS_MAX_DEPTH_SCHEMA,
                 optional: true,
             },
+            "read-threads": {
+                schema: VERIFY_JOB_READ_THREADS_SCHEMA,
+                optional: true,
+            },
+            "verify-threads": {
+                schema: VERIFY_JOB_VERIFY_THREADS_SCHEMA,
+                optional: true,
+            },
         },
     },
     returns: {
@@ -700,6 +709,8 @@ pub fn verify(
     ignore_verified: Option<bool>,
     outdated_after: Option<i64>,
     max_depth: Option<usize>,
+    read_threads: Option<usize>,
+    verify_threads: Option<usize>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -779,7 +790,8 @@ pub fn verify(
         auth_id.to_string(),
         to_stdout,
         move |worker| {
-            let verify_worker = VerifyWorker::new(worker.clone(), datastore)?;
+            let verify_worker =
+                VerifyWorker::new(worker.clone(), datastore, read_threads, verify_threads)?;
             let failed_dirs = if let Some(backup_dir) = backup_dir {
                 let mut res = Vec::new();
                 if !verify_worker.verify_backup_dir(

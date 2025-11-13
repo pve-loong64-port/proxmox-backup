@@ -800,7 +800,9 @@ impl BackupEnvironment {
             move |worker| {
                 worker.log_message("Automatically verifying newly added snapshot");
 
-                let verify_worker = VerifyWorker::new(worker.clone(), datastore)?;
+                // FIXME: update once per-datastore read/verify settings
+                // are available to not use default amount of threads here
+                let verify_worker = VerifyWorker::new(worker.clone(), datastore, None, None)?;
                 if !verify_worker.verify_backup_dir_with_lock(
                     &backup_dir,
                     worker.upid().clone(),

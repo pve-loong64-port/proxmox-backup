@@ -32,6 +32,8 @@ pub struct VerifyWorker {
     verified_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     backend: DatastoreBackend,
+    read_threads: usize,
+    verify_threads: usize,
 }
 
 struct IndexVerifyState {
@@ -67,6 +69,8 @@ impl VerifyWorker {
     pub fn new(
         worker: Arc<dyn WorkerTaskContext>,
         datastore: Arc<DataStore>,
+        read_threads: Option<usize>,
+        verify_threads: Option<usize>,
     ) -> Result<Self, Error> {
         let backend = datastore.backend()?;
         Ok(Self {
@@ -77,6 +81,8 @@ impl VerifyWorker {
             // start with 64 chunks since we assume there are few corrupt ones
             corrupt_chunks: Arc::new(Mutex::new(HashSet::with_capacity(64))),
             backend,
+            read_threads: read_threads.unwrap_or(1),
+            verify_threads: verify_threads.unwrap_or(4),
         })
     }
 
@@ -115,7 +121,7 @@ impl VerifyWorker {
             &self.verified_chunks,
         ));
 
-        let decoder_pool = ParallelHandler::new("verify chunk decoder", 4, {
+        let decoder_pool = ParallelHandler::new("verify chunk decoder", self.verify_threads, {
             let verify_state = Arc::clone(&verify_state);
             move |(chunk, digest, size): (DataBlob, [u8; 32], u64)| {
                 let chunk_crypt_mode = match chunk.crypt_mode() {
@@ -177,7 +183,7 @@ impl VerifyWorker {
             .datastore
             .get_chunks_in_order(&*index, skip_chunk, check_abort)?;
 
-        let reader_pool = ParallelHandler::new("read chunks", 1, {
+        let reader_pool = ParallelHandler::new("read chunks", self.read_threads, {
             let decoder_pool = decoder_pool.channel();
             let verify_state = Arc::clone(&verify_state);
             let backend = self.backend.clone();
@@ -584,6 +590,12 @@ impl VerifyWorker {
 
         let group_count = list.len();
         info!("found {group_count} groups");
+
+        log::info!(
+            "using {} read and {} verify thread(s)",
+            self.read_threads,
+            self.verify_threads,
+        );
 
         let mut progress = StoreProgress::new(group_count as u64);
 
