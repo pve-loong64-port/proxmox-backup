@@ -149,6 +149,10 @@ pub enum DeletableProperty {
     Ns,
     /// Delete max-depth property, defaulting to full recursion again
     MaxDepth,
+    /// Delete read-threads property
+    ReadThreads,
+    /// Delete verify-threads property
+    VerifyThreads,
 }
 
 #[api(
@@ -229,6 +233,12 @@ pub fn update_verification_job(
                 DeletableProperty::MaxDepth => {
                     data.max_depth = None;
                 }
+                DeletableProperty::ReadThreads => {
+                    data.read_threads = None;
+                }
+                DeletableProperty::VerifyThreads => {
+                    data.verify_threads = None;
+                }
             }
         }
     }
@@ -265,6 +275,12 @@ pub fn update_verification_job(
         if max_depth <= pbs_api_types::MAX_NAMESPACE_DEPTH {
             data.max_depth = Some(max_depth);
         }
+    }
+    if update.read_threads.is_some() {
+        data.read_threads = update.read_threads;
+    }
+    if update.verify_threads.is_some() {
+        data.verify_threads = update.verify_threads;
     }
 
     // check new store and NS
