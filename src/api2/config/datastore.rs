@@ -15,9 +15,9 @@ use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
     Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType, DatastoreNotify,
-    DatastoreTuning, KeepOptions, MaintenanceMode, Operation, PruneJobConfig, PruneJobOptions,
-    DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY,
-    PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType, PruneJobConfig,
+    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
+    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -107,7 +107,7 @@ impl Drop for UnmountGuard {
 pub(crate) fn do_create_datastore(
     _lock: BackupLockGuard,
     mut config: SectionConfigData,
-    datastore: DataStoreConfig,
+    mut datastore: DataStoreConfig,
     reuse_datastore: bool,
     overwrite_in_use: bool,
 ) -> Result<(), Error> {
@@ -194,6 +194,12 @@ pub(crate) fn do_create_datastore(
                     });
                 }
             }
+            // starting out in maintenance mode s3-refresh,
+            // so no other operation will start until done with that.
+            datastore.set_maintenance_mode(Some(MaintenanceMode {
+                ty: MaintenanceType::S3Refresh,
+                message: None,
+            }))?;
         }
         let backup_user = pbs_config::backup_user()?;
         ChunkStore::create(
@@ -348,7 +354,7 @@ pub fn create_datastore(
         Some(store_name.clone()),
         auth_id.to_string(),
         to_stdout,
-        move |_worker| {
+        move |worker| {
             do_create_datastore(
                 lock,
                 section_config,
@@ -361,16 +367,8 @@ pub fn create_datastore(
                 do_create_prune_job(prune_job_config)?;
             }
 
-            if reuse_datastore {
-                let datastore = pbs_datastore::DataStore::lookup_datastore(
-                    &store_name,
-                    Some(Operation::Lookup),
-                )
-                .context("failed to lookup datastore")?;
-                if backend == DatastoreBackendType::S3 {
-                    proxmox_async::runtime::block_on(datastore.s3_refresh())
-                        .context("S3 refresh failed")?;
-                }
+            if reuse_datastore && backend == DatastoreBackendType::S3 {
+                crate::api2::admin::datastore::do_s3_refresh(&store_name, &worker)?;
             }
             Ok(())
         },
