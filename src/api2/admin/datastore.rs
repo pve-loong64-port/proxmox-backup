@@ -2579,7 +2579,7 @@ fn unset_maintenance(
 
 fn do_unmount_device(
     datastore: DataStoreConfig,
-    worker: Option<&dyn WorkerTaskContext>,
+    worker: &dyn WorkerTaskContext,
 ) -> Result<(), Error> {
     if datastore.backing_device.is_none() {
         bail!("can't unmount non-removable datastore");
@@ -2590,27 +2590,25 @@ fn do_unmount_device(
     let mut old_status = String::new();
     let mut aborted = false;
     while active_operations.read + active_operations.write > 0 {
-        if let Some(worker) = worker {
-            if worker.abort_requested()
-                || expect_maintenance_type(&datastore.name, MaintenanceType::Unmount).is_err()
-            {
-                aborted = true;
-                break;
-            }
-            let status = format!(
-                "cannot unmount yet, still {} read and {} write operations active",
-                active_operations.read, active_operations.write
-            );
-            if status != old_status {
-                info!("{status}");
-                old_status = status;
-            }
+        if worker.abort_requested()
+            || expect_maintenance_type(&datastore.name, MaintenanceType::Unmount).is_err()
+        {
+            aborted = true;
+            break;
+        }
+        let status = format!(
+            "cannot unmount yet, still {} read and {} write operations active",
+            active_operations.read, active_operations.write
+        );
+        if status != old_status {
+            info!("{status}");
+            old_status = status;
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
         active_operations = task_tracking::get_active_operations(&datastore.name)?;
     }
 
-    if aborted || worker.is_some_and(|w| w.abort_requested()) {
+    if aborted || worker.abort_requested() {
         let _ = expect_maintenance_type(&datastore.name, MaintenanceType::Unmount)
             .inspect_err(|e| warn!("maintenance mode was not as expected: {e}"))
             .and_then(|(lock, config)| {
@@ -2686,7 +2684,7 @@ pub async fn unmount(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<V
         Some(store),
         auth_id.to_string(),
         to_stdout,
-        move |worker| do_unmount_device(datastore, Some(&worker)),
+        move |worker| do_unmount_device(datastore, &worker),
     )?;
 
     Ok(json!(upid))
