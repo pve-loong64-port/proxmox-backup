@@ -688,7 +688,7 @@ pub async fn status(
 )]
 /// Verify backups.
 ///
-/// This function can verify a single backup snapshot, all backup from a backup group,
+/// This function can verify a single backup snapshot, all backups from a backup group,
 /// or all backups in the datastore.
 #[allow(clippy::too_many_arguments)]
 pub fn verify(
