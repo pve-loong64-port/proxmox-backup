@@ -155,6 +155,30 @@ Ext.define('PBS.window.VerifyJobEdit', {
         ],
         advancedColumn1: [
             {
+                xtype: 'proxmoxintegerfield',
+                name: 'read-threads',
+                fieldLabel: gettext('# of Read Threads'),
+                emptyText: '1',
+                minValue: 1,
+                maxValue: 32,
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+            {
+                xtype: 'proxmoxintegerfield',
+                name: 'verify-threads',
+                fieldLabel: gettext('# of Verify Threads'),
+                emptyText: '4',
+                minValue: 1,
+                maxValue: 32,
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+            },
+        ],
+        advancedColumn2: [
+            {
                 xtype: 'pmxDisplayEditField',
                 fieldLabel: gettext('Job ID'),
                 emptyText: gettext('Autogenerate'),
