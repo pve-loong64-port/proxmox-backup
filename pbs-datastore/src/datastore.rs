@@ -1322,41 +1322,37 @@ impl DataStore {
                 }
             }
 
-            match s3_client {
-                None => {
-                    // Filesystem backend
-                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
-                        let hex = hex::encode(digest);
-                        warn!(
-                            "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
-                        );
+            if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                let hex = hex::encode(digest);
+                warn!(
+                    "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
+                );
 
-                        // touch any corresponding .bad files to keep them around, meaning if a chunk is
-                        // rewritten correctly they will be removed automatically, as well as if no index
-                        // file requires the chunk anymore (won't get to this loop then)
-                        for i in 0..=9 {
-                            let bad_ext = format!("{i}.bad");
-                            let mut bad_path = PathBuf::new();
-                            bad_path.push(self.chunk_path(digest).0);
-                            bad_path.set_extension(bad_ext);
-                            self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
-                        }
-                    }
+                // touch any corresponding .bad files to keep them around, meaning if a chunk is
+                // rewritten correctly they will be removed automatically, as well as if no index
+                // file requires the chunk anymore (won't get to this loop then)
+                for i in 0..=9 {
+                    let bad_ext = format!("{i}.bad");
+                    let mut bad_path = PathBuf::new();
+                    bad_path.push(self.chunk_path(digest).0);
+                    bad_path.set_extension(bad_ext);
+                    self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
                 }
-                Some(ref _s3_client) => {
-                    // Update atime on local cache marker files.
-                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
-                        let (chunk_path, _digest) = self.chunk_path(digest);
-                        // Insert empty file as marker to tell GC phase2 that this is
-                        // a chunk still in-use, so to keep in the S3 object store.
-                        std::fs::File::options()
-                            .write(true)
-                            .create_new(true)
-                            .open(&chunk_path)
-                            .with_context(|| {
-                                format!("failed to create marker for chunk {}", hex::encode(digest))
-                            })?;
-                    }
+            }
+
+            if let Some(ref _s3_client) = s3_client {
+                // Update atime on local cache marker files.
+                if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                    let (chunk_path, _digest) = self.chunk_path(digest);
+                    // Insert empty file as marker to tell GC phase2 that this is
+                    // a chunk still in-use, so to keep in the S3 object store.
+                    std::fs::File::options()
+                        .write(true)
+                        .create_new(true)
+                        .open(&chunk_path)
+                        .with_context(|| {
+                            format!("failed to create marker for chunk {}", hex::encode(digest))
+                        })?;
                 }
             }
         }
