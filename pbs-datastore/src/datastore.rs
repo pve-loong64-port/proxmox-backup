@@ -1347,13 +1347,7 @@ impl DataStore {
                     if !self.inner.chunk_store.cond_touch_chunk(digest, false)? && !is_bad {
                         // Insert empty file as marker to tell GC phase2 that this is
                         // a chunk still in-use, so to keep in the S3 object store.
-                        std::fs::File::options()
-                            .write(true)
-                            .create_new(true)
-                            .open(&chunk_path)
-                            .with_context(|| {
-                                format!("failed to create marker for chunk {}", hex::encode(digest))
-                            })?;
+                        self.inner.chunk_store.mark_chunk_as_expected(digest)?;
                     }
                 } else {
                     let hex = hex::encode(digest);
@@ -1683,8 +1677,16 @@ impl DataStore {
                     let atime = match std::fs::metadata(&chunk_path) {
                         Ok(stat) => stat.accessed()?,
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                            // File not found, delete by setting atime to unix epoch
-                            SystemTime::UNIX_EPOCH
+                            if self.inner.chunk_store.clear_chunk_expected_mark(&digest)? {
+                                unsafe {
+                                    // chunk store lock held
+                                    self.inner.chunk_store.replace_chunk_with_marker(&digest)?;
+                                }
+                                SystemTime::now()
+                            } else {
+                                // File not found, delete by setting atime to unix epoch
+                                SystemTime::UNIX_EPOCH
+                            }
                         }
                         Err(err) => return Err(err.into()),
                     };
@@ -1980,7 +1982,8 @@ impl DataStore {
         )
         .map_err(|err| format_err!("failed to upload chunk to s3 backend - {err:#}"))?;
         tracing::info!("Caching of chunk {}", hex::encode(digest));
-        self.cache_insert(&digest, &chunk)?;
+        self.cache_insert(digest, chunk)?;
+        self.inner.chunk_store.clear_chunk_expected_mark(digest)?;
         Ok((is_duplicate, chunk_size))
     }
 
