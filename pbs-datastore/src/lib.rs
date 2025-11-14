@@ -81,6 +81,19 @@
 //! because running these operations concurrently is treated as a feature
 //! on its own.
 //!
+//! For datastores with S3 backend there are further restrictions since
+//! there are 3 types of locking mechanisms involved:
+//! - per-chunk file lock
+//! - chunk store mutex lock
+//! - lru cache mutex lock
+//!
+//! Locks must always be acquired in this specific order to avoid deadlocks.
+//! The per-chunk file lock is used to avoid holding a mutex lock during calls
+//! into async contexts, which can deadlock otherwise. It must be held for the
+//! whole time from starting an operation on the chunk until it is persisted
+//! to s3 backend, local datastore cache and in-memory LRU cache where
+//! required.
+//!
 //! ## Inter-process Locking
 //!
 //! We need to be able to restart the proxmox-backup service daemons, so
