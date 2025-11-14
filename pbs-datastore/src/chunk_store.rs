@@ -721,16 +721,54 @@ impl ChunkStore {
     /// Safety: chunk store mutex must be held!
     pub(crate) unsafe fn replace_chunk_with_marker(&self, digest: &[u8; 32]) -> Result<(), Error> {
         let (chunk_path, digest_str) = self.chunk_path(digest);
+        Self::create_marker_file(&chunk_path)
+            .map_err(|err| format_err!("clear chunk failed for {digest_str} - {err}"))?;
+        Ok(())
+    }
+
+    /// Helper to generate new empty marker file
+    fn create_marker_file(path: &Path) -> Result<(), Error> {
         let mut create_options = CreateOptions::new();
         if nix::unistd::Uid::effective().is_root() {
             let uid = pbs_config::backup_user()?.uid;
             let gid = pbs_config::backup_group()?.gid;
             create_options = create_options.owner(uid).group(gid);
         }
+        proxmox_sys::fs::replace_file(&path, &[], create_options, false)
+    }
 
-        proxmox_sys::fs::replace_file(&chunk_path, &[], create_options, false)
-            .map_err(|err| format_err!("clear chunk failed for {digest_str} - {err}"))?;
+    /// Mark chunk as expected to be present by writing a file the chunk store.
+    ///
+    /// Used to mark chunks which are found in index files during phase 1 of garbage collection
+    /// for s3 datastores, but the marker file is not present and it is seemingly not a bad chunk.
+    /// This might happen if the local store cache is empty after datastore re-creation.
+    pub(crate) fn mark_chunk_as_expected(&self, digest: &[u8; 32]) -> Result<(), Error> {
+        let marker_path = self.chunk_expected_marker_path(digest);
+        Self::create_marker_file(&marker_path)
+            .map_err(|err| format_err!("mark chunk failed for {} - {err}", hex::encode(digest)))?;
         Ok(())
+    }
+
+    /// Remove chunk as required mark by removing file the chunk store.
+    ///
+    /// Returns true if the file was present and removed, false if the file did not exist.
+    pub(crate) fn clear_chunk_expected_mark(&self, digest: &[u8; 32]) -> Result<bool, Error> {
+        let marker_path = self.chunk_expected_marker_path(digest);
+        if let Err(err) = std::fs::remove_file(marker_path) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                return Err(err.into());
+            } else {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Helper to generate marker file path for expected chunks
+    fn chunk_expected_marker_path(&self, digest: &[u8; 32]) -> PathBuf {
+        let (mut path, _digest_str) = self.chunk_path(digest);
+        path.set_extension("using");
+        path
     }
 
     /// Removes a chunk marker file from the `LocalDatastoreLruCache`s chunk store.
