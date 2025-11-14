@@ -56,6 +56,8 @@ pub const GROUP_OWNER_FILE_NAME: &str = "owner";
 /// Filename for in-use marker stored on S3 object store backend
 pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
+// s3 put request times out after upload_size / 1 Kib/s, so about 2.3 hours for 8 MiB
+const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
@@ -2569,6 +2571,13 @@ impl DataStore {
     pub fn rename_corrupt_chunk(&self, digest: &[u8; 32]) -> Result<Option<PathBuf>, Error> {
         let (path, digest_str) = self.chunk_path(digest);
 
+        let _chunk_guard;
+        if let DatastoreBackendType::S3 = self.inner.backend_config.ty.unwrap_or_default() {
+            _chunk_guard = self
+                .inner
+                .chunk_store
+                .lock_chunk(digest, CHUNK_LOCK_TIMEOUT)?;
+        }
         let _lock = self.inner.chunk_store.mutex().lock().unwrap();
 
         let mut counter = 0;
