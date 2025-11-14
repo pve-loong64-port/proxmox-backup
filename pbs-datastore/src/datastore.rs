@@ -1913,6 +1913,10 @@ impl DataStore {
         match backend {
             DatastoreBackend::Filesystem => self.inner.chunk_store.insert_chunk(chunk, digest),
             DatastoreBackend::S3(s3_client) => {
+                let _chunk_guard = self
+                    .inner
+                    .chunk_store
+                    .lock_chunk(digest, CHUNK_LOCK_TIMEOUT)?;
                 let chunk_data: Bytes = chunk.raw_data().to_vec().into();
                 let chunk_size = chunk_data.len() as u64;
                 let object_key = crate::s3::object_key_from_digest(digest)?;
@@ -1933,6 +1937,10 @@ impl DataStore {
     ) -> Result<(bool, u64), Error> {
         let chunk_data = chunk.raw_data();
         let chunk_size = chunk_data.len() as u64;
+        let _chunk_guard = self
+            .inner
+            .chunk_store
+            .lock_chunk(digest, CHUNK_LOCK_TIMEOUT)?;
 
         // Avoid re-upload to S3 if the chunk is either present in the in-memory LRU cache
         // or the chunk marker file exists on filesystem. The latter means the chunk has
