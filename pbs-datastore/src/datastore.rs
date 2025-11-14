@@ -1674,7 +1674,6 @@ impl DataStore {
                         Ok(stat) => stat.accessed()?,
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                             // File not found, delete by setting atime to unix epoch
-                            info!("Not found, mark for deletion: {}", content.key);
                             SystemTime::UNIX_EPOCH
                         }
                         Err(err) => return Err(err.into()),
