@@ -1323,36 +1323,40 @@ impl DataStore {
             }
 
             if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
-                let hex = hex::encode(digest);
-                warn!(
-                    "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
-                );
-
+                let (chunk_path, _digest_str) = self.chunk_path(digest);
                 // touch any corresponding .bad files to keep them around, meaning if a chunk is
                 // rewritten correctly they will be removed automatically, as well as if no index
                 // file requires the chunk anymore (won't get to this loop then)
                 for i in 0..=9 {
                     let bad_ext = format!("{i}.bad");
-                    let mut bad_path = PathBuf::new();
-                    bad_path.push(self.chunk_path(digest).0);
+                    let mut bad_path = chunk_path.clone();
                     bad_path.set_extension(bad_ext);
                     self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
                 }
-            }
 
-            if let Some(ref _s3_client) = s3_client {
-                // Update atime on local cache marker files.
-                if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
-                    let (chunk_path, _digest) = self.chunk_path(digest);
-                    // Insert empty file as marker to tell GC phase2 that this is
-                    // a chunk still in-use, so to keep in the S3 object store.
-                    std::fs::File::options()
-                        .write(true)
-                        .create_new(true)
-                        .open(&chunk_path)
-                        .with_context(|| {
-                            format!("failed to create marker for chunk {}", hex::encode(digest))
-                        })?;
+                if let Some(ref _s3_client) = s3_client {
+                    // Do not retry here, this is very unlikely to happen as chunk markers will
+                    // most likely only be missing if the local cache store was recreated.
+                    let _guard = self
+                        .inner
+                        .chunk_store
+                        .lock_chunk(digest, CHUNK_LOCK_TIMEOUT)?;
+                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                        // Insert empty file as marker to tell GC phase2 that this is
+                        // a chunk still in-use, so to keep in the S3 object store.
+                        std::fs::File::options()
+                            .write(true)
+                            .create_new(true)
+                            .open(&chunk_path)
+                            .with_context(|| {
+                                format!("failed to create marker for chunk {}", hex::encode(digest))
+                            })?;
+                    }
+                } else {
+                    let hex = hex::encode(digest);
+                    warn!(
+                        "warning: unable to access non-existent chunk {hex}, required by {file_name:?}"
+                    );
                 }
             }
         }
