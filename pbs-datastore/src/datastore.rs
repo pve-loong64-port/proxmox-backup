@@ -2569,6 +2569,8 @@ impl DataStore {
     pub fn rename_corrupt_chunk(&self, digest: &[u8; 32]) -> Result<Option<PathBuf>, Error> {
         let (path, digest_str) = self.chunk_path(digest);
 
+        let _lock = self.inner.chunk_store.mutex().lock().unwrap();
+
         let mut counter = 0;
         let mut new_path = path.clone();
         loop {
@@ -2579,6 +2581,14 @@ impl DataStore {
                 break;
             }
         }
+
+        let result = match std::fs::rename(&path, &new_path) {
+            Ok(_) => Ok(Some(new_path)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(err) => bail!("could not rename corrupt chunk {path:?} - {err}"),
+        };
+
+        drop(_lock);
 
         let backend = self.backend().map_err(|err| {
             format_err!(
@@ -2610,10 +2620,6 @@ impl DataStore {
             )?;
         }
 
-        match std::fs::rename(&path, &new_path) {
-            Ok(_) => Ok(Some(new_path)),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(err) => bail!("could not rename corrupt chunk {path:?} - {err}"),
-        }
+        result
     }
 }
