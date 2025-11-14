@@ -1660,10 +1660,11 @@ impl DataStore {
             let mut delete_list = Vec::with_capacity(1000);
             loop {
                 for content in list_bucket_result.contents {
-                    let (chunk_path, digest) = match self.chunk_path_from_object_key(&content.key) {
-                        Some(path) => path,
-                        None => continue,
-                    };
+                    let (chunk_path, digest, bad) =
+                        match self.chunk_path_from_object_key(&content.key) {
+                            Some(path) => path,
+                            None => continue,
+                        };
 
                     let timeout = std::time::Duration::from_secs(0);
                     let _chunk_guard = match self.inner.chunk_store.lock_chunk(&digest, timeout) {
@@ -1691,11 +1692,6 @@ impl DataStore {
                         Err(err) => return Err(err.into()),
                     };
                     let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
-
-                    let bad = chunk_path
-                        .as_path()
-                        .extension()
-                        .is_some_and(|ext| ext == "bad");
 
                     unsafe {
                         self.inner.chunk_store.cond_sweep_chunk(
@@ -1852,14 +1848,23 @@ impl DataStore {
     }
 
     // Check and generate a chunk path from given object key
-    fn chunk_path_from_object_key(&self, object_key: &S3ObjectKey) -> Option<(PathBuf, [u8; 32])> {
+    fn chunk_path_from_object_key(
+        &self,
+        object_key: &S3ObjectKey,
+    ) -> Option<(PathBuf, [u8; 32], bool)> {
         // Check object is actually a chunk
+        let path = Path::new::<str>(object_key);
         // file_name() should always be Some, as objects will have a filename
-        let digest = Path::new::<str>(object_key).file_name()?;
+        let digest = path.file_name()?;
         let bytes = digest.as_bytes();
-        if bytes.len() != 64 && bytes.len() != 64 + ".0.bad".len() {
+        let bad_ext_len = ".0.bad".len();
+        let bad_chunk = if bytes.len() == 64 + bad_ext_len {
+            true
+        } else if bytes.len() == 64 {
+            false
+        } else {
             return None;
-        }
+        };
         if !bytes.iter().take(64).all(u8::is_ascii_hexdigit) {
             return None;
         }
@@ -1871,13 +1876,17 @@ impl DataStore {
         chunk_path.push(".chunks");
         chunk_path.push(hexdigit_prefix);
         chunk_path.push(digest);
+        if bad_chunk {
+            let extension = unsafe { digest_str.get_unchecked(64..64 + bad_ext_len) };
+            chunk_path.push(extension);
+        }
 
         let mut digest_bytes = [0u8; 32];
         let digest = digest.as_bytes();
         // safe to unwrap as already checked above
         hex::decode_to_slice(&digest[..64], &mut digest_bytes).unwrap();
 
-        Some((chunk_path, digest_bytes))
+        Some((chunk_path, digest_bytes, bad_chunk))
     }
 
     pub fn try_shared_chunk_store_lock(&self) -> Result<ProcessLockSharedGuard, Error> {
