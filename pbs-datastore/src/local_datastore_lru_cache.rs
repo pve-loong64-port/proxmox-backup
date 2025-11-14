@@ -34,9 +34,16 @@ impl LocalDatastoreLruCache {
     ///
     /// Fails if the chunk cannot be inserted successfully.
     pub fn insert(&self, digest: &[u8; 32], chunk: &DataBlob) -> Result<(), Error> {
-        self.store.insert_chunk(chunk, digest)?;
-        self.cache
-            .insert(*digest, (), |digest| self.store.clear_chunk(&digest))
+        let _lock = self.store.mutex().lock().unwrap();
+
+        // Safety: lock acquire above
+        unsafe {
+            self.store.insert_chunk_nolock(chunk, digest)?;
+        }
+        self.cache.insert(*digest, (), |digest| {
+            // Safety: lock acquired above, this is executed inline!
+            unsafe { self.store.clear_chunk(&digest) }
+        })
     }
 
     /// Remove a chunk from the local datastore cache.
@@ -70,8 +77,11 @@ impl LocalDatastoreLruCache {
             Ok(mut file) => match DataBlob::load_from_reader(&mut file) {
                 // File was still cached with contents, load response from file
                 Ok(chunk) => {
-                    self.cache
-                        .insert(*digest, (), |digest| self.store.clear_chunk(&digest))?;
+                    let _lock = self.store.mutex().lock().unwrap();
+                    self.cache.insert(*digest, (), |digest| {
+                        // Safety: lock acquired above, this is executed inline
+                        unsafe { self.store.clear_chunk(&digest) }
+                    })?;
                     Ok(Some(chunk))
                 }
                 // File was empty, might have been evicted since

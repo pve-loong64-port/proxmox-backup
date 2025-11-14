@@ -697,7 +697,9 @@ impl ChunkStore {
     ///
     /// Used to evict chunks from the local datastore cache, while keeping them as in-use markers
     /// for garbage collection. Returns with success also if chunk file is not pre-existing.
-    pub(crate) fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    ///
+    /// Safety: chunk store mutex must be held!
+    pub(crate) unsafe fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
         let (chunk_path, digest_str) = self.chunk_path(digest);
         let mut create_options = CreateOptions::new();
         if nix::unistd::Uid::effective().is_root() {
@@ -705,8 +707,6 @@ impl ChunkStore {
             let gid = pbs_config::backup_group()?.gid;
             create_options = create_options.owner(uid).group(gid);
         }
-
-        let _lock = self.mutex.lock();
 
         proxmox_sys::fs::replace_file(&chunk_path, &[], create_options, false)
             .map_err(|err| format_err!("clear chunk failed for {digest_str} - {err}"))?;
