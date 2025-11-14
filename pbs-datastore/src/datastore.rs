@@ -1662,13 +1662,18 @@ impl DataStore {
 
             let mut delete_list = Vec::with_capacity(1000);
             loop {
-                let lock = self.inner.chunk_store.mutex().lock().unwrap();
-
                 for content in list_bucket_result.contents {
                     let (chunk_path, digest) = match self.chunk_path_from_object_key(&content.key) {
                         Some(path) => path,
                         None => continue,
                     };
+
+                    let timeout = std::time::Duration::from_secs(0);
+                    let _chunk_guard = match self.inner.chunk_store.lock_chunk(&digest, timeout) {
+                        Ok(guard) => guard,
+                        Err(_) => continue,
+                    };
+                    let _guard = self.inner.chunk_store.mutex().lock().unwrap();
 
                     // Check local markers (created or atime updated during phase1) and
                     // keep or delete chunk based on that.
@@ -1697,10 +1702,9 @@ impl DataStore {
                             &mut gc_status,
                             || {
                                 if let Some(cache) = self.cache() {
-                                    // ignore errors, phase 3 will retry cleanup anyways
-                                    let _ = cache.remove(&digest);
+                                    cache.remove(&digest)?;
                                 }
-                                delete_list.push(content.key);
+                                delete_list.push((content.key, _chunk_guard));
                                 Ok(())
                             },
                         )?;
@@ -1709,14 +1713,19 @@ impl DataStore {
                     chunk_count += 1;
                 }
 
-                drop(lock);
-
                 if !delete_list.is_empty() {
-                    let delete_objects_result =
-                        proxmox_async::runtime::block_on(s3_client.delete_objects(&delete_list))?;
+                    let delete_objects_result = proxmox_async::runtime::block_on(
+                        s3_client.delete_objects(
+                            &delete_list
+                                .iter()
+                                .map(|(key, _)| key.clone())
+                                .collect::<Vec<S3ObjectKey>>(),
+                        ),
+                    )?;
                     if let Some(_err) = delete_objects_result.error {
                         bail!("failed to delete some objects");
                     }
+                    // release all chunk guards
                     delete_list.clear();
                 }
 
