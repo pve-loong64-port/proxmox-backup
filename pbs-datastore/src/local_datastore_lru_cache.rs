@@ -52,8 +52,7 @@ impl LocalDatastoreLruCache {
     /// Fails if the chunk cannot be deleted successfully.
     pub(crate) unsafe fn remove(&self, digest: &[u8; 32]) -> Result<(), Error> {
         self.cache.remove(*digest);
-        let (path, _digest_str) = self.store.chunk_path(digest);
-        std::fs::remove_file(path).map_err(Error::from)
+        self.store.remove_chunk(digest)
     }
 
     /// Access the locally cached chunk or fetch it from the S3 object store via the provided

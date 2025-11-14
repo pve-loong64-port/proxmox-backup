@@ -702,6 +702,15 @@ impl ChunkStore {
         Ok(())
     }
 
+    /// Removes a chunk marker file from the `LocalDatastoreLruCache`s chunk store.
+    ///
+    /// Callers must hold the per-chunk file lock in order to avoid races with renaming of corrupt
+    /// chunks by verifications and chunk inserts by backups.
+    pub(crate) fn remove_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+        let (chunk_path, _digest_str) = self.chunk_path(digest);
+        std::fs::remove_file(chunk_path).map_err(Error::from)
+    }
+
     pub fn relative_path(&self, path: &Path) -> PathBuf {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
