@@ -2597,6 +2597,12 @@ impl DataStore {
             Err(err) => bail!("could not rename corrupt chunk {path:?} - {err}"),
         };
 
+        if let Some(cache) = self.cache() {
+            // Locks are being held, so it is safe to call the method.
+            // Ignores errors from chunk marker file remove, it cannot be present since renamed.
+            let _ = unsafe { cache.remove(digest) };
+        }
+
         drop(_lock);
 
         let backend = self.backend().map_err(|err| {
