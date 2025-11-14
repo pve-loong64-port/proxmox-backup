@@ -8,6 +8,7 @@ use anyhow::{bail, format_err, Context, Error};
 use tracing::{info, warn};
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
+use pbs_config::BackupLockGuard;
 use proxmox_io::ReadExt;
 use proxmox_s3_client::S3Client;
 use proxmox_sys::fs::{create_dir, create_path, file_type_from_file_stat, CreateOptions};
@@ -16,6 +17,7 @@ use proxmox_sys::process_locker::{
 };
 use proxmox_worker_task::WorkerTaskContext;
 
+use crate::backup_info::DATASTORE_LOCKS_DIR;
 use crate::data_blob::DataChunkBuilder;
 use crate::file_formats::{
     COMPRESSED_BLOB_MAGIC_1_0, ENCRYPTED_BLOB_MAGIC_1_0, UNCOMPRESSED_BLOB_MAGIC_1_0,
@@ -775,6 +777,30 @@ impl ChunkStore {
         let lockfile_path = Self::lockfile_path(path.as_ref());
         ChunkStore::check_permissions(lockfile_path, 0o644)?;
         Ok(())
+    }
+
+    /// Generates the path to the chunks lock file
+    pub(crate) fn chunk_lock_path(&self, digest: &[u8]) -> PathBuf {
+        let mut lock_path = Path::new(DATASTORE_LOCKS_DIR).join(self.name.clone());
+        let digest_str = hex::encode(digest);
+        lock_path.push(".chunks");
+        let prefix = digest_to_prefix(digest);
+        lock_path.push(&prefix);
+        lock_path.push(&digest_str);
+        lock_path
+    }
+
+    /// Get an exclusive lock on the chunks lock file
+    pub(crate) fn lock_chunk(
+        &self,
+        digest: &[u8],
+        timeout: Duration,
+    ) -> Result<BackupLockGuard, Error> {
+        let lock_path = self.chunk_lock_path(digest);
+        let guard = crate::backup_info::lock_helper(self.name(), &lock_path, |path| {
+            pbs_config::open_backup_lockfile(path, Some(timeout), true)
+        })?;
+        Ok(guard)
     }
 }
 

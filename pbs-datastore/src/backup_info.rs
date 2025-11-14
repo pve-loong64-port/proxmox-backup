@@ -939,7 +939,7 @@ fn lock_file_path_helper(ns: &BackupNamespace, path: PathBuf) -> PathBuf {
 /// deletion.
 ///
 /// It also creates the base directory for lock files.
-fn lock_helper<F>(
+pub(crate) fn lock_helper<F>(
     store_name: &str,
     path: &std::path::Path,
     lock_fn: F,
