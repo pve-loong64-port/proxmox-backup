@@ -1755,6 +1755,7 @@ impl DataStore {
                 min_atime,
                 &mut tmp_gc_status,
                 worker,
+                self.cache(),
             )?;
         } else {
             self.inner.chunk_store.sweep_unused_chunks(
@@ -1762,6 +1763,7 @@ impl DataStore {
                 min_atime,
                 &mut gc_status,
                 worker,
+                None,
             )?;
         }
 

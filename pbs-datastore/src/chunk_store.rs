@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
+use hex::FromHex;
 use tracing::{info, warn};
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
@@ -22,7 +23,7 @@ use crate::data_blob::DataChunkBuilder;
 use crate::file_formats::{
     COMPRESSED_BLOB_MAGIC_1_0, ENCRYPTED_BLOB_MAGIC_1_0, UNCOMPRESSED_BLOB_MAGIC_1_0,
 };
-use crate::DataBlob;
+use crate::{DataBlob, LocalDatastoreLruCache};
 
 /// File system based chunk store
 pub struct ChunkStore {
@@ -383,6 +384,7 @@ impl ChunkStore {
         min_atime: i64,
         status: &mut GarbageCollectionStatus,
         worker: &dyn WorkerTaskContext,
+        cache: Option<&LocalDatastoreLruCache>,
     ) -> Result<(), Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
@@ -436,6 +438,24 @@ impl ChunkStore {
                         bad,
                         status,
                         || {
+                            // non-bad S3 chunks need to be removed via cache
+                            if let Some(cache) = cache {
+                                if !bad {
+                                    let digest = <[u8; 32]>::from_hex(filename.to_bytes())?;
+
+                                    // unless there is a concurrent upload pending,
+                                    // must never block due to required locking order
+                                    if let Ok(_guard) =
+                                        self.lock_chunk(&digest, Duration::from_secs(0))
+                                    {
+                                        cache.remove(&digest)?;
+                                    }
+
+                                    return Ok(());
+                                }
+                            }
+
+                            // bad or local chunks
                             unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(
                                 |err| {
                                     format_err!(
