@@ -1,3 +1,41 @@
+rust-proxmox-backup (4.0.20-1) trixie; urgency=medium
+
+  * verify: distinguish s3 object fetching and chunk loading error, as loading
+    chunks from the object store might be cause by transient issues, and must
+    therefore handled so they do not incorrectly mark chunks as corrupt.
+
+  *  api: admin: rework waiting on active operations and maintenance locking.
+
+  * api: datastore: wait for active operations to clear before s3 refresh.
+
+  * notifications/pbsXtoX: adapt to proxmox-apt making old_version optional.
+
+  * api: access: add vncticket verification endpoint.
+
+  * api: node shell: allow access for tokens.
+
+  * ui: replace Proxmox logo with slightly bigger SVG version to make it
+    crisper on HiDPI displays.
+
+  * datastore: GC: drop overly verbose info message during s3 chunk sweep.
+
+  * datastore: various concurrency fixes for GC and handling corrupt chunks.
+
+  * verify: never hold mutex lock in async scope on corrupt chunk rename to
+    avoid rare deadlock potential.
+
+  * cleanup chunk markers from cache in phase 3 on s3 backends.
+
+  * verification: add option to set number of {read,verify}-threads for jobs,
+    allowing to to increase verification throughput as long as the system does
+    not gets IO starved.
+
+  * api: datastore: auto-unmount after mount-triggered sync for a removable
+    datastore. This can be configured through a new 'unmount-on-done' option
+    for sync jobs.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 14 Nov 2025 22:56:36 +0100
+
 rust-proxmox-backup (4.0.19-1) trixie; urgency=medium
 
   * sync: pull: instantiate backend only once per sync job to avoid
