@@ -1327,11 +1327,14 @@ impl DataStore {
                 // touch any corresponding .bad files to keep them around, meaning if a chunk is
                 // rewritten correctly they will be removed automatically, as well as if no index
                 // file requires the chunk anymore (won't get to this loop then)
+                let mut is_bad = false;
                 for i in 0..=9 {
                     let bad_ext = format!("{i}.bad");
                     let mut bad_path = chunk_path.clone();
                     bad_path.set_extension(bad_ext);
-                    self.inner.chunk_store.cond_touch_path(&bad_path, false)?;
+                    if self.inner.chunk_store.cond_touch_path(&bad_path, false)? {
+                        is_bad = true;
+                    }
                 }
 
                 if let Some(ref _s3_client) = s3_client {
@@ -1341,7 +1344,7 @@ impl DataStore {
                         .inner
                         .chunk_store
                         .lock_chunk(digest, CHUNK_LOCK_TIMEOUT)?;
-                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? {
+                    if !self.inner.chunk_store.cond_touch_chunk(digest, false)? && !is_bad {
                         // Insert empty file as marker to tell GC phase2 that this is
                         // a chunk still in-use, so to keep in the S3 object store.
                         std::fs::File::options()
