@@ -226,8 +226,12 @@ Ext.define('PBS.MainView', {
                     prefix: 'widgettoolkit',
                 },
                 {
-                    padding: '0 0 0 5',
                     xtype: 'versioninfo',
+                    padding: '0 5',
+                    style: {
+                        'font-size': '16px',
+                        'line-height': '20px',
+                    },
                 },
                 {
                     flex: 1,
