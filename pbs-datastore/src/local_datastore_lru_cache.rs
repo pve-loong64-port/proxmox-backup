@@ -42,7 +42,7 @@ impl LocalDatastoreLruCache {
         }
         self.cache.insert(*digest, (), |digest| {
             // Safety: lock acquired above, this is executed inline!
-            unsafe { self.store.clear_chunk(&digest) }
+            unsafe { self.store.replace_chunk_with_marker(&digest) }
         })
     }
 
@@ -59,7 +59,7 @@ impl LocalDatastoreLruCache {
     /// Fails if the chunk cannot be deleted successfully.
     pub(crate) unsafe fn remove(&self, digest: &[u8; 32]) -> Result<(), Error> {
         self.cache.remove(*digest);
-        self.store.remove_chunk(digest)
+        self.store.remove_chunk_marker(digest)
     }
 
     /// Access the locally cached chunk or fetch it from the S3 object store via the provided
@@ -80,7 +80,7 @@ impl LocalDatastoreLruCache {
                     let _lock = self.store.mutex().lock().unwrap();
                     self.cache.insert(*digest, (), |digest| {
                         // Safety: lock acquired above, this is executed inline
-                        unsafe { self.store.clear_chunk(&digest) }
+                        unsafe { self.store.replace_chunk_with_marker(&digest) }
                     })?;
                     Ok(Some(chunk))
                 }

@@ -699,7 +699,7 @@ impl ChunkStore {
     /// for garbage collection. Returns with success also if chunk file is not pre-existing.
     ///
     /// Safety: chunk store mutex must be held!
-    pub(crate) unsafe fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    pub(crate) unsafe fn replace_chunk_with_marker(&self, digest: &[u8; 32]) -> Result<(), Error> {
         let (chunk_path, digest_str) = self.chunk_path(digest);
         let mut create_options = CreateOptions::new();
         if nix::unistd::Uid::effective().is_root() {
@@ -717,7 +717,7 @@ impl ChunkStore {
     ///
     /// Callers must hold the per-chunk file lock in order to avoid races with renaming of corrupt
     /// chunks by verifications and chunk inserts by backups.
-    pub(crate) fn remove_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    pub(crate) fn remove_chunk_marker(&self, digest: &[u8; 32]) -> Result<(), Error> {
         let (chunk_path, _digest_str) = self.chunk_path(digest);
         std::fs::remove_file(chunk_path).map_err(Error::from)
     }
