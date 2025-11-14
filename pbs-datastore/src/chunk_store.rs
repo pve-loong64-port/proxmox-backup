@@ -686,7 +686,7 @@ impl ChunkStore {
     ///
     /// Used to evict chunks from the local datastore cache, while keeping them as in-use markers
     /// for garbage collection. Returns with success also if chunk file is not pre-existing.
-    pub fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    pub(crate) fn clear_chunk(&self, digest: &[u8; 32]) -> Result<(), Error> {
         let (chunk_path, digest_str) = self.chunk_path(digest);
         let mut create_options = CreateOptions::new();
         if nix::unistd::Uid::effective().is_root() {
