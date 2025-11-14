@@ -1703,7 +1703,11 @@ impl DataStore {
                             &mut gc_status,
                             || {
                                 if let Some(cache) = self.cache() {
-                                    cache.remove(&digest)?;
+                                    if !bad {
+                                        cache.remove(&digest)?;
+                                    } else {
+                                        std::fs::remove_file(chunk_path)?;
+                                    }
                                 }
                                 delete_list.push((content.key, _chunk_guard));
                                 Ok(())
