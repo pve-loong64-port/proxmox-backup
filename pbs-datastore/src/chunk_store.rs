@@ -587,9 +587,22 @@ impl ChunkStore {
 
         //println!("DIGEST {}", hex::encode(digest));
 
-        let (chunk_path, digest_str) = self.chunk_path(digest);
+        let _lock = self.mutex.lock();
 
-        let lock = self.mutex.lock();
+        // Safety: lock acquired above
+        unsafe { self.insert_chunk_nolock(chunk, digest) }
+    }
+
+    /// Safety: requires holding the chunk store mutex!
+    pub(crate) unsafe fn insert_chunk_nolock(
+        &self,
+        chunk: &DataBlob,
+        digest: &[u8; 32],
+    ) -> Result<(bool, u64), Error> {
+        // unwrap: only `None` in unit tests
+        assert!(self.locker.is_some());
+
+        let (chunk_path, digest_str) = self.chunk_path(digest);
 
         let raw_data = chunk.raw_data();
         let encoded_size = raw_data.len() as u64;
@@ -664,8 +677,6 @@ impl ChunkStore {
             nix::unistd::fsync(dir.as_raw_fd())
                 .map_err(|err| format_err!("fsync failed: {err}"))?;
         }
-
-        drop(lock);
 
         Ok((false, encoded_size))
     }
