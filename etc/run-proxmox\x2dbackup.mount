@@ -1,0 +1,14 @@
+[Unit]
+Description=Mount tmpfs at /run/proxmox-backup
+Conflicts=umount.target
+Before=local-fs.target umount.target
+
+[Mount]
+Type=tmpfs
+What=tmpfs
+Where=/run/proxmox-backup
+# Unlimited inodes as this stores per-chunk file locks
+Options=rw,nosuid,nodev,noexec,relatime,uid=backup,gid=backup,nr_inodes=0,mode=755,inode64
+
+[Install]
+WantedBy=local-fs.target
