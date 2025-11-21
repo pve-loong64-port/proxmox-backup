@@ -116,6 +116,8 @@ pub enum DeletableProperty {
     Comment,
     /// Delete the timeframe property
     Timeframe,
+    /// Delete the users property
+    Users,
 }
 
 // fixme: use  TrafficControlUpdater
@@ -187,6 +189,9 @@ pub fn update_traffic_control(
                 DeletableProperty::Timeframe => {
                     data.timeframe = None;
                 }
+                DeletableProperty::Users => {
+                    data.users = None;
+                }
             }
         }
     }
@@ -221,6 +226,9 @@ pub fn update_traffic_control(
     }
     if update.timeframe.is_some() {
         data.timeframe = update.timeframe;
+    }
+    if update.users.is_some() {
+        data.users = update.users;
     }
 
     config.set_data(&name, "rule", &data)?;
