@@ -1660,6 +1660,25 @@ impl DataStore {
                     .context("failed to list chunk in s3 object store")?;
 
             let mut delete_list = Vec::with_capacity(S3_DELETE_BATCH_LIMIT);
+
+            let s3_delete_batch = |delete_list: &mut Vec<(S3ObjectKey, BackupLockGuard)>,
+                                   s3_client: &Arc<S3Client>|
+             -> Result<(), Error> {
+                let delete_objects_result = proxmox_async::runtime::block_on(
+                    s3_client.delete_objects(
+                        &delete_list
+                            .iter()
+                            .map(|(key, _)| key.clone())
+                            .collect::<Vec<S3ObjectKey>>(),
+                    ),
+                )?;
+                if let Some(_err) = delete_objects_result.error {
+                    bail!("failed to delete some objects");
+                }
+                // drops all chunk flock guards
+                delete_list.clear();
+                Ok(())
+            };
             loop {
                 for content in list_bucket_result.contents {
                     let (chunk_path, digest, bad) =
@@ -1724,37 +1743,13 @@ impl DataStore {
 
                     // limit pending deletes to avoid holding too many chunk flocks
                     if delete_list.len() >= S3_DELETE_BATCH_LIMIT {
-                        let delete_objects_result = proxmox_async::runtime::block_on(
-                            s3_client.delete_objects(
-                                &delete_list
-                                    .iter()
-                                    .map(|(key, _)| key.clone())
-                                    .collect::<Vec<S3ObjectKey>>(),
-                            ),
-                        )?;
-                        if let Some(_err) = delete_objects_result.error {
-                            bail!("failed to delete some objects");
-                        }
-                        // release all chunk guards
-                        delete_list.clear();
+                        s3_delete_batch(&mut delete_list, s3_client)?;
                     }
                 }
 
                 // delete the last batch of objects, if there are any remaining
                 if !delete_list.is_empty() {
-                    let delete_objects_result = proxmox_async::runtime::block_on(
-                        s3_client.delete_objects(
-                            &delete_list
-                                .iter()
-                                .map(|(key, _)| key.clone())
-                                .collect::<Vec<S3ObjectKey>>(),
-                        ),
-                    )?;
-                    if let Some(_err) = delete_objects_result.error {
-                        bail!("failed to delete some objects");
-                    }
-                    // release all chunk guards
-                    delete_list.clear();
+                    s3_delete_batch(&mut delete_list, s3_client)?;
                 }
 
                 // Process next batch of chunks if there is more
