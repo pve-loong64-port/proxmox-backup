@@ -1,3 +1,37 @@
+rust-proxmox-backup (4.0.21-1) trixie; urgency=medium
+
+  * task tracking: fix adding new entry if other PID is tracked.
+
+  * GC: S3: reduce number of open FDs for to-be-deleted objects to avoid
+    running into soft FD count limits, as we cannot just increase that due to
+    some libraries still potentially using the ancient select syscall.
+
+  * system report: better hardware and system utilization overview.
+
+  * pulling sync: ensure that all chunks of a synced index files can be
+    downloaded from the remote.
+
+  * pulling sync: mark chunks referenced in last backup snapshot as reusable.
+
+  * pulling sync: keep one "encountered chunks" map for a full backup group to
+    avoid frequently reinstating that map.
+
+  * docs: storage: fix "persistent" typo
+
+  * traffic-control: add user-specific rule matching and precedence. Introduce
+    user-aware rule lookup by accepting an optional user and preferring rules
+    that specify 'users' over IP-only matches.
+
+  * ui: traffic-control: add users field in edit form and list.
+
+  * s3 datastore: add support for configuring bandwidth rate-limiting for
+    clients, re-using the token bucket filter that the API server uses for
+    rate limiting.
+
+  * ui: expose rate and burst limits for s3 endpoints.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 21 Nov 2025 19:34:49 +0100
+
 rust-proxmox-backup (4.0.20-1) trixie; urgency=medium
 
   * verify: distinguish s3 object fetching and chunk loading error, as loading
