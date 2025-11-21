@@ -142,7 +142,7 @@ async fn pull_index_chunks<I: IndexFile>(
     chunk_reader: Arc<dyn AsyncReadChunk>,
     target: Arc<DataStore>,
     index: I,
-    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
     backend: &DatastoreBackend,
 ) -> Result<SyncStats, Error> {
     use futures::stream::{self, StreamExt, TryStreamExt};
@@ -153,14 +153,11 @@ async fn pull_index_chunks<I: IndexFile>(
         (0..index.index_count())
             .map(|pos| index.chunk_info(pos).unwrap())
             .filter(|info| {
-                let mut guard = encountered_chunks.lock().unwrap();
-                let done = guard.contains(&info.digest);
-                if !done {
-                    // Note: We mark a chunk as downloaded before its actually downloaded
-                    // to avoid duplicate downloads.
-                    guard.insert(info.digest);
+                let guard = encountered_chunks.lock().unwrap();
+                match guard.check_reusable(&info.digest) {
+                    Some(touched) => !touched, // reusable and already touched, can always skip
+                    None => true,
                 }
-                !done
             }),
     );
 
@@ -189,15 +186,30 @@ async fn pull_index_chunks<I: IndexFile>(
             let bytes = Arc::clone(&bytes);
             let chunk_count = Arc::clone(&chunk_count);
             let verify_and_write_channel = verify_and_write_channel.clone();
+            let encountered_chunks = Arc::clone(&encountered_chunks);
 
             Ok::<_, Error>(async move {
-                let chunk_exists = proxmox_async::runtime::block_in_place(|| {
-                    target.cond_touch_chunk(&info.digest, false)
-                })?;
-                if chunk_exists {
-                    //info!("chunk {} exists {}", pos, hex::encode(digest));
-                    return Ok::<_, Error>(());
+                {
+                    // limit guard scope
+                    let mut guard = encountered_chunks.lock().unwrap();
+                    if let Some(touched) = guard.check_reusable(&info.digest) {
+                        if touched {
+                            return Ok::<_, Error>(());
+                        }
+                        let chunk_exists = proxmox_async::runtime::block_in_place(|| {
+                            target.cond_touch_chunk(&info.digest, false)
+                        })?;
+                        if chunk_exists {
+                            guard.mark_touched(&info.digest);
+                            //info!("chunk {} exists {}", pos, hex::encode(digest));
+                            return Ok::<_, Error>(());
+                        }
+                    }
+                    // mark before actually downloading the chunk, so this happens only once
+                    guard.mark_reusable(&info.digest);
+                    guard.mark_touched(&info.digest);
                 }
+
                 //info!("sync {} chunk {}", pos, hex::encode(digest));
                 let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
                 let raw_size = chunk.raw_size() as usize;
@@ -269,7 +281,7 @@ async fn pull_single_archive<'a>(
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     archive_info: &'a FileInfo,
-    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
     backend: &DatastoreBackend,
 ) -> Result<SyncStats, Error> {
     let archive_name = &archive_info.filename;
@@ -364,7 +376,7 @@ async fn pull_snapshot<'a>(
     params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
-    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
     corrupt: bool,
     is_new: bool,
 ) -> Result<SyncStats, Error> {
@@ -542,7 +554,7 @@ async fn pull_snapshot_from<'a>(
     params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
-    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
     corrupt: bool,
 ) -> Result<SyncStats, Error> {
     let (_path, is_new, _snap_lock) = snapshot
@@ -702,7 +714,7 @@ async fn pull_group(
     }
 
     // start with 65536 chunks (up to 256 GiB)
-    let encountered_chunks = Arc::new(Mutex::new(HashSet::with_capacity(1024 * 64)));
+    let encountered_chunks = Arc::new(Mutex::new(EncounteredChunks::with_capacity(1024 * 64)));
 
     progress.group_snapshots = list.len() as u64;
 
