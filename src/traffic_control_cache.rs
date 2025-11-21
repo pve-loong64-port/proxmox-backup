@@ -13,7 +13,7 @@ use proxmox_section_config::SectionConfigData;
 
 use proxmox_time::{parse_daily_duration, DailyDuration, TmEditor};
 
-use pbs_api_types::TrafficControlRule;
+use pbs_api_types::{TrafficControlRule, Userid};
 
 use pbs_config::ConfigVersionCache;
 
@@ -30,6 +30,12 @@ struct ParsedTcRule {
     networks: Vec<IpInet>,         // parsed networks
     timeframe: Vec<DailyDuration>, // parsed timeframe
 }
+
+/// Represents a matched traffic control rule with its network prefix length and user rule status.
+///
+/// Used during rule lookup to track the best matching rule, where user-specific rules
+/// take precedence over IP-only rules, and longer network prefixes are preferred.
+type RuleMatch<'a> = (&'a ParsedTcRule, u8, bool); // (rule, network_prefix_length, is_user_rule)
 
 /// Traffic control statistics
 pub struct TrafficStat {
@@ -322,6 +328,7 @@ impl TrafficControlCache {
     ///
     /// - Rules where timeframe does not match are skipped.
     /// - Rules with smaller network size have higher priority.
+    /// - Rules with users are prioritized over IP-only rules, if multiple match
     ///
     /// Behavior is undefined if more than one rule matches after
     /// above selection.
@@ -329,10 +336,14 @@ impl TrafficControlCache {
         &self,
         peer: SocketAddr,
         now: i64,
+        user: Option<&Userid>,
     ) -> (&str, Option<SharedRateLimit>, Option<SharedRateLimit>) {
         let peer_ip = canonical_ip(peer.ip());
 
-        log::debug!("lookup_rate_limiter: {:?}", peer_ip);
+        log::debug!(
+            "lookup_rate_limiter: {peer_ip:?} - {}",
+            user.map_or("(no user)", |u| u.as_str())
+        );
 
         let now = match TmEditor::with_epoch(now, self.use_utc) {
             Ok(now) => now,
@@ -342,19 +353,33 @@ impl TrafficControlCache {
             }
         };
 
-        let mut last_rule_match = None;
+        let mut last_rule_match: Option<RuleMatch> = None;
 
         for rule in self.rules.iter() {
             if !timeframe_match(&rule.timeframe, &now) {
                 continue;
             }
 
+            if let Some(ref rule_users) = rule.config.users {
+                if let Some(cur_user) = user {
+                    if !rule_users.iter().any(|u| u == cur_user) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+
             if let Some(match_len) = network_match_len(&rule.networks, &peer_ip) {
+                let is_user_rule = rule.config.users.is_some();
                 match last_rule_match {
-                    None => last_rule_match = Some((rule, match_len)),
-                    Some((_, last_len)) => {
-                        if match_len > last_len {
-                            last_rule_match = Some((rule, match_len));
+                    None => last_rule_match = Some((rule, match_len, is_user_rule)),
+                    Some((_, last_len, last_is_user)) => {
+                        // Prefer rules with users over IP-only rules; for same class use longest prefix
+                        if (is_user_rule && !last_is_user)
+                            || (is_user_rule == last_is_user && match_len > last_len)
+                        {
+                            last_rule_match = Some((rule, match_len, is_user_rule));
                         }
                     }
                 }
@@ -362,7 +387,7 @@ impl TrafficControlCache {
         }
 
         match last_rule_match {
-            Some((rule, _)) => {
+            Some((rule, _, _)) => {
                 match self.limiter_map.get(&rule.config.name) {
                     Some((read_limiter, write_limiter)) => (
                         &rule.config.name,
@@ -454,33 +479,87 @@ rule: somewhere
         let somewhere = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)), 1234);
 
         let (rule, read_limiter, write_limiter) =
-            cache.lookup_rate_limiter(somewhere, THURSDAY_80_00);
+            cache.lookup_rate_limiter(somewhere, THURSDAY_80_00, None);
         assert_eq!(rule, "somewhere");
         assert!(read_limiter.is_some());
         assert!(write_limiter.is_some());
 
-        let (rule, read_limiter, write_limiter) = cache.lookup_rate_limiter(local, THURSDAY_19_00);
+        let (rule, read_limiter, write_limiter) =
+            cache.lookup_rate_limiter(local, THURSDAY_19_00, None);
         assert_eq!(rule, "rule2");
         assert!(read_limiter.is_some());
         assert!(write_limiter.is_some());
 
         let (rule, read_limiter, write_limiter) =
-            cache.lookup_rate_limiter(gateway, THURSDAY_15_00);
+            cache.lookup_rate_limiter(gateway, THURSDAY_15_00, None);
         assert_eq!(rule, "rule1");
         assert!(read_limiter.is_some());
         assert!(write_limiter.is_some());
 
         let (rule, read_limiter, write_limiter) =
-            cache.lookup_rate_limiter(gateway, THURSDAY_19_00);
+            cache.lookup_rate_limiter(gateway, THURSDAY_19_00, None);
         assert_eq!(rule, "somewhere");
         assert!(read_limiter.is_some());
         assert!(write_limiter.is_some());
 
         let (rule, read_limiter, write_limiter) =
-            cache.lookup_rate_limiter(private, THURSDAY_19_00);
+            cache.lookup_rate_limiter(private, THURSDAY_19_00, None);
         assert_eq!(rule, "rule2");
         assert!(read_limiter.is_some());
         assert!(write_limiter.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_user_based_rule_match_and_precedence() -> Result<(), Error> {
+        // rule user1: user-specific for alice@pam on 192.168.2.0/24
+        // rule ip1: ip-only broader network also matches, but user rule should win
+        // rule user2: user-specific for bob@pam but different network shouldn't match
+        let config_data = "
+rule: user1
+	comment user rule for alice
+	network 192.168.2.0/24
+	rate-in 50000000
+	rate-out 50000000
+	users alice@pam
+
+rule: ip1
+	network 192.168.2.0/24
+	rate-in 100000000
+	rate-out 100000000
+
+rule: user2
+	network 10.0.0.0/8
+	rate-in 75000000
+	rate-out 75000000
+	users bob@pam
+";
+
+        let config = pbs_config::traffic_control::CONFIG.parse("testconfig", config_data)?;
+
+        let mut cache = TrafficControlCache::new();
+        cache.use_utc = true;
+        cache.use_shared_memory = false; // avoid permission problems in test environment
+
+        cache.update_config(&config)?;
+
+        const NOW: i64 = make_test_time(0, 12, 0);
+        let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 2, 55)), 1234);
+
+        // No user -> should match ip1
+        let (rule, _, _) = cache.lookup_rate_limiter(peer, NOW, None);
+        assert_eq!(rule, "ip1");
+
+        // alice@pam -> should match user1 and take precedence over ip1
+        let alice = Userid::try_from("alice@pam".to_string())?;
+        let (rule, _, _) = cache.lookup_rate_limiter(peer, NOW, Some(&alice));
+        assert_eq!(rule, "user1");
+
+        // bob@pam on same peer/network -> user2 is different network, should fall back to ip1
+        let bob = Userid::try_from("bob@pam".to_string())?;
+        let (rule, _, _) = cache.lookup_rate_limiter(peer, NOW, Some(&bob));
+        assert_eq!(rule, "ip1");
 
         Ok(())
     }

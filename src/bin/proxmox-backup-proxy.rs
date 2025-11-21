@@ -17,6 +17,7 @@ use openssl::ssl::SslAcceptor;
 use serde_json::{json, Value};
 
 use proxmox_http::Body;
+use proxmox_http::RateLimiterTag;
 use proxmox_lang::try_block;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::CreateOptions;
@@ -955,6 +956,7 @@ async fn run_traffic_control_updater() {
 
 fn lookup_rate_limiter(
     peer: std::net::SocketAddr,
+    tags: &[RateLimiterTag],
 ) -> (Option<SharedRateLimit>, Option<SharedRateLimit>) {
     let mut cache = TRAFFIC_CONTROL_CACHE.lock().unwrap();
 
@@ -962,7 +964,15 @@ fn lookup_rate_limiter(
 
     cache.reload(now);
 
-    let (_rule_name, read_limiter, write_limiter) = cache.lookup_rate_limiter(peer, now);
+    let user = tags.iter().find_map(|tag| match tag {
+        RateLimiterTag::User(user) => Some(user.as_str()),
+    });
+
+    let authid = user.and_then(|s| s.parse::<pbs_api_types::Authid>().ok());
+    let user_parsed = authid.as_ref().map(|auth_id| auth_id.user());
+
+    let (_rule_name, read_limiter, write_limiter) =
+        cache.lookup_rate_limiter(peer, now, user_parsed);
 
     (read_limiter, write_limiter)
 }
