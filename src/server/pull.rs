@@ -1,6 +1,7 @@
 //! Sync datastore by pulling contents from remote server
 
-use std::collections::HashSet;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::io::Seek;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -1099,4 +1100,62 @@ async fn pull_ns(
     }
 
     Ok((progress, sync_stats, errors))
+}
+
+/// Store the state of encountered chunks, tracking if they can be reused for the
+/// index file currently being pulled and if the chunk has already been touched
+/// during this sync.
+struct EncounteredChunks {
+    // key: digest, value: (reusable, touched)
+    chunk_set: HashMap<[u8; 32], (bool, bool)>,
+}
+
+impl EncounteredChunks {
+    /// Create a new instance with preallocated capacity
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            chunk_set: HashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Check if the current state allows to reuse this chunk and if so,
+    /// if the chunk has already been touched.
+    fn check_reusable(&self, digest: &[u8; 32]) -> Option<bool> {
+        if let Some((reusable, touched)) = self.chunk_set.get(digest) {
+            if !reusable {
+                None
+            } else {
+                Some(*touched)
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Mark chunk as reusable, inserting it as un-touched if not present
+    fn mark_reusable(&mut self, digest: &[u8; 32]) {
+        match self.chunk_set.entry(*digest) {
+            Entry::Occupied(mut occupied) => {
+                let (reusable, _touched) = occupied.get_mut();
+                *reusable = true;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert((true, false));
+            }
+        }
+    }
+
+    /// Mark chunk as touched during this sync, inserting it as not reusable
+    /// but touched if not present.
+    fn mark_touched(&mut self, digest: &[u8; 32]) {
+        match self.chunk_set.entry(*digest) {
+            Entry::Occupied(mut occupied) => {
+                let (_reusable, touched) = occupied.get_mut();
+                *touched = true;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert((false, true));
+            }
+        }
+    }
 }
