@@ -58,6 +58,8 @@ pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 // s3 put request times out after upload_size / 1 Kib/s, so about 2.3 hours for 8 MiB
 const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
+// s3 deletion batch size to avoid 1024 open files soft limit
+const S3_DELETE_BATCH_LIMIT: usize = 100;
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
@@ -1657,7 +1659,7 @@ impl DataStore {
                 proxmox_async::runtime::block_on(s3_client.list_objects_v2(&prefix, None))
                     .context("failed to list chunk in s3 object store")?;
 
-            let mut delete_list = Vec::with_capacity(1000);
+            let mut delete_list = Vec::with_capacity(S3_DELETE_BATCH_LIMIT);
             loop {
                 for content in list_bucket_result.contents {
                     let (chunk_path, digest, bad) =
@@ -1716,8 +1718,29 @@ impl DataStore {
                     }
 
                     chunk_count += 1;
+
+                    // drop guard because of async S3 call below
+                    drop(_guard);
+
+                    // limit pending deletes to avoid holding too many chunk flocks
+                    if delete_list.len() >= S3_DELETE_BATCH_LIMIT {
+                        let delete_objects_result = proxmox_async::runtime::block_on(
+                            s3_client.delete_objects(
+                                &delete_list
+                                    .iter()
+                                    .map(|(key, _)| key.clone())
+                                    .collect::<Vec<S3ObjectKey>>(),
+                            ),
+                        )?;
+                        if let Some(_err) = delete_objects_result.error {
+                            bail!("failed to delete some objects");
+                        }
+                        // release all chunk guards
+                        delete_list.clear();
+                    }
                 }
 
+                // delete the last batch of objects, if there are any remaining
                 if !delete_list.is_empty() {
                     let delete_objects_result = proxmox_async::runtime::block_on(
                         s3_client.delete_objects(
