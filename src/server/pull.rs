@@ -613,6 +613,7 @@ async fn pull_group(
     source_namespace: &BackupNamespace,
     group: &BackupGroup,
     progress: &mut StoreProgress,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
 ) -> Result<SyncStats, Error> {
     let mut already_synced_skip_info = SkipInfo::new(SkipReason::AlreadySynced);
     let mut transfer_last_skip_info = SkipInfo::new(SkipReason::TransferLast);
@@ -712,9 +713,6 @@ async fn pull_group(
         info!("{transfer_last_skip_info}");
         transfer_last_skip_info.reset();
     }
-
-    // start with 65536 chunks (up to 256 GiB)
-    let encountered_chunks = Arc::new(Mutex::new(EncounteredChunks::with_capacity(1024 * 64)));
 
     let backup_group = params
         .target
@@ -979,6 +977,9 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
     let mut synced_ns = HashSet::with_capacity(namespaces.len());
     let mut sync_stats = SyncStats::default();
 
+    // start with 65536 chunks (up to 256 GiB)
+    let encountered_chunks = Arc::new(Mutex::new(EncounteredChunks::with_capacity(1024 * 64)));
+
     for namespace in namespaces {
         let source_store_ns_str = print_store_and_ns(params.source.get_store(), &namespace);
 
@@ -1000,7 +1001,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
             }
         }
 
-        match pull_ns(&namespace, &mut params).await {
+        match pull_ns(&namespace, &mut params, encountered_chunks.clone()).await {
             Ok((ns_progress, ns_sync_stats, ns_errors)) => {
                 errors |= ns_errors;
 
@@ -1058,6 +1059,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
 async fn pull_ns(
     namespace: &BackupNamespace,
     params: &mut PullParameters,
+    encountered_chunks: Arc<Mutex<EncounteredChunks>>,
 ) -> Result<(StoreProgress, SyncStats, bool), Error> {
     let list: Vec<BackupGroup> = params.source.list_groups(namespace, &params.owner).await?;
 
@@ -1116,7 +1118,16 @@ async fn pull_ns(
             );
             errors = true; // do not stop here, instead continue
         } else {
-            match pull_group(params, namespace, &group, &mut progress).await {
+            encountered_chunks.lock().unwrap().clear();
+            match pull_group(
+                params,
+                namespace,
+                &group,
+                &mut progress,
+                encountered_chunks.clone(),
+            )
+            .await
+            {
                 Ok(stats) => sync_stats.add(stats),
                 Err(err) => {
                     info!("sync group {} failed - {err:#}", &group);
@@ -1236,5 +1247,10 @@ impl EncounteredChunks {
                 vacant.insert((false, true));
             }
         }
+    }
+
+    /// Clear all entries
+    fn clear(&mut self) {
+        self.chunk_set.clear();
     }
 }
