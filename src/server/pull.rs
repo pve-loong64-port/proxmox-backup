@@ -142,7 +142,7 @@ async fn pull_index_chunks<I: IndexFile>(
     chunk_reader: Arc<dyn AsyncReadChunk>,
     target: Arc<DataStore>,
     index: I,
-    downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     backend: &DatastoreBackend,
 ) -> Result<SyncStats, Error> {
     use futures::stream::{self, StreamExt, TryStreamExt};
@@ -153,7 +153,7 @@ async fn pull_index_chunks<I: IndexFile>(
         (0..index.index_count())
             .map(|pos| index.chunk_info(pos).unwrap())
             .filter(|info| {
-                let mut guard = downloaded_chunks.lock().unwrap();
+                let mut guard = encountered_chunks.lock().unwrap();
                 let done = guard.contains(&info.digest);
                 if !done {
                     // Note: We mark a chunk as downloaded before its actually downloaded
@@ -269,7 +269,7 @@ async fn pull_single_archive<'a>(
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     archive_info: &'a FileInfo,
-    downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     backend: &DatastoreBackend,
 ) -> Result<SyncStats, Error> {
     let archive_name = &archive_info.filename;
@@ -304,7 +304,7 @@ async fn pull_single_archive<'a>(
                         .context("failed to get chunk reader")?,
                     snapshot.datastore().clone(),
                     index,
-                    downloaded_chunks,
+                    encountered_chunks,
                     backend,
                 )
                 .await?;
@@ -327,7 +327,7 @@ async fn pull_single_archive<'a>(
                         .context("failed to get chunk reader")?,
                     snapshot.datastore().clone(),
                     index,
-                    downloaded_chunks,
+                    encountered_chunks,
                     backend,
                 )
                 .await?;
@@ -364,7 +364,7 @@ async fn pull_snapshot<'a>(
     params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
-    downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt: bool,
     is_new: bool,
 ) -> Result<SyncStats, Error> {
@@ -482,7 +482,7 @@ async fn pull_snapshot<'a>(
             reader.clone(),
             snapshot,
             item,
-            downloaded_chunks.clone(),
+            encountered_chunks.clone(),
             backend,
         )
         .await?;
@@ -542,14 +542,22 @@ async fn pull_snapshot_from<'a>(
     params: &PullParameters,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
-    downloaded_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    encountered_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
     corrupt: bool,
 ) -> Result<SyncStats, Error> {
     let (_path, is_new, _snap_lock) = snapshot
         .datastore()
         .create_locked_backup_dir(snapshot.backup_ns(), snapshot.as_ref())?;
 
-    let result = pull_snapshot(params, reader, snapshot, downloaded_chunks, corrupt, is_new).await;
+    let result = pull_snapshot(
+        params,
+        reader,
+        snapshot,
+        encountered_chunks,
+        corrupt,
+        is_new,
+    )
+    .await;
 
     if is_new {
         // Cleanup directory on error if snapshot was not present before
@@ -694,7 +702,7 @@ async fn pull_group(
     }
 
     // start with 65536 chunks (up to 256 GiB)
-    let downloaded_chunks = Arc::new(Mutex::new(HashSet::with_capacity(1024 * 64)));
+    let encountered_chunks = Arc::new(Mutex::new(HashSet::with_capacity(1024 * 64)));
 
     progress.group_snapshots = list.len() as u64;
 
@@ -714,7 +722,7 @@ async fn pull_group(
             params,
             reader,
             &to_snapshot,
-            downloaded_chunks.clone(),
+            encountered_chunks.clone(),
             corrupt,
         )
         .await;
