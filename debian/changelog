@@ -4,7 +4,7 @@ rust-proxmox-backup (4.0.20-1) trixie; urgency=medium
     chunks from the object store might be cause by transient issues, and must
     therefore handled so they do not incorrectly mark chunks as corrupt.
 
-  *  api: admin: rework waiting on active operations and maintenance locking.
+  * api: admin: rework waiting on active operations and maintenance locking.
 
   * api: datastore: wait for active operations to clear before s3 refresh.
 
