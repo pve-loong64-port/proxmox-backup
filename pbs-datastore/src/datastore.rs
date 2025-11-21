@@ -22,7 +22,7 @@ use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
 use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::{ProcessLockExclusiveGuard, ProcessLockSharedGuard};
-use proxmox_time::TimeSpan;
+use proxmox_time::{epoch_i64, TimeSpan};
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
@@ -60,6 +60,8 @@ const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 // s3 deletion batch size to avoid 1024 open files soft limit
 const S3_DELETE_BATCH_LIMIT: usize = 100;
+// max defer time for s3 batch deletions
+const S3_DELETE_DEFER_LIMIT_SECONDS: i64 = 60 * 5;
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
@@ -1660,6 +1662,7 @@ impl DataStore {
                     .context("failed to list chunk in s3 object store")?;
 
             let mut delete_list = Vec::with_capacity(S3_DELETE_BATCH_LIMIT);
+            let mut delete_list_age = epoch_i64();
 
             let s3_delete_batch = |delete_list: &mut Vec<(S3ObjectKey, BackupLockGuard)>,
                                    s3_client: &Arc<S3Client>|
@@ -1730,6 +1733,11 @@ impl DataStore {
                                         std::fs::remove_file(chunk_path)?;
                                     }
                                 }
+
+                                // set age based on first insertion
+                                if delete_list.is_empty() {
+                                    delete_list_age = epoch_i64();
+                                }
                                 delete_list.push((content.key, _chunk_guard));
                                 Ok(())
                             },
@@ -1742,16 +1750,13 @@ impl DataStore {
                     drop(_guard);
 
                     // limit pending deletes to avoid holding too many chunk flocks
-                    if delete_list.len() >= S3_DELETE_BATCH_LIMIT {
+                    if delete_list.len() >= S3_DELETE_BATCH_LIMIT
+                        || (!delete_list.is_empty()
+                            && epoch_i64() - delete_list_age > S3_DELETE_DEFER_LIMIT_SECONDS)
+                    {
                         s3_delete_batch(&mut delete_list, s3_client)?;
                     }
                 }
-
-                // delete the last batch of objects, if there are any remaining
-                if !delete_list.is_empty() {
-                    s3_delete_batch(&mut delete_list, s3_client)?;
-                }
-
                 // Process next batch of chunks if there is more
                 if list_bucket_result.is_truncated {
                     list_bucket_result =
@@ -1764,6 +1769,12 @@ impl DataStore {
 
                 break;
             }
+
+            // delete the last batch of objects, if there are any remaining
+            if !delete_list.is_empty() {
+                s3_delete_batch(&mut delete_list, s3_client)?;
+            }
+
             info!("processed {chunk_count} total chunks");
 
             // Phase 2 GC of Filesystem backed storage is phase 3 for S3 backed GC
