@@ -215,6 +215,7 @@ Ext.define('PBS.window.TrafficControlEdit', {
                 PBS.Utils.delete_if_default(values, 'rate-out');
                 PBS.Utils.delete_if_default(values, 'burst-in');
                 PBS.Utils.delete_if_default(values, 'burst-out');
+                PBS.Utils.delete_if_default(values, 'users');
                 if (typeof values.delete === 'string') {
                     values.delete = values.delete.split(',');
                 }
@@ -276,6 +277,23 @@ Ext.define('PBS.window.TrafficControlEdit', {
         ],
 
         columnB: [
+            {
+                xtype: 'pmxUserSelector',
+                fieldLabel: gettext('Users'),
+                name: 'users',
+                multiSelect: true,
+                allowBlank: true,
+                cbind: {
+                    deleteEmpty: '{!isCreate}',
+                },
+                emptyText: gettext('Applies to all users'),
+                autoEl: {
+                    tag: 'div',
+                    'data-qtip': gettext(
+                        "Limit applies only to authenticated requests by these users. Overrides IP-only rules when both match. If networks are specified on this rule as well, it'll only apply if the users request comes from one of the specified networks.",
+                    ),
+                },
+            },
             {
                 xtype: 'proxmoxtextfield',
                 fieldLabel: gettext('Network(s)'),

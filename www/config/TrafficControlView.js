@@ -182,6 +182,13 @@ Ext.define('PBS.config.TrafficControlView', {
             dataIndex: 'burst-out',
         },
         {
+            header: gettext('Users'),
+            flex: 3,
+            sortable: true,
+            renderer: (users) => (users ? Ext.String.htmlEncode(users.join(', ')) : ''),
+            dataIndex: 'users',
+        },
+        {
             header: gettext('Networks'),
             flex: 3,
             sortable: true,
