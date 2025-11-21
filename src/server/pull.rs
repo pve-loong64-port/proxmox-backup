@@ -9,7 +9,7 @@ use std::time::SystemTime;
 
 use anyhow::{bail, format_err, Context, Error};
 use proxmox_human_byte::HumanByte;
-use tracing::info;
+use tracing::{info, warn};
 
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
@@ -715,6 +715,65 @@ async fn pull_group(
 
     // start with 65536 chunks (up to 256 GiB)
     let encountered_chunks = Arc::new(Mutex::new(EncounteredChunks::with_capacity(1024 * 64)));
+
+    let backup_group = params
+        .target
+        .store
+        .backup_group(target_ns.clone(), group.clone());
+    if let Some(info) = backup_group.last_backup(true).unwrap_or(None) {
+        let mut reusable_chunks = encountered_chunks.lock().unwrap();
+        if let Err(err) = proxmox_lang::try_block!({
+            let _snapshot_guard = info
+                .backup_dir
+                .lock_shared()
+                .with_context(|| format!("failed locking last backup of group {info:?}"))?;
+
+            let (manifest, _) = info.backup_dir.load_manifest().with_context(|| {
+                format!("failed loading manifest of last backup of group {info:?}")
+            })?;
+
+            match manifest.verify_state()? {
+                Some(verify_state) if verify_state.state == VerifyState::Failed => (),
+                _ => {
+                    for file in manifest.files() {
+                        let index: Box<dyn IndexFile> = match ArchiveType::from_path(&file.filename)
+                        {
+                            Ok(ArchiveType::FixedIndex) => {
+                                let mut path = info.backup_dir.full_path();
+                                path.push(&file.filename);
+                                let index =
+                                    params.target.store.open_fixed_reader(&path).with_context(
+                                        || format!("failed loading fixed index {path:?}"),
+                                    )?;
+                                Box::new(index)
+                            }
+                            Ok(ArchiveType::DynamicIndex) => {
+                                let mut path = info.backup_dir.full_path();
+                                path.push(&file.filename);
+                                let index = params
+                                    .target
+                                    .store
+                                    .open_dynamic_reader(&path)
+                                    .with_context(|| {
+                                        format!("failed loading dynamic index {path:?}")
+                                    })?;
+                                Box::new(index)
+                            }
+                            _ => continue,
+                        };
+
+                        for pos in 0..index.index_count() {
+                            let chunk_info = index.chunk_info(pos).unwrap();
+                            reusable_chunks.mark_reusable(&chunk_info.digest);
+                        }
+                    }
+                }
+            }
+            Ok::<(), Error>(())
+        }) {
+            warn!("Failed to collect reusable chunk from last backup: {err:#?}");
+        }
+    }
 
     progress.group_snapshots = list.len() as u64;
 
