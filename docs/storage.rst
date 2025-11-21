@@ -288,7 +288,7 @@ To list your s3 endpoint configuration, run:
    # proxmox-backup-manager s3 endpoint list
 
 A new datastore with S3 backend can be created using one of the configured S3 endpoints. Although
-storing all contents on the S3 object store, the datastore requires nevertheless a local persisant
+storing all contents on the S3 object store, the datastore requires nevertheless a local persistent
 cache, used to increase performance and reduce the number of requests to the backend. For this, a
 local filesystem path has to be provided during datastore creation, just like for regular datastore
 setup. However, unlike for regular datastores the size of the local cache can be limited, 64 GiB to
