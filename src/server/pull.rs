@@ -975,7 +975,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
 /// Permission checks:
 /// - remote namespaces are filtered by remote
 /// - owner check for vanished groups done here
-pub(crate) async fn pull_ns(
+async fn pull_ns(
     namespace: &BackupNamespace,
     params: &mut PullParameters,
 ) -> Result<(StoreProgress, SyncStats, bool), Error> {
