@@ -93,6 +93,7 @@ proxmox-sys = "1"
 proxmox-systemd = "1"
 proxmox-tfa = { version = "6.0.3", features = [ "api", "api-types" ] }
 proxmox-time = "2"
+proxmox-upgrade-checks = "1"
 proxmox-uuid = { version = "1", features = [ "serde" ] }
 proxmox-worker-task = "1"
 pbs-api-types = "1.0.8"
@@ -243,6 +244,7 @@ proxmox-sys = { workspace = true, features = [ "timer" ] }
 proxmox-systemd.workspace = true
 proxmox-tfa.workspace = true
 proxmox-time.workspace = true
+proxmox-upgrade-checks.workspace = true
 proxmox-uuid.workspace = true
 proxmox-worker-task.workspace = true
 pbs-api-types.workspace = true
@@ -308,6 +310,7 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-systemd = { path = "../proxmox/proxmox-systemd" }
 #proxmox-tfa = { path = "../proxmox/proxmox-tfa" }
 #proxmox-time = { path = "../proxmox/proxmox-time" }
+#proxmox-upgrade-checks = { path = "../proxmox/proxmox-upgrade-checks" }
 #proxmox-uuid = { path = "../proxmox/proxmox-uuid" }
 #proxmox-worker-task = { path = "../proxmox/proxmox-worker-task" }
 
