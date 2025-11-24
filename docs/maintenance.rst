@@ -296,8 +296,17 @@ data is intact. Verification is generally carried out through the creation of
 verify jobs. These are scheduled tasks that run verification at a given interval
 (see :ref:`calendar-event-scheduling`). With these, you can also set whether
 already verified snapshots are ignored, as well as set a time period, after
-which snapshots are checked again. The interface for creating verify jobs can be
-found under the **Verify Jobs** tab of the datastore.
+which snapshots are checked again. The number of read and verify threads used
+for a verification job can be specified via the `read-threads` and `verify-threads`
+parameters. Possible values range from 1 to 32 threads, defaults being 1 reader
+and 4 verify threads. The interface for creating verify jobs can be found under the
+**Verify Jobs** tab of the datastore. Alternatively, you can verify all backups manually.
+The interface for this can be found under the **Content** tab of the datastore or can
+be done via the CLI:
+
+.. code-block:: console
+
+ # proxmox-backup-manager verify <datastore> --read-threads 1 --verify-threads 4 --ignore-verified false
 
 .. Note:: It is recommended that you reverify all backups at least monthly, even
   if a previous verification was successful. This is because physical drives
