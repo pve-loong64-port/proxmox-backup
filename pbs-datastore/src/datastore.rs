@@ -153,6 +153,7 @@ pub struct DataStoreImpl {
     sync_level: DatastoreFSyncLevel,
     backend_config: DatastoreBackendConfig,
     lru_store_caching: Option<LocalDatastoreLruCache>,
+    thread_settings: DatastoreThreadSettings,
 }
 
 impl DataStoreImpl {
@@ -169,6 +170,7 @@ impl DataStoreImpl {
             sync_level: Default::default(),
             backend_config: Default::default(),
             lru_store_caching: None,
+            thread_settings: Default::default(),
         })
     }
 }
@@ -259,6 +261,27 @@ impl DatastoreBackend {
                     .await?;
                 Ok(true)
             }
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+/// Amount of threads to use for certain jobs in a datastore.
+pub struct DatastoreThreadSettings {
+    /// # of threads to use to verify in verify job
+    pub verify_job_verify_threads: Option<usize>,
+    /// # of threads to use to read in verify job
+    pub verify_job_read_threads: Option<usize>,
+}
+
+impl DatastoreThreadSettings {
+    fn new(
+        verify_job_verify_threads: Option<usize>,
+        verify_job_read_threads: Option<usize>,
+    ) -> Self {
+        Self {
+            verify_job_verify_threads,
+            verify_job_read_threads,
         }
     }
 }
@@ -545,6 +568,11 @@ impl DataStore {
             None
         };
 
+        let thread_settings = DatastoreThreadSettings::new(
+            tuning.default_verification_workers,
+            tuning.default_verification_readers,
+        );
+
         Ok(DataStoreImpl {
             chunk_store,
             gc_mutex: Mutex::new(None),
@@ -555,6 +583,7 @@ impl DataStore {
             sync_level: tuning.sync_level.unwrap_or_default(),
             backend_config,
             lru_store_caching,
+            thread_settings,
         })
     }
 
@@ -652,6 +681,11 @@ impl DataStore {
 
     pub fn base_path(&self) -> PathBuf {
         self.inner.chunk_store.base_path()
+    }
+
+    /// Returns the thread settings for this datastore
+    pub fn thread_settings(&self) -> &DatastoreThreadSettings {
+        &self.inner.thread_settings
     }
 
     /// Returns the absolute path for a backup namespace on this datastore
