@@ -618,6 +618,11 @@ There are some tuning related options for the datastore that are more advanced:
   cache slots, 1048576 (= 1024 * 1024) being the default, 8388608 (= 8192 *
   1024) the maximum value.
 
+* ``default-verification-workers`` and ``default-verification-readers``:
+  Define the default number of threads used for verification and reading of chunks,
+  respectively. By default, 4 threads are used for verification and 1 thread is used
+  for reading.
+
 If you want to set multiple tuning options simultaneously, you can separate them
 with a comma, like this:
 
