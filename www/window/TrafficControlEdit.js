@@ -283,6 +283,7 @@ Ext.define('PBS.window.TrafficControlEdit', {
                 name: 'users',
                 multiSelect: true,
                 allowBlank: true,
+                skipEmptyText: true,
                 cbind: {
                     deleteEmpty: '{!isCreate}',
                 },
