@@ -1709,48 +1709,58 @@ impl DataStore {
                     // Check local markers (created or atime updated during phase1) and
                     // keep or delete chunk based on that.
                     let atime = match std::fs::metadata(&chunk_path) {
-                        Ok(stat) => stat.accessed()?,
+                        Ok(stat) => Some(stat.accessed()?),
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                             if self.inner.chunk_store.clear_chunk_expected_mark(&digest)? {
                                 unsafe {
                                     // chunk store lock held
                                     self.inner.chunk_store.replace_chunk_with_marker(&digest)?;
                                 }
-                                SystemTime::now()
+                                Some(SystemTime::now())
                             } else {
-                                // File not found, delete by setting atime to unix epoch
-                                SystemTime::UNIX_EPOCH
+                                // File not found, only delete from S3
+                                None
                             }
                         }
                         Err(err) => return Err(err.into()),
                     };
-                    let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
+                    if let Some(atime) = atime {
+                        let atime = atime.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as i64;
 
-                    unsafe {
-                        self.inner.chunk_store.cond_sweep_chunk(
-                            atime,
-                            min_atime,
-                            oldest_writer,
-                            content.size,
-                            bad,
-                            &mut gc_status,
-                            || {
-                                if let Some(cache) = self.cache() {
-                                    if !bad {
-                                        cache.remove(&digest)?;
-                                    } else {
-                                        std::fs::remove_file(chunk_path)?;
+                        unsafe {
+                            self.inner.chunk_store.cond_sweep_chunk(
+                                atime,
+                                min_atime,
+                                oldest_writer,
+                                content.size,
+                                bad,
+                                &mut gc_status,
+                                || {
+                                    if let Some(cache) = self.cache() {
+                                        if !bad {
+                                            cache.remove(&digest)?;
+                                        } else {
+                                            std::fs::remove_file(chunk_path)?;
+                                        }
                                     }
-                                }
 
-                                // set age based on first insertion
-                                if delete_list.is_empty() {
-                                    delete_list_age = epoch_i64();
-                                }
-                                delete_list.push((content.key, _chunk_guard));
-                                Ok(())
-                            },
-                        )?;
+                                    // set age based on first insertion
+                                    if delete_list.is_empty() {
+                                        delete_list_age = epoch_i64();
+                                    }
+                                    delete_list.push((content.key, _chunk_guard));
+                                    Ok(())
+                                },
+                            )?;
+                        }
+                    } else {
+                        gc_status.removed_chunks += 1;
+                        gc_status.removed_bytes += content.size;
+                        // set age based on first insertion
+                        if delete_list.is_empty() {
+                            delete_list_age = epoch_i64();
+                        }
+                        delete_list.push((content.key, _chunk_guard));
                     }
 
                     chunk_count += 1;
