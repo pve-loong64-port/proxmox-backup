@@ -11,6 +11,36 @@ Ext.define('PBS.window.VerifyAll', {
         url: `/admin/datastore/{datastore}/verify`,
     },
 
+    viewModel: {
+        data: {
+            defaultReadThreads: null,
+            defaultVerifyThreads: null,
+        },
+    },
+
+    initComponent: function () {
+        let me = this;
+        me.callParent();
+
+        if (me.datastore === undefined) {
+            return;
+        }
+
+        Proxmox.Utils.API2Request({
+            url: `/api2/extjs/config/datastore/${encodeURIComponent(me.datastore)}`,
+            method: 'GET',
+            success: ({ result }) => {
+                let raw = result?.data?.tuning || {};
+                let tuning = PBS.Utils.parsePropertyString(raw);
+
+                me.getViewModel().set({
+                    defaultReadThreads: tuning['default-verification-readers'] ?? 1,
+                    defaultVerifyThreads: tuning['default-verification-workers'] ?? 4,
+                });
+            },
+        });
+    },
+
     submitText: gettext('Verify'),
     isCreate: true,
     showTaskViewer: true,
@@ -84,7 +114,9 @@ Ext.define('PBS.window.VerifyAll', {
                     xtype: 'proxmoxintegerfield',
                     name: 'read-threads',
                     fieldLabel: gettext('# of Read Threads'),
-                    emptyText: '1',
+                    bind: {
+                        emptyText: '{defaultReadThreads}',
+                    },
                     skipEmptyText: true,
                     minValue: 1,
                     maxValue: 32,
@@ -93,7 +125,9 @@ Ext.define('PBS.window.VerifyAll', {
                     xtype: 'proxmoxintegerfield',
                     name: 'verify-threads',
                     fieldLabel: gettext('# of Verify Threads'),
-                    emptyText: '4',
+                    bind: {
+                        emptyText: '{defaultVerifyThreads}',
+                    },
                     skipEmptyText: true,
                     minValue: 1,
                     maxValue: 32,

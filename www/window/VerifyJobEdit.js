@@ -32,8 +32,38 @@ Ext.define('PBS.window.VerifyJobEdit', {
     viewModel: {
         data: {
             ignoreVerified: true,
+            defaultReadThreads: null,
+            defaultVerifyThreads: null,
         },
     },
+
+    loadThreadDefaults: function (datastore) {
+        Proxmox.Utils.API2Request({
+            url: `/api2/extjs/config/datastore/${encodeURIComponent(datastore)}`,
+            method: 'GET',
+            success: ({ result }) => {
+                let raw = result?.data?.tuning || {};
+                let tuning = PBS.Utils.parsePropertyString(raw);
+
+                this.getViewModel().set({
+                    defaultReadThreads: tuning['default-verification-readers'] ?? 1,
+                    defaultVerifyThreads: tuning['default-verification-workers'] ?? 4,
+                });
+            },
+        });
+    },
+
+    initComponent: function () {
+        let me = this;
+        me.callParent();
+
+        if (me.datastore === undefined) {
+            return;
+        }
+
+        me.loadThreadDefaults(me.datastore);
+    },
+
     controller: {
         xclass: 'Ext.app.ViewController',
         control: {
@@ -46,6 +76,7 @@ Ext.define('PBS.window.VerifyJobEdit', {
             let view = this.getView();
             let nsSelector = view.down('pbsNamespaceSelector');
             nsSelector.setDatastore(value);
+            view.loadThreadDefaults(value)
         },
     },
 
@@ -164,6 +195,9 @@ Ext.define('PBS.window.VerifyJobEdit', {
                 cbind: {
                     deleteEmpty: '{!isCreate}',
                 },
+                bind: {
+                    emptyText: '{defaultReadThreads}',
+                },
             },
             {
                 xtype: 'proxmoxintegerfield',
@@ -174,6 +208,9 @@ Ext.define('PBS.window.VerifyJobEdit', {
                 maxValue: 32,
                 cbind: {
                     deleteEmpty: '{!isCreate}',
+                },
+                bind: {
+                    emptyText: '{defaultVerifyThreads}',
                 },
             },
         ],
