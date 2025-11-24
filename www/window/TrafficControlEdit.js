@@ -445,7 +445,7 @@ Ext.define('PBS.window.TrafficControlEdit', {
             },
             {
                 xtype: 'button',
-                text: gettext('Add'),
+                text: gettext('Add Timeframe'),
                 iconCls: 'fa fa-plus-circle',
                 handler: 'addTimeframe',
             },
