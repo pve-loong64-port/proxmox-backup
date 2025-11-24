@@ -1,3 +1,21 @@
+rust-proxmox-backup (4.0.22-1) trixie; urgency=medium
+
+  * s3 garbage-collection: fix local marker cleanup for unreferenced chunks
+    that are only available on the s3 storage itself.
+
+  * provide and enable dedicated mount unit for /run/proxmox-backup, avoiding
+    the (inode) limits of /run.
+
+  * datastore config: add default-verification-workers and
+    default-verification-readers to the tuning options.
+
+  * ui, docs: integrate new verification related thread-count options.
+
+  * ui: traffic-control: rename add-timeframe button to "Add Timeframe" to
+    avoid having two buttons with an "Add" label visible at the same time.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 24 Nov 2025 15:28:10 +0100
+
 rust-proxmox-backup (4.0.21-1) trixie; urgency=medium
 
   * task tracking: fix adding new entry if other PID is tracked.
