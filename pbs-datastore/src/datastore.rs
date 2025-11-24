@@ -1691,6 +1691,19 @@ impl DataStore {
                 delete_list.clear();
                 Ok(())
             };
+
+            let add_to_delete_list =
+                |delete_list: &mut Vec<(S3ObjectKey, BackupLockGuard)>,
+                 delete_list_age: &mut i64,
+                 key: S3ObjectKey,
+                 _chunk_guard: BackupLockGuard| {
+                    // set age based on first insertion
+                    if delete_list.is_empty() {
+                        *delete_list_age = epoch_i64();
+                    }
+                    delete_list.push((key, _chunk_guard));
+                };
+
             loop {
                 for content in list_bucket_result.contents {
                     let (chunk_path, digest, bad) =
@@ -1745,12 +1758,12 @@ impl DataStore {
                                             std::fs::remove_file(chunk_path)?;
                                         }
                                     }
-
-                                    // set age based on first insertion
-                                    if delete_list.is_empty() {
-                                        delete_list_age = epoch_i64();
-                                    }
-                                    delete_list.push((content.key, _chunk_guard));
+                                    add_to_delete_list(
+                                        &mut delete_list,
+                                        &mut delete_list_age,
+                                        content.key,
+                                        _chunk_guard,
+                                    );
                                     Ok(())
                                 },
                             )?;
@@ -1758,11 +1771,12 @@ impl DataStore {
                     } else {
                         gc_status.removed_chunks += 1;
                         gc_status.removed_bytes += content.size;
-                        // set age based on first insertion
-                        if delete_list.is_empty() {
-                            delete_list_age = epoch_i64();
-                        }
-                        delete_list.push((content.key, _chunk_guard));
+                        add_to_delete_list(
+                            &mut delete_list,
+                            &mut delete_list_age,
+                            content.key,
+                            _chunk_guard,
+                        );
                     }
 
                     chunk_count += 1;
