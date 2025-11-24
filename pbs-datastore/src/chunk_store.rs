@@ -716,10 +716,14 @@ impl ChunkStore {
     /// Replace a chunk file with a zero size file in the chunk store.
     ///
     /// Used to evict chunks from the local datastore cache, while keeping them as in-use markers
-    /// for garbage collection. Returns with success also if chunk file is not pre-existing.
+    /// for garbage collection. Returns with success also if chunk file is not pre-existing,
+    /// also creating the marker file in that case.
     ///
     /// Safety: chunk store mutex must be held!
-    pub(crate) unsafe fn replace_chunk_with_marker(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    pub(crate) unsafe fn replace_chunk_with_marker_or_create_marker(
+        &self,
+        digest: &[u8; 32],
+    ) -> Result<(), Error> {
         let (chunk_path, digest_str) = self.chunk_path(digest);
         Self::create_marker_file(&chunk_path)
             .map_err(|err| format_err!("clear chunk failed for {digest_str} - {err}"))?;

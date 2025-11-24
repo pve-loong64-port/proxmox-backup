@@ -1714,7 +1714,9 @@ impl DataStore {
                             if self.inner.chunk_store.clear_chunk_expected_mark(&digest)? {
                                 unsafe {
                                     // chunk store lock held
-                                    self.inner.chunk_store.replace_chunk_with_marker(&digest)?;
+                                    self.inner
+                                        .chunk_store
+                                        .replace_chunk_with_marker_or_create_marker(&digest)?;
                                 }
                                 Some(SystemTime::now())
                             } else {

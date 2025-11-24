@@ -42,7 +42,10 @@ impl LocalDatastoreLruCache {
         }
         self.cache.insert(*digest, (), |digest| {
             // Safety: lock acquired above, this is executed inline!
-            unsafe { self.store.replace_chunk_with_marker(&digest) }
+            unsafe {
+                self.store
+                    .replace_chunk_with_marker_or_create_marker(&digest)
+            }
         })
     }
 
@@ -80,7 +83,10 @@ impl LocalDatastoreLruCache {
                     let _lock = self.store.mutex().lock().unwrap();
                     self.cache.insert(*digest, (), |digest| {
                         // Safety: lock acquired above, this is executed inline
-                        unsafe { self.store.replace_chunk_with_marker(&digest) }
+                        unsafe {
+                            self.store
+                                .replace_chunk_with_marker_or_create_marker(&digest)
+                        }
                     })?;
                     Ok(Some(chunk))
                 }
