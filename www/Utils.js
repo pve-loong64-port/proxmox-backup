@@ -915,6 +915,18 @@ Ext.define('PBS.Utils', {
             `${gettext('GC cache capacity')}: ${gc_cache_capacity ?? Proxmox.Utils.defaultText}`,
         );
 
+        let verification_workers = tuning['default-verification-workers'];
+        delete tuning['default-verification-workers'];
+        options.push(
+            `${gettext('Default verification workers')}: ${verification_workers ?? 4}`,
+        );
+
+        let verification_readers = tuning['default-verification-readers'];
+        delete tuning['default-verification-readers'];
+        options.push(
+            `${gettext('Default verification readers')}: ${verification_readers ?? 1}`,
+        );
+
         for (const [k, v] of Object.entries(tuning)) {
             options.push(`${k}: ${v}`);
         }
