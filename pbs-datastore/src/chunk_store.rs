@@ -749,7 +749,12 @@ impl ChunkStore {
         Ok(())
     }
 
-    /// Remove chunk as required mark by removing file the chunk store.
+    /// Remove the chunk-expected marker file from the chunk store.
+    ///
+    /// Used to remove the chunk-expected marker file during phase 2 of garbage collection. This
+    /// marker file is created during phase 1 of garbage collection in case the chunk or its zero
+    /// size marker file is not found in the chunk store, but still referenced by an index file,
+    /// flagging it as still required.
     ///
     /// Returns true if the file was present and removed, false if the file did not exist.
     pub(crate) fn clear_chunk_expected_mark(&self, digest: &[u8; 32]) -> Result<bool, Error> {
