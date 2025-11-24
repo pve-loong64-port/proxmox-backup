@@ -73,6 +73,16 @@ impl VerifyWorker {
         verify_threads: Option<usize>,
     ) -> Result<Self, Error> {
         let backend = datastore.backend()?;
+        let thread_settings = datastore.thread_settings();
+
+        let read_threads = read_threads
+            .or(thread_settings.verify_job_read_threads)
+            .unwrap_or(1);
+
+        let verify_threads = verify_threads
+            .or(thread_settings.verify_job_verify_threads)
+            .unwrap_or(4);
+
         Ok(Self {
             worker,
             datastore,
@@ -81,8 +91,8 @@ impl VerifyWorker {
             // start with 64 chunks since we assume there are few corrupt ones
             corrupt_chunks: Arc::new(Mutex::new(HashSet::with_capacity(64))),
             backend,
-            read_threads: read_threads.unwrap_or(1),
-            verify_threads: verify_threads.unwrap_or(4),
+            read_threads,
+            verify_threads,
         })
     }
 
