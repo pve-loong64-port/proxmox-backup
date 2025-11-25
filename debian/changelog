@@ -1,3 +1,15 @@
+rust-proxmox-backup (4.1.0-1) trixie; urgency=medium
+
+  * ui: traffic-control: increase dialog height to fit "Add Timeframe" button.
+
+  * ui: datastore tuning options: reorder the fields for default verification
+    readers and workers for consistency with the verification job edit window.
+
+  * S3 garbage-collection: fix cleaning up the markers files for referenced
+    but locally unavailable chunks.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 25 Nov 2025 15:39:39 +0100
+
 rust-proxmox-backup (4.0.22-1) trixie; urgency=medium
 
   * s3 garbage-collection: fix local marker cleanup for unreferenced chunks
