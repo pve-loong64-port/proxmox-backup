@@ -129,7 +129,7 @@ a backup::
 
   CHUNK_COUNT = BACKUP_SIZE / ACS
 
-Here are some staticics from my developer worstation::
+Here are some staticics from my developer workstation::
 
   Disk Usage:       65 GB
   Directories:   58971
