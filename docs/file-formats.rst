@@ -44,7 +44,7 @@ All headers are stored as little-endian.
      - header of ``[u8; 16]`` consisting of type hash and size;
        marks start
    * - ``PAYLOAD``
-     - header of ``[u8; 16]`` cosisting of type hash and size;
+     - header of ``[u8; 16]`` consisting of type hash and size;
        referenced by metadata archive
    * - Payload
      - raw regular file payload
