@@ -5,7 +5,7 @@ Ext.define('PBS.window.TrafficControlEdit', {
 
     onlineHelp: 'sysadmin_traffic_control',
     width: 800,
-    height: 600,
+    height: 610,
 
     isAdd: true,
 
