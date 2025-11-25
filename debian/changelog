@@ -55,7 +55,7 @@ rust-proxmox-backup (4.0.21-1) trixie; urgency=medium
   * ui: traffic-control: add users field in edit form and list.
 
   * s3 datastore: add support for configuring bandwidth rate-limiting for
-    clients, re-using the token bucket filter that the API server uses for
+    clients, reusing the token bucket filter that the API server uses for
     rate limiting.
 
   * ui: expose rate and burst limits for s3 endpoints.
@@ -351,13 +351,13 @@ rust-proxmox-backup (4.0.6-1) trixie; urgency=medium
 
   * d/postinst: drop migration steps from PBS 2.x times, there is no
     single-step upgrade path from PBS 2 to PBS 4, one will always need to
-    upgrade to PBS 3 inbetween.
+    upgrade to PBS 3 in between.
 
   * d/postinst: add pbs-test repo on fresh installation during the beta.
 
   * api: datastore: fix cache store creation when reusing s3 backend.
 
-  * client: benchmark: fix no-cache flag backwards comaptibility.
+  * client: benchmark: fix no-cache flag backwards compatibility.
 
   * api: admin s3: switch request method from GET to PUT for s3 check.
 
@@ -536,7 +536,7 @@ rust-proxmox-backup (3.4.0-1) bookworm; urgency=medium
   * ui: set error mask: ensure that message is html-encoded to avoid visual
     glitches.
 
-  * api server: increase maximal request body size fro 64 kiB to 512 kiB,
+  * api server: increase maximal request body size from 64 kiB to 512 kiB,
     similar to a recent change for our perl based projects.
 
   * notifications: include Content-Length header for broader compatibility in
@@ -771,7 +771,7 @@ rust-proxmox-backup (3.3.1-1) bookworm; urgency=medium
     worker, causing a reference count issue where an old daemon could keep
     running forever.
 
-  * ui: check that store is set before trying to select anythin in the garbage
+  * ui: check that store is set before trying to select anything in the garbage
     collection (GC) job view.
 
  -- Proxmox Support Team <support@proxmox.com>  Tue, 03 Dec 2024 18:11:04 +0100
@@ -1033,7 +1033,7 @@ rust-proxmox-backup (3.2.8-1) bookworm; urgency=medium
   * tfa: webauthn: serialize OriginUrl following RFC6454
 
   * factor out apt and apt-repository handling into a new library crate for
-    re-use in other projects. There should be no functional change.
+    reuse in other projects. There should be no functional change.
 
   * fix various typos all over the place found using the rust based `typos`
     tool.
@@ -1244,7 +1244,7 @@ rust-proxmox-backup (3.2.0-1) bookworm; urgency=medium
   * ui: sync view: rename column 'Max. Recursion' -> 'Max. Depth'
 
   * api: assert that maintenance mode transitions are valid, e.g., do
-    not allow clearing the special "delete" maitenance mode
+    not allow clearing the special "delete" maintenance mode
 
   * fix #3217: ui: add global prune and GC job view for an overview over
     all datastores
@@ -1708,7 +1708,7 @@ rust-proxmox-backup (2.4.1-1) bullseye; urgency=medium
 
   * fix #4521: api/tasks: replace upid as filename for task log downloads
 
-  * docs: exand PBS to Proxmox Backup (Server)
+  * docs: expand PBS to Proxmox Backup (Server)
 
   * ui: dark mode: add dark mode colors to the datastore usage charts
 
@@ -2076,7 +2076,7 @@ rust-proxmox-backup (2.2.2-1) bullseye; urgency=medium
 
   * api: status: include empty entry for stores with ns-only privs
 
-  * ui: datastore options: avoid breakage if rrd store ore active-ops cannot
+  * ui: datastore options: avoid breakage if rrd store or active-ops cannot
     be queried
 
   * ui: datastore content: only mask the inner treeview, not the top bar on
@@ -2283,7 +2283,7 @@ rust-proxmox-backup (2.1.6-1) bullseye; urgency=medium
 
   * fix #3856: tape: encryption key's password hint parameter is not optional
 
-  * re-use PROXMOX_DEBUG environment variable to control log level filter
+  * reuse PROXMOX_DEBUG environment variable to control log level filter
 
   * ui: WebAuthn: fix stopping store upgrades on destroy and decrease interval
 
@@ -2569,7 +2569,7 @@ rust-proxmox-backup (2.0.10-1) bullseye; urgency=medium
   * server: add proxmox-backup-debug binary with chunk/file inspection, an API
     shell with completion support
 
-  * restructured code base to reduce linkage and libraray ABI version
+  * restructured code base to reduce linkage and library ABI version
     constraints for all non-server binaries (client, pxar, file-restore)
 
   * zsh: fix passign parameters in auto-completion scripts
@@ -2651,7 +2651,7 @@ rust-proxmox-backup (2.0.6-1) bullseye; urgency=medium
     command that can write the secret to standard out.
 
   * pull in new proxmox library version to improve the file system
-    comaptibility on creation of atomic files, e.g., lock files.
+    compatibility on creation of atomic files, e.g., lock files.
 
  -- Proxmox Support Team <support@proxmox.com>  Thu, 22 Jul 2021 10:22:19 +0200
 
@@ -2709,7 +2709,7 @@ rust-proxmox-backup (2.0.3-1) bullseye; urgency=medium
     showing, among other things, uptime, Kernel version, CPU info and
     repository status.
 
-  * ui: adminsitration/dashboard: auto-scale columns count and add
+  * ui: administration/dashboard: auto-scale columns count and add
     browser-local setting to override that to a fixed value of columns.
 
   * fix #3212: api, ui: add support for notes on backup groups
@@ -3053,7 +3053,7 @@ rust-proxmox-backup (1.1.0-1) unstable; urgency=medium
 
   * tape: cleanup media catalog on tape reuse
 
-  * zfs: re-use underlying pool wide IO stats for datasets
+  * zfs: reuse underlying pool wide IO stats for datasets
 
   * api daemon: only log error from accepting new connections to avoid opening
     to many file descriptors
@@ -3455,7 +3455,7 @@ rust-proxmox-backup (0.9.4-1) unstable; urgency=medium
 
   * ui: add widget to view the effective permissions of a user or token
 
-  * ui: datastore summary: handle error when havin zero snapshot of any type
+  * ui: datastore summary: handle error when having zero snapshot of any type
 
   * ui: move user, token and permissions into an access control tab panel
 

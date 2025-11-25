@@ -195,7 +195,7 @@ allows provisioning of ``TXT`` records via an API.
 Configuring ACME DNS APIs for validation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Proxmox Backup re-uses the DNS plugins developed for the
+Proxmox Backup reuses the DNS plugins developed for the
 ``acme.sh``  [1]_ project. Please refer to its documentation for details
 on configuration of specific APIs.
 
@@ -295,7 +295,7 @@ Follow the instructions on the screen, for example:
    Country Name (2 letter code) [AU]: AT
    State or Province Name (full name) [Some-State]:Vienna
    Locality Name (eg, city) []:Vienna
-   Organization Name (eg, company) [Internet Widgits Pty Ltd]: Proxmox GmbH
+   Organization Name (eg, company) [Internet Widgets Pty Ltd]: Proxmox GmbH
    Organizational Unit Name (eg, section) []:Proxmox Backup
    Common Name (eg, YOUR name) []: yourproxmox.yourdomain.com
    Email Address []:support@yourdomain.com
