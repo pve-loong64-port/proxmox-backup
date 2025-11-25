@@ -25,6 +25,8 @@ use crate::file_formats::{
 };
 use crate::{DataBlob, LocalDatastoreLruCache};
 
+const USING_MARKER_FILENAME_EXT: &str = "using";
+
 /// File system based chunk store
 pub struct ChunkStore {
     name: String, // used for error reporting
@@ -426,6 +428,16 @@ impl ChunkStore {
                     drop(lock);
                     continue;
                 }
+                if filename
+                    .to_bytes()
+                    .ends_with(USING_MARKER_FILENAME_EXT.as_bytes())
+                {
+                    unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(|err| {
+                        format_err!("unlinking chunk using marker {filename:?} failed - {err}")
+                    })?;
+                    drop(lock);
+                    continue;
+                }
 
                 chunk_count += 1;
 
@@ -776,7 +788,7 @@ impl ChunkStore {
     /// Helper to generate marker file path for expected chunks
     fn chunk_expected_marker_path(&self, digest: &[u8; 32]) -> PathBuf {
         let (mut path, _digest_str) = self.chunk_path(digest);
-        path.set_extension("using");
+        path.set_extension(USING_MARKER_FILENAME_EXT);
         path
     }
 
