@@ -1725,6 +1725,8 @@ impl DataStore {
 
             loop {
                 for content in list_bucket_result.contents {
+                    worker.check_abort()?;
+                    worker.fail_on_shutdown()?;
                     let (chunk_path, digest, bad) =
                         match self.chunk_path_from_object_key(&content.key) {
                             Some(path) => path,
