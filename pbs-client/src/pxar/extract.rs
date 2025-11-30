@@ -1333,13 +1333,11 @@ where
         }
         .await
         {
-            error!(
-                "error extracting {}: {err}",
-                match entry.kind() {
-                    EntryKind::GoodbyeTable => "<directory>",
-                    _ => &entry.path().display().to_string(),
-                },
-            );
+            let path_display = match entry.kind() {
+                EntryKind::GoodbyeTable => "<directory>".to_string(),
+                _ => entry.path().display().to_string(),
+            };
+            error!("error extracting {path_display}: {err}");
         }
 
         if dir_level < 0 {
