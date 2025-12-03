@@ -967,21 +967,6 @@ impl DataStore {
         backup_group: &pbs_api_types::BackupGroup,
     ) -> Result<Authid, Error> {
         let full_path = self.owner_path(ns, backup_group);
-
-        if let DatastoreBackend::S3(s3_client) = self.backend()? {
-            let mut path = ns.path();
-            path.push(backup_group.to_string());
-            let object_key = crate::s3::object_key_from_path(&path, GROUP_OWNER_FILE_NAME)
-                .context("invalid owner file object key")?;
-            let response = proxmox_async::runtime::block_on(s3_client.get_object(object_key))?
-                .ok_or_else(|| format_err!("fetching owner failed"))?;
-            let content = proxmox_async::runtime::block_on(response.content.collect())?;
-            let owner = String::from_utf8(content.to_bytes().trim_ascii_end().to_vec())?;
-            return owner
-                .parse()
-                .map_err(|err| format_err!("parsing owner for {backup_group} failed: {err}"));
-        }
-
         let owner = proxmox_sys::fs::file_read_firstline(full_path)?;
         owner
             .trim_end() // remove trailing newline
