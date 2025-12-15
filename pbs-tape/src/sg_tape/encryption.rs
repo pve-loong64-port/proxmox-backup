@@ -134,7 +134,7 @@ fn sg_spout_set_encryption<F: AsRawFd>(
 // Warning: this blocks and fails if there is no media loaded
 #[allow(clippy::vec_init_then_push)]
 fn sg_spin_data_encryption_status<F: AsRawFd>(file: &mut F) -> Result<Vec<u8>, Error> {
-    let allocation_len: u32 = 8192 + 4;
+    let allocation_len: u32 = 8192;
 
     let mut sg_raw = SgRaw::new(file, allocation_len as usize)?;
 
@@ -163,7 +163,7 @@ fn sg_spin_data_encryption_status<F: AsRawFd>(file: &mut F) -> Result<Vec<u8>, E
 // Warning: this blocks and fails if there is no media loaded
 #[allow(clippy::vec_init_then_push)]
 fn sg_spin_data_encryption_caps<F: AsRawFd>(file: &mut F) -> Result<Vec<u8>, Error> {
-    let allocation_len: u32 = 8192 + 4;
+    let allocation_len: u32 = 8192;
 
     let mut sg_raw = SgRaw::new(file, allocation_len as usize)?;
 
