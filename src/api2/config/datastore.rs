@@ -22,10 +22,10 @@ use pbs_api_types::{
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
-use crate::api2::admin::{
-    datastore::do_mount_device, prune::list_prune_jobs, sync::list_config_sync_jobs,
-    verify::list_verification_jobs,
-};
+use crate::api2::admin::datastore::do_mount_device;
+use crate::api2::admin::prune::list_prune_jobs;
+use crate::api2::admin::sync::list_config_sync_jobs;
+use crate::api2::admin::verify::list_verification_jobs;
 use crate::api2::config::prune::{delete_prune_job, do_create_prune_job, has_prune_job};
 use crate::api2::config::sync::delete_sync_job;
 use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_backup_jobs};
