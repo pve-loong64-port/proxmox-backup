@@ -80,6 +80,7 @@ Ext.define('PBS.window.UserEdit', {
                 bind: {
                     value: '{realm}',
                 },
+                stateful: false, // realm is not saved between page reloads
                 cbind: {
                     hidden: '{!isCreate}',
                     disabled: '{!isCreate}',
