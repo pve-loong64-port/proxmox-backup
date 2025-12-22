@@ -1,3 +1,23 @@
+rust-proxmox-backup (4.1.1-1) trixie; urgency=medium
+
+  * datastore: s3: use owner from local store cache instead of refetching to
+    reduce the time and amount of request needed for listing backup contents.
+
+  * garbage collection: add task-cancellation points during phase 2 for s3
+    stores after each processed s3 object key.
+
+  * tape: cope with drives that aligned buffer sizes when setting up
+    encryption.
+
+  * api: notification: correctly enumerate known push-sync-jobs.
+
+  * api: config: fix push sync jobs cleanup on datastore destroy.
+
+  * update proxmox-apt and related api-types for more robust package name
+    handling.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 22 Dec 2025 16:58:06 +0100
+
 rust-proxmox-backup (4.1.0-1) trixie; urgency=medium
 
   * ui: traffic-control: increase dialog height to fit "Add Timeframe" button.
