@@ -1,3 +1,10 @@
+rust-proxmox-backup (3.4.8-2) bookworm; urgency=medium
+
+  * update proxmox-apt and related api-types for more robust package name
+    handling.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 22 Dec 2025 17:32:12 +0100
+
 rust-proxmox-backup (3.4.8-1) bookworm; urgency=medium
 
   * fix #6566: backup api: conditionally drop group and snapshot locks to
