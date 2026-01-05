@@ -34,7 +34,8 @@ use pbs_api_types::{
     MaintenanceType, Operation, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
-use pbs_config::BackupLockGuard;
+use pbs_config::{BackupLockGuard, ConfigVersionCache};
+use proxmox_section_config::SectionConfigData;
 
 use crate::backup_info::{
     BackupDir, BackupGroup, BackupInfo, OLD_LOCKING, PROTECTED_MARKER_FILENAME,
@@ -47,6 +48,17 @@ use crate::index::IndexFile;
 use crate::s3::S3_CONTENT_PREFIX;
 use crate::task_tracking::{self, update_active_operations};
 use crate::{DataBlob, LocalDatastoreLruCache};
+
+// Cache for fully parsed datastore.cfg
+struct DatastoreConfigCache {
+    // Parsed datastore.cfg file
+    config: Arc<SectionConfigData>,
+    // Generation number from ConfigVersionCache
+    last_generation: usize,
+}
+
+static DATASTORE_CONFIG_CACHE: LazyLock<Mutex<Option<DatastoreConfigCache>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -149,11 +161,13 @@ pub struct DataStoreImpl {
     last_gc_status: Mutex<GarbageCollectionStatus>,
     verify_new: bool,
     chunk_order: ChunkOrder,
-    last_digest: Option<[u8; 32]>,
     sync_level: DatastoreFSyncLevel,
     backend_config: DatastoreBackendConfig,
     lru_store_caching: Option<LocalDatastoreLruCache>,
     thread_settings: DatastoreThreadSettings,
+    /// datastore.cfg cache generation number at lookup time, used to
+    /// invalidate this cached `DataStoreImpl`
+    config_generation: Option<usize>,
 }
 
 impl DataStoreImpl {
@@ -166,11 +180,11 @@ impl DataStoreImpl {
             last_gc_status: Mutex::new(GarbageCollectionStatus::default()),
             verify_new: false,
             chunk_order: Default::default(),
-            last_digest: None,
             sync_level: Default::default(),
             backend_config: Default::default(),
             lru_store_caching: None,
             thread_settings: Default::default(),
+            config_generation: None,
         })
     }
 }
@@ -286,6 +300,55 @@ impl DatastoreThreadSettings {
     }
 }
 
+/// Returns the parsed datastore config (`datastore.cfg`) and its
+/// generation.
+///
+/// Uses `ConfigVersionCache` to detect stale entries:
+/// - If the cached generation matches the current generation, the
+///   cached config is returned.
+/// - Otherwise the config is re-read from disk. If `update_cache` is
+///   `true`, the new config and current generation are stored in the
+///   cache. Callers that set `update_cache = true` must hold the
+///   datastore config lock to avoid racing with concurrent config
+///   changes.
+/// - If `update_cache` is `false`, the freshly read config is returned
+///   but the cache is left unchanged.
+///
+/// If `ConfigVersionCache` is not available, the config is always read
+/// from disk and `None` is returned as the generation.
+fn datastore_section_config_cached(
+    update_cache: bool,
+) -> Result<(Arc<SectionConfigData>, Option<usize>), Error> {
+    let mut config_cache = DATASTORE_CONFIG_CACHE.lock().unwrap();
+
+    if let Ok(version_cache) = ConfigVersionCache::new() {
+        let current_gen = version_cache.datastore_generation();
+        if let Some(cached) = config_cache.as_ref() {
+            // Fast path: re-use cached datastore.cfg
+            if cached.last_generation == current_gen {
+                return Ok((cached.config.clone(), Some(cached.last_generation)));
+            }
+        }
+        // Slow path: re-read datastore.cfg
+        let (config_raw, _digest) = pbs_config::datastore::config()?;
+        let config = Arc::new(config_raw);
+
+        if update_cache {
+            *config_cache = Some(DatastoreConfigCache {
+                config: config.clone(),
+                last_generation: current_gen,
+            });
+        }
+
+        Ok((config, Some(current_gen)))
+    } else {
+        // Fallback path, no config version cache: read datastore.cfg and return None as generation
+        *config_cache = None;
+        let (config_raw, _digest) = pbs_config::datastore::config()?;
+        Ok((Arc::new(config_raw), None))
+    }
+}
+
 impl DataStore {
     // This one just panics on everything
     #[doc(hidden)]
@@ -367,10 +430,9 @@ impl DataStore {
         // we use it to decide whether it is okay to delete the datastore.
         let _config_lock = pbs_config::datastore::lock_config()?;
 
-        // we could use the ConfigVersionCache's generation for staleness detection, but  we load
-        // the config anyway -> just use digest, additional benefit: manual changes get detected
-        let (config, digest) = pbs_config::datastore::config()?;
-        let config: DataStoreConfig = config.lookup("datastore", name)?;
+        // Get the current datastore.cfg generation number and cached config
+        let (section_config, gen_num) = datastore_section_config_cached(true)?;
+        let config: DataStoreConfig = section_config.lookup("datastore", name)?;
 
         if let Some(maintenance_mode) = config.get_maintenance_mode() {
             if let Err(error) = maintenance_mode.check(operation) {
@@ -378,19 +440,19 @@ impl DataStore {
             }
         }
 
+        let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
+
         if get_datastore_mount_status(&config) == Some(false) {
-            let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
             datastore_cache.remove(&config.name);
             bail!("datastore '{}' is not mounted", config.name);
         }
 
-        let mut datastore_cache = DATASTORE_MAP.lock().unwrap();
         let entry = datastore_cache.get(name);
 
         // reuse chunk store so that we keep using the same process locker instance!
         let chunk_store = if let Some(datastore) = &entry {
-            let last_digest = datastore.last_digest.as_ref();
-            if let Some(true) = last_digest.map(|last_digest| last_digest == &digest) {
+            // Re-use DataStoreImpl
+            if datastore.config_generation == gen_num && gen_num.is_some() {
                 if let Some(operation) = operation {
                     update_active_operations(name, operation, 1)?;
                 }
@@ -412,7 +474,7 @@ impl DataStore {
             )?)
         };
 
-        let datastore = DataStore::with_store_and_config(chunk_store, config, Some(digest))?;
+        let datastore = DataStore::with_store_and_config(chunk_store, config, gen_num)?;
 
         let datastore = Arc::new(datastore);
         datastore_cache.insert(name.to_string(), datastore.clone());
@@ -514,7 +576,7 @@ impl DataStore {
     fn with_store_and_config(
         chunk_store: Arc<ChunkStore>,
         config: DataStoreConfig,
-        last_digest: Option<[u8; 32]>,
+        generation: Option<usize>,
     ) -> Result<DataStoreImpl, Error> {
         let mut gc_status_path = chunk_store.base_path();
         gc_status_path.push(".gc-status");
@@ -579,11 +641,11 @@ impl DataStore {
             last_gc_status: Mutex::new(gc_status),
             verify_new: config.verify_new.unwrap_or(false),
             chunk_order: tuning.chunk_order.unwrap_or_default(),
-            last_digest,
             sync_level: tuning.sync_level.unwrap_or_default(),
             backend_config,
             lru_store_caching,
             thread_settings,
+            config_generation: generation,
         })
     }
 

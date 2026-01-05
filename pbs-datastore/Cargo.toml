@@ -40,6 +40,7 @@ proxmox-io.workspace = true
 proxmox-lang.workspace=true
 proxmox-s3-client = { workspace = true, features = [ "impl" ] }
 proxmox-schema = { workspace = true, features = [ "api-macro" ] }
+proxmox-section-config.workspace = true
 proxmox-serde = { workspace = true, features = [ "serde_json" ] }
 proxmox-sys.workspace = true
 proxmox-systemd.workspace = true
