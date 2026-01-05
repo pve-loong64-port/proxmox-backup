@@ -53,8 +53,12 @@ use crate::{DataBlob, LocalDatastoreLruCache};
 struct DatastoreConfigCache {
     // Parsed datastore.cfg file
     config: Arc<SectionConfigData>,
+    // Digest of the datastore.cfg file
+    digest: [u8; 32],
     // Generation number from ConfigVersionCache
     last_generation: usize,
+    // Last update time (epoch seconds)
+    last_update: i64,
 }
 
 static DATASTORE_CONFIG_CACHE: LazyLock<Mutex<Option<DatastoreConfigCache>>> =
@@ -63,6 +67,8 @@ static DATASTORE_CONFIG_CACHE: LazyLock<Mutex<Option<DatastoreConfigCache>>> =
 static DATASTORE_MAP: LazyLock<Mutex<HashMap<String, Arc<DataStoreImpl>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Max age in seconds to reuse the cached datastore config.
+const DATASTORE_CONFIG_CACHE_TTL_SECS: i64 = 60;
 /// Filename to store backup group notes
 pub const GROUP_NOTES_FILE_NAME: &str = "notes";
 /// Filename to store backup group owner
@@ -323,15 +329,16 @@ impl DatastoreThreadSettings {
 /// generation.
 ///
 /// Uses `ConfigVersionCache` to detect stale entries:
-/// - If the cached generation matches the current generation, the
-///   cached config is returned.
+/// - If the cached generation matches the current generation and TTL is
+///   OK, the cached config is returned.
 /// - Otherwise the config is re-read from disk. If `update_cache` is
-///   `true`, the new config and current generation are stored in the
-///   cache. Callers that set `update_cache = true` must hold the
-///   datastore config lock to avoid racing with concurrent config
-///   changes.
+///   `true` and a previous cached entry exists with the same generation
+///   but a different digest, this indicates the config has changed
+///   (e.g. manual edit) and the generation must be bumped. Callers
+///   that set `update_cache = true` must hold the datastore config lock
+///   to avoid racing with concurrent config changes.
 /// - If `update_cache` is `false`, the freshly read config is returned
-///   but the cache is left unchanged.
+///   but the cache and generation are left unchanged.
 ///
 /// If `ConfigVersionCache` is not available, the config is always read
 /// from disk and `None` is returned as the generation.
@@ -341,25 +348,41 @@ fn datastore_section_config_cached(
     let mut config_cache = DATASTORE_CONFIG_CACHE.lock().unwrap();
 
     if let Ok(version_cache) = ConfigVersionCache::new() {
+        let now = epoch_i64();
         let current_gen = version_cache.datastore_generation();
         if let Some(cached) = config_cache.as_ref() {
-            // Fast path: re-use cached datastore.cfg
-            if cached.last_generation == current_gen {
+            // Fast path: re-use cached datastore.cfg if generation matches and TTL not expired
+            if cached.last_generation == current_gen
+                && now - cached.last_update < DATASTORE_CONFIG_CACHE_TTL_SECS
+            {
                 return Ok((cached.config.clone(), Some(cached.last_generation)));
             }
         }
         // Slow path: re-read datastore.cfg
-        let (config_raw, _digest) = pbs_config::datastore::config()?;
+        let (config_raw, digest) = pbs_config::datastore::config()?;
         let config = Arc::new(config_raw);
 
+        let mut effective_gen = current_gen;
         if update_cache {
+            // Bump the generation if the config has been changed manually.
+            // This ensures that Drop handlers will detect that a newer config exists
+            // and will not rely on a stale cached entry for maintenance mandate.
+            if let Some(cached) = config_cache.as_ref() {
+                if cached.last_generation == current_gen && cached.digest != digest {
+                    effective_gen = version_cache.increase_datastore_generation() + 1;
+                }
+            }
+
+            // Persist
             *config_cache = Some(DatastoreConfigCache {
                 config: config.clone(),
-                last_generation: current_gen,
+                digest,
+                last_generation: effective_gen,
+                last_update: now,
             });
         }
 
-        Ok((config, Some(current_gen)))
+        Ok((config, Some(effective_gen)))
     } else {
         // Fallback path, no config version cache: read datastore.cfg and return None as generation
         *config_cache = None;
