@@ -224,14 +224,33 @@ impl Drop for DataStore {
 
             // remove datastore from cache iff
             //  - last task finished, and
-            //  - datastore is in a maintenance mode that mandates it
-            let remove_from_cache = last_task
-                && pbs_config::datastore::config()
-                    .and_then(|(s, _)| s.lookup::<DataStoreConfig>("datastore", self.name()))
-                    .is_ok_and(|c| {
-                        c.get_maintenance_mode()
-                            .is_some_and(|m| m.clear_from_cache())
-                    });
+            //  - datastore is in a maintenance mode that mandates it, or the datastore was removed from datastore.cfg
+
+            // first check: check if last task finished
+            if !last_task {
+                return;
+            }
+
+            // determine whether we should evict from DATASTORE_MAP.
+            let remove_from_cache = match datastore_section_config_cached(false) {
+                Ok((section_config, _gen)) => {
+                    match section_config.lookup::<DataStoreConfig>("datastore", self.name()) {
+                        // second check: check if maintenance mode requires closing FDs
+                        Ok(config) => config
+                            .get_maintenance_mode()
+                            .is_some_and(|m| m.clear_from_cache()),
+                        Err(err) => {
+                            // datastore removed from config; evict cached entry if available (without checking maintenance mode)
+                            log::warn!("DataStore::drop: datastore '{}' missing from datastore.cfg; evicting cached instance: {err}", self.name());
+                            true
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::warn!("DataStore::drop: failed to load datastore.cfg for '{}'; skipping cache-eviction: {err}", self.name());
+                    false
+                }
+            };
 
             if remove_from_cache {
                 DATASTORE_MAP.lock().unwrap().remove(self.name());
