@@ -339,7 +339,7 @@ async fn s3_refresh(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result
 
     let info = &api2::admin::datastore::API_METHOD_S3_REFRESH;
     let result = match info.handler {
-        ApiHandler::Async(handler) => (handler)(param, info, rpcenv).await?,
+        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
         _ => unreachable!(),
     };
 
