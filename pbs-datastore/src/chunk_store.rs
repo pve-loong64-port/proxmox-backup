@@ -750,7 +750,7 @@ impl ChunkStore {
             let gid = pbs_config::backup_group()?.gid;
             create_options = create_options.owner(uid).group(gid);
         }
-        proxmox_sys::fs::replace_file(&path, &[], create_options, false)
+        proxmox_sys::fs::replace_file(path, &[], create_options, false)
     }
 
     /// Mark chunk as expected to be present by writing a file the chunk store.

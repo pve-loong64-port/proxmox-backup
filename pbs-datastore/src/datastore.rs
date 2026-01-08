@@ -2005,7 +2005,7 @@ impl DataStore {
     ) -> Result<(bool, u64), Error> {
         match backend {
             DatastoreBackend::Filesystem => self.inner.chunk_store.insert_chunk(chunk, digest),
-            DatastoreBackend::S3(s3_client) => self.insert_chunk_cached(chunk, digest, &s3_client),
+            DatastoreBackend::S3(s3_client) => self.insert_chunk_cached(chunk, digest, s3_client),
         }
     }
 
@@ -2060,7 +2060,7 @@ impl DataStore {
         // or the chunk marker file exists on filesystem. The latter means the chunk has
         // been uploaded in the past, but was evicted from the LRU cache since but was not
         // cleaned up by garbage collection, so contained in the S3 object store.
-        if self.cache_contains(&digest) {
+        if self.cache_contains(digest) {
             tracing::info!("Skip upload of cached chunk {}", hex::encode(digest));
             return Ok((true, chunk_size));
         }

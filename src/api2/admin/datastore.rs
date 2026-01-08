@@ -2734,8 +2734,8 @@ pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
 /// Performs an s3 refresh for given datastore. Expects the store to already be in maintenance mode
 /// s3-refresh.
 pub(crate) fn do_s3_refresh(store: &str, worker: &dyn WorkerTaskContext) -> Result<(), Error> {
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Lookup))?;
-    run_maintenance_locked(&store, MaintenanceType::S3Refresh, worker, || {
+    let datastore = DataStore::lookup_datastore(store, Some(Operation::Lookup))?;
+    run_maintenance_locked(store, MaintenanceType::S3Refresh, worker, || {
         proxmox_async::runtime::block_on(datastore.s3_refresh())
     })
 }
