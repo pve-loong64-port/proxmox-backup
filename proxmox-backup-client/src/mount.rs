@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::hash::BuildHasher;
 use std::os::unix::io::{AsRawFd, OwnedFd};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
@@ -18,11 +18,13 @@ use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{ArchiveType, BackupArchiveName, BackupNamespace};
-use pbs_client::tools::key_source::get_encryption_key_password;
+use pbs_client::tools::key_source::{
+    crypto_parameters, format_key_source, get_encryption_key_password,
+};
 use pbs_client::{BackupReader, RemoteChunkReader};
 use pbs_datastore::cached_chunk_reader::CachedChunkReader;
 use pbs_datastore::index::IndexFile;
-use pbs_key_config::load_and_decrypt_key;
+use pbs_key_config::decrypt_key;
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json::required_string_param;
 
@@ -208,14 +210,16 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
     let path = required_string_param(&param, "snapshot")?;
     let backup_dir = dir_or_last_from_group(&client, &repo, &backup_ns, path).await?;
 
-    let keyfile = param["keyfile"].as_str().map(PathBuf::from);
-    let crypt_config = match keyfile {
+    let crypto = crypto_parameters(&param)?;
+
+    let crypt_config = match crypto.enc_key {
         None => None,
-        Some(path) => {
-            log::info!("Encryption key file: '{:?}'", path);
-            let (key, _, fingerprint) = load_and_decrypt_key(&path, &get_encryption_key_password)?;
-            log::info!("Encryption key fingerprint: '{}'", fingerprint);
-            Some(Arc::new(CryptConfig::new(key)?))
+        Some(key) => {
+            log::info!("{}", format_key_source(&key.source, "encryption"));
+            let (key, _created, fingerprint) = decrypt_key(&key.key, &get_encryption_key_password)?;
+            log::info!("Encryption key fingerprint: '{fingerprint}'");
+            let crypt_config = CryptConfig::new(key)?;
+            Some(Arc::new(crypt_config))
         }
     };
 
