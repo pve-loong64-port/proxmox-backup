@@ -5,10 +5,9 @@ use std::path::Path;
 use anyhow::{bail, format_err, Error};
 use serde_json::Value;
 
+use pbs_api_types::PROXMOX_SAFE_ID_REGEX;
 use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{file_read_string, CreateOptions};
-
-use pbs_api_types::PROXMOX_SAFE_ID_REGEX;
 
 use crate::api2::types::{AcmeAccountName, AcmeChallengeSchema, KnownAcmeDirectory};
 

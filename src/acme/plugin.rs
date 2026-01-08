@@ -19,11 +19,10 @@ use tokio::net::TcpListener;
 use tokio::process::Command;
 
 use proxmox_acme::{Authorization, Challenge};
+use proxmox_rest_server::WorkerTask;
 
 use crate::acme::AcmeClient;
 use crate::api2::types::AcmeDomain;
-use proxmox_rest_server::WorkerTask;
-
 use crate::config::acme::plugin::{DnsPlugin, PluginData};
 
 const PROXMOX_ACME_SH_PATH: &str = "/usr/share/proxmox-acme/proxmox-acme";

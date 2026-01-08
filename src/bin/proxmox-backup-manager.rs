@@ -5,10 +5,6 @@ use std::str::FromStr;
 use anyhow::{format_err, Error};
 use serde_json::{json, Value};
 
-use proxmox_router::{cli::*, RpcEnvironment};
-use proxmox_schema::api;
-use proxmox_sys::fs::CreateOptions;
-
 use pbs_api_types::percent_encoding::percent_encode_component;
 use pbs_api_types::{
     BackupNamespace, GroupFilter, RateLimitConfig, SyncDirection, SyncJobConfig, DATASTORE_SCHEMA,
@@ -18,12 +14,14 @@ use pbs_api_types::{
     VERIFICATION_OUTDATED_AFTER_SCHEMA, VERIFY_JOB_READ_THREADS_SCHEMA,
     VERIFY_JOB_VERIFY_THREADS_SCHEMA,
 };
+use proxmox_rest_server::wait_for_local_worker;
+use proxmox_router::{cli::*, RpcEnvironment};
+use proxmox_schema::api;
+use proxmox_sys::fs::CreateOptions;
+
 use pbs_client::{display_task_log, view_task_result};
 use pbs_config::sync;
 use pbs_tools::json::required_string_param;
-
-use proxmox_rest_server::wait_for_local_worker;
-
 use proxmox_backup::api2;
 use proxmox_backup::client_helpers::connect_to_localhost;
 use proxmox_backup::config;

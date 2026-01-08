@@ -10,22 +10,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
+use pbs_api_types::{Authid, PRIV_SYS_MODIFY};
+use proxmox_acme::types::AccountData as AcmeAccountData;
+use proxmox_acme::Account;
+use proxmox_rest_server::WorkerTask;
 use proxmox_router::{
     http_bail, list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap,
 };
 use proxmox_schema::{api, param_bail};
-
-use proxmox_acme::types::AccountData as AcmeAccountData;
-use proxmox_acme::Account;
-
-use pbs_api_types::{Authid, PRIV_SYS_MODIFY};
 
 use crate::acme::AcmeClient;
 use crate::api2::types::{AcmeAccountName, AcmeChallengeSchema, KnownAcmeDirectory};
 use crate::config::acme::plugin::{
     self, DnsPlugin, DnsPluginCore, DnsPluginCoreUpdater, PLUGIN_ID_SCHEMA,
 };
-use proxmox_rest_server::WorkerTask;
 
 pub(crate) const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))

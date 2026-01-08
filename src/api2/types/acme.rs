@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use proxmox_schema::{api, ApiStringFormat, ApiType, Schema, StringSchema};
-
 use pbs_api_types::{DNS_ALIAS_FORMAT, DNS_NAME_FORMAT, PROXMOX_SAFE_ID_FORMAT};
+use proxmox_schema::{api, ApiStringFormat, ApiType, Schema, StringSchema};
 
 #[api(
     properties: {
