@@ -598,6 +598,7 @@ pub enum DeletableTokenProperty {
     },
 )]
 /// Update user's API token metadata
+#[allow(clippy::too_many_arguments)]
 pub fn update_token(
     userid: Userid,
     token_name: Tokenname,
