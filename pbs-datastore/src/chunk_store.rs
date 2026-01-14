@@ -280,7 +280,11 @@ impl ChunkStore {
         &self,
     ) -> Result<
         impl std::iter::FusedIterator<
-            Item = (Result<proxmox_sys::fs::ReadDirEntry, Error>, usize, bool),
+            Item = (
+                Result<proxmox_sys::fs::ReadDirEntry, Error>,
+                usize,
+                ChunkExt,
+            ),
         >,
         Error,
     > {
@@ -315,21 +319,47 @@ impl ChunkStore {
                         Some(Ok(entry)) => {
                             // skip files if they're not a hash
                             let bytes = entry.file_name().to_bytes();
-                            if bytes.len() != 64 && bytes.len() != 64 + ".0.bad".len() {
+
+                            if bytes.len() < 64 {
                                 continue;
                             }
+
                             if !bytes.iter().take(64).all(u8::is_ascii_hexdigit) {
                                 continue;
                             }
 
-                            let bad = bytes.ends_with(b".bad");
-                            return Some((Ok(entry), percentage, bad));
+                            // regular chunk
+                            if bytes.len() == 64 {
+                                return Some((Ok(entry), percentage, ChunkExt::None));
+                            }
+
+                            // i-th bad chunk
+                            if bytes.len() == 64 + ".i.bad".len()
+                                && bytes[64] == b'.'
+                                && bytes[65] >= b'0'
+                                && bytes[65] <= b'9'
+                                && bytes[66] == b'.'
+                                && bytes.ends_with(b"bad")
+                            {
+                                return Some((Ok(entry), percentage, ChunkExt::Bad));
+                            }
+
+                            // chunk marker file
+                            let marker_ext_bytes = USING_MARKER_FILENAME_EXT.as_bytes();
+                            if bytes.len() == 64 + 1 + marker_ext_bytes.len()
+                                && bytes[64] == b'.'
+                                && bytes.ends_with(marker_ext_bytes)
+                            {
+                                return Some((Ok(entry), percentage, ChunkExt::UsedMarker));
+                            }
+
+                            continue;
                         }
                         Some(Err(err)) => {
                             // stop after first error
                             done = true;
                             // and pass the error through:
-                            return Some((Err(err), percentage, false));
+                            return Some((Err(err), percentage, ChunkExt::None));
                         }
                         None => (), // open next directory
                     }
@@ -362,7 +392,7 @@ impl ChunkStore {
                         return Some((
                             Err(format_err!("unable to read subdir '{subdir}' - {err}")),
                             percentage,
-                            false,
+                            ChunkExt::None,
                         ));
                     }
                 }
@@ -397,7 +427,8 @@ impl ChunkStore {
         let mut last_percentage = 0;
         let mut chunk_count = 0;
 
-        for (entry, percentage, bad) in self.get_chunk_store_iterator()? {
+        for (entry, percentage, chunk_ext) in self.get_chunk_store_iterator()? {
+            let bad = chunk_ext == ChunkExt::Bad;
             if last_percentage != percentage {
                 last_percentage = percentage;
                 info!("processed {percentage}% ({chunk_count} chunks)");
@@ -428,10 +459,7 @@ impl ChunkStore {
                     drop(lock);
                     continue;
                 }
-                if filename
-                    .to_bytes()
-                    .ends_with(USING_MARKER_FILENAME_EXT.as_bytes())
-                {
+                if chunk_ext == ChunkExt::UsedMarker {
                     unlinkat(Some(dirfd), filename, UnlinkatFlags::NoRemoveDir).map_err(|err| {
                         format_err!("unlinking chunk using marker {filename:?} failed - {err}")
                     })?;
@@ -901,6 +929,14 @@ impl ChunkStore {
         })?;
         Ok(guard)
     }
+}
+
+#[derive(PartialEq)]
+/// Chunk iterator directory entry filename extension
+enum ChunkExt {
+    None,
+    Bad,
+    UsedMarker,
 }
 
 #[test]
