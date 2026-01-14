@@ -276,7 +276,7 @@ impl ChunkStore {
         Ok(true)
     }
 
-    pub fn get_chunk_iterator(
+    fn get_chunk_store_iterator(
         &self,
     ) -> Result<
         impl std::iter::FusedIterator<
@@ -397,7 +397,7 @@ impl ChunkStore {
         let mut last_percentage = 0;
         let mut chunk_count = 0;
 
-        for (entry, percentage, bad) in self.get_chunk_iterator()? {
+        for (entry, percentage, bad) in self.get_chunk_store_iterator()? {
             if last_percentage != percentage {
                 last_percentage = percentage;
                 info!("processed {percentage}% ({chunk_count} chunks)");
