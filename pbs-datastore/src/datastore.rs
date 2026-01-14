@@ -82,7 +82,7 @@ const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 // s3 deletion batch size to avoid 1024 open files soft limit
 const S3_DELETE_BATCH_LIMIT: usize = 100;
 // max defer time for s3 batch deletions
-const S3_DELETE_DEFER_LIMIT_SECONDS: i64 = 60 * 5;
+const S3_DELETE_DEFER_LIMIT_SECONDS: Duration = Duration::from_secs(60 * 5);
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token
@@ -1793,40 +1793,8 @@ impl DataStore {
                 proxmox_async::runtime::block_on(s3_client.list_objects_v2(&prefix, None))
                     .context("failed to list chunk in s3 object store")?;
 
-            let mut delete_list = Vec::with_capacity(S3_DELETE_BATCH_LIMIT);
-            let mut delete_list_age = epoch_i64();
-
-            let s3_delete_batch = |delete_list: &mut Vec<(S3ObjectKey, BackupLockGuard)>,
-                                   s3_client: &Arc<S3Client>|
-             -> Result<(), Error> {
-                let delete_objects_result = proxmox_async::runtime::block_on(
-                    s3_client.delete_objects(
-                        &delete_list
-                            .iter()
-                            .map(|(key, _)| key.clone())
-                            .collect::<Vec<S3ObjectKey>>(),
-                    ),
-                )?;
-                if let Some(_err) = delete_objects_result.error {
-                    bail!("failed to delete some objects");
-                }
-                // drops all chunk flock guards
-                delete_list.clear();
-                Ok(())
-            };
-
-            let add_to_delete_list =
-                |delete_list: &mut Vec<(S3ObjectKey, BackupLockGuard)>,
-                 delete_list_age: &mut i64,
-                 key: S3ObjectKey,
-                 _chunk_guard: BackupLockGuard| {
-                    // set age based on first insertion
-                    if delete_list.is_empty() {
-                        *delete_list_age = epoch_i64();
-                    }
-                    delete_list.push((key, _chunk_guard));
-                };
-
+            let mut delete_list =
+                S3DeleteList::with_thresholds(S3_DELETE_BATCH_LIMIT, S3_DELETE_DEFER_LIMIT_SECONDS);
             loop {
                 for content in list_bucket_result.contents {
                     worker.check_abort()?;
@@ -1883,12 +1851,7 @@ impl DataStore {
                                             std::fs::remove_file(chunk_path)?;
                                         }
                                     }
-                                    add_to_delete_list(
-                                        &mut delete_list,
-                                        &mut delete_list_age,
-                                        content.key,
-                                        _chunk_guard,
-                                    );
+                                    delete_list.push(content.key, _chunk_guard);
                                     Ok(())
                                 },
                             )?;
@@ -1896,12 +1859,7 @@ impl DataStore {
                     } else {
                         gc_status.removed_chunks += 1;
                         gc_status.removed_bytes += content.size;
-                        add_to_delete_list(
-                            &mut delete_list,
-                            &mut delete_list_age,
-                            content.key,
-                            _chunk_guard,
-                        );
+                        delete_list.push(content.key, _chunk_guard);
                     }
 
                     chunk_count += 1;
@@ -1910,12 +1868,7 @@ impl DataStore {
                     drop(_guard);
 
                     // limit pending deletes to avoid holding too many chunk flocks
-                    if delete_list.len() >= S3_DELETE_BATCH_LIMIT
-                        || (!delete_list.is_empty()
-                            && epoch_i64() - delete_list_age > S3_DELETE_DEFER_LIMIT_SECONDS)
-                    {
-                        s3_delete_batch(&mut delete_list, s3_client)?;
-                    }
+                    delete_list.conditional_delete_and_drop_locks(s3_client)?;
                 }
                 // Process next batch of chunks if there is more
                 if list_bucket_result.is_truncated {
@@ -1931,9 +1884,7 @@ impl DataStore {
             }
 
             // delete the last batch of objects, if there are any remaining
-            if !delete_list.is_empty() {
-                s3_delete_batch(&mut delete_list, s3_client)?;
-            }
+            delete_list.delete_and_drop_locks(s3_client)?;
 
             info!("processed {chunk_count} total chunks");
 
@@ -2870,5 +2821,77 @@ impl DataStore {
         }
 
         result
+    }
+}
+
+/// Track S3 object keys to be deleted by garbage collection while holding their file lock.
+struct S3DeleteList {
+    list: Vec<(S3ObjectKey, BackupLockGuard)>,
+    first_entry_added: SystemTime,
+    age_threshold: Duration,
+    capacity_threshold: usize,
+}
+
+impl S3DeleteList {
+    /// Create a new list instance with given capacity and age thresholds.
+    fn with_thresholds(capacity_threshold: usize, age_threshold: Duration) -> Self {
+        Self {
+            first_entry_added: SystemTime::now(), // init only, updated once added
+            list: Vec::with_capacity(capacity_threshold),
+            age_threshold,
+            capacity_threshold,
+        }
+    }
+
+    /// Pushes the current key and backup lock guard to the list, updating the delete list age if
+    /// the list was empty before the insert.
+    fn push(&mut self, key: S3ObjectKey, guard: BackupLockGuard) {
+        // set age based on first insertion
+        if self.list.is_empty() {
+            self.first_entry_added = SystemTime::now();
+        }
+        self.list.push((key, guard));
+    }
+
+    /// Delete the objects in the list via the provided S3 client instance.
+    /// Clears the list contents and frees the per-chunk file locks.
+    fn delete_and_drop_locks(&mut self, s3_client: &Arc<S3Client>) -> Result<(), Error> {
+        if self.list.is_empty() {
+            return Ok(());
+        }
+        let delete_objects_result = proxmox_async::runtime::block_on(
+            s3_client.delete_objects(
+                &self
+                    .list
+                    .iter()
+                    .map(|(key, _)| key.clone())
+                    .collect::<Vec<S3ObjectKey>>(),
+            ),
+        )?;
+        if delete_objects_result.error.is_some() {
+            bail!("failed to delete some objects");
+        }
+        // drops all chunk flock guards
+        self.list.clear();
+        Ok(())
+    }
+
+    /// Delete the object stored in the list if either the list equals or exceed the capacity
+    /// threshold or the delete list age threshold.
+    fn conditional_delete_and_drop_locks(
+        &mut self,
+        s3_client: &Arc<S3Client>,
+    ) -> Result<(), Error> {
+        if self.list.len() >= self.capacity_threshold
+            || (!self.list.is_empty()
+                && self
+                    .first_entry_added
+                    .elapsed()
+                    .unwrap_or(self.age_threshold) // time jump to past, chunk markers already gone
+                    >= self.age_threshold)
+        {
+            self.delete_and_drop_locks(s3_client)?;
+        }
+        Ok(())
     }
 }
