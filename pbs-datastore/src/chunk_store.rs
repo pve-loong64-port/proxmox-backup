@@ -948,6 +948,22 @@ impl ChunkStore {
         })?;
         Ok(guard)
     }
+
+    /// Generate the next bad chunk file path for given digest. Returns the path as well as the bad
+    /// chunk counter.
+    pub(crate) fn next_bad_chunk_path(&self, digest: &[u8; 32]) -> (PathBuf, usize) {
+        let (mut chunk_path, digest_str) = self.chunk_path(digest);
+        let mut counter = 0;
+        loop {
+            chunk_path.set_file_name(format!("{digest_str}.{counter}.bad"));
+            if chunk_path.exists() && counter < 9 {
+                counter += 1;
+            } else {
+                break;
+            }
+        }
+        (chunk_path, counter)
+    }
 }
 
 #[derive(PartialEq)]

@@ -2756,16 +2756,7 @@ impl DataStore {
         }
         let _lock = self.inner.chunk_store.mutex().lock().unwrap();
 
-        let mut counter = 0;
-        let mut new_path = path.clone();
-        loop {
-            new_path.set_file_name(format!("{digest_str}.{counter}.bad"));
-            if new_path.exists() && counter < 9 {
-                counter += 1;
-            } else {
-                break;
-            }
-        }
+        let (new_path, counter) = self.inner.chunk_store.next_bad_chunk_path(digest);
 
         let result = match std::fs::rename(&path, &new_path) {
             Ok(_) => Ok(Some(new_path)),
