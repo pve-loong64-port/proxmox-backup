@@ -242,7 +242,7 @@ impl ChunkStore {
         self.cond_touch_path(&chunk_path, assert_exists)
     }
 
-    pub(super) fn cond_touch_path(&self, path: &Path, assert_exists: bool) -> Result<bool, Error> {
+    fn cond_touch_path(&self, path: &Path, assert_exists: bool) -> Result<bool, Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
 
@@ -274,6 +274,25 @@ impl ChunkStore {
         }
 
         Ok(true)
+    }
+
+    /// Update access timestamp on all bad chunks for given digest
+    ///
+    /// Gets exclusive access by acquiring the chunk store mutex guard.
+    pub(super) fn cond_touch_bad_chunks(&self, digest: &[u8; 32]) -> Result<bool, Error> {
+        let _lock = self.mutex.lock();
+
+        let (chunk_path, _digest_str) = self.chunk_path(digest);
+        let mut is_bad = false;
+        for i in 0..=9 {
+            let bad_ext = format!("{i}.bad");
+            let mut bad_path = chunk_path.clone();
+            bad_path.set_extension(bad_ext);
+            if self.cond_touch_path(&bad_path, false)? {
+                is_bad = true;
+            }
+        }
+        Ok(is_bad)
     }
 
     fn get_chunk_store_iterator(
