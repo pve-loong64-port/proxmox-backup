@@ -282,13 +282,11 @@ impl ChunkStore {
     pub(super) fn cond_touch_bad_chunks(&self, digest: &[u8; 32]) -> Result<bool, Error> {
         let _lock = self.mutex.lock();
 
-        let (chunk_path, _digest_str) = self.chunk_path(digest);
+        let (mut chunk_path, digest_str) = self.chunk_path(digest);
         let mut is_bad = false;
         for i in 0..=9 {
-            let bad_ext = format!("{i}.bad");
-            let mut bad_path = chunk_path.clone();
-            bad_path.set_extension(bad_ext);
-            if self.cond_touch_path(&bad_path, false)? {
+            chunk_path.set_file_name(ChunkExt::bad_chunk_filename(&digest_str, i));
+            if self.cond_touch_path(&chunk_path, false)? {
                 is_bad = true;
             }
         }
@@ -955,7 +953,7 @@ impl ChunkStore {
         let (mut chunk_path, digest_str) = self.chunk_path(digest);
         let mut counter = 0;
         loop {
-            chunk_path.set_file_name(format!("{digest_str}.{counter}.bad"));
+            chunk_path.set_file_name(ChunkExt::bad_chunk_filename(&digest_str, counter));
             if chunk_path.exists() && counter < 9 {
                 counter += 1;
             } else {
@@ -972,6 +970,12 @@ enum ChunkExt {
     None,
     Bad,
     UsedMarker,
+}
+
+impl ChunkExt {
+    fn bad_chunk_filename(digest_str: &str, counter: usize) -> String {
+        format!("{digest_str}.{counter}.bad")
+    }
 }
 
 #[test]
