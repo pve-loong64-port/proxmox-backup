@@ -62,7 +62,7 @@ proxmox-borrow = "1"
 proxmox-compression = "1.0.1"
 proxmox-config-digest = "1"
 proxmox-daemon = "1"
-proxmox-fuse = "1"
+proxmox-fuse = "2"
 proxmox-http = { version = "1.0.2", features = [ "client", "http-helpers", "websocket" ] } # see below
 proxmox-human-byte = "1"
 proxmox-io = "1.0.1" # tools and client use "tokio" feature
