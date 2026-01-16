@@ -1,42 +1,16 @@
-use std::sync::LazyLock;
-
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use pbs_api_types::PROXMOX_SAFE_ID_FORMAT;
-use proxmox_schema::{api, ApiType, Schema, StringSchema, Updater};
-use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
-
-use pbs_config::{open_backup_lockfile, BackupLockGuard};
+use proxmox_schema::{api, Schema, StringSchema, Updater};
+use proxmox_section_config::SectionConfigData;
 
 pub const PLUGIN_ID_SCHEMA: Schema = StringSchema::new("ACME Challenge Plugin ID.")
     .format(&PROXMOX_SAFE_ID_FORMAT)
     .min_length(1)
     .max_length(32)
     .schema();
-
-pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
-
-#[api(
-    properties: {
-        id: { schema: PLUGIN_ID_SCHEMA },
-    },
-)]
-#[derive(Deserialize, Serialize)]
-/// Standalone ACME Plugin for the http-1 challenge.
-pub struct StandalonePlugin {
-    /// Plugin ID.
-    id: String,
-}
-
-impl Default for StandalonePlugin {
-    fn default() -> Self {
-        Self {
-            id: "standalone".to_string(),
-        }
-    }
-}
 
 #[api(
     properties: {
@@ -97,64 +71,6 @@ impl DnsPlugin {
     pub fn decode_data(&self, output: &mut Vec<u8>) -> Result<(), Error> {
         Ok(proxmox_base64::url::decode_to_vec(&self.data, output)?)
     }
-}
-
-fn init() -> SectionConfig {
-    let mut config = SectionConfig::new(&PLUGIN_ID_SCHEMA);
-
-    let standalone_schema = match &StandalonePlugin::API_SCHEMA {
-        Schema::Object(schema) => schema,
-        _ => unreachable!(),
-    };
-    let standalone_plugin = SectionConfigPlugin::new(
-        "standalone".to_string(),
-        Some("id".to_string()),
-        standalone_schema,
-    );
-    config.register_plugin(standalone_plugin);
-
-    let dns_challenge_schema = match DnsPlugin::API_SCHEMA {
-        Schema::AllOf(ref schema) => schema,
-        _ => unreachable!(),
-    };
-    let dns_challenge_plugin = SectionConfigPlugin::new(
-        "dns".to_string(),
-        Some("id".to_string()),
-        dns_challenge_schema,
-    );
-    config.register_plugin(dns_challenge_plugin);
-
-    config
-}
-
-const ACME_PLUGIN_CFG_FILENAME: &str = pbs_buildcfg::configdir!("/acme/plugins.cfg");
-const ACME_PLUGIN_CFG_LOCKFILE: &str = pbs_buildcfg::configdir!("/acme/.plugins.lck");
-
-pub fn lock() -> Result<BackupLockGuard, Error> {
-    super::make_acme_dir()?;
-    open_backup_lockfile(ACME_PLUGIN_CFG_LOCKFILE, None, true)
-}
-
-pub fn config() -> Result<(PluginData, [u8; 32]), Error> {
-    let content =
-        proxmox_sys::fs::file_read_optional_string(ACME_PLUGIN_CFG_FILENAME)?.unwrap_or_default();
-
-    let digest = openssl::sha::sha256(content.as_bytes());
-    let mut data = CONFIG.parse(ACME_PLUGIN_CFG_FILENAME, &content)?;
-
-    if !data.sections.contains_key("standalone") {
-        let standalone = StandalonePlugin::default();
-        data.set_data("standalone", "standalone", &standalone)
-            .unwrap();
-    }
-
-    Ok((PluginData { data }, digest))
-}
-
-pub fn save_config(config: &PluginData) -> Result<(), Error> {
-    super::make_acme_dir()?;
-    let raw = CONFIG.write(ACME_PLUGIN_CFG_FILENAME, &config.data)?;
-    pbs_config::replace_backup_config(ACME_PLUGIN_CFG_FILENAME, raw.as_bytes())
 }
 
 pub struct PluginData {

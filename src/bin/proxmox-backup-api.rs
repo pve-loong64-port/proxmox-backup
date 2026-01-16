@@ -14,6 +14,7 @@ use proxmox_rest_server::{ApiConfig, RestServer};
 use proxmox_router::RpcEnvironmentType;
 use proxmox_sys::fs::CreateOptions;
 
+use pbs_buildcfg::configdir;
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::config;
 use proxmox_backup::server::auth::check_pbs_auth;
@@ -78,6 +79,7 @@ async fn run() -> Result<(), Error> {
     let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
 
     proxmox_product_config::init(backup_user.clone(), pbs_config::priv_user()?);
+    proxmox_acme_api::init(configdir!("/acme"), true)?;
 
     let dir_opts = CreateOptions::new()
         .owner(backup_user.uid)

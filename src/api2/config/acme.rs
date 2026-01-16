@@ -1,29 +1,19 @@
-use std::fs;
-use std::ops::ControlFlow;
+use anyhow::Error;
 use std::path::Path;
-use std::sync::{Arc, LazyLock, Mutex};
-use std::time::SystemTime;
-
-use anyhow::{bail, format_err, Error};
-use hex::FromHex;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use tracing::{info, warn};
+use tracing::info;
 
 use pbs_api_types::{Authid, PRIV_SYS_MODIFY};
-use proxmox_acme::types::AccountData as AcmeAccountData;
-use proxmox_acme::Account;
+use proxmox_acme_api::{
+    AccountEntry, AccountInfo, AcmeAccountName, AcmeChallengeSchema, ChallengeSchemaWrapper,
+    DeletablePluginProperty, DnsPluginCore, DnsPluginCoreUpdater, KnownAcmeDirectory, PluginConfig,
+    DEFAULT_ACME_DIRECTORY_ENTRY, PLUGIN_ID_SCHEMA,
+};
+use proxmox_config_digest::ConfigDigest;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{
     http_bail, list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap,
 };
-use proxmox_schema::{api, param_bail};
-
-use crate::acme::AcmeClient;
-use crate::api2::types::{AcmeAccountName, AcmeChallengeSchema, KnownAcmeDirectory};
-use crate::config::acme::plugin::{
-    self, DnsPlugin, DnsPluginCore, DnsPluginCoreUpdater, PLUGIN_ID_SCHEMA,
-};
+use proxmox_schema::api;
 
 pub(crate) const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))
@@ -66,19 +56,6 @@ const PLUGIN_ITEM_ROUTER: Router = Router::new()
     .delete(&API_METHOD_DELETE_PLUGIN);
 
 #[api(
-    properties: {
-        name: { type: AcmeAccountName },
-    },
-)]
-/// An ACME Account entry.
-///
-/// Currently only contains a 'name' property.
-#[derive(Serialize)]
-pub struct AccountEntry {
-    name: AcmeAccountName,
-}
-
-#[api(
     access: {
         permission: &Permission::Privilege(&["system", "certificates"], PRIV_SYS_MODIFY, false),
     },
@@ -91,40 +68,7 @@ pub struct AccountEntry {
 )]
 /// List ACME accounts.
 pub fn list_accounts() -> Result<Vec<AccountEntry>, Error> {
-    let mut entries = Vec::new();
-    crate::config::acme::foreach_acme_account(|name| {
-        entries.push(AccountEntry { name });
-        ControlFlow::Continue(())
-    })?;
-    Ok(entries)
-}
-
-#[api(
-    properties: {
-        account: { type: Object, properties: {}, additional_properties: true },
-        tos: {
-            type: String,
-            optional: true,
-        },
-    },
-)]
-/// ACME Account information.
-///
-/// This is what we return via the API.
-#[derive(Serialize)]
-pub struct AccountInfo {
-    /// Raw account data.
-    account: AcmeAccountData,
-
-    /// The ACME directory URL the account was created at.
-    directory: String,
-
-    /// The account's own URL within the ACME directory.
-    location: String,
-
-    /// The ToS URL, if the user agreed to one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tos: Option<String>,
+    proxmox_acme_api::list_accounts()
 }
 
 #[api(
@@ -141,23 +85,7 @@ pub struct AccountInfo {
 )]
 /// Return existing ACME account information.
 pub async fn get_account(name: AcmeAccountName) -> Result<AccountInfo, Error> {
-    let client = AcmeClient::load(&name).await?;
-    let account = client.account()?;
-    Ok(AccountInfo {
-        location: account.location.clone(),
-        tos: client.tos().map(str::to_owned),
-        directory: client.directory_url().to_owned(),
-        account: AcmeAccountData {
-            only_return_existing: false, // don't actually write this out in case it's set
-            ..account.data.clone()
-        },
-    })
-}
-
-fn account_contact_from_string(s: &str) -> Vec<String> {
-    s.split(&[' ', ';', ',', '\0'][..])
-        .map(|s| format!("mailto:{s}"))
-        .collect()
+    proxmox_acme_api::get_account(name).await
 }
 
 #[api(
@@ -222,15 +150,11 @@ fn register_account(
         );
     }
 
-    if Path::new(&crate::config::acme::account_path(&name)).exists() {
+    if Path::new(&proxmox_acme_api::account_config_filename(&name)).exists() {
         http_bail!(BAD_REQUEST, "account {} already exists", name);
     }
 
-    let directory = directory.unwrap_or_else(|| {
-        crate::config::acme::DEFAULT_ACME_DIRECTORY_ENTRY
-            .url
-            .to_owned()
-    });
+    let directory = directory.unwrap_or_else(|| DEFAULT_ACME_DIRECTORY_ENTRY.url.to_string());
 
     WorkerTask::spawn(
         "acme-register",
@@ -238,39 +162,22 @@ fn register_account(
         auth_id.to_string(),
         true,
         move |_worker| async move {
-            let mut client = AcmeClient::new(directory);
-
             info!("Registering ACME account '{}'...", &name);
 
-            let account = do_register_account(
-                &mut client,
+            let location = proxmox_acme_api::register_account(
                 &name,
-                tos_url.is_some(),
                 contact,
-                None,
+                tos_url,
+                Some(directory),
                 eab_kid.zip(eab_hmac_key),
             )
             .await?;
 
-            info!("Registration successful, account URL: {}", account.location);
+            info!("Registration successful, account URL: {}", location);
 
             Ok(())
         },
     )
-}
-
-pub async fn do_register_account<'a>(
-    client: &'a mut AcmeClient,
-    name: &AcmeAccountName,
-    agree_to_tos: bool,
-    contact: String,
-    rsa_bits: Option<u32>,
-    eab_creds: Option<(String, String)>,
-) -> Result<&'a Account, Error> {
-    let contact = account_contact_from_string(&contact);
-    client
-        .new_account(name, agree_to_tos, contact, rsa_bits, eab_creds)
-        .await
 }
 
 #[api(
@@ -303,14 +210,7 @@ pub fn update_account(
         auth_id.to_string(),
         true,
         move |_worker| async move {
-            let data = match contact {
-                Some(data) => json!({
-                    "contact": account_contact_from_string(&data),
-                }),
-                None => json!({}),
-            };
-
-            AcmeClient::load(&name).await?.update_account(&data).await?;
+            proxmox_acme_api::update_account(&name, contact).await?;
 
             Ok(())
         },
@@ -348,18 +248,8 @@ pub fn deactivate_account(
         auth_id.to_string(),
         true,
         move |_worker| async move {
-            match AcmeClient::load(&name)
-                .await?
-                .update_account(&json!({"status": "deactivated"}))
-                .await
-            {
-                Ok(_account) => (),
-                Err(err) if !force => return Err(err),
-                Err(err) => {
-                    warn!("error deactivating account {name}, proceeding anyway - {err}");
-                }
-            }
-            crate::config::acme::mark_account_deactivated(&name)?;
+            proxmox_acme_api::deactivate_account(&name, force).await?;
+
             Ok(())
         },
     )
@@ -386,15 +276,7 @@ pub fn deactivate_account(
 )]
 /// Get the Terms of Service URL for an ACME directory.
 async fn get_tos(directory: Option<String>) -> Result<Option<String>, Error> {
-    let directory = directory.unwrap_or_else(|| {
-        crate::config::acme::DEFAULT_ACME_DIRECTORY_ENTRY
-            .url
-            .to_owned()
-    });
-    Ok(AcmeClient::new(directory)
-        .terms_of_service_url()
-        .await?
-        .map(str::to_owned))
+    proxmox_acme_api::get_tos(directory).await
 }
 
 #[api(
@@ -409,52 +291,7 @@ async fn get_tos(directory: Option<String>) -> Result<Option<String>, Error> {
 )]
 /// Get named known ACME directory endpoints.
 fn get_directories() -> Result<&'static [KnownAcmeDirectory], Error> {
-    Ok(crate::config::acme::KNOWN_ACME_DIRECTORIES)
-}
-
-/// Wrapper for efficient Arc use when returning the ACME challenge-plugin schema for serializing
-struct ChallengeSchemaWrapper {
-    inner: Arc<Vec<AcmeChallengeSchema>>,
-}
-
-impl Serialize for ChallengeSchemaWrapper {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.inner.serialize(serializer)
-    }
-}
-
-struct CachedSchema {
-    schema: Arc<Vec<AcmeChallengeSchema>>,
-    cached_mtime: SystemTime,
-}
-
-fn get_cached_challenge_schemas() -> Result<ChallengeSchemaWrapper, Error> {
-    static CACHE: LazyLock<Mutex<Option<CachedSchema>>> = LazyLock::new(|| Mutex::new(None));
-
-    // the actual loading code
-    let mut last = CACHE.lock().unwrap();
-
-    let actual_mtime = fs::metadata(crate::config::acme::ACME_DNS_SCHEMA_FN)?.modified()?;
-
-    let schema = match &*last {
-        Some(CachedSchema {
-            schema,
-            cached_mtime,
-        }) if *cached_mtime >= actual_mtime => schema.clone(),
-        _ => {
-            let new_schema = Arc::new(crate::config::acme::load_dns_challenge_schema()?);
-            *last = Some(CachedSchema {
-                schema: Arc::clone(&new_schema),
-                cached_mtime: actual_mtime,
-            });
-            new_schema
-        }
-    };
-
-    Ok(ChallengeSchemaWrapper { inner: schema })
+    Ok(proxmox_acme_api::KNOWN_ACME_DIRECTORIES)
 }
 
 #[api(
@@ -469,69 +306,7 @@ fn get_cached_challenge_schemas() -> Result<ChallengeSchemaWrapper, Error> {
 )]
 /// Get named known ACME directory endpoints.
 fn get_challenge_schema() -> Result<ChallengeSchemaWrapper, Error> {
-    get_cached_challenge_schemas()
-}
-
-#[api]
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-/// The API's format is inherited from PVE/PMG:
-pub struct PluginConfig {
-    /// Plugin ID.
-    plugin: String,
-
-    /// Plugin type.
-    #[serde(rename = "type")]
-    ty: String,
-
-    /// DNS Api name.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    api: Option<String>,
-
-    /// Plugin configuration data.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    data: Option<String>,
-
-    /// Extra delay in seconds to wait before requesting validation.
-    ///
-    /// Allows to cope with long TTL of DNS records.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    validation_delay: Option<u32>,
-
-    /// Flag to disable the config.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    disable: Option<bool>,
-}
-
-// See PMG/PVE's $modify_cfg_for_api sub
-fn modify_cfg_for_api(id: &str, ty: &str, data: &Value) -> PluginConfig {
-    let mut entry = data.clone();
-
-    let obj = entry.as_object_mut().unwrap();
-    obj.remove("id");
-    obj.insert("plugin".to_string(), Value::String(id.to_owned()));
-    obj.insert("type".to_string(), Value::String(ty.to_owned()));
-
-    // FIXME: This needs to go once the `Updater` is fixed.
-    // None of these should be able to fail unless the user changed the files by hand, in which
-    // case we leave the unmodified string in the Value for now. This will be handled with an error
-    // later.
-    if let Some(Value::String(ref mut data)) = obj.get_mut("data") {
-        if let Ok(new) = proxmox_base64::url::decode_no_pad(&data) {
-            if let Ok(utf8) = String::from_utf8(new) {
-                *data = utf8;
-            }
-        }
-    }
-
-    // PVE/PMG do this explicitly for ACME plugins...
-    // obj.insert("digest".to_string(), Value::String(digest.clone()));
-
-    serde_json::from_value(entry).unwrap_or_else(|_| PluginConfig {
-        plugin: "*Error*".to_string(),
-        ty: "*Error*".to_string(),
-        ..Default::default()
-    })
+    proxmox_acme_api::get_cached_challenge_schemas()
 }
 
 #[api(
@@ -547,12 +322,7 @@ fn modify_cfg_for_api(id: &str, ty: &str, data: &Value) -> PluginConfig {
 )]
 /// List ACME challenge plugins.
 pub fn list_plugins(rpcenv: &mut dyn RpcEnvironment) -> Result<Vec<PluginConfig>, Error> {
-    let (plugins, digest) = plugin::config()?;
-    rpcenv["digest"] = hex::encode(digest).into();
-    Ok(plugins
-        .iter()
-        .map(|(id, (ty, data))| modify_cfg_for_api(id, ty, data))
-        .collect())
+    proxmox_acme_api::list_plugins(rpcenv)
 }
 
 #[api(
@@ -569,13 +339,7 @@ pub fn list_plugins(rpcenv: &mut dyn RpcEnvironment) -> Result<Vec<PluginConfig>
 )]
 /// List ACME challenge plugins.
 pub fn get_plugin(id: String, rpcenv: &mut dyn RpcEnvironment) -> Result<PluginConfig, Error> {
-    let (plugins, digest) = plugin::config()?;
-    rpcenv["digest"] = hex::encode(digest).into();
-
-    match plugins.get(&id) {
-        Some((ty, data)) => Ok(modify_cfg_for_api(&id, ty, data)),
-        None => http_bail!(NOT_FOUND, "no such plugin"),
-    }
+    proxmox_acme_api::get_plugin(id, rpcenv)
 }
 
 // Currently we only have "the" standalone plugin and DNS plugins so we can just flatten a
@@ -607,30 +371,7 @@ pub fn get_plugin(id: String, rpcenv: &mut dyn RpcEnvironment) -> Result<PluginC
 )]
 /// Add ACME plugin configuration.
 pub fn add_plugin(r#type: String, core: DnsPluginCore, data: String) -> Result<(), Error> {
-    // Currently we only support DNS plugins and the standalone plugin is "fixed":
-    if r#type != "dns" {
-        param_bail!("type", "invalid ACME plugin type: {:?}", r#type);
-    }
-
-    let data = String::from_utf8(proxmox_base64::decode(data)?)
-        .map_err(|_| format_err!("data must be valid UTF-8"))?;
-
-    let id = core.id.clone();
-
-    let _lock = plugin::lock()?;
-
-    let (mut plugins, _digest) = plugin::config()?;
-    if plugins.contains_key(&id) {
-        param_bail!("id", "ACME plugin ID {:?} already exists", id);
-    }
-
-    let plugin = serde_json::to_value(DnsPlugin { core, data })?;
-
-    plugins.insert(id, r#type, plugin);
-
-    plugin::save_config(&plugins)?;
-
-    Ok(())
+    proxmox_acme_api::add_plugin(r#type, core, data)
 }
 
 #[api(
@@ -646,26 +387,7 @@ pub fn add_plugin(r#type: String, core: DnsPluginCore, data: String) -> Result<(
 )]
 /// Delete an ACME plugin configuration.
 pub fn delete_plugin(id: String) -> Result<(), Error> {
-    let _lock = plugin::lock()?;
-
-    let (mut plugins, _digest) = plugin::config()?;
-    if plugins.remove(&id).is_none() {
-        http_bail!(NOT_FOUND, "no such plugin");
-    }
-    plugin::save_config(&plugins)?;
-
-    Ok(())
-}
-
-#[api()]
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-/// Deletable property name
-pub enum DeletableProperty {
-    /// Delete the disable property
-    Disable,
-    /// Delete the validation-delay property
-    ValidationDelay,
+    proxmox_acme_api::delete_plugin(id)
 }
 
 #[api(
@@ -687,12 +409,12 @@ pub enum DeletableProperty {
                 type: Array,
                 optional: true,
                 items: {
-                    type: DeletableProperty,
+                    type: DeletablePluginProperty,
                 }
             },
             digest: {
-                description: "Digest to protect against concurrent updates",
                 optional: true,
+                type: ConfigDigest,
             },
         },
     },
@@ -706,65 +428,8 @@ pub fn update_plugin(
     id: String,
     update: DnsPluginCoreUpdater,
     data: Option<String>,
-    delete: Option<Vec<DeletableProperty>>,
-    digest: Option<String>,
+    delete: Option<Vec<DeletablePluginProperty>>,
+    digest: Option<ConfigDigest>,
 ) -> Result<(), Error> {
-    let data = data
-        .as_deref()
-        .map(proxmox_base64::decode)
-        .transpose()?
-        .map(String::from_utf8)
-        .transpose()
-        .map_err(|_| format_err!("data must be valid UTF-8"))?;
-
-    let _lock = plugin::lock()?;
-
-    let (mut plugins, expected_digest) = plugin::config()?;
-
-    if let Some(digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
-
-    match plugins.get_mut(&id) {
-        Some((ty, ref mut entry)) => {
-            if ty != "dns" {
-                bail!("cannot update plugin of type {:?}", ty);
-            }
-
-            let mut plugin = DnsPlugin::deserialize(&*entry)?;
-
-            if let Some(delete) = delete {
-                for delete_prop in delete {
-                    match delete_prop {
-                        DeletableProperty::ValidationDelay => {
-                            plugin.core.validation_delay = None;
-                        }
-                        DeletableProperty::Disable => {
-                            plugin.core.disable = None;
-                        }
-                    }
-                }
-            }
-            if let Some(data) = data {
-                plugin.data = data;
-            }
-            if let Some(api) = update.api {
-                plugin.core.api = api;
-            }
-            if update.validation_delay.is_some() {
-                plugin.core.validation_delay = update.validation_delay;
-            }
-            if update.disable.is_some() {
-                plugin.core.disable = update.disable;
-            }
-
-            *entry = serde_json::to_value(plugin)?;
-        }
-        None => http_bail!(NOT_FOUND, "no such plugin"),
-    }
-
-    plugin::save_config(&plugins)?;
-
-    Ok(())
+    proxmox_acme_api::update_plugin(id, update, data, delete, digest)
 }

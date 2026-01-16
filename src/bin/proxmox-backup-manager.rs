@@ -19,12 +19,12 @@ use proxmox_router::{cli::*, RpcEnvironment};
 use proxmox_schema::api;
 use proxmox_sys::fs::CreateOptions;
 
+use pbs_buildcfg::configdir;
 use pbs_client::{display_task_log, view_task_result};
 use pbs_config::sync;
 use pbs_tools::json::required_string_param;
 use proxmox_backup::api2;
 use proxmox_backup::client_helpers::connect_to_localhost;
-use proxmox_backup::config;
 
 mod proxmox_backup_manager;
 use proxmox_backup_manager::*;
@@ -667,6 +667,7 @@ async fn run() -> Result<(), Error> {
         .init()?;
     proxmox_backup::server::notifications::init()?;
     proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
+    proxmox_acme_api::init(configdir!("/acme"), false)?;
 
     let cmd_def = CliCommandMap::new()
         .insert("acl", acl_commands())

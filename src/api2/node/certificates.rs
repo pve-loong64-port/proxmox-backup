@@ -1,13 +1,11 @@
-use std::sync::Arc;
-use std::time::Duration;
-
 use anyhow::{bail, format_err, Error};
 use openssl::pkey::PKey;
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::info;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_MODIFY};
+use proxmox_acme_api::AcmeDomain;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::list_subdirs_api_method;
 use proxmox_router::SubdirMap;
@@ -17,9 +15,6 @@ use proxmox_schema::api;
 use pbs_buildcfg::configdir;
 use pbs_tools::cert;
 
-use crate::acme::AcmeClient;
-use crate::api2::types::AcmeDomain;
-use crate::config::node::NodeConfig;
 use crate::server::send_certificate_renewal_mail;
 
 pub const ROUTER: Router = Router::new()
@@ -268,193 +263,6 @@ pub async fn delete_custom_certificate() -> Result<(), Error> {
     Ok(())
 }
 
-struct OrderedCertificate {
-    certificate: hyper::body::Bytes,
-    private_key_pem: Vec<u8>,
-}
-
-async fn order_certificate(
-    worker: Arc<WorkerTask>,
-    node_config: &NodeConfig,
-) -> Result<Option<OrderedCertificate>, Error> {
-    use proxmox_acme::authorization::Status;
-    use proxmox_acme::order::Identifier;
-
-    let domains = node_config.acme_domains().try_fold(
-        Vec::<AcmeDomain>::new(),
-        |mut acc, domain| -> Result<_, Error> {
-            let mut domain = domain?;
-            domain.domain.make_ascii_lowercase();
-            if let Some(alias) = &mut domain.alias {
-                alias.make_ascii_lowercase();
-            }
-            acc.push(domain);
-            Ok(acc)
-        },
-    )?;
-
-    let get_domain_config = |domain: &str| {
-        domains
-            .iter()
-            .find(|d| d.domain == domain)
-            .ok_or_else(|| format_err!("no config for domain '{}'", domain))
-    };
-
-    if domains.is_empty() {
-        info!("No domains configured to be ordered from an ACME server.");
-        return Ok(None);
-    }
-
-    let (plugins, _) = crate::config::acme::plugin::config()?;
-
-    let mut acme = node_config.acme_client().await?;
-
-    info!("Placing ACME order");
-    let order = acme
-        .new_order(domains.iter().map(|d| d.domain.to_ascii_lowercase()))
-        .await?;
-    info!("Order URL: {}", order.location);
-
-    let identifiers: Vec<String> = order
-        .data
-        .identifiers
-        .iter()
-        .map(|identifier| match identifier {
-            Identifier::Dns(domain) => domain.clone(),
-        })
-        .collect();
-
-    for auth_url in &order.data.authorizations {
-        info!("Getting authorization details from '{auth_url}'");
-        let mut auth = acme.get_authorization(auth_url).await?;
-
-        let domain = match &mut auth.identifier {
-            Identifier::Dns(domain) => domain.to_ascii_lowercase(),
-        };
-
-        if auth.status == Status::Valid {
-            info!("{domain} is already validated!");
-            continue;
-        }
-
-        info!("The validation for {domain} is pending");
-        let domain_config: &AcmeDomain = get_domain_config(&domain)?;
-        let plugin_id = domain_config.plugin.as_deref().unwrap_or("standalone");
-        let mut plugin_cfg = crate::acme::get_acme_plugin(&plugins, plugin_id)?
-            .ok_or_else(|| format_err!("plugin '{plugin_id}' for domain '{domain}' not found!"))?;
-
-        info!("Setting up validation plugin");
-        let validation_url = plugin_cfg
-            .setup(&mut acme, &auth, domain_config, Arc::clone(&worker))
-            .await?;
-
-        let result = request_validation(&mut acme, auth_url, validation_url).await;
-
-        if let Err(err) = plugin_cfg
-            .teardown(&mut acme, &auth, domain_config, Arc::clone(&worker))
-            .await
-        {
-            warn!("Failed to teardown plugin '{plugin_id}' for domain '{domain}' - {err}");
-        }
-
-        result?;
-    }
-
-    info!("All domains validated");
-    info!("Creating CSR");
-
-    let csr = proxmox_acme::util::Csr::generate(&identifiers, &Default::default())?;
-    let mut finalize_error_cnt = 0u8;
-    let order_url = &order.location;
-    let mut order;
-    loop {
-        use proxmox_acme::order::Status;
-
-        order = acme.get_order(order_url).await?;
-
-        match order.status {
-            Status::Pending => {
-                info!("still pending, trying to finalize anyway");
-                let finalize = order
-                    .finalize
-                    .as_deref()
-                    .ok_or_else(|| format_err!("missing 'finalize' URL in order"))?;
-                if let Err(err) = acme.finalize(finalize, &csr.data).await {
-                    if finalize_error_cnt >= 5 {
-                        return Err(err);
-                    }
-
-                    finalize_error_cnt += 1;
-                }
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
-            Status::Ready => {
-                info!("order is ready, finalizing");
-                let finalize = order
-                    .finalize
-                    .as_deref()
-                    .ok_or_else(|| format_err!("missing 'finalize' URL in order"))?;
-                acme.finalize(finalize, &csr.data).await?;
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
-            Status::Processing => {
-                info!("still processing, trying again in 30 seconds");
-                tokio::time::sleep(Duration::from_secs(30)).await;
-            }
-            Status::Valid => {
-                info!("valid");
-                break;
-            }
-            other => bail!("order status: {:?}", other),
-        }
-    }
-
-    info!("Downloading certificate");
-    let certificate = acme
-        .get_certificate(
-            order
-                .certificate
-                .as_deref()
-                .ok_or_else(|| format_err!("missing certificate url in finalized order"))?,
-        )
-        .await?;
-
-    Ok(Some(OrderedCertificate {
-        certificate,
-        private_key_pem: csr.private_key_pem,
-    }))
-}
-
-async fn request_validation(
-    acme: &mut AcmeClient,
-    auth_url: &str,
-    validation_url: &str,
-) -> Result<(), Error> {
-    info!("Triggering validation");
-    acme.request_challenge_validation(validation_url).await?;
-
-    info!("Sleeping for 5 seconds");
-    tokio::time::sleep(Duration::from_secs(5)).await;
-
-    loop {
-        use proxmox_acme::authorization::Status;
-
-        let auth = acme.get_authorization(auth_url).await?;
-        match auth.status {
-            Status::Pending => {
-                info!("Status is still 'pending', trying again in 10 seconds");
-                tokio::time::sleep(Duration::from_secs(10)).await;
-            }
-            Status::Valid => return Ok(()),
-            other => bail!(
-                "validating challenge '{}' failed - status: {:?}",
-                validation_url,
-                other
-            ),
-        }
-    }
-}
-
 #[api(
     input: {
         properties: {
@@ -524,9 +332,26 @@ fn spawn_certificate_worker(
 
     let auth_id = rpcenv.get_auth_id().unwrap();
 
+    let acme_config = node_config.acme_config()?;
+
+    let domains = node_config.acme_domains().try_fold(
+        Vec::<AcmeDomain>::new(),
+        |mut acc, domain| -> Result<_, Error> {
+            let mut domain = domain?;
+            domain.domain.make_ascii_lowercase();
+            if let Some(alias) = &mut domain.alias {
+                alias.make_ascii_lowercase();
+            }
+            acc.push(domain);
+            Ok(acc)
+        },
+    )?;
+
     WorkerTask::spawn(name, None, auth_id, true, move |worker| async move {
         let work = || async {
-            if let Some(cert) = order_certificate(worker, &node_config).await? {
+            if let Some(cert) =
+                proxmox_acme_api::order_certificate(worker, &acme_config, &domains).await?
+            {
                 crate::config::set_proxy_certificate(&cert.certificate, &cert.private_key_pem)?;
                 crate::server::reload_proxy_certificate().await?;
             }
@@ -562,16 +387,16 @@ pub fn revoke_acme_cert(rpcenv: &mut dyn RpcEnvironment) -> Result<String, Error
 
     let auth_id = rpcenv.get_auth_id().unwrap();
 
+    let acme_config = node_config.acme_config()?;
+
     WorkerTask::spawn(
         "acme-revoke-cert",
         None,
         auth_id,
         true,
         move |_worker| async move {
-            info!("Loading ACME account");
-            let mut acme = node_config.acme_client().await?;
             info!("Revoking old certificate");
-            acme.revoke_certificate(cert_pem.as_bytes(), None).await?;
+            proxmox_acme_api::revoke_certificate(&acme_config, &cert_pem.as_bytes()).await?;
             info!("Deleting certificate and regenerating a self-signed one");
             delete_custom_certificate().await?;
             Ok(())

@@ -3,15 +3,13 @@ use std::io::Write;
 use anyhow::{bail, Error};
 use serde_json::Value;
 
+use proxmox_acme::async_client::AcmeClient;
+use proxmox_acme_api::{AcmeAccountName, DnsPluginCore, KNOWN_ACME_DIRECTORIES};
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_schema::api;
 use proxmox_sys::fs::file_get_contents;
 
-use proxmox_backup::acme::AcmeClient;
 use proxmox_backup::api2;
-use proxmox_backup::api2::types::AcmeAccountName;
-use proxmox_backup::config::acme::plugin::DnsPluginCore;
-use proxmox_backup::config::acme::KNOWN_ACME_DIRECTORIES;
 
 pub fn acme_mgmt_cli() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
@@ -122,7 +120,7 @@ async fn register_account(
 
                 match input.trim().parse::<usize>() {
                     Ok(n) if n < KNOWN_ACME_DIRECTORIES.len() => {
-                        break (KNOWN_ACME_DIRECTORIES[n].url.to_owned(), false);
+                        break (KNOWN_ACME_DIRECTORIES[n].url.to_string(), false);
                     }
                     Ok(n) if n == KNOWN_ACME_DIRECTORIES.len() => {
                         input.clear();
@@ -188,17 +186,20 @@ async fn register_account(
 
     println!("Attempting to register account with {directory_url:?}...");
 
-    let account = api2::config::acme::do_register_account(
-        &mut client,
+    let tos_agreed = tos_agreed
+        .then(|| directory.terms_of_service_url().map(str::to_owned))
+        .flatten();
+
+    let location = proxmox_acme_api::register_account(
         &name,
-        tos_agreed,
         contact,
-        None,
+        tos_agreed,
+        Some(directory_url),
         eab_creds,
     )
     .await?;
 
-    println!("Registration successful, account URL: {}", account.location);
+    println!("Registration successful, account URL: {}", location);
 
     Ok(())
 }
@@ -266,19 +267,19 @@ pub fn account_cli() -> CommandLineInterface {
             "deactivate",
             CliCommand::new(&API_METHOD_DEACTIVATE_ACCOUNT)
                 .arg_param(&["name"])
-                .completion_cb("name", crate::config::acme::complete_acme_account),
+                .completion_cb("name", proxmox_acme_api::complete_acme_account),
         )
         .insert(
             "info",
             CliCommand::new(&API_METHOD_GET_ACCOUNT)
                 .arg_param(&["name"])
-                .completion_cb("name", crate::config::acme::complete_acme_account),
+                .completion_cb("name", proxmox_acme_api::complete_acme_account),
         )
         .insert(
             "update",
             CliCommand::new(&API_METHOD_UPDATE_ACCOUNT)
                 .arg_param(&["name"])
-                .completion_cb("name", crate::config::acme::complete_acme_account),
+                .completion_cb("name", proxmox_acme_api::complete_acme_account),
         );
 
     cmd_def.into()
@@ -373,26 +374,26 @@ pub fn plugin_cli() -> CommandLineInterface {
             "config", // name comes from pve/pmg
             CliCommand::new(&API_METHOD_GET_PLUGIN)
                 .arg_param(&["id"])
-                .completion_cb("id", crate::config::acme::complete_acme_plugin),
+                .completion_cb("id", proxmox_acme_api::complete_acme_plugin),
         )
         .insert(
             "add",
             CliCommand::new(&API_METHOD_ADD_PLUGIN)
                 .arg_param(&["type", "id"])
-                .completion_cb("api", crate::config::acme::complete_acme_api_challenge_type)
-                .completion_cb("type", crate::config::acme::complete_acme_plugin_type),
+                .completion_cb("api", proxmox_acme_api::complete_acme_api_challenge_type)
+                .completion_cb("type", proxmox_acme_api::complete_acme_plugin_type),
         )
         .insert(
             "remove",
             CliCommand::new(&acme::API_METHOD_DELETE_PLUGIN)
                 .arg_param(&["id"])
-                .completion_cb("id", crate::config::acme::complete_acme_plugin),
+                .completion_cb("id", proxmox_acme_api::complete_acme_plugin),
         )
         .insert(
             "set",
             CliCommand::new(&acme::API_METHOD_UPDATE_PLUGIN)
                 .arg_param(&["id"])
-                .completion_cb("id", crate::config::acme::complete_acme_plugin),
+                .completion_cb("id", proxmox_acme_api::complete_acme_plugin),
         );
 
     cmd_def.into()

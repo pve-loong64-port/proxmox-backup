@@ -18,10 +18,10 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tokio::process::Command;
 
+use proxmox_acme::async_client::AcmeClient;
 use proxmox_acme::{Authorization, Challenge};
 use proxmox_rest_server::WorkerTask;
 
-use crate::acme::AcmeClient;
 use crate::api2::types::AcmeDomain;
 use crate::config::acme::plugin::{DnsPlugin, PluginData};
 

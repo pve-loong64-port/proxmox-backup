@@ -8,16 +8,14 @@ use pbs_api_types::{
     EMAIL_SCHEMA, MULTI_LINE_COMMENT_SCHEMA, OPENSSL_CIPHERS_TLS_1_2_SCHEMA,
     OPENSSL_CIPHERS_TLS_1_3_SCHEMA,
 };
+use proxmox_acme_api::{AcmeConfig, AcmeDomain, ACME_DOMAIN_PROPERTY_SCHEMA};
 use proxmox_http::ProxyConfig;
 use proxmox_schema::{api, ApiStringFormat, ApiType, Updater};
 
 use pbs_buildcfg::configdir;
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
 
-use crate::acme::AcmeClient;
-use crate::api2::types::{
-    AcmeAccountName, AcmeDomain, ACME_DOMAIN_PROPERTY_SCHEMA, HTTP_PROXY_SCHEMA,
-};
+use crate::api2::types::HTTP_PROXY_SCHEMA;
 
 const CONF_FILE: &str = configdir!("/node.cfg");
 const LOCK_FILE: &str = configdir!("/.node.lck");
@@ -42,20 +40,6 @@ pub fn save_config(config: &NodeConfig) -> Result<(), Error> {
 
     let raw = crate::tools::config::to_bytes(config, &NodeConfig::API_SCHEMA)?;
     pbs_config::replace_backup_config(CONF_FILE, &raw)
-}
-
-#[api(
-    properties: {
-        account: { type: AcmeAccountName },
-    }
-)]
-#[derive(Deserialize, Serialize)]
-/// The ACME configuration.
-///
-/// Currently only contains the name of the account use.
-pub struct AcmeConfig {
-    /// Account to use to acquire ACME certificates.
-    account: AcmeAccountName,
 }
 
 /// All available languages in Proxmox. Taken from proxmox-i18n repository.
@@ -235,19 +219,16 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn acme_config(&self) -> Option<Result<AcmeConfig, Error>> {
-        self.acme.as_deref().map(|config| -> Result<_, Error> {
-            crate::tools::config::from_property_string(config, &AcmeConfig::API_SCHEMA)
-        })
-    }
-
-    pub async fn acme_client(&self) -> Result<AcmeClient, Error> {
-        let account = if let Some(cfg) = self.acme_config().transpose()? {
-            cfg.account
-        } else {
-            AcmeAccountName::from_string("default".to_string())? // should really not happen
-        };
-        AcmeClient::load(&account).await
+    pub fn acme_config(&self) -> Result<AcmeConfig, Error> {
+        self.acme
+            .as_deref()
+            .map(|config| {
+                crate::tools::config::from_property_string::<AcmeConfig>(
+                    config,
+                    &AcmeConfig::API_SCHEMA,
+                )
+            })
+            .unwrap_or_else(|| proxmox_acme_api::parse_acme_config_string("account=default"))
     }
 
     pub fn acme_domains(&'_ self) -> AcmeDomainIter<'_> {

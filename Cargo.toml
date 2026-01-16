@@ -101,6 +101,7 @@ pbs-api-types = "1.0.8"
 # other proxmox crates
 pathpatterns = "1"
 proxmox-acme = "1"
+proxmox-acme-api = { version = "1", features = [ "impl" ] }
 pxar = "1"
 
 # PBS workspace
@@ -251,6 +252,7 @@ pbs-api-types.workspace = true
 
 # in their respective repo
 proxmox-acme.workspace = true
+proxmox-acme-api.workspace = true
 pxar.workspace = true
 
 # proxmox-backup workspace/internal crates
@@ -269,6 +271,7 @@ proxmox-rrd-api-types.workspace = true
 [patch.crates-io]
 #pbs-api-types = { path = "../proxmox/pbs-api-types" }
 #proxmox-acme = { path = "../proxmox/proxmox-acme" }
+#proxmox-acme-api = { path = "../proxmox/proxmox-acme-api" }
 #proxmox-api-macro = { path = "../proxmox/proxmox-api-macro" }
 #proxmox-apt = { path = "../proxmox/proxmox-apt" }
 #proxmox-apt-api-types = { path = "../proxmox/proxmox-apt-api-types" }

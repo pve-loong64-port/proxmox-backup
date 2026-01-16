@@ -188,6 +188,7 @@ async fn run() -> Result<(), Error> {
     proxmox_backup::server::notifications::init()?;
     metric_collection::init()?;
     proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
+    proxmox_acme_api::init(configdir!("/acme"), false)?;
 
     let mut indexpath = PathBuf::from(pbs_buildcfg::JS_DIR);
     indexpath.push("index.hbs");
