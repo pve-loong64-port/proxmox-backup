@@ -27,8 +27,6 @@ pub(crate) mod auth;
 
 pub mod tape;
 
-pub mod acme;
-
 pub mod client_helpers;
 
 pub mod traffic_control_cache;

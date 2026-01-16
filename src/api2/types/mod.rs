@@ -4,9 +4,6 @@ use anyhow::bail;
 
 use proxmox_schema::*;
 
-mod acme;
-pub use acme::*;
-
 // File names: may not contain slashes, may not start with "."
 pub const FILENAME_FORMAT: ApiStringFormat = ApiStringFormat::VerifyFn(|name| {
     if name.starts_with('.') {

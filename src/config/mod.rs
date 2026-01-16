@@ -15,7 +15,6 @@ use proxmox_lang::try_block;
 use pbs_api_types::{PamRealmConfig, PbsRealmConfig};
 use pbs_buildcfg::{self, configdir};
 
-pub mod acme;
 pub mod node;
 pub mod tfa;
 
