@@ -237,7 +237,11 @@ pub fn delete_ticket_info(prefix: &str, server: &str, username: &Userid) -> Resu
     let mut data = file_get_json(&path, Some(json!({})))?;
 
     if let Some(map) = data[server].as_object_mut() {
-        map.remove(username.as_str());
+        if map.remove(username.as_str()).is_none() {
+            warn!("no ticket found for {username} on server {server}");
+        }
+    } else {
+        warn!("no ticket found for server {server}");
     }
 
     replace_file(
