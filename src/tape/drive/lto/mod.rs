@@ -16,18 +16,16 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
 use anyhow::{bail, format_err, Error};
 
-use pbs_tape::sg_tape::drive_get_encryption;
+use proxmox_sys::command::run_command;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
     Fingerprint, Lp17VolumeStatistics, LtoDriveAndMediaStatus, LtoTapeDrive, MamAttribute,
 };
 use pbs_key_config::KeyConfig;
-use pbs_tape::{
-    sg_tape::{SgTape, TapeAlertFlags},
-    BlockReadError, MediaContentHeader, TapeRead, TapeWrite,
-};
-use proxmox_sys::command::run_command;
+
+use pbs_tape::sg_tape::{drive_get_encryption, SgTape, TapeAlertFlags};
+use pbs_tape::{BlockReadError, MediaContentHeader, TapeRead, TapeWrite};
 
 use crate::tape::{
     drive::TapeDriver,
