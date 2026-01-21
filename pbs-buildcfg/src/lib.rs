@@ -51,12 +51,16 @@ macro_rules! PROXMOX_BACKUP_CACHE_DIR_M {
     };
 }
 
-#[macro_export]
-macro_rules! PROXMOX_BACKUP_FILE_RESTORE_BIN_DIR_M {
+macro_rules! PROXMOX_BACKUP_MULTIARCH_LIB_DIR_M {
     () => {
-        "/usr/lib/x86_64-linux-gnu/proxmox-backup/file-restore"
+        concat!("/usr/lib/", env!("DEB_HOST_MULTIARCH"), "/proxmox-backup")
     };
 }
+
+/// The multiarch-namespaced /usr/lib path for Proxmox Backup.
+///
+/// E.g., on am64/x86_64 this will be "/usr/lib/x86_64-linux-gnu/proxmox-backup"
+pub const PROXMOX_BACKUP_MULTIARCH_LIB_DIR: &str = PROXMOX_BACKUP_MULTIARCH_LIB_DIR_M!();
 
 /// namespaced directory for in-memory (tmpfs) run state
 pub const PROXMOX_BACKUP_RUN_DIR: &str = PROXMOX_BACKUP_RUN_DIR_M!();
@@ -93,8 +97,10 @@ pub const PROXMOX_BACKUP_INITRAMFS_DBG_FN: &str = concat!(
 );
 
 /// filename of the kernel to use for booting single file restore VMs
-pub const PROXMOX_BACKUP_KERNEL_FN: &str =
-    concat!(PROXMOX_BACKUP_FILE_RESTORE_BIN_DIR_M!(), "/bzImage");
+pub const PROXMOX_BACKUP_KERNEL_FN: &str = concat!(
+    PROXMOX_BACKUP_MULTIARCH_LIB_DIR_M!(),
+    "/file-restore/bzImage"
+);
 
 pub const PROXMOX_BACKUP_SUBSCRIPTION_FN: &str = configdir!("/subscription");
 

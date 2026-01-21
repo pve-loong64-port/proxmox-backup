@@ -3,8 +3,20 @@
 set -e
 
 update_initramfs() {
+
+    ARCH="${DPKG_MAINTSCRIPT_ARCH:-$(dpkg --print-architecture)}"
+    case "$ARCH" in
+        amd64) HOST_MULTIARCH="x86_64-linux-gnu" ;;
+        arm64) HOST_MULTIARCH="aarch64-linux-gnu" ;;
+        riscv64) HOST_MULTIARCH="riscv64-linux-gnu" ;;
+        *)
+            echo "Error: Unsupported architecture '$ARCH', amd64, arm64, and riscv64 are supported." >&2
+            exit 1
+            ;;
+    esac
+
     # regenerate initramfs for single file restore VM
-    INST_PATH="/usr/lib/x86_64-linux-gnu/proxmox-backup/file-restore"
+    INST_PATH="/usr/lib/${HOST_MULTIARCH}/proxmox-backup/file-restore"
     CACHE_PATH="/var/cache/proxmox-backup/file-restore-initramfs.img"
     CACHE_PATH_DBG="/var/cache/proxmox-backup/file-restore-initramfs-debug.img"
 

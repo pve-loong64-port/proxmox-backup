@@ -22,6 +22,7 @@ use proxmox_uuid::Uuid;
 use pbs_api_types::{
     Fingerprint, Lp17VolumeStatistics, LtoDriveAndMediaStatus, LtoTapeDrive, MamAttribute,
 };
+use pbs_buildcfg::PROXMOX_BACKUP_MULTIARCH_LIB_DIR;
 use pbs_key_config::KeyConfig;
 
 use pbs_tape::sg_tape::{drive_get_encryption, SgTape, TapeAlertFlags};
@@ -284,7 +285,7 @@ impl TapeDriver for LtoTapeHandle {
 
 fn run_sg_tape_cmd(subcmd: &str, args: &[&str], fd: RawFd) -> Result<String, Error> {
     let mut command =
-        std::process::Command::new("/usr/lib/x86_64-linux-gnu/proxmox-backup/sg-tape-cmd");
+        std::process::Command::new(format!("{PROXMOX_BACKUP_MULTIARCH_LIB_DIR}/sg-tape-cmd"));
     command.args([subcmd]);
     command.args(["--stdin"]);
     command.args(args);

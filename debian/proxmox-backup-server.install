@@ -10,11 +10,11 @@ etc/run-proxmox\x2dbackup.mount /usr/lib/systemd/system/
 usr/bin/pmt
 usr/bin/pmtx
 usr/bin/proxmox-tape
-usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-api
-usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
-usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-proxy
-usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-daily-update
-usr/lib/x86_64-linux-gnu/proxmox-backup/sg-tape-cmd
+usr/lib/${DEB_HOST_MULTIARCH}/proxmox-backup/proxmox-backup-api
+usr/lib/${DEB_HOST_MULTIARCH}/proxmox-backup/proxmox-backup-banner
+usr/lib/${DEB_HOST_MULTIARCH}/proxmox-backup/proxmox-backup-proxy
+usr/lib/${DEB_HOST_MULTIARCH}/proxmox-backup/proxmox-daily-update
+usr/lib/${DEB_HOST_MULTIARCH}/proxmox-backup/sg-tape-cmd
 usr/sbin/pbs3to4
 usr/sbin/proxmox-backup-debug
 usr/sbin/proxmox-backup-manager
