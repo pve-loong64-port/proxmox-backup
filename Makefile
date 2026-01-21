@@ -254,7 +254,7 @@ upload: $(SERVER_DEB) $(CLIENT_DEB) $(RESTORE_DEB) $(DOC_DEB) $(STATIC_CLIENT_DE
 	# check if working directory is clean
 	git diff --exit-code --stat && git diff --exit-code --stat --staged
 	tar cf - $(SERVER_DEB) $(SERVER_DBG_DEB) $(DOC_DEB) $(CLIENT_DEB) $(CLIENT_DBG_DEB) \
-	  | ssh -X repoman@repo.proxmox.com upload --product pbs --dist $(UPLOAD_DIST)
-	tar cf - $(CLIENT_DEB) $(CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve,pmg,pbs-client" --dist $(UPLOAD_DIST)
-	tar cf - $(STATIC_CLIENT_DEB) $(STATIC_CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pbs-client" --dist $(UPLOAD_DIST)
-	tar cf - $(RESTORE_DEB) $(RESTORE_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve" --dist $(UPLOAD_DIST)
+	  | ssh -X repoman@repo.proxmox.com upload --product pbs --dist $(UPLOAD_DIST) --arch $(DEB_HOST_ARCH)
+	tar cf - $(CLIENT_DEB) $(CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve,pmg,pbs-client" --dist $(UPLOAD_DIST) --arch $(DEB_HOST_ARCH)
+	tar cf - $(STATIC_CLIENT_DEB) $(STATIC_CLIENT_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pbs-client" --dist $(UPLOAD_DIST) --arch $(DEB_HOST_ARCH)
+	tar cf - $(RESTORE_DEB) $(RESTORE_DBG_DEB) | ssh -X repoman@repo.proxmox.com upload --product "pve" --dist $(UPLOAD_DIST) --arch $(DEB_HOST_ARCH)
