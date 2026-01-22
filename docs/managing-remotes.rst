@@ -67,8 +67,8 @@ itself. Alternatively, you can manage them with the ``proxmox-backup-manager
 sync-job`` command. The configuration information for sync jobs is stored at
 ``/etc/proxmox-backup/sync.cfg``. To create a new sync job, click the add button
 in the GUI, or use the ``create`` subcommand. After creating a sync job, you can
-either start it manually from the GUI or provide it with a schedule (see
-:ref:`calendar-event-scheduling`) to run regularly.
+start it manually from the GUI, use the ``run`` subcommand, or provide it with
+a schedule (see :ref:`calendar-event-scheduling`) to run regularly.
 Backup snapshots, groups and namespaces which are no longer available on the
 **Remote** datastore can be removed from the local datastore as well by setting
 the ``remove-vanished`` option for the sync job.
@@ -87,6 +87,17 @@ trusted remote backup server.
   ╞════════════╪═══════╪════════╪══════════════╪═══════════╪═════════╡
   │ pbs2-local │ local │ pbs2   │ local        │ Wed 02:30 │ offsite │
   └────────────┴───────┴────────┴──────────────┴───────────┴─────────┘
+  # proxmox-backup-manager sync-job run pbs2-local
+  Starting datastore sync job 'pbs2:local:local::pbs2-local'
+  sync datastore 'local' from 'pbs2/local'
+  ----
+  Syncing datastore 'local', root namespace into datastore 'local', root namespace
+  found 0 groups to sync (out of 0 total)
+  Finished syncing root namespace, current progress: 0 groups, 0 snapshots
+  Summary: sync job found no new data to pull
+  sync job 'pbs2:local:local::pbs2-local' end
+  queued notification (id=a8ce89b5-330a-4ad7-9906-3a876e7ed174)
+  TASK OK
   # proxmox-backup-manager sync-job remove pbs2-local
 
 To set up sync jobs, the configuring user needs the following permissions:
