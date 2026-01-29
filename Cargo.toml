@@ -100,8 +100,8 @@ pbs-api-types = "1.0.8"
 
 # other proxmox crates
 pathpatterns = "1"
-proxmox-acme = "1"
-proxmox-acme-api = { version = "1", features = [ "impl" ] }
+proxmox-acme = "1.1"
+proxmox-acme-api = { version = "1.0.2", features = [ "impl" ] }
 pxar = "1"
 
 # PBS workspace
