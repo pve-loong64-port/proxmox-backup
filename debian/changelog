@@ -1,3 +1,29 @@
+rust-proxmox-backup (4.1.2-1) trixie; urgency=medium
+
+  * fix #7149: ui: user create: do not leak changing the realm for a new user
+    into the pre-selected realm of the currently logged in user, as that might
+    cause some UX friction and confusion on their next login.
+
+  * fix recent regression that failed s3 refresh.
+
+  * fix #7219: client: mount: align encryption key loading behavior to
+    fallback to the default key location, just like all other commands.
+
+  * partially fix #6049: datastore: implement various optimizations for
+    handling large datastore configs, including a cache for the datastore
+    config to avoid re-parsing the whole config if not necessary.
+
+  * chunk store: various code clean-ups for the chunk store iterator, chunk
+    filename checks and "bad chunk" handling.
+
+  * add basic multiarch support to resulting package and executable locations.
+
+  * switch ACME implementation over to factored out one.
+
+  * fix #6939: acme: support servers returning 204 for nonce requests.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 29 Jan 2026 13:59:20 +0100
+
 rust-proxmox-backup (4.1.1-1) trixie; urgency=medium
 
   * datastore: s3: use owner from local store cache instead of refetching to
