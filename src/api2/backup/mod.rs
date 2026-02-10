@@ -456,7 +456,7 @@ pub const API_METHOD_CREATE_FIXED_INDEX: ApiMethod = ApiMethod::new(
             ("archive-name", false, &BACKUP_ARCHIVE_NAME_SCHEMA),
             (
                 "size",
-                false,
+                true,
                 &IntegerSchema::new("File size.").minimum(1).schema()
             ),
             (
@@ -480,7 +480,7 @@ fn create_fixed_index(
     let env: &BackupEnvironment = rpcenv.as_ref();
 
     let name = required_string_param(&param, "archive-name")?.to_owned();
-    let size = required_integer_param(&param, "size")? as u64;
+    let size = param["size"].as_u64();
     let reuse_csum = param["reuse-csum"].as_str();
 
     let archive_name = name.clone();
@@ -528,9 +528,7 @@ fn create_fixed_index(
         reader = Some(index);
     }
 
-    let mut writer = env
-        .datastore
-        .create_fixed_writer(&path, Some(size), chunk_size)?;
+    let mut writer = env.datastore.create_fixed_writer(&path, size, chunk_size)?;
 
     if let Some(reader) = reader {
         writer.clone_data_from(&reader)?;
