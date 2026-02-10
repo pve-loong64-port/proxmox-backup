@@ -351,7 +351,7 @@ impl FixedIndexWriter {
         Ok(index_csum)
     }
 
-    pub fn check_chunk_alignment(&self, offset: usize, chunk_len: usize) -> Result<usize, Error> {
+    fn check_chunk_alignment(&self, offset: usize, chunk_len: usize) -> Result<usize, Error> {
         if offset < chunk_len {
             bail!("got chunk with small offset ({} < {}", offset, chunk_len);
         }
@@ -381,7 +381,7 @@ impl FixedIndexWriter {
         Ok(pos / self.chunk_size)
     }
 
-    pub fn add_digest(&mut self, index: usize, digest: &[u8; 32]) -> Result<(), Error> {
+    fn add_digest(&mut self, index: usize, digest: &[u8; 32]) -> Result<(), Error> {
         if index >= self.index_length {
             bail!(
                 "add digest failed - index out of range ({} >= {})",
@@ -401,6 +401,19 @@ impl FixedIndexWriter {
         }
 
         Ok(())
+    }
+
+    /// Write the digest of a chunk into this index file.
+    ///
+    /// The `start` and `size` parameters encode the range of
+    /// content that is backed up. It is verified that `start` is
+    /// aligned and that only the last chunk may be smaller.
+    pub fn add_chunk(&mut self, start: u64, size: u32, digest: &[u8; 32]) -> Result<(), Error> {
+        let Some(end) = start.checked_add(size.into()) else {
+            bail!("add_chunk: start and size are too large: {start}+{size}");
+        };
+        let idx = self.check_chunk_alignment(end as usize, size as usize)?;
+        self.add_digest(idx, digest)
     }
 
     pub fn clone_data_from(&mut self, reader: &FixedIndexReader) -> Result<(), Error> {

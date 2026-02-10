@@ -442,12 +442,9 @@ impl BackupEnvironment {
             );
         }
 
-        let end = (offset as usize) + (size as usize);
-        let idx = data.index.check_chunk_alignment(end, size as usize)?;
+        data.index.add_chunk(offset, size, digest)?;
 
         data.chunk_count += 1;
-
-        data.index.add_digest(idx, digest)?;
 
         Ok(())
     }
