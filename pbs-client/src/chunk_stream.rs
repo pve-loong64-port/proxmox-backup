@@ -187,6 +187,7 @@ pub struct FixedChunkStream<S: Unpin> {
     input: S,
     chunk_size: usize,
     buffer: BytesMut,
+    done: bool,
 }
 
 impl<S: Unpin> FixedChunkStream<S> {
@@ -195,6 +196,7 @@ impl<S: Unpin> FixedChunkStream<S> {
             input,
             chunk_size,
             buffer: BytesMut::new(),
+            done: false,
         }
     }
 }
@@ -213,6 +215,9 @@ where
         cx: &mut Context,
     ) -> Poll<Option<Result<BytesMut, S::Error>>> {
         let this = self.get_mut();
+        if this.done {
+            return Poll::Ready(None);
+        }
         loop {
             if this.buffer.len() >= this.chunk_size {
                 return Poll::Ready(Some(Ok(this.buffer.split_to(this.chunk_size))));
@@ -223,6 +228,9 @@ where
                     return Poll::Ready(Some(Err(err)));
                 }
                 None => {
+                    // Must not call input.try_poll_next again!
+                    this.done = true;
+
                     // last chunk can have any size
                     if !this.buffer.is_empty() {
                         return Poll::Ready(Some(Ok(this.buffer.split())));
