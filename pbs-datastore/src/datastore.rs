@@ -718,9 +718,8 @@ impl DataStore {
         &self,
         filename: P,
     ) -> Result<DynamicIndexWriter, Error> {
-        let index = DynamicIndexWriter::create(self.inner.chunk_store.clone(), filename.as_ref())?;
-
-        Ok(index)
+        let full_path = self.inner.chunk_store.relative_path(filename.as_ref());
+        DynamicIndexWriter::create(full_path)
     }
 
     pub fn open_dynamic_reader<P: AsRef<Path>>(

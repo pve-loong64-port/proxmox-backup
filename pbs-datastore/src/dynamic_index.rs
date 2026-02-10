@@ -16,7 +16,6 @@ use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_tools::lru_cache::LruCache;
 
-use crate::chunk_store::ChunkStore;
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
 use crate::read_chunk::ReadChunk;
@@ -288,8 +287,8 @@ impl Drop for DynamicIndexWriter {
 
 impl DynamicIndexWriter {
     // Requires obtaining a shared chunk store lock beforehand
-    pub fn create(store: Arc<ChunkStore>, path: &Path) -> Result<Self, Error> {
-        let full_path = store.relative_path(path);
+    pub fn create(full_path: impl Into<PathBuf>) -> Result<Self, Error> {
+        let full_path = full_path.into();
         let mut tmp_path = full_path.clone();
         tmp_path.set_extension("tmp_didx");
 
