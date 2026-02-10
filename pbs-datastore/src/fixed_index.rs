@@ -567,3 +567,181 @@ impl FixedIndexWriter {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use crate::temp_dir::TempDir;
+
+    const CS: u32 = 4096;
+
+    #[test]
+    fn test_empty() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test_empty");
+        let mut w = FixedIndexWriter::create(&path, None, CS).unwrap();
+
+        assert!(w.add_digest(0, &[1u8; 32]).is_err(), "out of bounds");
+
+        assert_eq!(0, w.size);
+        assert_eq!(0, w.index_length(), "returns length, not capacity");
+        assert_eq!(FixedIndexWriter::INITIAL_CAPACITY, w.index_capacity);
+
+        assert!(w.close().is_err(), "should refuse to create empty file");
+
+        drop(w);
+        assert!(!fs::exists(path).unwrap());
+
+        dir.delete().unwrap();
+    }
+
+    #[test]
+    fn test_single_partial_chunk() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test_single_partial_chunk");
+        let mut w = FixedIndexWriter::create(&path, None, CS).unwrap();
+
+        let size = CS as u64 - 1;
+        let expected = test_data(size);
+        w.grow_to_size(size).unwrap();
+        expected[0].add_to(&mut w);
+
+        w.close().unwrap();
+        drop(w);
+
+        check_with_reader(&path, size, &expected);
+        compare_to_known_size_writer(&path, size, &expected);
+
+        dir.delete().unwrap();
+    }
+
+    #[test]
+    fn test_grow_to_multiples_of_chunk_size() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test_grow_to_multiples_of_chunk_size");
+        let mut w = FixedIndexWriter::create(&path, None, CS).unwrap();
+
+        let initial = FixedIndexWriter::INITIAL_CAPACITY;
+        let steps = [1, 2, initial, initial + 1, 5 * initial, 10 * initial + 1];
+        let expected = test_data(*steps.last().unwrap() as u64 * CS as u64);
+
+        let mut begin = 0;
+        for chunk_count in steps {
+            let last = &expected[chunk_count - 1];
+            w.grow_to_size(last.end).unwrap();
+            assert_eq!(last.index + 1, w.index_length());
+            assert!(w.add_digest(last.index + 1, &[1u8; 32]).is_err());
+
+            for c in expected[begin..chunk_count].iter().rev() {
+                c.add_to(&mut w);
+            }
+            begin = chunk_count;
+        }
+        w.close().unwrap();
+        drop(w);
+
+        let size = expected.len() as u64 * CS as u64;
+        check_with_reader(&path, size, &expected);
+        compare_to_known_size_writer(&path, size, &expected);
+
+        dir.delete().unwrap();
+    }
+
+    #[test]
+    fn test_grow_to_misaligned_size() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test_grow_to_misaligned_size");
+        let mut w = FixedIndexWriter::create(&path, None, CS).unwrap();
+
+        let size = (FixedIndexWriter::INITIAL_CAPACITY as u64 + 42) * CS as u64 - 1; // last is not full
+        let expected = test_data(size);
+
+        w.grow_to_size(size).unwrap();
+        assert!(w.grow_to_size(size + 1).is_err(), "size must be fixed now");
+        assert_eq!(expected.len(), w.index_length());
+        assert!(w.add_digest(expected.len(), &[1u8; 32]).is_err());
+
+        for c in expected.iter().rev() {
+            c.add_to(&mut w);
+        }
+
+        w.close().unwrap();
+        drop(w);
+
+        check_with_reader(&path, size, &expected);
+        compare_to_known_size_writer(&path, size, &expected);
+
+        dir.delete().unwrap();
+    }
+
+    struct TestChunk {
+        digest: [u8; 32],
+        index: usize,
+        size: u32,
+        end: u64,
+    }
+
+    impl TestChunk {
+        fn add_to(&self, w: &mut FixedIndexWriter) {
+            assert_eq!(
+                self.index,
+                w.check_chunk_alignment(self.end, self.size as u64).unwrap()
+            );
+            w.add_digest(self.index, &self.digest).unwrap();
+        }
+    }
+
+    fn test_data(size: u64) -> Vec<TestChunk> {
+        (0..size.div_ceil(CS as u64))
+            .map(|index| {
+                let mut digest = [0u8; 32];
+                let i = &index.to_le_bytes();
+                for c in digest.chunks_mut(i.len()) {
+                    c.copy_from_slice(i);
+                }
+                let size = if ((index + 1) * CS as u64) <= size {
+                    CS
+                } else {
+                    (size % CS as u64) as u32
+                };
+                TestChunk {
+                    digest,
+                    index: index as usize,
+                    size,
+                    end: index * CS as u64 + size as u64,
+                }
+            })
+            .collect()
+    }
+
+    fn check_with_reader(path: &Path, size: u64, chunks: &[TestChunk]) {
+        let reader = FixedIndexReader::open(path).unwrap();
+        assert_eq!(size, reader.index_bytes());
+        assert_eq!(chunks.len(), reader.index_count());
+        for c in chunks {
+            assert_eq!(&c.digest, reader.index_digest(c.index).unwrap());
+        }
+    }
+
+    fn compare_to_known_size_writer(file: &Path, size: u64, chunks: &[TestChunk]) {
+        let mut path = file.to_path_buf();
+        path.set_extension("reference");
+        let mut w = FixedIndexWriter::create(&path, Some(size), CS).unwrap();
+        for c in chunks {
+            c.add_to(&mut w);
+        }
+        w.close().unwrap();
+        drop(w);
+
+        let mut reference = fs::read(file).unwrap();
+        let mut tested = fs::read(path).unwrap();
+
+        // ignore uuid and ctime
+        reference[8..32].fill(0);
+        tested[8..32].fill(0);
+
+        assert_eq!(reference, tested);
+    }
+}
