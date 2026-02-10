@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::io::Write;
 use std::io::{Seek, SeekFrom};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -216,6 +215,18 @@ impl IndexFile for FixedIndexReader {
     }
 }
 
+struct MmapPtr(NonNull<std::ffi::c_void>);
+
+impl MmapPtr {
+    fn header(&self) -> NonNull<FixedIndexHeader> {
+        self.0.cast::<FixedIndexHeader>()
+    }
+
+    fn index(&self) -> NonNull<u8> {
+        unsafe { self.0.byte_add(size_of::<FixedIndexHeader>()).cast::<u8>() }
+    }
+}
+
 pub struct FixedIndexWriter {
     file: File,
     filename: PathBuf,
@@ -226,11 +237,10 @@ pub struct FixedIndexWriter {
     size: u64,
     index_length: usize,
     index_capacity: usize,
-    index: *mut u8,
+    memory: Option<MmapPtr>,
     pub uuid: [u8; 16],
     pub ctime: i64,
     growable_size: bool,
-    write_size_on_close: bool,
 }
 
 // `index` is mmap()ed which cannot be thread-local so should be sendable
@@ -256,7 +266,6 @@ impl FixedIndexWriter {
     /// strictly necessary.
     const INITIAL_CAPACITY: usize = 4096 / 32;
 
-    #[allow(clippy::cast_ptr_alignment)]
     // Requires obtaining a shared chunk store lock beforehand
     pub fn create(
         full_path: impl Into<PathBuf>,
@@ -267,7 +276,7 @@ impl FixedIndexWriter {
         let mut tmp_path = full_path.clone();
         tmp_path.set_extension("tmp_fidx");
 
-        let mut file = std::fs::OpenOptions::new()
+        let file = std::fs::OpenOptions::new()
             .create(true)
             .truncate(true)
             .read(true)
@@ -291,19 +300,6 @@ impl FixedIndexWriter {
 
         let uuid = Uuid::generate();
 
-        let buffer = vec![0u8; header_size];
-        let header = unsafe { &mut *(buffer.as_ptr() as *mut FixedIndexHeader) };
-
-        header.magic = file_formats::FIXED_SIZED_CHUNK_INDEX_1_0;
-        header.ctime = i64::to_le(ctime);
-        header.size = u64::to_le(size);
-        header.chunk_size = u64::to_le(chunk_size);
-        header.uuid = *uuid.as_bytes();
-
-        header.index_csum = [0u8; 32];
-
-        file.write_all(&buffer)?;
-
         let (index_length, index_capacity) = match known_size {
             Some(s) => {
                 let len = s.div_ceil(chunk_size).try_into()?;
@@ -312,23 +308,25 @@ impl FixedIndexWriter {
             None => (0, Self::INITIAL_CAPACITY),
         };
 
-        let index_size = index_capacity * 32;
         let file_size = Self::file_size(index_capacity)?;
         nix::unistd::ftruncate(&file, file_size)?;
 
-        let data = unsafe {
+        let memory = MmapPtr(unsafe {
             nix::sys::mman::mmap(
                 None,
-                std::num::NonZeroUsize::new(index_size)
-                    .ok_or_else(|| format_err!("invalid index size"))?,
+                std::num::NonZeroUsize::new(file_size as usize).expect("has header"),
                 nix::sys::mman::ProtFlags::PROT_READ | nix::sys::mman::ProtFlags::PROT_WRITE,
                 nix::sys::mman::MapFlags::MAP_SHARED,
                 &file,
-                header_size as i64,
+                0,
             )
-        }?
-        .as_ptr()
-        .cast::<u8>();
+        }?);
+
+        let header = unsafe { memory.header().as_mut() };
+        header.magic = file_formats::FIXED_SIZED_CHUNK_INDEX_1_0;
+        header.ctime = i64::to_le(ctime);
+        header.chunk_size = u64::to_le(chunk_size);
+        header.uuid = *uuid.as_bytes();
 
         Ok(Self {
             file,
@@ -338,11 +336,10 @@ impl FixedIndexWriter {
             size,
             index_length,
             index_capacity,
-            index: data,
+            memory: Some(memory),
             ctime,
             uuid: *uuid.as_bytes(),
             growable_size: known_size.is_none(),
-            write_size_on_close: known_size.is_none(),
         })
     }
 
@@ -368,27 +365,26 @@ impl FixedIndexWriter {
         if new_capacity == self.index_capacity {
             return Ok(());
         }
-        let old_index_size = self.index_capacity * 32;
-        let new_index_size = new_capacity * 32;
-        let new_file_size = Self::file_size(new_capacity)?;
+        let old_size = Self::file_size(self.index_capacity)?;
+        let new_size = Self::file_size(new_capacity)?;
 
-        let index_addr = NonNull::new(self.index as *mut std::ffi::c_void).ok_or_else(|| {
-            format_err!("Can't resize FixedIndexWriter index because the index pointer is null.")
-        })?;
+        let Some(MmapPtr(index_addr)) = self.memory else {
+            bail!("Can't resize unmapped FixedIndexWriter");
+        };
 
-        nix::unistd::ftruncate(&self.file, new_file_size)?;
+        nix::unistd::ftruncate(&self.file, new_size)?;
 
         let new_index = unsafe {
             nix::sys::mman::mremap(
                 index_addr,
-                old_index_size,
-                new_index_size,
+                old_size as usize,
+                new_size as usize,
                 nix::sys::mman::MRemapFlags::MREMAP_MAYMOVE,
                 None,
             )
         }?;
 
-        self.index = new_index.as_ptr().cast::<u8>();
+        self.memory = Some(MmapPtr(new_index));
         self.index_capacity = new_capacity;
         Ok(())
     }
@@ -401,7 +397,7 @@ impl FixedIndexWriter {
                 "failed to resize index capacity from {} to {new_capacity} with backing file: {:?}",
                 self.index_capacity, self.tmp_filename
             );
-            assert!(self.index.is_null(), "{message} {unmap_result:?}");
+            assert!(self.memory.is_none(), "{message} {unmap_result:?}");
             e.context(message)
         })
     }
@@ -447,29 +443,31 @@ impl FixedIndexWriter {
     }
 
     fn unmap(&mut self) -> Result<(), Error> {
-        let Some(index) = NonNull::new(self.index as *mut std::ffi::c_void) else {
-            return Ok(());
-        };
-
-        let index_size = self.index_capacity * 32;
-
-        if let Err(err) = unsafe { nix::sys::mman::munmap(index, index_size) } {
-            bail!("unmap file {:?} failed - {}", self.tmp_filename, err);
+        if let Some(ptr) = self.memory.take() {
+            let len = Self::file_size(self.index_capacity).expect(
+                "this is the capacity that didn't cause an overflow when the memory was mapped",
+            );
+            if let Err(err) = unsafe { nix::sys::mman::munmap(ptr.0, len as usize) } {
+                bail!("unmap file {:?} failed - {}", self.tmp_filename, err);
+            }
         }
-
-        self.index = std::ptr::null_mut();
-
         Ok(())
     }
 
     pub fn close(&mut self) -> Result<[u8; 32], Error> {
-        if self.index.is_null() {
+        let Some(ptr) = &self.memory else {
             bail!("cannot close already closed index file.");
-        }
+        };
 
         let index_size = self.index_length * 32;
-        let data = unsafe { std::slice::from_raw_parts(self.index, index_size) };
+        let data = unsafe { std::slice::from_raw_parts(ptr.index().as_ptr(), index_size) };
         let index_csum = openssl::sha::sha256(data);
+
+        {
+            let header = unsafe { ptr.header().as_mut() };
+            header.index_csum = index_csum;
+            header.size = self.size.to_le();
+        }
 
         self.unmap()?;
 
@@ -478,18 +476,6 @@ impl FixedIndexWriter {
             nix::unistd::ftruncate(&self.file, file_size)?;
             self.index_capacity = self.index_length;
         }
-
-        let csum_offset = std::mem::offset_of!(FixedIndexHeader, index_csum);
-        self.file.seek(SeekFrom::Start(csum_offset as u64))?;
-        self.file.write_all(&index_csum)?;
-
-        if self.write_size_on_close {
-            let size_offset = std::mem::offset_of!(FixedIndexHeader, size);
-            self.file.seek(SeekFrom::Start(size_offset as u64))?;
-            self.file.write_all(&self.size.to_le_bytes())?;
-        }
-
-        self.file.flush()?;
 
         if let Err(err) = std::fs::rename(&self.tmp_filename, &self.filename) {
             bail!("Atomic rename file {:?} failed - {}", self.filename, err);
@@ -535,13 +521,13 @@ impl FixedIndexWriter {
             );
         }
 
-        if self.index.is_null() {
+        let Some(ptr) = &self.memory else {
             bail!("cannot write to closed index file.");
-        }
+        };
 
         let index_pos = index * 32;
         unsafe {
-            let dst = self.index.add(index_pos);
+            let dst = ptr.index().as_ptr().add(index_pos);
             dst.copy_from_nonoverlapping(digest.as_ptr(), 32);
         }
 
