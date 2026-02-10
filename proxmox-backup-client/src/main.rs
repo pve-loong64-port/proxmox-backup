@@ -855,6 +855,7 @@ async fn create_backup(
 
     let mut upload_list = vec![];
     let mut target_set = HashSet::new();
+    let mut pipe_set = HashSet::new();
 
     for backupspec in backupspec_list {
         let pbs_client::BackupSpecification {
@@ -868,7 +869,7 @@ async fn create_backup(
         }
         target_set.insert(target.clone());
 
-        use std::os::unix::fs::FileTypeExt;
+        use std::os::unix::fs::{FileTypeExt, MetadataExt};
 
         let metadata = std::fs::metadata(&filename).map_err(|err| {
             if filename == "-" {
@@ -893,6 +894,11 @@ async fn create_backup(
                     }
                     size
                 } else if file_type.is_fifo() {
+                    // dev is needed for named pipes
+                    if !pipe_set.insert((metadata.dev(), metadata.ino())) {
+                        // The second archive would be empty
+                        bail!("got duplicate pipe '{filename}'");
+                    }
                     0
                 } else {
                     if file_type.is_char_device() {
@@ -940,6 +946,7 @@ async fn create_backup(
             }
         }
     }
+    drop(pipe_set);
 
     let backup_time = backup_time_opt.unwrap_or_else(epoch_i64);
 
