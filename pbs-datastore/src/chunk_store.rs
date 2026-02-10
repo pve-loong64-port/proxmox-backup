@@ -984,19 +984,17 @@ impl ChunkExt {
 
 #[test]
 fn test_chunk_store1() {
-    let mut path = std::fs::canonicalize(".").unwrap(); // we need absolute path
-    path.push(".testdir");
+    let temp_dir = crate::temp_dir::TempDir::new().unwrap();
+    let path = temp_dir.path();
 
-    if let Err(_e) = std::fs::remove_dir_all(".testdir") { /* ignore */ }
-
-    let chunk_store = ChunkStore::open("test", &path, DatastoreFSyncLevel::None);
+    let chunk_store = ChunkStore::open("test", path, DatastoreFSyncLevel::None);
     assert!(chunk_store.is_err());
 
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::current())
         .unwrap()
         .unwrap();
     let chunk_store =
-        ChunkStore::create("test", &path, user.uid, user.gid, DatastoreFSyncLevel::None).unwrap();
+        ChunkStore::create("test", path, user.uid, user.gid, DatastoreFSyncLevel::None).unwrap();
 
     let (chunk, digest) = crate::data_blob::DataChunkBuilder::new(&[0u8, 1u8])
         .build()
@@ -1009,8 +1007,8 @@ fn test_chunk_store1() {
     assert!(exists);
 
     let chunk_store =
-        ChunkStore::create("test", &path, user.uid, user.gid, DatastoreFSyncLevel::None);
+        ChunkStore::create("test", path, user.uid, user.gid, DatastoreFSyncLevel::None);
     assert!(chunk_store.is_err());
 
-    if let Err(_e) = std::fs::remove_dir_all(".testdir") { /* ignore */ }
+    temp_dir.delete().unwrap();
 }
