@@ -34,6 +34,7 @@ impl InjectionData {
 /// Split input stream into dynamic sized chunks
 pub struct ChunkStream<S: Unpin> {
     input: S,
+    input_is_done: bool,
     chunker: Box<dyn Chunker + Send>,
     buffer: BytesMut,
     scan_pos: usize,
@@ -51,6 +52,7 @@ impl<S: Unpin> ChunkStream<S> {
         let chunk_size = chunk_size.unwrap_or(4 * 1024 * 1024);
         Self {
             input,
+            input_is_done: false,
             chunker: if let Some(suggested) = suggested_boundaries {
                 Box::new(PayloadChunker::new(chunk_size, suggested))
             } else {
@@ -162,12 +164,16 @@ where
                 }
             }
 
+            if this.input_is_done {
+                return Poll::Ready(None);
+            }
             match ready!(Pin::new(&mut this.input).try_poll_next(cx)) {
                 Some(Err(err)) => {
                     return Poll::Ready(Some(Err(err.into())));
                 }
                 None => {
                     this.scan_pos = 0;
+                    this.input_is_done = true;
                     if !this.buffer.is_empty() {
                         return Poll::Ready(Some(Ok(this.buffer.split())));
                     } else {
@@ -254,11 +260,12 @@ mod test {
 
     struct DummyInput {
         data: Vec<u8>,
+        done: bool,
     }
 
     impl DummyInput {
         fn new(data: Vec<u8>) -> Self {
-            Self { data }
+            Self { data, done: false }
         }
     }
 
@@ -268,7 +275,11 @@ mod test {
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             let this = self.get_mut();
             match this.data.len() {
-                0 => Poll::Ready(None),
+                0 => {
+                    assert!(!this.done);
+                    this.done = true;
+                    Poll::Ready(None)
+                }
                 size if size > 10 => Poll::Ready(Some(Ok(this.data.split_off(10)))),
                 _ => Poll::Ready(Some(Ok(std::mem::take(&mut this.data)))),
             }
