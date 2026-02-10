@@ -313,7 +313,8 @@ impl FixedIndexWriter {
         };
 
         let index_size = index_capacity * 32;
-        nix::unistd::ftruncate(&file, (header_size + index_size) as i64)?;
+        let file_size = Self::file_size(index_capacity)?;
+        nix::unistd::ftruncate(&file, file_size)?;
 
         let data = unsafe {
             nix::sys::mman::mmap(
@@ -345,6 +346,22 @@ impl FixedIndexWriter {
         })
     }
 
+    /// Computes the size of a fidx file containing `index_length`
+    /// chunk digests.
+    ///
+    /// Guarantees that the size fits into usize, isize and i64.
+    fn file_size(index_length: usize) -> Result<i64, Error> {
+        if index_length == 0 {
+            bail!("fidx file must have at least one chunk");
+        }
+        index_length
+            .checked_mul(32)
+            .and_then(|s| s.checked_add(size_of::<FixedIndexHeader>()))
+            .filter(|s| *s <= isize::MAX as usize)
+            .and_then(|s| i64::try_from(s).ok())
+            .ok_or_else(|| format_err!("fidx file size overflow for {index_length} chunks"))
+    }
+
     /// If this returns an error, the sizes may be out of sync,
     /// which is especially bad if the capacity was reduced.
     fn set_index_capacity(&mut self, new_capacity: usize) -> Result<(), Error> {
@@ -353,7 +370,7 @@ impl FixedIndexWriter {
         }
         let old_index_size = self.index_capacity * 32;
         let new_index_size = new_capacity * 32;
-        let new_file_size = (size_of::<FixedIndexHeader>() + new_index_size) as i64;
+        let new_file_size = Self::file_size(new_capacity)?;
 
         let index_addr = NonNull::new(self.index as *mut std::ffi::c_void).ok_or_else(|| {
             format_err!("Can't resize FixedIndexWriter index because the index pointer is null.")
@@ -456,11 +473,9 @@ impl FixedIndexWriter {
 
         self.unmap()?;
 
-        if self.index_length == 0 {
-            bail!("refusing to close empty fidx file {:?}", self.tmp_filename);
-        } else if self.index_length < self.index_capacity {
-            let file_size = size_of::<FixedIndexHeader>() + index_size;
-            nix::unistd::ftruncate(&self.file, file_size as i64)?;
+        if self.index_length < self.index_capacity {
+            let file_size = Self::file_size(self.index_length)?;
+            nix::unistd::ftruncate(&self.file, file_size)?;
             self.index_capacity = self.index_length;
         }
 
