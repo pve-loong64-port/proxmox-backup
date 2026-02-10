@@ -698,14 +698,8 @@ impl DataStore {
         size: usize,
         chunk_size: usize,
     ) -> Result<FixedIndexWriter, Error> {
-        let index = FixedIndexWriter::create(
-            self.inner.chunk_store.clone(),
-            filename.as_ref(),
-            size,
-            chunk_size,
-        )?;
-
-        Ok(index)
+        let full_path = self.inner.chunk_store.relative_path(filename.as_ref());
+        FixedIndexWriter::create(full_path, size, chunk_size)
     }
 
     pub fn open_fixed_reader<P: AsRef<Path>>(

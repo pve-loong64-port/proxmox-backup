@@ -4,14 +4,12 @@ use std::io::{Seek, SeekFrom};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
-use std::sync::Arc;
 
 use anyhow::{bail, format_err, Error};
 
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
 
-use crate::chunk_store::ChunkStore;
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
 
@@ -240,12 +238,11 @@ impl FixedIndexWriter {
     #[allow(clippy::cast_ptr_alignment)]
     // Requires obtaining a shared chunk store lock beforehand
     pub fn create(
-        store: Arc<ChunkStore>,
-        path: &Path,
+        full_path: impl Into<PathBuf>,
         size: usize,
         chunk_size: usize,
     ) -> Result<Self, Error> {
-        let full_path = store.relative_path(path);
+        let full_path = full_path.into();
         let mut tmp_path = full_path.clone();
         tmp_path.set_extension("tmp_fidx");
 
