@@ -17,7 +17,8 @@ use pbs_api_types::{
     PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
 };
 use pbs_client::{
-    BackupRepository, BackupWriter, BackupWriterOptions, HttpClient, MergedChunkInfo, UploadOptions,
+    BackupRepository, BackupWriter, BackupWriterOptions, HttpClient, IndexType, MergedChunkInfo,
+    UploadOptions,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::ChunkInfo;
@@ -917,7 +918,7 @@ pub(crate) async fn push_snapshot(
                         index,
                         chunk_reader,
                         &backup_writer,
-                        None,
+                        IndexType::Dynamic,
                         known_chunks.clone(),
                     )
                     .await?;
@@ -944,7 +945,7 @@ pub(crate) async fn push_snapshot(
                         index,
                         chunk_reader,
                         &backup_writer,
-                        Some(size),
+                        IndexType::Fixed(Some(size)),
                         known_chunks.clone(),
                     )
                     .await?;
@@ -1002,7 +1003,7 @@ async fn push_index(
     index: impl IndexFile + Send + 'static,
     chunk_reader: Arc<dyn AsyncReadChunk>,
     backup_writer: &BackupWriter,
-    size: Option<u64>,
+    index_type: IndexType,
     known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
 ) -> Result<SyncStats, Error> {
     let (upload_channel_tx, upload_channel_rx) = mpsc::channel(20);
@@ -1048,7 +1049,7 @@ async fn push_index(
     let upload_options = UploadOptions {
         compress: true,
         encrypt: false,
-        fixed_size: size,
+        index_type,
         ..UploadOptions::default()
     };
 

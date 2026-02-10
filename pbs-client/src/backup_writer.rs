@@ -52,7 +52,26 @@ pub struct UploadOptions {
     pub previous_manifest: Option<Arc<BackupManifest>>,
     pub compress: bool,
     pub encrypt: bool,
-    pub fixed_size: Option<u64>,
+    pub index_type: IndexType,
+}
+
+/// Index type for upload options.
+#[derive(Default, Clone)]
+pub enum IndexType {
+    /// Dynamic chunking.
+    #[default]
+    Dynamic,
+    /// Fixed size chunking with optional image file size.
+    Fixed(Option<u64>),
+}
+
+impl IndexType {
+    fn to_prefix_and_size(&self) -> (&'static str, Option<u64>) {
+        match self {
+            IndexType::Fixed(size) => ("fixed", *size),
+            IndexType::Dynamic => ("dynamic", None),
+        }
+    }
 }
 
 struct ChunkUploadResponse {
@@ -292,12 +311,10 @@ impl BackupWriter {
         options: UploadOptions,
     ) -> Result<BackupStats, Error> {
         let mut param = json!({ "archive-name": archive_name });
-        let prefix = if let Some(size) = options.fixed_size {
+        let (prefix, archive_size) = options.index_type.to_prefix_and_size();
+        if let Some(size) = archive_size {
             param["size"] = size.into();
-            "fixed"
-        } else {
-            "dynamic"
-        };
+        }
 
         if options.encrypt && self.crypt_config.is_none() {
             bail!("requested encryption without a crypt config");
@@ -387,12 +404,10 @@ impl BackupWriter {
         let known_chunks = Arc::new(Mutex::new(HashSet::new()));
 
         let mut param = json!({ "archive-name": archive_name });
-        let prefix = if let Some(size) = options.fixed_size {
+        let (prefix, archive_size) = options.index_type.to_prefix_and_size();
+        if let Some(size) = archive_size {
             param["size"] = size.into();
-            "fixed"
-        } else {
-            "dynamic"
-        };
+        }
 
         if options.encrypt && self.crypt_config.is_none() {
             bail!("requested encryption without a crypt config");

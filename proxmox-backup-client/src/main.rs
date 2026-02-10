@@ -46,7 +46,7 @@ use pbs_client::tools::{
 use pbs_client::{
     delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
     BackupReader, BackupRepository, BackupSpecificationType, BackupStats, BackupWriter,
-    BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, InjectionData,
+    BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, IndexType, InjectionData,
     PxarBackupStream, RemoteChunkReader, UploadOptions, BACKUP_SOURCE_SCHEMA,
 };
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogReader, CatalogWriter};
@@ -228,7 +228,7 @@ async fn backup_directory<P: AsRef<Path>>(
     pxar_create_options: pbs_client::pxar::PxarCreateOptions,
     upload_options: UploadOptions,
 ) -> Result<(BackupStats, Option<BackupStats>), Error> {
-    if upload_options.fixed_size.is_some() {
+    if let IndexType::Fixed(_) = upload_options.index_type {
         bail!("cannot backup directory with fixed chunk size!");
     }
 
@@ -318,7 +318,7 @@ async fn backup_image<P: AsRef<Path>>(
 
     let stream = FixedChunkStream::new(stream, chunk_size.unwrap_or(4 * 1024 * 1024));
 
-    if upload_options.fixed_size.is_none() {
+    if let IndexType::Dynamic = upload_options.index_type {
         bail!("cannot backup image with dynamic chunk size!");
     }
 
@@ -870,8 +870,12 @@ async fn create_backup(
 
         use std::os::unix::fs::FileTypeExt;
 
-        let metadata = std::fs::metadata(&filename)
-            .map_err(|err| format_err!("unable to access '{}' - {}", filename, err))?;
+        let metadata = std::fs::metadata(&filename).map_err(|err| {
+            if filename == "-" {
+                log::info!("If you are trying to read from stdin use '/dev/stdin' instead of '-'.");
+            }
+            format_err!("unable to access '{}' - {}", filename, err)
+        })?;
         let file_type = metadata.file_type();
 
         match spec_type {
@@ -882,15 +886,25 @@ async fn create_backup(
                 upload_list.push((BackupSpecificationType::PXAR, filename, target, "didx", 0));
             }
             BackupSpecificationType::IMAGE => {
-                if !(file_type.is_file() || file_type.is_block_device()) {
-                    bail!("got unexpected file type (expected file or block device)");
-                }
-
-                let size = image_size(&PathBuf::from(&filename))?;
-
-                if size == 0 {
-                    bail!("got zero-sized file '{}'", filename);
-                }
+                let size = if file_type.is_file() || file_type.is_block_device() {
+                    let size = image_size(&PathBuf::from(&filename))?;
+                    if size == 0 {
+                        bail!("got zero-sized file '{filename}'");
+                    }
+                    size
+                } else if file_type.is_fifo() {
+                    0
+                } else {
+                    if file_type.is_char_device() {
+                        // This would technically work, but allowing interactive
+                        // inputs is error prone, and devices like /dev/random
+                        // are often infinite streams.
+                        log::info!(
+                            "Character devices (including pseudo terminals) are not supported."
+                        );
+                    }
+                    bail!("got unexpected file type (expected file, block device, or fifo): {filename}");
+                };
 
                 upload_list.push((
                     BackupSpecificationType::IMAGE,
@@ -1214,9 +1228,11 @@ async fn create_backup(
             (BackupSpecificationType::IMAGE, false) => {
                 log_file("image", &filename, target.as_ref());
 
+                // 0 means fifo pipe with unknown size
+                let image_file_size = (size != 0).then_some(size);
                 let upload_options = UploadOptions {
                     previous_manifest: previous_manifest.clone(),
-                    fixed_size: Some(size),
+                    index_type: IndexType::Fixed(image_file_size),
                     compress: true,
                     encrypt: crypto.mode == CryptMode::Encrypt,
                 };
