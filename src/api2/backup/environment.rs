@@ -67,7 +67,7 @@ struct DynamicWriterState {
 struct FixedWriterState {
     name: String,
     index: FixedIndexWriter,
-    size: usize,
+    size: u64,
     chunk_size: u32,
     chunk_count: u64,
     small_chunk_count: usize, // allow 0..1 small chunks (last chunk may be smaller)
@@ -349,7 +349,7 @@ impl BackupEnvironment {
         &self,
         index: FixedIndexWriter,
         name: String,
-        size: usize,
+        size: u64,
         chunk_size: u32,
         incremental: bool,
     ) -> Result<usize, Error> {
@@ -618,7 +618,7 @@ impl BackupEnvironment {
                 );
             }
 
-            if size != (data.size as u64) {
+            if size != data.size {
                 bail!(
                     "fixed writer '{}' close failed - unexpected file size ({} != {})",
                     data.name,

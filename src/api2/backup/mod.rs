@@ -480,7 +480,7 @@ fn create_fixed_index(
     let env: &BackupEnvironment = rpcenv.as_ref();
 
     let name = required_string_param(&param, "archive-name")?.to_owned();
-    let size = required_integer_param(&param, "size")? as usize;
+    let size = required_integer_param(&param, "size")? as u64;
     let reuse_csum = param["reuse-csum"].as_str();
 
     let archive_name = name.clone();

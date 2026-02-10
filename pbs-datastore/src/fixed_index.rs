@@ -214,8 +214,10 @@ pub struct FixedIndexWriter {
     file: File,
     filename: PathBuf,
     tmp_filename: PathBuf,
-    chunk_size: usize,
-    size: usize,
+    /// Most places use u32 because values are just a few MiB, but here
+    /// u64 is sightly more convenient for calculations involving size.
+    chunk_size: u64,
+    size: u64,
     index_length: usize,
     index: *mut u8,
     pub uuid: [u8; 16],
@@ -239,8 +241,8 @@ impl FixedIndexWriter {
     // Requires obtaining a shared chunk store lock beforehand
     pub fn create(
         full_path: impl Into<PathBuf>,
-        size: usize,
-        chunk_size: usize,
+        size: u64,
+        chunk_size: u32,
     ) -> Result<Self, Error> {
         let full_path = full_path.into();
         let mut tmp_path = full_path.clone();
@@ -260,6 +262,8 @@ impl FixedIndexWriter {
             panic!("got unexpected header size");
         }
 
+        let chunk_size = u64::from(chunk_size);
+
         let ctime = proxmox_time::epoch_i64();
 
         let uuid = Uuid::generate();
@@ -269,15 +273,15 @@ impl FixedIndexWriter {
 
         header.magic = file_formats::FIXED_SIZED_CHUNK_INDEX_1_0;
         header.ctime = i64::to_le(ctime);
-        header.size = u64::to_le(size as u64);
-        header.chunk_size = u64::to_le(chunk_size as u64);
+        header.size = u64::to_le(size);
+        header.chunk_size = u64::to_le(chunk_size);
         header.uuid = *uuid.as_bytes();
 
         header.index_csum = [0u8; 32];
 
         file.write_all(&buffer)?;
 
-        let index_length = size.div_ceil(chunk_size);
+        let index_length = size.div_ceil(chunk_size).try_into()?;
         let index_size = index_length * 32;
         nix::unistd::ftruncate(&file, (header_size + index_size) as i64)?;
 
@@ -351,12 +355,10 @@ impl FixedIndexWriter {
         Ok(index_csum)
     }
 
-    fn check_chunk_alignment(&self, offset: usize, chunk_len: usize) -> Result<usize, Error> {
-        if offset < chunk_len {
+    fn check_chunk_alignment(&self, offset: u64, chunk_len: u64) -> Result<usize, Error> {
+        let Some(pos) = offset.checked_sub(chunk_len) else {
             bail!("got chunk with small offset ({} < {}", offset, chunk_len);
-        }
-
-        let pos = offset - chunk_len;
+        };
 
         if offset > self.size {
             bail!("chunk data exceeds size ({} >= {})", offset, self.size);
@@ -378,7 +380,7 @@ impl FixedIndexWriter {
             bail!("got unaligned chunk (pos = {})", pos);
         }
 
-        Ok(pos / self.chunk_size)
+        Ok((pos / self.chunk_size) as usize)
     }
 
     fn add_digest(&mut self, index: usize, digest: &[u8; 32]) -> Result<(), Error> {
@@ -409,10 +411,11 @@ impl FixedIndexWriter {
     /// content that is backed up. It is verified that `start` is
     /// aligned and that only the last chunk may be smaller.
     pub fn add_chunk(&mut self, start: u64, size: u32, digest: &[u8; 32]) -> Result<(), Error> {
-        let Some(end) = start.checked_add(size.into()) else {
+        let size = u64::from(size);
+        let Some(end) = start.checked_add(size) else {
             bail!("add_chunk: start and size are too large: {start}+{size}");
         };
-        let idx = self.check_chunk_alignment(end as usize, size as usize)?;
+        let idx = self.check_chunk_alignment(end, size)?;
         self.add_digest(idx, digest)
     }
 
