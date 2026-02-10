@@ -86,6 +86,10 @@ impl FixedIndexReader {
         let ctime = i64::from_le(header.ctime);
         let chunk_size = u64::from_le(header.chunk_size);
 
+        if !chunk_size.is_power_of_two() {
+            bail!("got non-power-of-two chunk size: {chunk_size}");
+        }
+
         let index_length = size.div_ceil(chunk_size) as usize;
         let index_size = index_length * 32;
 
@@ -97,6 +101,8 @@ impl FixedIndexReader {
                 expected_index_size
             );
         }
+
+        let chunk_size = usize::try_from(chunk_size)?;
 
         let data = unsafe {
             nix::sys::mman::mmap(
@@ -114,7 +120,7 @@ impl FixedIndexReader {
 
         Ok(Self {
             _file: file,
-            chunk_size: chunk_size as usize,
+            chunk_size,
             size,
             index_length,
             index: data,
@@ -263,6 +269,9 @@ impl FixedIndexWriter {
         }
 
         let chunk_size = u64::from(chunk_size);
+        if !chunk_size.is_power_of_two() {
+            bail!("got non-power-of-two chunk size: {chunk_size}");
+        }
 
         let ctime = proxmox_time::epoch_i64();
 
