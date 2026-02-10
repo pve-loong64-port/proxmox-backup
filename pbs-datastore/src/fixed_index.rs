@@ -520,7 +520,10 @@ impl FixedIndexWriter {
                 self.index_length
             );
         }
+        self.add_digest_unchecked(index, digest)
+    }
 
+    fn add_digest_unchecked(&mut self, index: usize, digest: &[u8; 32]) -> Result<(), Error> {
         let Some(ptr) = &self.memory else {
             bail!("cannot write to closed index file.");
         };
@@ -553,23 +556,23 @@ impl FixedIndexWriter {
         self.add_digest(idx, digest)
     }
 
+    /// Copy the chunk hashes from a Reader to the start of this Writer.
+    ///
+    /// If this writer is resizable the capacity may increase,
+    /// but the size and length stay the same.
     pub fn clone_data_from(&mut self, reader: &FixedIndexReader) -> Result<(), Error> {
-        if self.growable_size {
-            bail!("reusing the index is only supported with known input size");
-        }
-
         if self.chunk_size != reader.chunk_size as u64 {
             bail!("can't reuse file with different chunk size");
         }
 
-        if self.index_length != reader.index_count() {
-            bail!("clone_data_from failed - index sizes not equal");
+        let count = reader.index_count();
+        if self.growable_size && self.index_capacity < count {
+            self.set_index_capacity_or_unmap(count)?;
         }
 
-        for i in 0..self.index_length {
-            self.add_digest(i, reader.index_digest(i).unwrap())?;
+        for i in 0..count.min(self.index_capacity) {
+            self.add_digest_unchecked(i, reader.index_digest(i).unwrap())?;
         }
-
         Ok(())
     }
 }
@@ -678,6 +681,51 @@ mod tests {
 
         check_with_reader(&path, size, &expected);
         compare_to_known_size_writer(&path, size, &expected);
+
+        dir.delete().unwrap();
+    }
+
+    #[test]
+    fn test_clone_data_from() {
+        let dir = TempDir::new().unwrap();
+        let size = (FixedIndexWriter::INITIAL_CAPACITY as u64 + 3) * CS as u64;
+        let mut expected = test_data(size);
+
+        let reused = dir.path().join("reused");
+        let mut w = FixedIndexWriter::create(&reused, Some(size), CS).unwrap();
+        for c in expected.iter() {
+            c.add_to(&mut w);
+        }
+        w.close().unwrap();
+        drop(w);
+
+        let reused = FixedIndexReader::open(&reused).unwrap();
+
+        let truncated = dir.path().join("truncated");
+        let size = size - CS as u64;
+        expected.pop();
+        let mut w = FixedIndexWriter::create(&truncated, Some(size), CS).unwrap();
+        w.clone_data_from(&reused).unwrap();
+        w.close().unwrap();
+        drop(w);
+        check_with_reader(&truncated, size, &expected);
+        compare_to_known_size_writer(&truncated, size, &expected);
+
+        let modified = dir.path().join("modified");
+        let mut w = FixedIndexWriter::create(&modified, None, CS).unwrap();
+        w.clone_data_from(&reused).unwrap();
+        {
+            let i = expected.len() / 2;
+            expected[i].digest[1] += 1;
+            let chunk = &expected[i];
+            let chunk_pos = chunk.end - chunk.size as u64;
+            w.add_chunk(chunk_pos, chunk.size, &chunk.digest).unwrap();
+        }
+        w.grow_to_size(size).unwrap();
+        w.close().unwrap();
+        drop(w);
+        check_with_reader(&modified, size, &expected);
+        compare_to_known_size_writer(&modified, size, &expected);
 
         dir.delete().unwrap();
     }

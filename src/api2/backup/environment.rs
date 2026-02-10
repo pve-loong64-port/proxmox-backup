@@ -606,6 +606,10 @@ impl BackupEnvironment {
             );
         }
 
+        if data.incremental && data.size.is_none() {
+            data.index.grow_to_size(size)?;
+        }
+
         if !data.incremental {
             let expected_count = data.index.index_length();
 
