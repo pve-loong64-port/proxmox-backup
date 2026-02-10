@@ -528,13 +528,15 @@ fn create_fixed_index(
         reader = Some(index);
     }
 
-    let mut writer = env.datastore.create_fixed_writer(&path, size, chunk_size)?;
+    let mut writer = env
+        .datastore
+        .create_fixed_writer(&path, Some(size), chunk_size)?;
 
     if let Some(reader) = reader {
         writer.clone_data_from(&reader)?;
     }
 
-    let wid = env.register_fixed_writer(writer, name, size, chunk_size as u32, incremental)?;
+    let wid = env.register_fixed_writer(writer, name, size, chunk_size, incremental)?;
 
     env.log(format!("created new fixed index {wid} ({path:?})"));
 

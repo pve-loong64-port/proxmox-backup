@@ -695,7 +695,7 @@ impl DataStore {
     pub fn create_fixed_writer<P: AsRef<Path>>(
         &self,
         filename: P,
-        size: u64,
+        size: Option<u64>,
         chunk_size: u32,
     ) -> Result<FixedIndexWriter, Error> {
         let full_path = self.inner.chunk_store.relative_path(filename.as_ref());
