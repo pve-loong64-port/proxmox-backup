@@ -630,6 +630,14 @@ impl BackupEnvironment {
             }
         }
 
+        let writer_size = data.index.size();
+        if size != writer_size {
+            bail!(
+                "fixed writer '{}' close failed - unexpected size ({size} != {writer_size})",
+                data.name,
+            );
+        }
+
         let expected_csum = data.index.close()?;
         data.closed = true;
 

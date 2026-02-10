@@ -424,6 +424,11 @@ impl FixedIndexWriter {
         self.index_length
     }
 
+    /// The current total size of the referenced content.
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
     fn unmap(&mut self) -> Result<(), Error> {
         let Some(index) = NonNull::new(self.index as *mut std::ffi::c_void) else {
             return Ok(());
