@@ -128,6 +128,21 @@ Ext.define('PBS.window.RemoteEdit', {
                 fieldLabel: gettext('Comment'),
             },
         ],
+        advancedColumn1: [
+            {
+                xtype: 'proxmoxcheckbox',
+                fieldLabel: gettext("Use node proxy"),
+                name: 'use-node-proxy',
+                autoEl: {
+                    tag: 'div',
+                    'data-qtip': gettext(
+                        "Use the node's http proxy configuration for remote connections.",
+                    ),
+                },
+                uncheckedValue: false,
+                value: false,
+            },
+        ],
     },
 
     setValues: function (values) {
@@ -151,6 +166,10 @@ Ext.define('PBS.window.RemoteEdit', {
 
         if (values.password === '') {
             delete values.password;
+        }
+
+        if (!me.isCreate) {
+            PBS.Utils.delete_if_default(values, 'use-node-proxy', false);
         }
 
         return values;
