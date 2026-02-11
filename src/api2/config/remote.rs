@@ -142,6 +142,8 @@ pub enum DeletableProperty {
     Fingerprint,
     /// Delete the port property.
     Port,
+    /// Delete the use_node_proxy property.
+    UseNodeProxy,
 }
 
 #[api(
@@ -209,6 +211,9 @@ pub fn update_remote(
                 DeletableProperty::Port => {
                     data.config.port = None;
                 }
+                DeletableProperty::UseNodeProxy => {
+                    data.config.use_node_proxy = None;
+                }
             }
         }
     }
@@ -236,6 +241,10 @@ pub fn update_remote(
 
     if update.fingerprint.is_some() {
         data.config.fingerprint = update.fingerprint;
+    }
+
+    if update.use_node_proxy.is_some() {
+        data.config.use_node_proxy = update.use_node_proxy;
     }
 
     config.set_data(&name, "remote", &data)?;
@@ -309,6 +318,10 @@ pub fn remote_client_config(
 
     if let Some(limit) = limit {
         options = options.rate_limit(limit);
+    }
+    if remote.config.use_node_proxy.unwrap_or(false) {
+        let proxy = crate::config::node::node_http_proxy_config()?;
+        options = options.proxy(proxy);
     }
 
     let client = HttpClient::new(

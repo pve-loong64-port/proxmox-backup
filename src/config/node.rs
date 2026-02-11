@@ -309,3 +309,8 @@ impl Iterator for AcmeDomainIter<'_> {
         ))
     }
 }
+
+pub(crate) fn node_http_proxy_config() -> Result<Option<ProxyConfig>, Error> {
+    let (node_config, _digest) = self::config()?;
+    Ok(node_config.http_proxy())
+}
