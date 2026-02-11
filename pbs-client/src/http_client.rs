@@ -134,6 +134,7 @@ pub struct HttpClientOptions {
     fingerprint_cache: bool,
     verify_cert: bool,
     limit: RateLimitConfig,
+    proxy: Option<ProxyConfig>,
 }
 
 impl HttpClientOptions {
@@ -196,6 +197,11 @@ impl HttpClientOptions {
         self.limit = rate_limit;
         self
     }
+
+    pub fn proxy(mut self, proxy: Option<ProxyConfig>) -> Self {
+        self.proxy = proxy;
+        self
+    }
 }
 
 impl Default for HttpClientOptions {
@@ -209,6 +215,7 @@ impl Default for HttpClientOptions {
             fingerprint_cache: false,
             verify_cert: true,
             limit: RateLimitConfig::default(), // unlimited
+            proxy: None,
         }
     }
 }
@@ -479,6 +486,8 @@ impl HttpClient {
         }
 
         let proxy_config = ProxyConfig::from_proxy_env()?;
+        let proxy_config = proxy_config.or(options.proxy.clone());
+
         if let Some(config) = proxy_config {
             info!("Using proxy connection: {}:{}", config.host, config.port);
             https.set_proxy(config);
