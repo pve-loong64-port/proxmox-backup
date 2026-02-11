@@ -697,10 +697,12 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
 
 /// Converts SCSI ASCII text into String, trim zero and spaces
 pub fn scsi_ascii_to_string(data: &[u8]) -> String {
-    String::from_utf8_lossy(data)
-        .trim_matches(char::from(0))
-        .trim()
-        .to_string()
+    let mut view = data;
+
+    if let Some(idx) = data.iter().position(|c| *c == 0u8) {
+        view = &view[..idx];
+    }
+    String::from_utf8_lossy(view).trim().to_string()
 }
 
 /// Read SCSI Inquiry page
@@ -1011,4 +1013,38 @@ pub fn scsi_request_sense<F: AsRawFd>(file: &mut F) -> Result<RequestSenseFixed,
     .map_err(|err: Error| format_err!("decode request sense failed - {}", err))?;
 
     Ok(sense)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::sgutils2::scsi_ascii_to_string;
+
+    #[test]
+    fn test_scsi_ascii_to_string() {
+        fn test(input: &'static str, expected: &'static str) {
+            let output = scsi_ascii_to_string(input.as_bytes());
+            assert_eq!(&output, expected);
+        }
+
+        test("TAPE00L1", "TAPE00L1");
+        test("TAPE00L1  ", "TAPE00L1");
+        test("TAPE00L1               ", "TAPE00L1");
+        test("TAPE00L1 \0", "TAPE00L1");
+        test("TAPE00L1  \0\0", "TAPE00L1");
+        test("TAPE00L1\0", "TAPE00L1");
+        test("TAPE00L1\0 ", "TAPE00L1");
+        test("TAPE00L1\0\0  ", "TAPE00L1");
+        test("TAPE0\0L1\0\0  ", "TAPE0");
+        test("TAPE0 \0L1  ", "TAPE0");
+        test("\0TAPE00L1", "");
+        test(" TAPE00L1", "TAPE00L1");
+        test("", "");
+        test(" ", "");
+        test("  ", "");
+        test("\0", "");
+        test("\0\0", "");
+        test("\0 ", "");
+        test(" \0 ", "");
+        test("  \0\0  ", "");
+    }
 }
