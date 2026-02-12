@@ -6,6 +6,7 @@ use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
 use proxmox_subscription::SubscriptionStatus;
 use proxmox_sys::fs::CreateOptions;
 
+use pbs_buildcfg::configdir;
 use proxmox_backup::api2;
 
 async fn wait_for_local_worker(upid_str: &str) -> Result<(), Error> {
@@ -103,6 +104,8 @@ async fn run(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
     command_sock.spawn(proxmox_rest_server::last_worker_future())?;
 
     proxmox_notify::context::set_context(&PBS_CONTEXT);
+
+    proxmox_acme_api::init(configdir!("/acme"), false)?;
 
     do_update(rpcenv).await
 }
