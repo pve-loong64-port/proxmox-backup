@@ -160,7 +160,7 @@ async fn api_datastore_list_snapshots(
     Ok(result["data"].take())
 }
 
-pub async fn api_datastore_latest_snapshot(
+pub async fn api_datastore_latest_finished_snapshot(
     client: &HttpClient,
     store: &str,
     ns: &BackupNamespace,
@@ -175,7 +175,30 @@ pub async fn api_datastore_latest_snapshot(
 
     list.sort_unstable_by(|a, b| b.backup.time.cmp(&a.backup.time));
 
-    Ok((group, list[0].backup.time).into())
+    let last_finished_time = list
+        .iter()
+        .find_map(|snapshot_item| {
+            // only once a snapshots contains the manifest it is considered finished
+            snapshot_item
+                .files
+                .iter()
+                .find_map(|content| {
+                    if content.filename == MANIFEST_BLOB_NAME.as_ref() {
+                        Some(snapshot_item.backup.time)
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| {
+                    log::info!("skipped not finished snapshot {}", snapshot_item.backup);
+                    None
+                })
+        })
+        .ok_or_else(|| {
+            format_err!("backup group {group} does not contain any finished snapshots.")
+        })?;
+
+    Ok((group, last_finished_time).into())
 }
 
 pub async fn dir_or_last_from_group(
@@ -187,7 +210,7 @@ pub async fn dir_or_last_from_group(
     match path.parse::<BackupPart>()? {
         BackupPart::Dir(dir) => Ok(dir),
         BackupPart::Group(group) => {
-            api_datastore_latest_snapshot(client, repo.store(), ns, group).await
+            api_datastore_latest_finished_snapshot(client, repo.store(), ns, group).await
         }
     }
 }
