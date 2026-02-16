@@ -1,3 +1,15 @@
+rust-proxmox-backup (4.1.3-1) trixie; urgency=medium
+
+  * fix #7311: fix ACME failure in proxmox-daily-update
+
+  * docs: add sync-job run
+
+  * fix #7303: tape: handle NUL bytes in SCSI strings better
+
+  * fix #7305: client: restore: filter out unfinished snapshots
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 16 Feb 2026 11:03:06 +0100
+
 rust-proxmox-backup (4.1.2-1) trixie; urgency=medium
 
   * fix #7149: ui: user create: do not leak changing the realm for a new user
