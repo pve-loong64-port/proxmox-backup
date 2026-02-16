@@ -214,6 +214,20 @@ async fn run() -> Result<(), Error> {
             ("docs", "/usr/share/doc/proxmox-backup/html"),
         ]);
 
+    if let Ok(real_ip_header) = std::env::var("PROXY_REAL_IP_HEADER") {
+        config = config.real_ip_header(real_ip_header);
+    }
+    if let Ok(real_ip_allow_from) = std::env::var("PROXY_REAL_IP_ALLOW_FROM") {
+        match proxmox_network_types::Cidr::from_str_list(&real_ip_allow_from) {
+            Ok(allowed_cidrs) => {
+                config = config.real_ip_allow_from(allowed_cidrs);
+            }
+            Err(err) => {
+                log::error!("ignoring environment variable 'PROXY_REAL_IP_ALLOW_FROM={real_ip_allow_from}', failed to parse as CIDR/IP-range list: {err}");
+            }
+        }
+    }
+
     let backup_user = pbs_config::backup_user()?;
     let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
 
