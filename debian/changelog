@@ -1,3 +1,25 @@
+rust-proxmox-backup (4.1.4-1) trixie; urgency=medium
+
+  * update proxmox-rest-server to 1.0.5 addressing a minor regression that
+    resulted in some requests with auth issues being answered with HTTP code
+    400 "bad request" instead of the correct HTTP code 401 "unauthorized".
+    The new rest-server also defaults to only checking the forwarded header in
+    the non-public RPC environment.
+
+  * proxy daemon: support configuration of real peer-ip header and allowed
+    source through the PROXY_REAL_IP_HEADER and PROXY_REAL_IP_ALLOW_FROM
+    environment variables. These variables can currently be set through
+    overriding the proxmox-backup-proxy.service systemd unit.
+    For example, to check the "X-Real-IP" header if the client is connecting
+    from a local (reverse) proxy, one would add the following override:
+    ```
+    [Service]
+    Environment=PROXY_REAL_IP_HEADER=X-Real-IP
+    Environment=PROXY_REAL_IP_ALLOW_FROM=127.0.0.1,::1
+    ```
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 17 Feb 2026 18:56:29 +0100
+
 rust-proxmox-backup (4.1.3-1) trixie; urgency=medium
 
   * fix #7311: fix recent regression in ACME certificate renewal through the
