@@ -60,7 +60,7 @@ Ext.define('PBS.TapeManagement.DriveEditWindow', {
             allowBlank: true,
             emptyText: '0',
             minValue: 0,
-            maxValue: 8,
+            maxValue: 255,
             cbind: {
                 deleteEmpty: '{!isCreate}',
             },
