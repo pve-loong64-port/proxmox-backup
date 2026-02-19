@@ -65,6 +65,23 @@ You are now able to build using the Makefile or cargo itself, e.g.::
   # # or for a non-package build
   # cargo build --all --release
 
+Building the online documentation
+=================================
+
+The online documentation can be build in HTML format as follows. First build the
+required binaries::
+
+  make docs
+
+The previous step is only necessary once. Then the online documentation can be
+built or regenerated with::
+
+  make -C docs DEB_HOST_RUST_TYPE=x86_64-unknown-linux-gnu html
+
+With the `rust target <https://doc.rust-lang.org/rustc/platform-support.html>`__
+of the host. The resulting documentation will be at ``docs/output/html/`` and
+can be open with your browser of choice or, e.g. ``xdg-open``.
+
 Design Notes
 ************
 
