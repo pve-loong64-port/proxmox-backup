@@ -349,3 +349,9 @@ Internally Proxmox Backup Server tracks whether each datastore access is a
 write or read operation, so that it can gracefully enter the respective mode,
 by allowing conflicting operations that started before enabling the maintenance
 mode to finish.
+
+The supported maintenance modes are:
+
+- ``read-only``: Only read operations are allowed on the datastore.
+
+- ``offline``: Neither read nor write operations are allowed on the datastore.
