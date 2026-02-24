@@ -63,6 +63,7 @@ proxmox-compression = "1.0.1"
 proxmox-config-digest = "1"
 proxmox-daemon = "1"
 proxmox-fuse = "2"
+proxmox-docgen = "1"
 proxmox-http = { version = "1.0.2", features = [ "client", "http-helpers", "websocket" ] } # see below
 proxmox-human-byte = "1"
 proxmox-io = "1.0.1" # tools and client use "tokio" feature
@@ -220,6 +221,7 @@ proxmox-base64.workspace = true
 proxmox-compression.workspace = true
 proxmox-config-digest.workspace = true
 proxmox-daemon.workspace = true
+proxmox-docgen.workspace = true
 proxmox-http = { workspace = true, features = [ "body", "client-trait", "proxmox-async", "rate-limited-stream" ] } # pbs-client doesn't use these
 proxmox-human-byte.workspace = true
 proxmox-io.workspace = true
@@ -284,6 +286,7 @@ proxmox-rrd-api-types.workspace = true
 #proxmox-compression = { path = "../proxmox/proxmox-compression" }
 #proxmox-config-digest = { path = "../proxmox/proxmox-config-digest" }
 #proxmox-daemon = { path = "../proxmox/proxmox-daemon" }
+#proxmox-docgen = { path = "../proxmox/proxmox-docgen" }
 #proxmox-http = { path = "../proxmox/proxmox-http" }
 #proxmox-http-error = { path = "../proxmox/proxmox-http-error" }
 #proxmox-human-byte = { path = "../proxmox/proxmox-human-byte" }
