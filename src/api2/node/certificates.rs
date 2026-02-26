@@ -396,7 +396,7 @@ pub fn revoke_acme_cert(rpcenv: &mut dyn RpcEnvironment) -> Result<String, Error
         true,
         move |_worker| async move {
             info!("Revoking old certificate");
-            proxmox_acme_api::revoke_certificate(&acme_config, &cert_pem.as_bytes()).await?;
+            proxmox_acme_api::revoke_certificate(&acme_config, cert_pem.as_bytes()).await?;
             info!("Deleting certificate and regenerating a self-signed one");
             delete_custom_certificate().await?;
             Ok(())
