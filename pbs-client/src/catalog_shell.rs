@@ -7,6 +7,7 @@ use std::ops::ControlFlow;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Mutex;
 
 use anyhow::{bail, format_err, Error};
 use nix::dir::Dir;
@@ -35,7 +36,7 @@ type FileEntry = pxar::accessor::aio::FileEntry<Reader>;
 
 const MAX_SYMLINK_COUNT: usize = 40;
 
-static mut SHELL: Option<usize> = None;
+static SHELL: Mutex<Option<Shell>> = Mutex::new(None);
 
 /// This list defines all the shell commands and their properties
 /// using the api schema
@@ -103,8 +104,10 @@ pub fn catalog_shell_cli() -> CommandLineInterface {
 }
 
 fn complete_path(complete_me: &str, _map: &HashMap<String, String>) -> Vec<String> {
-    let shell: &mut Shell = unsafe { std::mem::transmute(SHELL.unwrap()) };
-    match block_on(shell.complete_path(complete_me)) {
+    let result = block_on(Shell::with(async |shell| {
+        shell.complete_path(complete_me).await
+    }));
+    match result {
         Ok(list) => list,
         Err(err) => {
             error!("error during completion: {}", err);
@@ -124,7 +127,7 @@ async fn exit() -> Result<(), Error> {
 #[api(input: { properties: {} })]
 /// List the current working directory.
 async fn pwd_command() -> Result<(), Error> {
-    Shell::with(move |shell| shell.pwd()).await
+    Shell::with(Shell::pwd).await
 }
 
 #[api(
@@ -141,7 +144,7 @@ async fn pwd_command() -> Result<(), Error> {
 /// Change the current working directory to the new directory
 async fn cd_command(path: Option<String>) -> Result<(), Error> {
     let path = path.as_ref().map(Path::new);
-    Shell::with(move |shell| shell.cd(path)).await
+    Shell::with(async |shell| shell.cd(path).await).await
 }
 
 #[api(
@@ -158,7 +161,7 @@ async fn cd_command(path: Option<String>) -> Result<(), Error> {
 /// List the content of working directory or given path.
 async fn ls_command(path: Option<String>) -> Result<(), Error> {
     let path = path.as_ref().map(Path::new);
-    Shell::with(move |shell| shell.ls(path)).await
+    Shell::with(async |shell| shell.ls(path).await).await
 }
 
 #[api(
@@ -176,7 +179,7 @@ async fn ls_command(path: Option<String>) -> Result<(), Error> {
 /// This is expensive because the data has to be read from the pxar archive, which means reading
 /// over the network.
 async fn stat_command(path: String) -> Result<(), Error> {
-    Shell::with(move |shell| shell.stat(PathBuf::from(path))).await
+    Shell::with(async |shell| shell.stat(PathBuf::from(path)).await).await
 }
 
 #[api(
@@ -194,7 +197,7 @@ async fn stat_command(path: String) -> Result<(), Error> {
 /// This will return an error if the entry is already present in the list or
 /// if an invalid path was provided.
 async fn select_command(path: String) -> Result<(), Error> {
-    Shell::with(move |shell| shell.select(PathBuf::from(path))).await
+    Shell::with(async |shell| shell.select(PathBuf::from(path)).await).await
 }
 
 #[api(
@@ -212,13 +215,13 @@ async fn select_command(path: String) -> Result<(), Error> {
 /// This will return an error if the entry was not found in the list of entries
 /// selected for restore.
 async fn deselect_command(path: String) -> Result<(), Error> {
-    Shell::with(move |shell| shell.deselect(PathBuf::from(path))).await
+    Shell::with(async |shell| shell.deselect(PathBuf::from(path)).await).await
 }
 
 #[api( input: { properties: { } })]
 /// Clear the list of files selected for restore.
 async fn clear_selected_command() -> Result<(), Error> {
-    Shell::with(move |shell| shell.deselect_all()).await
+    Shell::with(async |shell| shell.deselect_all().await).await
 }
 
 #[api(
@@ -235,7 +238,7 @@ async fn clear_selected_command() -> Result<(), Error> {
 )]
 /// List entries currently selected for restore.
 async fn list_selected_command(patterns: bool) -> Result<(), Error> {
-    Shell::with(move |shell| shell.list_selected(patterns)).await
+    Shell::with(async |shell| shell.list_selected(patterns).await).await
 }
 
 #[api(
@@ -255,7 +258,7 @@ async fn list_selected_command(patterns: bool) -> Result<(), Error> {
 )]
 /// Find entries in the catalog matching the given match pattern.
 async fn find_command(pattern: String, select: bool) -> Result<(), Error> {
-    Shell::with(move |shell| shell.find(pattern, select)).await
+    Shell::with(async |shell| shell.find(pattern, select).await).await
 }
 
 #[api(
@@ -272,7 +275,7 @@ async fn find_command(pattern: String, select: bool) -> Result<(), Error> {
 ///
 /// Target must not exist on the clients filesystem.
 async fn restore_selected_command(target: String) -> Result<(), Error> {
-    Shell::with(move |shell| shell.restore_selected(PathBuf::from(target))).await
+    Shell::with(async |shell| shell.restore_selected(PathBuf::from(target)).await).await
 }
 
 #[api(
@@ -295,7 +298,7 @@ async fn restore_selected_command(target: String) -> Result<(), Error> {
 /// subset of this sub-archive.
 /// If pattern is not present or empty, the full archive is restored to target.
 async fn restore_command(target: String, pattern: Option<String>) -> Result<(), Error> {
-    Shell::with(move |shell| shell.restore(PathBuf::from(target), pattern)).await
+    Shell::with(async |shell| shell.restore(PathBuf::from(target), pattern).await).await
 }
 
 /// TODO: Should we use this to fix `step()`? Make path resolution behave more like described in
@@ -305,9 +308,6 @@ async fn restore_command(target: String, pattern: Option<String>) -> Result<(), 
 /// trailing `Component::CurDir` entries. Since we only support regular paths we'll roll our own
 /// here:
 pub struct Shell {
-    /// Readline instance handling input and callbacks
-    rl: rustyline::Editor<CliHelper, rustyline::history::MemHistory>,
-
     /// Interactive prompt.
     prompt: String,
 
@@ -351,13 +351,6 @@ impl Shell {
         archive_name: &str,
         archive: Accessor,
     ) -> Result<Self, Error> {
-        let cli_helper = CliHelper::new(catalog_shell_cli());
-        let mut rl = rustyline::Editor::<CliHelper, _>::with_history(
-            rustyline::Config::default(),
-            rustyline::history::MemHistory::new(),
-        )?;
-        rl.set_helper(Some(cli_helper));
-
         let mut position = Vec::new();
         if let Some(catalog) = catalog.as_mut() {
             let catalog_root = catalog.root()?;
@@ -385,7 +378,6 @@ impl Shell {
         }
 
         let mut this = Self {
-            rl,
             prompt: String::new(),
             catalog,
             selected: HashMap::new(),
@@ -396,28 +388,40 @@ impl Shell {
         Ok(this)
     }
 
-    async fn with<'a, Fut, R, F>(call: F) -> Result<R, Error>
+    async fn with<R, F>(call: F) -> Result<R, Error>
     where
-        F: FnOnce(&'a mut Shell) -> Fut,
-        Fut: Future<Output = Result<R, Error>>,
-        F: 'a,
-        Fut: 'a,
-        R: 'static,
+        F: AsyncFnOnce(&mut Shell) -> Result<R, Error>,
     {
-        let shell: &mut Shell = unsafe { std::mem::transmute(SHELL.unwrap()) };
-        call(&mut *shell).await
+        // Under the assumption that only one shell command is executed at a
+        // time, moving out of a std mutex like this ensures data integrity
+        // after panics (or cancellations) and detects deadlocks from recursion.
+        let mut shell = SHELL
+            .lock()
+            .unwrap()
+            .take()
+            .ok_or_else(|| format_err!("expected SHELL"))?;
+        let result = call(&mut shell).await;
+        *SHELL.lock().unwrap() = Some(shell);
+        result
     }
 
-    pub async fn shell(mut self) -> Result<(), Error> {
-        let this = &mut self;
-        unsafe {
-            SHELL = Some(this as *mut Shell as usize);
-        }
-        while let Ok(line) = this.rl.readline(&this.prompt) {
+    pub async fn shell(self) -> Result<(), Error> {
+        let mut prompt = self.prompt.clone();
+
+        *SHELL.lock().unwrap() = Some(self);
+
+        let cli_helper = CliHelper::new(catalog_shell_cli());
+        let mut rl = rustyline::Editor::<CliHelper, _>::with_history(
+            rustyline::Config::default(),
+            rustyline::history::MemHistory::new(),
+        )?;
+        rl.set_helper(Some(cli_helper));
+
+        while let Ok(line) = rl.readline(&prompt) {
             if line == "exit" {
                 break;
             }
-            let helper = this.rl.helper().unwrap();
+            let helper = rl.helper().unwrap();
             let args = match cli::shellword_split(&line) {
                 Ok(args) => args,
                 Err(err) => {
@@ -429,9 +433,16 @@ impl Shell {
             let _ =
                 cli::handle_command_future(helper.cmd_def(), "", args, cli::CliEnvironment::new())
                     .await;
-            let _ = this.rl.add_history_entry(line);
-            this.update_prompt();
+            let _ = rl.add_history_entry(line);
+
+            if let Some(shell) = &mut *SHELL.lock().unwrap() {
+                shell.update_prompt();
+                prompt = shell.prompt.clone();
+            } else {
+                bail!("SHELL missing at prompt update");
+            }
         }
+        *SHELL.lock().unwrap() = None;
         Ok(())
     }
 
