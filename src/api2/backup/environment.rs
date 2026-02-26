@@ -489,11 +489,8 @@ impl BackupEnvironment {
             ));
         }
 
-        if upload_stat.size > 0 {
-            self.log(format!(
-                "Compression: {}%",
-                (upload_stat.compressed_size * 100) / upload_stat.size
-            ));
+        if let Some(c) = (upload_stat.compressed_size * 100).checked_div(upload_stat.size) {
+            self.log(format!("Compression: {c}%"));
         }
     }
 
