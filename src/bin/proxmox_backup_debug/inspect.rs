@@ -36,11 +36,13 @@ fn decode_blob(
     let mut crypt_conf_opt = None;
     let crypt_conf;
 
-    if blob.is_encrypted() && key_file.is_some() {
-        let (key, _created, _fingerprint) =
-            load_and_decrypt_key(key_file.unwrap(), &get_encryption_key_password)?;
-        crypt_conf = CryptConfig::new(key)?;
-        crypt_conf_opt = Some(&crypt_conf);
+    if blob.is_encrypted() {
+        if let Some(key_file) = key_file {
+            let (key, _created, _fingerprint) =
+                load_and_decrypt_key(key_file, &get_encryption_key_password)?;
+            crypt_conf = CryptConfig::new(key)?;
+            crypt_conf_opt = Some(&crypt_conf);
+        }
     }
 
     output_path = match output_path {
