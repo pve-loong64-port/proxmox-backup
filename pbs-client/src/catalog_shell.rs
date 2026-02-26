@@ -1080,7 +1080,8 @@ impl Shell {
             extractor,
             match_list,
             &self.accessor,
-        )?;
+        )
+        .await?;
 
         extractor.extract().await
     }
@@ -1119,7 +1120,7 @@ struct ExtractorState<'a> {
 }
 
 impl<'a> ExtractorState<'a> {
-    pub fn new(
+    pub async fn new(
         catalog: &'a mut Option<CatalogReader>,
         dir_stack: Vec<PathStackEntry>,
         extractor: crate::pxar::extract::Extractor,
@@ -1132,8 +1133,8 @@ impl<'a> ExtractorState<'a> {
                 .into_iter()
         } else {
             let pxar_entry = parent_pxar_entry(&dir_stack)?;
-            let dir = block_on(pxar_entry.enter_directory())?;
-            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+            let dir = pxar_entry.enter_directory().await?;
+            let entries = crate::pxar::tools::pxar_metadata_read_dir(dir).await?;
 
             let mut catalog_entries = Vec::with_capacity(entries.len());
             for entry in entries {
@@ -1229,7 +1230,7 @@ impl<'a> ExtractorState<'a> {
             let dir = Shell::walk_pxar_archive(self.accessor, &mut self.dir_stack).await?;
             self.dir_stack.pop();
             let dir = dir.enter_directory().await?;
-            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+            let entries = crate::pxar::tools::pxar_metadata_read_dir(dir).await?;
             entries
                 .into_iter()
                 .map(|entry| {
