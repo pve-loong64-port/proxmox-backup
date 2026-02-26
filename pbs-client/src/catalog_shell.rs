@@ -104,7 +104,7 @@ pub fn catalog_shell_cli() -> CommandLineInterface {
 
 fn complete_path(complete_me: &str, _map: &HashMap<String, String>) -> Vec<String> {
     let shell: &mut Shell = unsafe { std::mem::transmute(SHELL.unwrap()) };
-    match shell.complete_path(complete_me) {
+    match block_on(shell.complete_path(complete_me)) {
         Ok(list) => list,
         Err(err) => {
             error!("error during completion: {}", err);
@@ -554,7 +554,7 @@ impl Shell {
         Ok(())
     }
 
-    fn step_nofollow(
+    async fn step_nofollow(
         stack: &mut Vec<PathStackEntry>,
         catalog: &mut Option<CatalogReader>,
         component: std::path::Component<'_>,
@@ -579,8 +579,8 @@ impl Shell {
                     }
                 } else {
                     let pxar_entry = parent_pxar_entry(stack)?;
-                    let parent_dir = block_on(pxar_entry.enter_directory())?;
-                    match block_on(parent_dir.lookup(entry))? {
+                    let parent_dir = pxar_entry.enter_directory().await?;
+                    match parent_dir.lookup(entry).await? {
                         Some(entry) => {
                             let entry_attr = DirEntryAttribute::try_from(&entry)?;
                             stack.push(PathStackEntry {
@@ -614,13 +614,13 @@ impl Shell {
     }
 
     /// Non-async version cannot follow symlinks.
-    fn walk_catalog_nofollow(
+    async fn walk_catalog_nofollow(
         stack: &mut Vec<PathStackEntry>,
         catalog: &mut Option<CatalogReader>,
         path: &Path,
     ) -> Result<(), Error> {
         for c in path.components() {
-            Self::step_nofollow(stack, catalog, c)?;
+            Self::step_nofollow(stack, catalog, c).await?;
         }
         Ok(())
     }
@@ -657,7 +657,7 @@ impl Shell {
         Ok(stack.last().unwrap().pxar.clone().unwrap())
     }
 
-    fn complete_path(&mut self, input: &str) -> Result<Vec<String>, Error> {
+    async fn complete_path(&mut self, input: &str) -> Result<Vec<String>, Error> {
         let mut tmp_stack;
         let (parent, base, part) = match input.rfind('/') {
             Some(ind) => {
@@ -668,7 +668,7 @@ impl Shell {
                 } else {
                     tmp_stack = self.position.clone();
                 }
-                Self::walk_catalog_nofollow(&mut tmp_stack, &mut self.catalog, &path)?;
+                Self::walk_catalog_nofollow(&mut tmp_stack, &mut self.catalog, &path).await?;
                 (&tmp_stack.last().unwrap(), base, part)
             }
             None => (&self.position.last().unwrap(), "", input),
@@ -678,12 +678,12 @@ impl Shell {
             catalog.read_dir(&parent.catalog)?
         } else {
             let dir = if let Some(entry) = parent.pxar.as_ref() {
-                block_on(entry.enter_directory())?
+                entry.enter_directory().await?
             } else {
                 bail!("missing pxar entry for parent");
             };
             let mut out = Vec::new();
-            let entries = block_on(crate::pxar::tools::pxar_metadata_read_dir(dir))?;
+            let entries = crate::pxar::tools::pxar_metadata_read_dir(dir).await?;
             for entry in entries {
                 let mut name = base.to_string();
                 let file_name = entry.file_name().as_bytes();
