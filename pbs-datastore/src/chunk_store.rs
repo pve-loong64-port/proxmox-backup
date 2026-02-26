@@ -538,6 +538,7 @@ impl ChunkStore {
     ///
     /// Unsafe: requires locking and GC checks to be called
     /// FIXME: make this internal with further refactoring
+    #[allow(clippy::too_many_arguments)]
     pub(super) unsafe fn cond_sweep_chunk<T: FnOnce() -> Result<(), Error>>(
         &self,
         atime: i64,
