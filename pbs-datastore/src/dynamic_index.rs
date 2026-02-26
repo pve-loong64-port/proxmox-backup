@@ -149,7 +149,6 @@ impl DynamicIndexReader {
     }
 
     #[inline]
-    #[allow(clippy::cast_ptr_alignment)]
     pub fn chunk_end(&self, pos: usize) -> u64 {
         if pos >= self.index.len() {
             panic!("chunk index out of range");
