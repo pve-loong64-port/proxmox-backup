@@ -2250,9 +2250,7 @@ impl DataStore {
 
         match self.inner.chunk_order {
             // sorting by inode improves data locality, which makes it lots faster on spinners
-            ChunkOrder::Inode => {
-                chunk_list.sort_unstable_by(|(_, ino_a), (_, ino_b)| ino_a.cmp(ino_b))
-            }
+            ChunkOrder::Inode => chunk_list.sort_unstable_by_key(|(_, ino)| *ino),
             ChunkOrder::None => {}
         }
 

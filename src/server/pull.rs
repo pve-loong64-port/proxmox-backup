@@ -622,7 +622,7 @@ async fn pull_group(
         .source
         .list_backup_snapshots(source_namespace, group)
         .await?;
-    raw_list.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
+    raw_list.sort_unstable_by_key(|a| a.backup.time);
 
     let target_ns = source_namespace.map_prefix(&params.source.get_ns(), &params.target.ns)?;
 

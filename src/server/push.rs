@@ -679,7 +679,7 @@ pub(crate) async fn push_group(
         .source
         .list_backup_snapshots(namespace, group)
         .await?;
-    snapshots.sort_unstable_by(|a, b| a.backup.time.cmp(&b.backup.time));
+    snapshots.sort_unstable_by_key(|a| a.backup.time);
 
     if snapshots.is_empty() {
         info!("Group '{group}' contains no snapshots to sync to remote");

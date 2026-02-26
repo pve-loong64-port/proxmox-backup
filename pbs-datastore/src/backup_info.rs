@@ -851,10 +851,10 @@ impl BackupInfo {
     pub fn sort_list(list: &mut [BackupInfo], ascendending: bool) {
         if ascendending {
             // oldest first
-            list.sort_unstable_by(|a, b| a.backup_dir.dir.time.cmp(&b.backup_dir.dir.time));
+            list.sort_unstable_by_key(|a| a.backup_dir.dir.time);
         } else {
             // newest first
-            list.sort_unstable_by(|a, b| b.backup_dir.dir.time.cmp(&a.backup_dir.dir.time));
+            list.sort_unstable_by_key(|b| std::cmp::Reverse(b.backup_dir.dir.time));
         }
     }
 
