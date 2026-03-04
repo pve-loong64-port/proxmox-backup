@@ -135,20 +135,6 @@ Ext.define('PBS.window.S3ClientEdit', {
                 emptyText: gettext('Unlimited'),
                 submitAutoScaledSizeUnit: true,
             },
-            {
-                xtype: 'proxmoxKVComboBox',
-                name: 'provider-quirks',
-                fieldLabel: gettext('Provider Quirks'),
-                value: '__default__',
-                defaultValue: '__default__',
-                comboItems: [
-                    ['__default__', gettext('None (default)')],
-                    ['skip-if-none-match-header', gettext('Skip If-None-Match header')],
-                ],
-                cbind: {
-                    deleteEmpty: '{!isCreate}',
-                },
-            },
         ],
         advancedColumn2: [
             {
@@ -164,6 +150,27 @@ Ext.define('PBS.window.S3ClientEdit', {
                 fieldLabel: gettext('Burst Out'),
                 emptyText: gettext('Same as Rate'),
                 submitAutoScaledSizeUnit: true,
+            },
+        ],
+        advancedColumnB: [
+            {
+                xtype: 'fieldset',
+                name: 'provider-quirks',
+                fieldLabel: gettext('Provider Quirks'),
+                items: [
+                    {
+                        xtype: 'checkbox',
+                        name: 'skip-if-none-match-header',
+                        fieldLabel: gettext('Skip If-None-Match header'),
+                        labelWidth: 200,
+                    },
+                    {
+                        xtype: 'checkbox',
+                        name: 'delete-objects-via-delete-object',
+                        fieldLabel: gettext('DeleteObjects via deleteObject'),
+                        labelWidth: 200,
+                    },
+                ],
             },
         ],
     },
@@ -193,6 +200,28 @@ Ext.define('PBS.window.S3ClientEdit', {
             delete values['secret-key'];
         }
 
+        let quirks = [];
+        ['skip-if-none-match-header', 'delete-objects-via-delete-object'].forEach((quirk) => {
+            if (values[quirk]) {
+                quirks.push(quirk);
+                delete values[quirk];
+            }
+        });
+
+        if (quirks.length > 0) {
+            values['provider-quirks'] = quirks;
+        } else if (!me.isCreate) {
+            values.delete.push('provider-quirks');
+        }
+
         return values;
+    },
+
+    setValues: function (values) {
+        if (values['provider-quirks']) {
+            values['provider-quirks'].forEach((quirk) => (values[quirk] = true));
+        }
+
+        this.callParent(arguments);
     },
 });
