@@ -250,14 +250,15 @@ impl BackupGroup {
                 .to_str()
                 .ok_or_else(|| format_err!("invalid group path prefix"))?;
             let prefix = format!("{S3_CONTENT_PREFIX}/{group_prefix}");
-            let delete_objects_error = proxmox_async::runtime::block_on(
+            let delete_objects_errors = proxmox_async::runtime::block_on(
                 s3_client.delete_objects_by_prefix_with_suffix_filter(
                     &S3PathPrefix::Some(prefix),
                     PROTECTED_MARKER_FILENAME,
                     &[GROUP_OWNER_FILE_NAME, GROUP_NOTES_FILE_NAME],
                 ),
             )?;
-            if delete_objects_error {
+            if !delete_objects_errors.is_empty() {
+                crate::s3::log_s3_delete_objects_errors(&delete_objects_errors);
                 bail!("deleting objects failed");
             }
         }
@@ -636,7 +637,8 @@ impl BackupDir {
             let delete_objects_error = proxmox_async::runtime::block_on(
                 s3_client.delete_objects_by_prefix(&S3PathPrefix::Some(prefix)),
             )?;
-            if delete_objects_error {
+            if !delete_objects_error.is_empty() {
+                crate::s3::log_s3_delete_objects_errors(&delete_objects_error);
                 bail!("deleting objects failed");
             }
         }

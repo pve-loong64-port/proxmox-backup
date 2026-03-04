@@ -948,7 +948,8 @@ impl DataStore {
                         &[GROUP_OWNER_FILE_NAME, GROUP_NOTES_FILE_NAME],
                     ),
                 )?;
-                if delete_objects_error {
+                if !delete_objects_error.is_empty() {
+                    crate::s3::log_s3_delete_objects_errors(&delete_objects_error);
                     bail!("deleting objects failed");
                 }
             }
@@ -2394,7 +2395,8 @@ impl DataStore {
                 let prefix = S3PathPrefix::Some(String::default());
                 let delete_objects_error =
                     proxmox_async::runtime::block_on(s3_client.delete_objects_by_prefix(&prefix))?;
-                if delete_objects_error {
+                if !delete_objects_error.is_empty() {
+                    crate::s3::log_s3_delete_objects_errors(&delete_objects_error);
                     bail!("deleting objects failed");
                 }
             }

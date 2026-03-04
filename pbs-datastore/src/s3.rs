@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, format_err, Error};
 
-use proxmox_s3_client::S3ObjectKey;
+use proxmox_s3_client::{DeleteObjectError, S3ObjectKey};
 
 /// Object key prefix to group regular datastore contents (not chunks)
 pub const S3_CONTENT_PREFIX: &str = ".cnt";
@@ -46,6 +46,30 @@ pub fn object_key_from_digest_with_suffix(
     let digest_prefix = &object_key[..4];
     let object_key_string = format!(".chunks/{digest_prefix}/{object_key}{suffix}");
     S3ObjectKey::try_from(object_key_string.as_str())
+}
+
+/// Log errors from delete objects api calls
+pub(crate) fn log_s3_delete_objects_errors(errors: &[DeleteObjectError]) {
+    for error in errors {
+        log::error!(
+            "delete object failed: {} {} {}",
+            error
+                .key
+                .as_ref()
+                .map(|key| key.to_string())
+                .unwrap_or_else(|| "None".into()),
+            error
+                .code
+                .as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| "None"),
+            error
+                .message
+                .as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| "None"),
+        );
+    }
 }
 
 #[test]
