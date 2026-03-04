@@ -38,7 +38,7 @@ impl LocalDatastoreLruCache {
 
         // Safety: lock acquire above
         unsafe {
-            self.store.insert_chunk_nolock(chunk, digest)?;
+            self.store.insert_chunk_nolock(chunk, digest, false)?;
         }
         self.cache.insert(*digest, (), |digest| {
             // Safety: lock acquired above, this is executed inline!

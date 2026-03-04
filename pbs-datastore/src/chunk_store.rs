@@ -667,7 +667,7 @@ impl ChunkStore {
         let _lock = self.mutex.lock();
 
         // Safety: lock acquired above
-        unsafe { self.insert_chunk_nolock(chunk, digest) }
+        unsafe { self.insert_chunk_nolock(chunk, digest, true) }
     }
 
     /// Safety: requires holding the chunk store mutex!
@@ -675,6 +675,7 @@ impl ChunkStore {
         &self,
         chunk: &DataBlob,
         digest: &[u8; 32],
+        warn_on_overwrite_empty: bool,
     ) -> Result<(bool, u64), Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
@@ -695,7 +696,9 @@ impl ChunkStore {
                 self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else if old_size == 0 {
-                log::warn!("found empty chunk '{digest_str}' in store {name}, overwriting");
+                if warn_on_overwrite_empty {
+                    log::warn!("found empty chunk '{digest_str}' in store {name}, overwriting");
+                }
             } else if chunk.is_encrypted() {
                 // incoming chunk is encrypted, possible attack or hash collision!
                 let mut existing_file = std::fs::File::open(&chunk_path)?;
