@@ -2547,9 +2547,9 @@ impl DataStore {
                 if object_path.ends_with(NAMESPACE_MARKER_FILENAME) {
                     info!("Created namespace {object_path}");
                     continue;
-                } else {
-                    info!("Fetching object {object_path}");
                 }
+
+                info!("Fetching object {object_path}");
 
                 let mut target_file = tokio::fs::OpenOptions::new()
                     .write(true)
