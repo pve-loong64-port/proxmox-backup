@@ -848,8 +848,8 @@ impl BackupInfo {
         })
     }
 
-    pub fn sort_list(list: &mut [BackupInfo], ascendending: bool) {
-        if ascendending {
+    pub fn sort_list(list: &mut [BackupInfo], ascending: bool) {
+        if ascending {
             // oldest first
             list.sort_unstable_by_key(|a| a.backup_dir.dir.time);
         } else {
