@@ -2534,11 +2534,6 @@ impl DataStore {
                 let object_path = object_path.strip_prefix(&store_prefix).with_context(|| {
                     format!("failed to strip store context prefix {store_prefix} for {object_key}")
                 })?;
-                if object_path.ends_with(NAMESPACE_MARKER_FILENAME) {
-                    continue;
-                }
-
-                info!("Fetching object {object_path}");
 
                 let file_path = tmp_base.join(object_path);
                 if let Some(parent) = file_path.parent() {
@@ -2547,6 +2542,13 @@ impl DataStore {
                         Some(dir_create_options),
                         Some(dir_create_options),
                     )?;
+                }
+
+                if object_path.ends_with(NAMESPACE_MARKER_FILENAME) {
+                    info!("Created namespace {object_path}");
+                    continue;
+                } else {
+                    info!("Fetching object {object_path}");
                 }
 
                 let mut target_file = tokio::fs::OpenOptions::new()
