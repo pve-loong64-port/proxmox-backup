@@ -977,6 +977,8 @@ fn lookup_rate_limiter(
 
     cache.reload(now);
 
+    // TODO: remove allow once there is more than one tag
+    #[allow(clippy::unnecessary_find_map)]
     let user = tags.iter().find_map(|tag| match tag {
         RateLimiterTag::User(user) => Some(user.as_str()),
     });
