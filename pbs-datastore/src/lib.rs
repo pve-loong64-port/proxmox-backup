@@ -233,6 +233,3 @@ pub use local_chunk_reader::LocalChunkReader;
 
 mod local_datastore_lru_cache;
 pub use local_datastore_lru_cache::LocalDatastoreLruCache;
-
-#[cfg(test)]
-mod temp_dir;

@@ -53,3 +53,6 @@ pbs-buildcfg.workspace = true
 pbs-config.workspace = true
 pbs-key-config.workspace = true
 pbs-tools.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

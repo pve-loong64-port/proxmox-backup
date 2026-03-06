@@ -984,7 +984,8 @@ impl ChunkExt {
 
 #[test]
 fn test_chunk_store1() {
-    let temp_dir = crate::temp_dir::TempDir::new().unwrap();
+    use tempfile::TempDir;
+    let temp_dir = TempDir::new().unwrap();
     let path = temp_dir.path();
 
     let chunk_store = ChunkStore::open("test", path, DatastoreFSyncLevel::None);
@@ -1010,5 +1011,5 @@ fn test_chunk_store1() {
         ChunkStore::create("test", path, user.uid, user.gid, DatastoreFSyncLevel::None);
     assert!(chunk_store.is_err());
 
-    temp_dir.delete().unwrap();
+    temp_dir.close().unwrap();
 }

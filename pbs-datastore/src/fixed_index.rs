@@ -580,9 +580,9 @@ impl FixedIndexWriter {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use tempfile::TempDir;
 
     use super::*;
-    use crate::temp_dir::TempDir;
 
     const CS: u32 = 4096;
 
@@ -603,7 +603,7 @@ mod tests {
         drop(w);
         assert!(!fs::exists(path).unwrap());
 
-        dir.delete().unwrap();
+        dir.close().unwrap();
     }
 
     #[test]
@@ -623,7 +623,7 @@ mod tests {
         check_with_reader(&path, size, &expected);
         compare_to_known_size_writer(&path, size, &expected);
 
-        dir.delete().unwrap();
+        dir.close().unwrap();
     }
 
     #[test]
@@ -655,7 +655,7 @@ mod tests {
         check_with_reader(&path, size, &expected);
         compare_to_known_size_writer(&path, size, &expected);
 
-        dir.delete().unwrap();
+        dir.close().unwrap();
     }
 
     #[test]
@@ -682,7 +682,7 @@ mod tests {
         check_with_reader(&path, size, &expected);
         compare_to_known_size_writer(&path, size, &expected);
 
-        dir.delete().unwrap();
+        dir.close().unwrap();
     }
 
     #[test]
@@ -727,7 +727,7 @@ mod tests {
         check_with_reader(&modified, size, &expected);
         compare_to_known_size_writer(&modified, size, &expected);
 
-        dir.delete().unwrap();
+        dir.close().unwrap();
     }
 
     struct TestChunk {
