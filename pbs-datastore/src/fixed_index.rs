@@ -4,7 +4,7 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
@@ -314,7 +314,8 @@ impl FixedIndexWriter {
         let memory = MmapPtr(unsafe {
             nix::sys::mman::mmap(
                 None,
-                std::num::NonZeroUsize::new(file_size as usize).expect("has header"),
+                std::num::NonZeroUsize::new(file_size as usize)
+                    .ok_or_else(|| format_err!("index file size cannot be zero"))?,
                 nix::sys::mman::ProtFlags::PROT_READ | nix::sys::mman::ProtFlags::PROT_WRITE,
                 nix::sys::mman::MapFlags::MAP_SHARED,
                 &file,
@@ -397,8 +398,11 @@ impl FixedIndexWriter {
                 "failed to resize index capacity from {} to {new_capacity} with backing file: {:?}",
                 self.index_capacity, self.tmp_filename
             );
-            assert!(self.memory.is_none(), "{message} {unmap_result:?}");
-            e.context(message)
+            if let Err(unmap_err) = unmap_result {
+                e.context(message).context(unmap_err)
+            } else {
+                e.context(message)
+            }
         })
     }
 
@@ -444,9 +448,9 @@ impl FixedIndexWriter {
 
     fn unmap(&mut self) -> Result<(), Error> {
         if let Some(ptr) = self.memory.take() {
-            let len = Self::file_size(self.index_capacity).expect(
-                "this is the capacity that didn't cause an overflow when the memory was mapped",
-            );
+            let len = Self::file_size(self.index_capacity).context(
+                "calculation of index file size for unmapping failed - this should never happen!",
+            )?;
             if let Err(err) = unsafe { nix::sys::mman::munmap(ptr.0, len as usize) } {
                 bail!("unmap file {:?} failed - {}", self.tmp_filename, err);
             }
