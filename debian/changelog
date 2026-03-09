@@ -1,3 +1,27 @@
+rust-proxmox-backup (4.1.5-1) trixie; urgency=medium
+
+  * maintenance: Document supported maintenance modes
+
+  * fix #7331: ui: allow up to 256 drives per changer
+
+  * docs: use proxmox-rs docgen crate
+
+  * docs: update zfs swap docs to be in line with debian trixie changes.
+
+  * chunk store: s3: mute warning on overwrite empty chunk in local cache
+
+  * datastore: don't skip empty namespaces on s3 refresh
+
+  * various code cleanups
+
+  * api: backup: make fixed index file size optional
+
+  * fix #3847: client: support fifo pipe inputs for image backups
+
+  * datastore: support writing fidx files on systems with larger page size
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 09 Mar 2026 16:11:55 +0100
+
 rust-proxmox-backup (4.1.4-1) trixie; urgency=medium
 
   * update proxmox-rest-server to 1.0.5 addressing a minor regression that
