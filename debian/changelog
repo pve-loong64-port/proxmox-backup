@@ -1,24 +1,34 @@
 rust-proxmox-backup (4.1.5-1) trixie; urgency=medium
 
-  * maintenance: Document supported maintenance modes
+  * fix #7331: ui: tape: allow up to 256 drives per changer, matching the
+    backend capability that was previously only limited in the web interface.
 
-  * fix #7331: ui: allow up to 256 drives per changer
+  * chunk store: s3: mute spurious warning on overwriting empty chunks in the
+    local cache during normal cache eviction.
 
-  * docs: use proxmox-rs docgen crate
+  * datastore: don't skip empty namespaces on s3 refresh, ensuring they are
+    properly synchronized to the local cache.
 
-  * docs: update zfs swap docs to be in line with debian trixie changes.
+  * fix #3847: client: support fifo pipe inputs for image backups, allowing
+    users to pipe data of unknown size as fixed-index backup input. The backup
+    API no longer requires the file size upfront for fixed-index uploads.
 
-  * chunk store: s3: mute warning on overwrite empty chunk in local cache
+  * client: fail early if the same pipe is specified for multiple inputs, as
+    the files with repeated pipes will always be empty.
 
-  * datastore: don't skip empty namespaces on s3 refresh
+  * datastore: support writing fidx (fixed-index) files on systems with larger
+    page size, fixing undefined behavior on ARM systems with 64KB pages.
 
-  * various code cleanups
+  * datastore: support incremental fidx uploads with different size, allowing
+    incremental backups even when the image size changed between runs.
 
-  * api: backup: make fixed index file size optional
+  * fixed index: use errors instead of panics, so a corrupted or unexpected
+    index state fails the single backup task instead of crashing the service.
 
-  * fix #3847: client: support fifo pipe inputs for image backups
+  * docs: update ZFS swap documentation to reflect Debian Trixie no longer
+    reading /etc/sysctl.conf.
 
-  * datastore: support writing fidx files on systems with larger page size
+  * docs: maintenance: add list of supported maintenance modes.
 
  -- Proxmox Support Team <support@proxmox.com>  Mon, 09 Mar 2026 16:11:55 +0100
 
