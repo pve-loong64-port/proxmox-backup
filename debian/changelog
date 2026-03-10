@@ -1,3 +1,17 @@
+rust-proxmox-backup (4.1.5-2) trixie; urgency=medium
+
+  * api: backup: don't verify total file size for incremental backups to fix a
+    critical regression with the previous version bump and incremental qemu
+    backups. As there, the submitted value is currently the upload size
+    instead of the total size.
+
+  * api: backup: disallow incremental backups with different index length
+    again.
+    Currently, fixed index files are only reused for qemu backups where the
+    total size never changes at the moment.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 10 Mar 2026 19:33:30 +0100
+
 rust-proxmox-backup (4.1.5-1) trixie; urgency=medium
 
   * fix #7331: ui: tape: allow up to 256 drives per changer, matching the
