@@ -85,7 +85,7 @@ fn commands() -> Vec<(&'static str, Vec<&'static str>)> {
         ("bash", vec!["-c", "ls -l /dev/disk/by-*/"]),
         ("zpool", vec!["status"]),
         ("zfs", vec!["list"]),
-        ("arcstat", vec![]),
+        ("zarcstat", vec![]),
         ("dmidecode", vec!["-t", "bios"]),
         ("lscpu", vec![]),
         ("lspci", vec!["-nnk"]),
