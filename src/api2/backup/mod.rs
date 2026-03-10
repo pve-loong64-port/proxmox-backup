@@ -765,7 +765,7 @@ pub const API_METHOD_CLOSE_FIXED_INDEX: ApiMethod = ApiMethod::new(
             (
                 "chunk-count",
                 false,
-                &IntegerSchema::new("Chunk count. This is used to verify that the server got all chunks. Ignored for incremental backups.")
+                &IntegerSchema::new("Number of new and re-indexed chunks. Used to verify that the server got all chunk digests.")
                     .minimum(0)
                     .schema()
             ),
