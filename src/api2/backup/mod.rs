@@ -498,6 +498,11 @@ fn create_fixed_index(
     let mut incremental = false;
     if let Some(csum) = reuse_csum {
         incremental = true;
+
+        if size.is_none() {
+            bail!("size is required for incremental backups");
+        }
+
         let last_backup = match &env.last_backup {
             Some(info) => info,
             None => {
@@ -531,6 +536,14 @@ fn create_fixed_index(
     let mut writer = env.datastore.create_fixed_writer(&path, size, chunk_size)?;
 
     if let Some(reader) = reader {
+        // compares chunk count instead of size for backwards compatibility
+        if writer.index_length() != reader.index_count() {
+            bail!(
+                "cannot reuse index - index sizes not equal ({} != {})",
+                writer.index_length(),
+                reader.index_count()
+            );
+        }
         writer.clone_data_from(&reader)?;
     }
 
