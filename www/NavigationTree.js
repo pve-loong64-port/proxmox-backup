@@ -75,6 +75,12 @@ Ext.define('PBS.store.NavigationStore', {
                         leaf: true,
                     },
                     {
+                        text: gettext('Encryption Keys'),
+                        iconCls: 'fa fa-lock',
+                        path: 'pbsEncryptionKeysView',
+                        leaf: true,
+                    },
+                    {
                         text: gettext('Notifications'),
                         iconCls: 'fa fa-bell-o',
                         path: 'pbsNotificationConfigView',

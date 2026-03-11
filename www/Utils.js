@@ -451,6 +451,7 @@ Ext.define('PBS.Utils', {
             prune: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Prune')),
             prunejob: (type, id) => PBS.Utils.render_prune_job_worker_id(id, gettext('Prune Job')),
             reader: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Read Objects')),
+            'remove-encryption-key': [gettext('Key'), gettext('Remove Key')],
             'rewind-media': [gettext('Drive'), gettext('Rewind Media')],
             's3-refresh': [gettext('Datastore'), gettext('S3 Refresh')],
             sync: ['Datastore', gettext('Remote Sync')],

@@ -70,6 +70,7 @@ JSSRC=							\
 	config/GCView.js				\
 	config/WebauthnView.js				\
 	config/CertificateView.js			\
+	config/EncryptionKeysView.js			\
 	config/NodeOptionView.js			\
 	config/MetricServerView.js			\
 	config/NotificationConfigView.js		\
@@ -78,6 +79,7 @@ JSSRC=							\
 	window/BackupGroupChangeOwner.js		\
 	window/CreateDirectory.js			\
 	window/DataStoreEdit.js				\
+	window/EncryptionKeysEdit.js			\
 	window/NamespaceEdit.js				\
 	window/MaintenanceOptions.js			\
 	window/NotesEdit.js				\
