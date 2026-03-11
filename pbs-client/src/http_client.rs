@@ -485,8 +485,8 @@ impl HttpClient {
             )))));
         }
 
-        let proxy_config = ProxyConfig::from_proxy_env()?;
-        let proxy_config = proxy_config.or(options.proxy.clone());
+        let proxy_config = options.proxy.clone();
+        let proxy_config = proxy_config.or(ProxyConfig::from_proxy_env()?);
 
         if let Some(config) = proxy_config {
             info!("Using proxy connection: {}:{}", config.host, config.port);
