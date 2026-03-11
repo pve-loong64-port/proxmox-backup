@@ -24,6 +24,7 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
             error: '',
             removable: false,
             maintenance: '',
+            isS3: false,
         },
     },
     setTasks: function (taskdata, since) {
@@ -115,7 +116,12 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
             return entry;
         });
 
-        me.lookup('historychart').setData(data);
+        let historyChart = me.lookup('historychart');
+        if (statusData['backend-type'] === 's3') {
+            vm.set('isS3', true);
+            historyChart.setTitle(gettext('Cache Usage History'));
+        }
+        historyChart.setData(data);
     },
 
     items: [
@@ -189,7 +195,7 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
                         data: {
                             text: '{full}',
                         },
-                        visible: '{!error}',
+                        visible: '{!error && !isS3}',
                     },
                 },
                 {

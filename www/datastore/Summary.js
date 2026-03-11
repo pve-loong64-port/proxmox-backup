@@ -94,6 +94,10 @@ Ext.define('PBS.DataStoreInfo', {
             let counts = store.getById('counts').data.value;
             let used = store.getById('used').data.value;
             let total = store.getById('avail').data.value + used;
+            let backendType = store.getById('backend-type').data.value;
+            if (backendType === 's3') {
+                me.lookup('usage').title = gettext('Local Cache Usage');
+            }
 
             let usage = Proxmox.Utils.render_size_usage(used, total, true);
             vm.set('usagetext', usage);
@@ -152,6 +156,7 @@ Ext.define('PBS.DataStoreInfo', {
         {
             iconCls: 'fa fa-fw fa-hdd-o',
             title: gettext('Usage'),
+            reference: 'usage',
             bind: {
                 data: {
                     usage: '{usage}',
@@ -337,6 +342,7 @@ Ext.define('PBS.DataStoreSummary', {
         {
             xtype: 'proxmoxRRDChart',
             title: gettext('Storage usage (bytes)'),
+            name: 'usage-rrd-chart',
             fields: ['unpriv-total', 'used'],
             fieldTitles: [gettext('Total'), gettext('Storage usage')],
         },
@@ -437,6 +443,13 @@ Ext.define('PBS.DataStoreSummary', {
                 unmountBtn.setDisabled(false);
                 mountBtn.setDisabled(true);
                 lastRequestWasFailue = false;
+
+                let backendType = s.getById('backend-type').data.value;
+                if (backendType === 's3') {
+                    me.down('[name=usage-rrd-chart]').setTitle(
+                        gettext('Local Cache Usage (bytes)'),
+                    );
+                }
             }
         });
 
