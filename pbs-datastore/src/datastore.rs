@@ -403,7 +403,7 @@ impl DataStore {
 
     /// Get the backend for this datastore based on it's configuration
     pub fn backend(&self) -> Result<DatastoreBackend, Error> {
-        let backend_type = match self.inner.backend_config.ty.unwrap_or_default() {
+        let backend = match self.backend_type() {
             DatastoreBackendType::Filesystem => DatastoreBackend::Filesystem,
             DatastoreBackendType::S3 => {
                 let s3_client_id = self
@@ -439,7 +439,11 @@ impl DataStore {
             }
         };
 
-        Ok(backend_type)
+        Ok(backend)
+    }
+
+    pub fn backend_type(&self) -> DatastoreBackendType {
+        self.inner.backend_config.ty.unwrap_or_default()
     }
 
     pub fn cache(&self) -> Option<&LocalDatastoreLruCache> {
