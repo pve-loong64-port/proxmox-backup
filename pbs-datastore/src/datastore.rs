@@ -433,6 +433,7 @@ impl DataStore {
                     Some(bucket),
                     self.name().to_owned(),
                     Some(rate_limiter_options),
+                    None, //FIXME read from node.cfg
                 );
                 let s3_client = S3Client::new(options)?;
                 DatastoreBackend::S3(Arc::new(s3_client))
@@ -2658,6 +2659,7 @@ impl DataStore {
             Some(bucket),
             datastore_config.name.to_owned(),
             Some(rate_limiter_options),
+            None, // FIXME read from node.cfg
         );
         let s3_client = S3Client::new(options)
             .context("failed to create s3 client")

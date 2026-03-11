@@ -55,6 +55,7 @@ pub async fn check(
         Some(bucket),
         store_prefix,
         None,
+        None, // FIXME read from node.cfg once regular datastore operations do as well
     );
 
     let test_object_key =

@@ -350,8 +350,14 @@ pub async fn list_buckets(
         .context("config lookup failed")?;
 
     let empty_prefix = String::new();
-    let options =
-        S3ClientOptions::from_config(config.config, config.secret_key, None, empty_prefix, None);
+    let options = S3ClientOptions::from_config(
+        config.config,
+        config.secret_key,
+        None,
+        empty_prefix,
+        None,
+        None, // FIXME read from node.cfg once regular datastore operations do as well
+    );
     let client = S3Client::new(options).context("client creation failed")?;
     let list_buckets_response = client
         .list_buckets()
