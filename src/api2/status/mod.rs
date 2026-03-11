@@ -74,7 +74,7 @@ pub async fn datastore_status(
         };
 
         if !allowed {
-            if let Ok(datastore) = DataStore::lookup_datastore(store, Some(Operation::Lookup)) {
+            if let Ok(datastore) = DataStore::lookup_datastore(store, Operation::Lookup) {
                 if can_access_any_namespace(datastore, &auth_id, &user_info) {
                     list.push(DataStoreStatusListItem::empty(
                         store,
@@ -87,7 +87,7 @@ pub async fn datastore_status(
             continue;
         }
 
-        let datastore = match DataStore::lookup_datastore(store, Some(Operation::Read)) {
+        let datastore = match DataStore::lookup_datastore(store, Operation::Read) {
             Ok(datastore) => datastore,
             Err(err) => {
                 list.push(DataStoreStatusListItem::empty(

@@ -96,7 +96,7 @@ fn upgrade_to_backup_reader_protocol(
             bail!("no permissions on /{}", acl_path.join("/"));
         }
 
-        let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+        let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
 
         let backup_dir = pbs_api_types::BackupDir::deserialize(&param)?;
 

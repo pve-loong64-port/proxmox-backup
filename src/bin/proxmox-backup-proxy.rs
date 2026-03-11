@@ -545,7 +545,7 @@ async fn schedule_datastore_garbage_collection() {
 
         {
             // limit datastore scope due to Op::Lookup
-            let datastore = match DataStore::lookup_datastore(&store, Some(Operation::Lookup)) {
+            let datastore = match DataStore::lookup_datastore(&store, Operation::Lookup) {
                 Ok(datastore) => datastore,
                 Err(err) => {
                     eprintln!("lookup_datastore failed - {err}");
@@ -588,7 +588,7 @@ async fn schedule_datastore_garbage_collection() {
             Err(_) => continue, // could not get lock
         };
 
-        let datastore = match DataStore::lookup_datastore(&store, Some(Operation::Write)) {
+        let datastore = match DataStore::lookup_datastore(&store, Operation::Write) {
             Ok(datastore) => datastore,
             Err(err) => {
                 log::warn!("skipping scheduled GC on {store}, could look it up - {err}");

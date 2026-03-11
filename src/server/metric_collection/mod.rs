@@ -234,7 +234,7 @@ fn collect_disk_stats_sync() -> (DiskStat, Vec<DiskStat>) {
             for config in datastore_list {
                 if config
                     .get_maintenance_mode()
-                    .is_some_and(|mode| mode.check(Some(Operation::Read)).is_err())
+                    .is_some_and(|mode| mode.check(Operation::Read).is_err())
                 {
                     continue;
                 }

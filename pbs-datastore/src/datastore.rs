@@ -468,10 +468,7 @@ impl DataStore {
         Ok(())
     }
 
-    pub fn lookup_datastore(
-        name: &str,
-        operation: Option<Operation>,
-    ) -> Result<Arc<DataStore>, Error> {
+    pub fn lookup_datastore(name: &str, operation: Operation) -> Result<Arc<DataStore>, Error> {
         // Avoid TOCTOU between checking maintenance mode and updating active operation counter, as
         // we use it to decide whether it is okay to delete the datastore.
         let _config_lock = pbs_config::datastore::lock_config()?;
@@ -499,12 +496,10 @@ impl DataStore {
         let chunk_store = if let Some(datastore) = &entry {
             // Re-use DataStoreImpl
             if datastore.config_generation == gen_num && gen_num.is_some() {
-                if let Some(operation) = operation {
-                    update_active_operations(name, operation, 1)?;
-                }
+                update_active_operations(name, operation, 1)?;
                 return Ok(Arc::new(Self {
                     inner: Arc::clone(datastore),
-                    operation,
+                    operation: Some(operation),
                 }));
             }
             Arc::clone(&datastore.chunk_store)
@@ -525,13 +520,11 @@ impl DataStore {
         let datastore = Arc::new(datastore);
         datastore_cache.insert(name.to_string(), datastore.clone());
 
-        if let Some(operation) = operation {
-            update_active_operations(name, operation, 1)?;
-        }
+        update_active_operations(name, operation, 1)?;
 
         Ok(Arc::new(Self {
             inner: datastore,
-            operation,
+            operation: Some(operation),
         }))
     }
 
@@ -557,7 +550,7 @@ impl DataStore {
         {
             // the datastore drop handler does the checking if tasks are running and clears the
             // cache entry, so we just have to trigger it here
-            let _ = DataStore::lookup_datastore(name, Some(Operation::Lookup));
+            let _ = DataStore::lookup_datastore(name, Operation::Lookup);
         }
 
         Ok(())

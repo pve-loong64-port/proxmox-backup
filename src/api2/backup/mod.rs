@@ -99,7 +99,7 @@ fn upgrade_to_backup_protocol(
             )
             .map_err(|err| http_err!(FORBIDDEN, "{err}"))?;
 
-        let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
+        let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
 
         let protocols = parts
             .headers

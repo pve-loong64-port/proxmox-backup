@@ -83,7 +83,7 @@ fn check_privs_and_load_store(
     auth_id: &Authid,
     full_access_privs: u64,
     partial_access_privs: u64,
-    operation: Option<Operation>,
+    operation: Operation,
     backup_group: &pbs_api_types::BackupGroup,
 ) -> Result<Arc<DataStore>, Error> {
     let limited = check_ns_privs_full(store, ns, auth_id, full_access_privs, partial_access_privs)?;
@@ -134,7 +134,7 @@ pub fn list_groups(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
 
     datastore
         .iter_backup_groups(ns.clone())? // FIXME: Namespaces and recursion parameters!
@@ -251,7 +251,7 @@ pub async fn delete_group(
             &auth_id,
             PRIV_DATASTORE_MODIFY,
             PRIV_DATASTORE_PRUNE,
-            Some(Operation::Write),
+            Operation::Write,
             &group,
         )?;
 
@@ -318,7 +318,7 @@ pub async fn list_snapshot_files(
             &auth_id,
             PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_READ,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Read),
+            Operation::Read,
             &backup_dir.group,
         )?;
 
@@ -372,7 +372,7 @@ pub async fn delete_snapshot(
             &auth_id,
             PRIV_DATASTORE_MODIFY,
             PRIV_DATASTORE_PRUNE,
-            Some(Operation::Write),
+            Operation::Write,
             &backup_dir.group,
         )?;
 
@@ -467,7 +467,7 @@ unsafe fn list_snapshots_blocking(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
 
     // FIXME: filter also owner before collecting, for doing that nicely the owner should move into
     // backup group and provide an error free (Err -> None) accessor
@@ -601,7 +601,7 @@ pub async fn status(
         }
     };
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
 
     let (counts, gc_status) = if verbose {
         let filter_owner = if store_privs & PRIV_DATASTORE_AUDIT != 0 {
@@ -728,7 +728,7 @@ pub fn verify(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
     let ignore_verified = ignore_verified.unwrap_or(true);
 
     let worker_id;
@@ -908,7 +908,7 @@ pub fn prune(
         &auth_id,
         PRIV_DATASTORE_MODIFY,
         PRIV_DATASTORE_PRUNE,
-        Some(Operation::Write),
+        Operation::Write,
         &group,
     )?;
 
@@ -1080,7 +1080,7 @@ pub fn prune_datastore(
         true,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
     let ns = prune_options.ns.clone().unwrap_or_default();
     let worker_id = format!("{store}:{ns}");
 
@@ -1118,7 +1118,7 @@ pub fn start_garbage_collection(
     _info: &ApiMethod,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     let job = Job::new("garbage_collection", &store)
@@ -1165,7 +1165,7 @@ pub fn garbage_collection_status(
         ..Default::default()
     };
 
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
     let status_in_memory = datastore.last_gc_status();
     let state_file = JobState::load("garbage_collection", &store)
         .map_err(|err| log::error!("could not open GC statefile for {store}: {err}"))
@@ -1311,7 +1311,7 @@ pub fn download_file(
             &auth_id,
             PRIV_DATASTORE_READ,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Read),
+            Operation::Read,
             &backup_dir.group,
         )?;
 
@@ -1396,7 +1396,7 @@ pub fn download_file_decoded(
             &auth_id,
             PRIV_DATASTORE_READ,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Read),
+            Operation::Read,
             &backup_dir_api.group,
         )?;
 
@@ -1525,7 +1525,7 @@ pub fn upload_backup_log(
             &auth_id,
             0,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Write),
+            Operation::Write,
             &backup_dir_api.group,
         )?;
         let backup_dir = datastore.backup_dir(backup_ns.clone(), backup_dir_api.clone())?;
@@ -1623,7 +1623,7 @@ pub async fn catalog(
         &auth_id,
         PRIV_DATASTORE_READ,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Read),
+        Operation::Read,
         &backup_dir.group,
     )?;
 
@@ -1745,7 +1745,7 @@ pub fn pxar_file_download(
             &auth_id,
             PRIV_DATASTORE_READ,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Read),
+            Operation::Read,
             &backup_dir.group,
         )?;
 
@@ -1877,7 +1877,7 @@ pub fn get_rrd_stats(
     cf: RrdMode,
     _param: Value,
 ) -> Result<Value, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Some(Operation::Read))?;
+    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
     let disk_manager = crate::tools::disks::DiskManage::new();
 
     let mut rrd_fields = vec![
@@ -1956,7 +1956,7 @@ pub fn get_group_notes(
         &auth_id,
         PRIV_DATASTORE_AUDIT,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Read),
+        Operation::Read,
         &backup_group,
     )?;
 
@@ -2004,7 +2004,7 @@ pub fn set_group_notes(
         &auth_id,
         PRIV_DATASTORE_MODIFY,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Write),
+        Operation::Write,
         &backup_group,
     )?;
 
@@ -2051,7 +2051,7 @@ pub fn get_notes(
         &auth_id,
         PRIV_DATASTORE_AUDIT,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Read),
+        Operation::Read,
         &backup_dir.group,
     )?;
 
@@ -2104,7 +2104,7 @@ pub fn set_notes(
         &auth_id,
         PRIV_DATASTORE_MODIFY,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Write),
+        Operation::Write,
         &backup_dir.group,
     )?;
 
@@ -2149,7 +2149,7 @@ pub fn get_protection(
         &auth_id,
         PRIV_DATASTORE_AUDIT,
         PRIV_DATASTORE_BACKUP,
-        Some(Operation::Read),
+        Operation::Read,
         &backup_dir.group,
     )?;
 
@@ -2199,7 +2199,7 @@ pub async fn set_protection(
             &auth_id,
             PRIV_DATASTORE_MODIFY,
             PRIV_DATASTORE_BACKUP,
-            Some(Operation::Write),
+            Operation::Write,
             &backup_dir.group,
         )?;
 
@@ -2253,7 +2253,7 @@ pub async fn set_backup_owner(
             PRIV_DATASTORE_BACKUP,
         )?;
 
-        let datastore = DataStore::lookup_datastore(&store, Some(Operation::Write))?;
+        let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
 
         let backup_group = datastore.backup_group(ns, backup_group);
         let owner = backup_group.get_owner()?;
@@ -2738,7 +2738,7 @@ pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
 /// Performs an s3 refresh for given datastore. Expects the store to already be in maintenance mode
 /// s3-refresh.
 pub(crate) fn do_s3_refresh(store: &str, worker: &dyn WorkerTaskContext) -> Result<(), Error> {
-    let datastore = DataStore::lookup_datastore(store, Some(Operation::Lookup))?;
+    let datastore = DataStore::lookup_datastore(store, Operation::Lookup)?;
     run_maintenance_locked(store, MaintenanceType::S3Refresh, worker, || {
         proxmox_async::runtime::block_on(datastore.s3_refresh())
     })

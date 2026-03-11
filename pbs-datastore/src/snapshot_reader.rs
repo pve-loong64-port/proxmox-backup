@@ -164,7 +164,7 @@ impl<F: Fn(&[u8; 32]) -> bool> Iterator for SnapshotChunkIterator<'_, F> {
 
                         let datastore = DataStore::lookup_datastore(
                             self.snapshot_reader.datastore_name(),
-                            Some(Operation::Read),
+                            Operation::Read,
                         )?;
                         let order =
                             datastore.get_chunks_in_order(&*index, &self.skip_fn, |_| Ok(()))?;

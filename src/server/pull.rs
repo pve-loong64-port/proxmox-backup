@@ -113,11 +113,11 @@ impl PullParameters {
             })
         } else {
             Arc::new(LocalSource {
-                store: DataStore::lookup_datastore(remote_store, Some(Operation::Read))?,
+                store: DataStore::lookup_datastore(remote_store, Operation::Read)?,
                 ns: remote_ns,
             })
         };
-        let store = DataStore::lookup_datastore(store, Some(Operation::Write))?;
+        let store = DataStore::lookup_datastore(store, Operation::Write)?;
         let backend = store.backend()?;
         let target = PullTarget { store, ns, backend };
 
