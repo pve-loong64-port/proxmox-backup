@@ -622,6 +622,8 @@ pub async fn status(
         (None, None)
     };
 
+    let backend_type = datastore.backend_type();
+
     Ok(if store_stats {
         let storage = crate::tools::fs::fs_info(datastore.base_path()).await?;
         DataStoreStatus {
@@ -630,6 +632,7 @@ pub async fn status(
             avail: storage.available,
             gc_status,
             counts,
+            backend_type,
         }
     } else {
         DataStoreStatus {
@@ -638,6 +641,7 @@ pub async fn status(
             avail: 0,
             gc_status,
             counts,
+            backend_type,
         }
     })
 }

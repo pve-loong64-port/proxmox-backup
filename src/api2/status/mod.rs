@@ -10,8 +10,8 @@ use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreMountStatus, DataStoreStatusListItem, Operation,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+    Authid, DataStoreConfig, DataStoreMountStatus, DataStoreStatusListItem, DatastoreBackendConfig,
+    Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 
 use pbs_config::CachedUserInfo;
@@ -55,6 +55,10 @@ pub async fn datastore_status(
 
         let store_config = config.lookup::<DataStoreConfig>("datastore", store)?;
 
+        let backend_config: DatastoreBackendConfig =
+            store_config.backend.as_deref().unwrap_or("").parse()?;
+        let backend_type = backend_config.ty.unwrap_or_default();
+
         let mount_status = match get_datastore_mount_status(&store_config) {
             Some(true) => DataStoreMountStatus::Mounted,
             Some(false) => {
@@ -62,6 +66,7 @@ pub async fn datastore_status(
                     store,
                     None,
                     DataStoreMountStatus::NotMounted,
+                    backend_type,
                 ));
                 continue;
             }
@@ -71,7 +76,12 @@ pub async fn datastore_status(
         if !allowed {
             if let Ok(datastore) = DataStore::lookup_datastore(store, Some(Operation::Lookup)) {
                 if can_access_any_namespace(datastore, &auth_id, &user_info) {
-                    list.push(DataStoreStatusListItem::empty(store, None, mount_status));
+                    list.push(DataStoreStatusListItem::empty(
+                        store,
+                        None,
+                        mount_status,
+                        backend_type,
+                    ));
                 }
             }
             continue;
@@ -84,6 +94,7 @@ pub async fn datastore_status(
                     store,
                     Some(err.to_string()),
                     mount_status,
+                    backend_type,
                 ));
                 continue;
             }
@@ -102,6 +113,7 @@ pub async fn datastore_status(
             estimated_full_date: None,
             error: None,
             gc_status: Some(datastore.last_gc_status()),
+            backend_type,
         };
 
         let rrd_dir = format!("datastore/{store}");
