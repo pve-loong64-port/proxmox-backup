@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::fs;
+use std::io::ErrorKind;
 use std::sync::LazyLock;
+use std::time::SystemTime;
 
 use anyhow::{bail, format_err, Error};
 use parking_lot::RwLock;
@@ -7,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value};
 
 use proxmox_sys::fs::CreateOptions;
+use proxmox_time::epoch_i64;
 
 use pbs_api_types::Authid;
 //use crate::auth;
@@ -24,6 +28,7 @@ static TOKEN_SECRET_CACHE: LazyLock<RwLock<ApiTokenSecretCache>> = LazyLock::new
     RwLock::new(ApiTokenSecretCache {
         secrets: HashMap::new(),
         shared_gen: 0,
+        shadow: None,
     })
 });
 
@@ -62,6 +67,56 @@ fn write_file(data: HashMap<Authid, String>) -> Result<(), Error> {
     proxmox_sys::fs::replace_file(CONF_FILE, &json, options, true)
 }
 
+/// Refreshes the in-memory cache if the on-disk token.shadow file changed.
+/// Returns true if the cache is valid to use, false if not.
+fn refresh_cache_if_file_changed() -> bool {
+    let now = epoch_i64();
+
+    // Best-effort refresh under write lock.
+    let Some(mut cache) = TOKEN_SECRET_CACHE.try_write() else {
+        return false;
+    };
+
+    let Some(shared_gen_now) = token_shadow_shared_gen() else {
+        return false;
+    };
+
+    // If another process bumped the generation, we don't know what changed -> clear cache
+    if cache.shared_gen != shared_gen_now {
+        cache.reset_and_set_gen(shared_gen_now);
+    }
+
+    // Stat the file to detect manual edits.
+    let Ok((new_mtime, new_len)) = shadow_mtime_len() else {
+        return false;
+    };
+
+    // If the file didn't change, only update last_checked
+    if let Some(shadow) = cache.shadow.as_mut() {
+        if shadow.mtime == new_mtime && shadow.len == new_len {
+            shadow.last_checked = now;
+            return true;
+        }
+    }
+
+    cache.secrets.clear();
+
+    let prev = cache.shadow.replace(ShadowFileInfo {
+        mtime: new_mtime,
+        len: new_len,
+        last_checked: now,
+    });
+
+    if prev.is_some() {
+        // Best-effort propagation to other processes if a change was detected
+        if let Some(shared_gen_new) = bump_token_shadow_shared_gen() {
+            cache.shared_gen = shared_gen_new;
+        }
+    }
+
+    false
+}
+
 /// Verifies that an entry for given tokenid / API token secret exists
 pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     if !tokenid.is_token() {
@@ -69,7 +124,7 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     }
 
     // Fast path
-    if cache_try_secret_matches(tokenid, secret) {
+    if refresh_cache_if_file_changed() && cache_try_secret_matches(tokenid, secret) {
         return Ok(());
     }
 
@@ -109,12 +164,15 @@ fn set_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
 
     let guard = lock_config()?;
 
+    // Capture state before we write to detect external edits.
+    let pre_meta = shadow_mtime_len().unwrap_or((None, None));
+
     let mut data = read_file()?;
     let hashed_secret = proxmox_sys::crypt::encrypt_pw(secret)?;
     data.insert(tokenid.clone(), hashed_secret);
     write_file(data)?;
 
-    apply_api_mutation(guard, tokenid, Some(secret));
+    apply_api_mutation(guard, tokenid, Some(secret), pre_meta);
 
     Ok(())
 }
@@ -127,11 +185,14 @@ pub fn delete_secret(tokenid: &Authid) -> Result<(), Error> {
 
     let guard = lock_config()?;
 
+    // Capture state before we write to detect external edits.
+    let pre_meta = shadow_mtime_len().unwrap_or((None, None));
+
     let mut data = read_file()?;
     data.remove(tokenid);
     write_file(data)?;
 
-    apply_api_mutation(guard, tokenid, None);
+    apply_api_mutation(guard, tokenid, None, pre_meta);
 
     Ok(())
 }
@@ -150,6 +211,8 @@ struct ApiTokenSecretCache {
     secrets: HashMap<Authid, CachedSecret>,
     /// Shared generation to detect mutations of the underlying token.shadow file.
     shared_gen: usize,
+    /// Shadow file info to detect changes
+    shadow: Option<ShadowFileInfo>,
 }
 
 impl ApiTokenSecretCache {
@@ -157,6 +220,7 @@ impl ApiTokenSecretCache {
     fn reset_and_set_gen(&mut self, new_gen: usize) {
         self.secrets.clear();
         self.shared_gen = new_gen;
+        self.shadow = None;
     }
 
     /// Caches a secret and sets/updates the cache generation.
@@ -170,6 +234,16 @@ impl ApiTokenSecretCache {
         self.secrets.remove(tokenid);
         self.shared_gen = new_gen;
     }
+}
+
+/// Shadow file info
+struct ShadowFileInfo {
+    // shadow file mtime to detect changes
+    mtime: Option<SystemTime>,
+    // shadow file length to detect changes
+    len: Option<u64>,
+    // last time the file metadata was checked
+    last_checked: i64,
 }
 
 fn cache_try_insert_secret(tokenid: Authid, secret: String, shared_gen_before: usize) {
@@ -220,7 +294,14 @@ fn cache_try_secret_matches(tokenid: &Authid, secret: &str) -> bool {
     false
 }
 
-fn apply_api_mutation(_guard: BackupLockGuard, tokenid: &Authid, new_secret: Option<&str>) {
+fn apply_api_mutation(
+    _guard: BackupLockGuard,
+    tokenid: &Authid,
+    new_secret: Option<&str>,
+    pre_write_meta: (Option<SystemTime>, Option<u64>),
+) {
+    let now = epoch_i64();
+
     // Signal cache invalidation to other processes (best-effort).
     let bumped_gen = bump_token_shadow_shared_gen();
 
@@ -239,6 +320,16 @@ fn apply_api_mutation(_guard: BackupLockGuard, tokenid: &Authid, new_secret: Opt
         return;
     }
 
+    // If our cached file metadata does not match the on-disk state before our write,
+    // we likely missed an external/manual edit. We can no longer trust any cached secrets.
+    if cache
+        .shadow
+        .as_ref()
+        .is_some_and(|s| (s.mtime, s.len) != pre_write_meta)
+    {
+        cache.secrets.clear();
+    }
+
     // Apply the new mutation.
     match new_secret {
         Some(secret) => {
@@ -248,6 +339,22 @@ fn apply_api_mutation(_guard: BackupLockGuard, tokenid: &Authid, new_secret: Opt
             cache.insert_and_set_gen(tokenid.clone(), cached_secret, current_gen);
         }
         None => cache.evict_and_set_gen(tokenid, current_gen),
+    }
+
+    // Update our view of the file metadata to the post-write state (best-effort).
+    // (If this fails, drop local cache so callers fall back to slow path until refreshed.)
+    match shadow_mtime_len() {
+        Ok((mtime, len)) => {
+            cache.shadow = Some(ShadowFileInfo {
+                mtime,
+                len,
+                last_checked: now,
+            });
+        }
+        Err(_) => {
+            // If we cannot validate state, do not trust cache.
+            cache.reset_and_set_gen(current_gen);
+        }
     }
 }
 
@@ -263,4 +370,12 @@ fn bump_token_shadow_shared_gen() -> Option<usize> {
     crate::ConfigVersionCache::new()
         .ok()
         .map(|cvc| cvc.increase_token_shadow_generation() + 1)
+}
+
+fn shadow_mtime_len() -> Result<(Option<SystemTime>, Option<u64>), Error> {
+    match fs::metadata(CONF_FILE) {
+        Ok(meta) => Ok((meta.modified().ok(), Some(meta.len()))),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok((None, None)),
+        Err(e) => Err(e.into()),
+    }
 }
