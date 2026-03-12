@@ -156,6 +156,10 @@ metadata:
 Similarly, the ``user delete-token`` subcommand can be used to delete a token
 again.
 
+.. WARNING:: Direct/manual edits to ``token.shadow`` may take up to 60 seconds (or
+   longer in edge cases) to take effect due to caching. Restart services for
+   immediate effect of manual edits.
+
 Newly generated API tokens don't have any permissions. Please read the next
 section to learn how to set access permissions.
 

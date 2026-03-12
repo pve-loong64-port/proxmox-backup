@@ -31,6 +31,8 @@ static TOKEN_SECRET_CACHE: LazyLock<RwLock<ApiTokenSecretCache>> = LazyLock::new
         shadow: None,
     })
 });
+/// Max age in seconds of the token secret cache before checking for file changes.
+const TOKEN_SECRET_CACHE_TTL_SECS: i64 = 60;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -72,11 +74,24 @@ fn write_file(data: HashMap<Authid, String>) -> Result<(), Error> {
 fn refresh_cache_if_file_changed() -> bool {
     let now = epoch_i64();
 
-    // Best-effort refresh under write lock.
+    // Fast path: cache is fresh if shared-gen matches and TTL not expired.
+    if let (Some(cache), Some(shared_gen_read)) =
+        (TOKEN_SECRET_CACHE.try_read(), token_shadow_shared_gen())
+    {
+        if cache.shared_gen == shared_gen_read && cache.shadow_check_within_ttl(now) {
+            return true;
+        }
+        // read lock drops here
+    } else {
+        return false;
+    }
+
+    // Slow path: best-effort refresh under write lock.
     let Some(mut cache) = TOKEN_SECRET_CACHE.try_write() else {
         return false;
     };
 
+    // Re-read generation after acquiring the lock (may have changed meanwhile).
     let Some(shared_gen_now) = token_shadow_shared_gen() else {
         return false;
     };
@@ -84,6 +99,12 @@ fn refresh_cache_if_file_changed() -> bool {
     // If another process bumped the generation, we don't know what changed -> clear cache
     if cache.shared_gen != shared_gen_now {
         cache.reset_and_set_gen(shared_gen_now);
+    }
+
+    // TTL check again after acquiring the lock
+    let now = epoch_i64();
+    if cache.shadow_check_within_ttl(now) {
+        return true;
     }
 
     // Stat the file to detect manual edits.
@@ -233,6 +254,13 @@ impl ApiTokenSecretCache {
     fn evict_and_set_gen(&mut self, tokenid: &Authid, new_gen: usize) {
         self.secrets.remove(tokenid);
         self.shared_gen = new_gen;
+    }
+
+    /// Returns true if cached token.shadow metadata exists and was checked within the TTL window.
+    fn shadow_check_within_ttl(&self, now: i64) -> bool {
+        self.shadow.as_ref().is_some_and(|cached| {
+            now >= cached.last_checked && (now - cached.last_checked) < TOKEN_SECRET_CACHE_TTL_SECS
+        })
     }
 }
 
