@@ -27,6 +27,8 @@ struct ConfigVersionCacheDataInner {
     traffic_control_generation: AtomicUsize,
     // datastore (datastore.cfg) generation/version
     datastore_generation: AtomicUsize,
+    // Token shadow (token.shadow) generation/version.
+    token_shadow_generation: AtomicUsize,
     // Add further atomics here
 }
 
@@ -157,6 +159,22 @@ impl ConfigVersionCache {
         self.shmem
             .data()
             .datastore_generation
+            .fetch_add(1, Ordering::AcqRel)
+    }
+
+    /// Returns the token shadow generation number.
+    pub fn token_shadow_generation(&self) -> usize {
+        self.shmem
+            .data()
+            .token_shadow_generation
+            .load(Ordering::Acquire)
+    }
+
+    /// Increase the token shadow generation number.
+    pub fn increase_token_shadow_generation(&self) -> usize {
+        self.shmem
+            .data()
+            .token_shadow_generation
             .fetch_add(1, Ordering::AcqRel)
     }
 }
