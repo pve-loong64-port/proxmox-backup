@@ -782,7 +782,7 @@ pub fn update_interface(
 
     if interface.cidr6.is_some() || interface.gateway6.is_some() {
         interface.method6 = Some(NetworkConfigMethod::Static);
-    } else {
+    } else if interface.method6.is_none() {
         interface.method6 = Some(NetworkConfigMethod::Manual);
     }
 
