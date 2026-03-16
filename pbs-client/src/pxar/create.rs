@@ -537,13 +537,20 @@ impl Archiver {
 
             let mut buf;
             let (line, mode, anchored) = if line[0] == b'/' {
-                buf = Vec::with_capacity(path_bytes.len() + 1 + line.len());
+                buf = Vec::with_capacity(path_bytes.len() + 2 + line.len());
+                // need to anchor the base path if it is not
+                if !path_bytes.is_empty() && !path_bytes.starts_with(b"/") {
+                    buf.push(b'/');
+                }
                 buf.extend(path_bytes);
                 buf.extend(line);
                 (&buf[..], MatchType::Exclude, true)
             } else if line.starts_with(b"!/") {
                 // inverted case with absolute path
-                buf = Vec::with_capacity(path_bytes.len() + line.len());
+                buf = Vec::with_capacity(path_bytes.len() + 1 + line.len());
+                if !path_bytes.is_empty() && !path_bytes.starts_with(b"/") {
+                    buf.push(b'/');
+                }
                 buf.extend(path_bytes);
                 buf.extend(&line[1..]); // without the '!'
                 (&buf[..], MatchType::Include, true)
