@@ -69,9 +69,18 @@ fn write_file(data: HashMap<Authid, String>) -> Result<(), Error> {
     proxmox_sys::fs::replace_file(CONF_FILE, &json, options, true)
 }
 
-/// Refreshes the in-memory cache if the on-disk token.shadow file changed.
-/// Returns true if the cache is valid to use, false if not.
-fn refresh_cache_if_file_changed() -> bool {
+/// Tries to match the given token secret against the cached secret.
+///
+/// Verifies the generation/version before doing the constant-time
+/// comparison to reduce TOCTOU risk. During token rotation or deletion
+/// tokens for in-flight requests may still validate against the previous
+/// generation.
+///
+/// If the cache file metadata's TTL has expired, will revalidate and invalidate the cache if
+/// needed.
+///
+/// Returns true if secret is cached and cache is still valid
+fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
     let now = epoch_i64();
 
     // Fast path: cache is fresh if shared-gen matches and TTL not expired.
@@ -79,7 +88,7 @@ fn refresh_cache_if_file_changed() -> bool {
         (TOKEN_SECRET_CACHE.try_read(), token_shadow_shared_gen())
     {
         if cache.shared_gen == shared_gen_read && cache.shadow_check_within_ttl(now) {
-            return true;
+            return cache.secret_matches(tokenid, secret);
         }
         // read lock drops here
     } else {
@@ -104,7 +113,7 @@ fn refresh_cache_if_file_changed() -> bool {
     // TTL check again after acquiring the lock
     let now = epoch_i64();
     if cache.shadow_check_within_ttl(now) {
-        return true;
+        return cache.secret_matches(tokenid, secret);
     }
 
     // Stat the file to detect manual edits.
@@ -116,7 +125,7 @@ fn refresh_cache_if_file_changed() -> bool {
     if let Some(shadow) = cache.shadow.as_mut() {
         if shadow.mtime == new_mtime && shadow.len == new_len {
             shadow.last_checked = now;
-            return true;
+            return cache.secret_matches(tokenid, secret);
         }
     }
 
@@ -145,7 +154,7 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     }
 
     // Fast path
-    if refresh_cache_if_file_changed() && cache_try_secret_matches(tokenid, secret) {
+    if cached_secret_valid(tokenid, secret) {
         return Ok(());
     }
 
@@ -262,6 +271,18 @@ impl ApiTokenSecretCache {
             now >= cached.last_checked && (now - cached.last_checked) < TOKEN_SECRET_CACHE_TTL_SECS
         })
     }
+
+    /// Returns true if there is a matching cached entry
+    fn secret_matches(&self, tokenid: &Authid, secret: &str) -> bool {
+        let Some(entry) = self.secrets.get(tokenid) else {
+            return false;
+        };
+        let cached_secret_bytes = entry.secret.as_bytes();
+        let secret_bytes = secret.as_bytes();
+
+        cached_secret_bytes.len() == secret_bytes.len()
+            && openssl::memcmp::eq(cached_secret_bytes, secret_bytes)
+    }
 }
 
 /// Shadow file info
@@ -294,34 +315,6 @@ fn cache_try_insert_secret(tokenid: Authid, secret: String, shared_gen_before: u
     }
 }
 
-/// Tries to match the given token secret against the cached secret.
-///
-/// Verifies the generation/version before doing the constant-time
-/// comparison to reduce TOCTOU risk. During token rotation or deletion
-/// tokens for in-flight requests may still validate against the previous
-/// generation.
-fn cache_try_secret_matches(tokenid: &Authid, secret: &str) -> bool {
-    let Some(cache) = TOKEN_SECRET_CACHE.try_read() else {
-        return false;
-    };
-    let Some(entry) = cache.secrets.get(tokenid) else {
-        return false;
-    };
-    let Some(current_gen) = token_shadow_shared_gen() else {
-        return false;
-    };
-
-    if current_gen == cache.shared_gen {
-        let cached_secret_bytes = entry.secret.as_bytes();
-        let secret_bytes = secret.as_bytes();
-
-        return cached_secret_bytes.len() == secret_bytes.len()
-            && openssl::memcmp::eq(cached_secret_bytes, secret_bytes);
-    }
-
-    false
-}
-
 fn apply_api_mutation(
     _guard: BackupLockGuard,
     tokenid: &Authid,
@@ -332,7 +325,6 @@ fn apply_api_mutation(
 
     // Signal cache invalidation to other processes (best-effort).
     let bumped_gen = bump_token_shadow_shared_gen();
-
     let mut cache = TOKEN_SECRET_CACHE.write();
 
     // If we cannot get the current generation, we cannot trust the cache
