@@ -181,43 +181,13 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
 /// Generates a new secret for the given tokenid / API token, sets it then returns it.
 /// The secret is stored as salted hash.
 pub fn generate_and_set_secret(tokenid: &Authid) -> Result<String, Error> {
-    let secret = format!("{:x}", proxmox_uuid::Uuid::generate());
-
-    if !tokenid.is_token() {
-        bail!("not an API token ID");
-    }
-
-    let guard = lock_config()?;
-
-    // Capture state before we write to detect external edits.
-    let pre_meta = shadow_mtime_len().unwrap_or((None, None));
-
-    let mut data = read_file()?;
-    let hashed_secret = proxmox_sys::crypt::encrypt_pw(&secret)?;
-    data.insert(tokenid.clone(), hashed_secret);
-    write_file(data)?;
-
-    apply_api_mutation(guard, tokenid, Some(&secret), pre_meta);
-
-    Ok(secret)
+    apply_api_mutation(tokenid, true)?
+        .ok_or_else(|| format_err!("Failed to generate API token secret"))
 }
 
 /// Deletes the entry for the given tokenid.
 pub fn delete_secret(tokenid: &Authid) -> Result<(), Error> {
-    if !tokenid.is_token() {
-        bail!("not an API token ID");
-    }
-
-    let guard = lock_config()?;
-
-    // Capture state before we write to detect external edits.
-    let pre_meta = shadow_mtime_len().unwrap_or((None, None));
-
-    let mut data = read_file()?;
-    data.remove(tokenid);
-    write_file(data)?;
-
-    apply_api_mutation(guard, tokenid, None, pre_meta);
+    apply_api_mutation(tokenid, false)?;
 
     Ok(())
 }
@@ -310,12 +280,28 @@ fn cache_try_insert_secret(tokenid: Authid, secret: String, gen_before: usize) {
     }
 }
 
-fn apply_api_mutation(
-    _guard: BackupLockGuard,
-    tokenid: &Authid,
-    new_secret: Option<&str>,
-    pre_write_meta: (Option<SystemTime>, Option<u64>),
-) {
+fn apply_api_mutation(tokenid: &Authid, generate: bool) -> Result<Option<String>, Error> {
+    if !tokenid.is_token() {
+        bail!("not an API token ID");
+    }
+
+    let _guard = lock_config()?;
+
+    // Capture state before we write to detect external edits.
+    let pre_write_meta = shadow_mtime_len().unwrap_or((None, None));
+
+    let mut data = read_file()?;
+    let secret = if generate {
+        let secret = format!("{:x}", proxmox_uuid::Uuid::generate());
+        let hashed_secret = proxmox_sys::crypt::encrypt_pw(&secret)?;
+        data.insert(tokenid.clone(), hashed_secret);
+        Some(secret)
+    } else {
+        data.remove(tokenid);
+        None
+    };
+    write_file(data)?;
+
     let now = epoch_i64();
 
     // Signal cache invalidation to other processes (best-effort).
@@ -325,14 +311,14 @@ fn apply_api_mutation(
     // If we cannot get the current generation, we cannot trust the cache
     let Some(current_gen) = token_shadow_generation() else {
         cache.reset_and_set_gen(0);
-        return;
+        return Ok(secret);
     };
 
     // If we cannot bump the generation, or if it changed after
     // obtaining the cache write lock, we cannot trust the cache
     if bumped_gen != Some(current_gen) {
         cache.reset_and_set_gen(current_gen);
-        return;
+        return Ok(secret);
     }
 
     // If our cached file metadata does not match the on-disk state before our write,
@@ -346,7 +332,7 @@ fn apply_api_mutation(
     }
 
     // Apply the new mutation.
-    match new_secret {
+    match &secret {
         Some(secret) => {
             let cached_secret = CachedSecret {
                 secret: secret.to_owned(),
@@ -371,6 +357,7 @@ fn apply_api_mutation(
             cache.reset_and_set_gen(current_gen);
         }
     }
+    Ok(secret)
 }
 
 /// Get the current generation.
