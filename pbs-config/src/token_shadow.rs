@@ -27,8 +27,8 @@ const CONF_FILE: &str = pbs_buildcfg::configdir!("/token.shadow");
 static TOKEN_SECRET_CACHE: LazyLock<RwLock<ApiTokenSecretCache>> = LazyLock::new(|| {
     RwLock::new(ApiTokenSecretCache {
         secrets: HashMap::new(),
-        shared_gen: 0,
-        shadow: None,
+        cached_gen: 0,
+        file_info: None,
     })
 });
 /// Max age in seconds of the token secret cache before checking for file changes.
@@ -83,11 +83,11 @@ fn write_file(data: HashMap<Authid, String>) -> Result<(), Error> {
 fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
     let now = epoch_i64();
 
-    // Fast path: cache is fresh if shared-gen matches and TTL not expired.
-    if let (Some(cache), Some(shared_gen_read)) =
-        (TOKEN_SECRET_CACHE.try_read(), token_shadow_shared_gen())
+    // Fast path: cache is fresh if generation matches and TTL not expired.
+    if let (Some(cache), Some(read_gen)) =
+        (TOKEN_SECRET_CACHE.try_read(), token_shadow_generation())
     {
-        if cache.shared_gen == shared_gen_read && cache.shadow_check_within_ttl(now) {
+        if cache.cached_gen == read_gen && cache.shadow_check_within_ttl(now) {
             return cache.secret_matches(tokenid, secret);
         }
         // read lock drops here
@@ -101,13 +101,13 @@ fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
     };
 
     // Re-read generation after acquiring the lock (may have changed meanwhile).
-    let Some(shared_gen_now) = token_shadow_shared_gen() else {
+    let Some(current_gen) = token_shadow_generation() else {
         return false;
     };
 
     // If another process bumped the generation, we don't know what changed -> clear cache
-    if cache.shared_gen != shared_gen_now {
-        cache.reset_and_set_gen(shared_gen_now);
+    if cache.cached_gen != current_gen {
+        cache.reset_and_set_gen(current_gen);
     }
 
     // TTL check again after acquiring the lock
@@ -122,7 +122,7 @@ fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
     };
 
     // If the file didn't change, only update last_checked
-    if let Some(shadow) = cache.shadow.as_mut() {
+    if let Some(shadow) = cache.file_info.as_mut() {
         if shadow.mtime == new_mtime && shadow.len == new_len {
             shadow.last_checked = now;
             return cache.secret_matches(tokenid, secret);
@@ -131,7 +131,7 @@ fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
 
     cache.secrets.clear();
 
-    let prev = cache.shadow.replace(ShadowFileInfo {
+    let prev = cache.file_info.replace(ShadowFileInfo {
         mtime: new_mtime,
         len: new_len,
         last_checked: now,
@@ -139,8 +139,8 @@ fn cached_secret_valid(tokenid: &Authid, secret: &str) -> bool {
 
     if prev.is_some() {
         // Best-effort propagation to other processes if a change was detected
-        if let Some(shared_gen_new) = bump_token_shadow_shared_gen() {
-            cache.shared_gen = shared_gen_new;
+        if let Some(new_gen) = bump_token_shadow_generation() {
+            cache.cached_gen = new_gen;
         }
     }
 
@@ -159,8 +159,8 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     }
 
     // Slow path
-    // First, capture the shared generation before doing the hash verification.
-    let gen_before = token_shadow_shared_gen();
+    // First, capture the generation before doing the hash verification.
+    let gen_before = token_shadow_generation();
 
     let data = read_file()?;
     match data.get(tokenid) {
@@ -239,35 +239,35 @@ struct ApiTokenSecretCache {
     /// `generate_and_set_secret`. Used to avoid repeated
     /// password-hash computation on subsequent authentications.
     secrets: HashMap<Authid, CachedSecret>,
-    /// Shared generation to detect mutations of the underlying token.shadow file.
-    shared_gen: usize,
+    /// token.shadow generation of cached secrets.
+    cached_gen: usize,
     /// Shadow file info to detect changes
-    shadow: Option<ShadowFileInfo>,
+    file_info: Option<ShadowFileInfo>,
 }
 
 impl ApiTokenSecretCache {
     /// Resets all local cache contents and sets/updates the cached generation.
     fn reset_and_set_gen(&mut self, new_gen: usize) {
         self.secrets.clear();
-        self.shared_gen = new_gen;
-        self.shadow = None;
+        self.cached_gen = new_gen;
+        self.file_info = None;
     }
 
     /// Caches a secret and sets/updates the cache generation.
     fn insert_and_set_gen(&mut self, tokenid: Authid, secret: CachedSecret, new_gen: usize) {
         self.secrets.insert(tokenid, secret);
-        self.shared_gen = new_gen;
+        self.cached_gen = new_gen;
     }
 
     /// Evicts a cached secret and sets/updates the cached generation.
     fn evict_and_set_gen(&mut self, tokenid: &Authid, new_gen: usize) {
         self.secrets.remove(tokenid);
-        self.shared_gen = new_gen;
+        self.cached_gen = new_gen;
     }
 
     /// Returns true if cached token.shadow metadata exists and was checked within the TTL window.
     fn shadow_check_within_ttl(&self, now: i64) -> bool {
-        self.shadow.as_ref().is_some_and(|cached| {
+        self.file_info.as_ref().is_some_and(|cached| {
             now >= cached.last_checked && (now - cached.last_checked) < TOKEN_SECRET_CACHE_TTL_SECS
         })
     }
@@ -295,23 +295,23 @@ struct ShadowFileInfo {
     last_checked: i64,
 }
 
-fn cache_try_insert_secret(tokenid: Authid, secret: String, shared_gen_before: usize) {
+fn cache_try_insert_secret(tokenid: Authid, secret: String, gen_before: usize) {
     let Some(mut cache) = TOKEN_SECRET_CACHE.try_write() else {
         return;
     };
 
-    let Some(shared_gen_now) = token_shadow_shared_gen() else {
+    let Some(gen_now) = token_shadow_generation() else {
         return;
     };
 
     // If this process missed a generation bump, its cache is stale.
-    if cache.shared_gen != shared_gen_now {
-        cache.reset_and_set_gen(shared_gen_now);
+    if cache.cached_gen != gen_now {
+        cache.reset_and_set_gen(gen_now);
     }
 
     // If a mutation happened while we were verifying the secret, do not insert.
-    if shared_gen_now == shared_gen_before {
-        cache.insert_and_set_gen(tokenid, CachedSecret { secret }, shared_gen_now);
+    if gen_now == gen_before {
+        cache.insert_and_set_gen(tokenid, CachedSecret { secret }, gen_now);
     }
 }
 
@@ -324,16 +324,16 @@ fn apply_api_mutation(
     let now = epoch_i64();
 
     // Signal cache invalidation to other processes (best-effort).
-    let bumped_gen = bump_token_shadow_shared_gen();
+    let bumped_gen = bump_token_shadow_generation();
     let mut cache = TOKEN_SECRET_CACHE.write();
 
     // If we cannot get the current generation, we cannot trust the cache
-    let Some(current_gen) = token_shadow_shared_gen() else {
+    let Some(current_gen) = token_shadow_generation() else {
         cache.reset_and_set_gen(0);
         return;
     };
 
-    // If we cannot bump the shared generation, or if it changed after
+    // If we cannot bump the generation, or if it changed after
     // obtaining the cache write lock, we cannot trust the cache
     if bumped_gen != Some(current_gen) {
         cache.reset_and_set_gen(current_gen);
@@ -343,7 +343,7 @@ fn apply_api_mutation(
     // If our cached file metadata does not match the on-disk state before our write,
     // we likely missed an external/manual edit. We can no longer trust any cached secrets.
     if cache
-        .shadow
+        .file_info
         .as_ref()
         .is_some_and(|s| (s.mtime, s.len) != pre_write_meta)
     {
@@ -365,7 +365,7 @@ fn apply_api_mutation(
     // (If this fails, drop local cache so callers fall back to slow path until refreshed.)
     match shadow_mtime_len() {
         Ok((mtime, len)) => {
-            cache.shadow = Some(ShadowFileInfo {
+            cache.file_info = Some(ShadowFileInfo {
                 mtime,
                 len,
                 last_checked: now,
@@ -378,15 +378,15 @@ fn apply_api_mutation(
     }
 }
 
-/// Get the current shared generation.
-fn token_shadow_shared_gen() -> Option<usize> {
+/// Get the current generation.
+fn token_shadow_generation() -> Option<usize> {
     crate::ConfigVersionCache::new()
         .ok()
         .map(|cvc| cvc.token_shadow_generation())
 }
 
-/// Bump and return the new shared generation.
-fn bump_token_shadow_shared_gen() -> Option<usize> {
+/// Bump and return the new generation.
+fn bump_token_shadow_generation() -> Option<usize> {
     crate::ConfigVersionCache::new()
         .ok()
         .map(|cvc| cvc.increase_token_shadow_generation() + 1)
