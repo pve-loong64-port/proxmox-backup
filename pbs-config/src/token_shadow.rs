@@ -182,12 +182,7 @@ pub fn verify_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
 /// The secret is stored as salted hash.
 pub fn generate_and_set_secret(tokenid: &Authid) -> Result<String, Error> {
     let secret = format!("{:x}", proxmox_uuid::Uuid::generate());
-    set_secret(tokenid, &secret)?;
-    Ok(secret)
-}
 
-/// Adds a new entry for the given tokenid / API token secret. The secret is stored as salted hash.
-fn set_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     if !tokenid.is_token() {
         bail!("not an API token ID");
     }
@@ -198,13 +193,13 @@ fn set_secret(tokenid: &Authid, secret: &str) -> Result<(), Error> {
     let pre_meta = shadow_mtime_len().unwrap_or((None, None));
 
     let mut data = read_file()?;
-    let hashed_secret = proxmox_sys::crypt::encrypt_pw(secret)?;
+    let hashed_secret = proxmox_sys::crypt::encrypt_pw(&secret)?;
     data.insert(tokenid.clone(), hashed_secret);
     write_file(data)?;
 
-    apply_api_mutation(guard, tokenid, Some(secret), pre_meta);
+    apply_api_mutation(guard, tokenid, Some(&secret), pre_meta);
 
-    Ok(())
+    Ok(secret)
 }
 
 /// Deletes the entry for the given tokenid.
