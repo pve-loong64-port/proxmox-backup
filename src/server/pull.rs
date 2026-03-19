@@ -7,10 +7,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
+use super::sync::{
+    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
+    ignore_not_verified_or_encrypted, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
+    SkipReason, SyncSource, SyncSourceReader, SyncStats,
+};
+use crate::backup::{check_ns_modification_privs, check_ns_privs};
+use crate::server::sync::SharedGroupProgress;
 use anyhow::{bail, format_err, Context, Error};
-use proxmox_human_byte::HumanByte;
-use tracing::{info, Level};
-
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
     BackupNamespace, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
@@ -29,15 +33,9 @@ use pbs_datastore::{check_backup_owner, DataStore, DatastoreBackend, StoreProgre
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use pbs_tools::sha::sha256;
-
-use super::sync::{
-    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
-    ignore_not_verified_or_encrypted, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
-    SkipReason, SyncSource, SyncSourceReader, SyncStats,
-};
-use crate::backup::{check_ns_modification_privs, check_ns_privs};
-use crate::server::sync::SharedGroupProgress;
-use crate::tools::parallel_handler::ParallelHandler;
+use proxmox_human_byte::HumanByte;
+use proxmox_parallel_handler::ParallelHandler;
+use tracing::{info, Level};
 
 pub(crate) struct PullTarget {
     store: Arc<DataStore>,

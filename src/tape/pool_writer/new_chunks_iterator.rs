@@ -3,10 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{format_err, Error};
 
+use proxmox_parallel_handler::ParallelHandler;
+
 use pbs_datastore::{DataBlob, DataStore, SnapshotReader};
 
 use crate::tape::CatalogSet;
-use crate::tools::parallel_handler::ParallelHandler;
 
 /// Chunk iterator which uses separate threads to read chunks
 ///

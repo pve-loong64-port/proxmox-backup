@@ -10,6 +10,7 @@ use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_io::ReadExt;
+use proxmox_parallel_handler::ParallelHandler;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::{api, ApiType};
@@ -38,21 +39,17 @@ use pbs_tape::{
 
 use crate::backup::check_ns_modification_privs;
 use crate::tape::{assert_datastore_type, TapeNotificationMode};
-use crate::{
-    tape::{
-        drive::{lock_tape_device, request_and_load_media, set_tape_device_state, TapeDriver},
-        file_formats::{
-            CatalogArchiveHeader, ChunkArchiveDecoder, ChunkArchiveHeader, SnapshotArchiveHeader,
-            PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1,
-            PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_1,
-            PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0, PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0,
-            PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1,
-            PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
-        },
-        lock_media_set, Inventory, MediaCatalog, MediaId, MediaSet, MediaSetCatalog,
-        TAPE_STATUS_DIR,
+use crate::tape::{
+    drive::{lock_tape_device, request_and_load_media, set_tape_device_state, TapeDriver},
+    file_formats::{
+        CatalogArchiveHeader, ChunkArchiveDecoder, ChunkArchiveHeader, SnapshotArchiveHeader,
+        PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1,
+        PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_1,
+        PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0, PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0,
+        PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1,
+        PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
     },
-    tools::parallel_handler::ParallelHandler,
+    lock_media_set, Inventory, MediaCatalog, MediaId, MediaSet, MediaSetCatalog, TAPE_STATUS_DIR,
 };
 
 struct NamespaceMap {

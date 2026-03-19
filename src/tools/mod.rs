@@ -21,8 +21,6 @@ pub mod statistics;
 pub mod systemd;
 pub mod ticket;
 
-pub mod parallel_handler;
-
 /// The default 2 hours are far too long for PBS
 pub const PROXMOX_BACKUP_TCP_KEEPALIVE_TIME: u32 = 120;
 pub const DEFAULT_USER_AGENT_STRING: &str = "proxmox-backup-client/1.0";

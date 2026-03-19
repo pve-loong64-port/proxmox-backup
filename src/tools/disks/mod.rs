@@ -21,7 +21,7 @@ use proxmox_sys::linux::procfs::{mountinfo::Device, MountInfo};
 
 use pbs_api_types::{BLOCKDEVICE_DISK_AND_PARTITION_NAME_REGEX, BLOCKDEVICE_NAME_REGEX};
 
-use crate::tools::parallel_handler::ParallelHandler;
+use proxmox_parallel_handler::ParallelHandler;
 
 mod zfs;
 pub use zfs::*;

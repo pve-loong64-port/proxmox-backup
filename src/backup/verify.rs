@@ -8,6 +8,7 @@ use anyhow::{bail, Error};
 use http_body_util::BodyExt;
 use tracing::{error, info, warn};
 
+use proxmox_parallel_handler::{ParallelHandler, SendHandle};
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
@@ -19,8 +20,6 @@ use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::{ChunkReadInfo, IndexFile};
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::{DataBlob, DataStore, DatastoreBackend, StoreProgress};
-
-use crate::tools::parallel_handler::{ParallelHandler, SendHandle};
 
 use crate::backup::hierarchy::ListAccessibleBackupGroups;
 
