@@ -48,6 +48,7 @@ Ext.define('PBS.LoginView', {
 
             if (this.getViewModel().data.openid === true) {
                 const redirectURL = location.origin;
+                sessionStorage.setItem('pbsOpenIDDeeplink', location.hash);
                 try {
                     let resp = await Proxmox.Async.api2({
                         url: '/api2/extjs/access/openid/auth-url',
@@ -217,7 +218,13 @@ Ext.define('PBS.LoginView', {
                                 let creds = response.result.data;
                                 PBS.Utils.updateLoginData(creds);
                                 PBS.app.changeView('mainview');
-                                history.replaceState(null, '', `${redirectURL}#pbsDashboard`);
+                                let deeplink = sessionStorage.getItem('pbsOpenIDDeeplink');
+                                if (deeplink) {
+                                    sessionStorage.removeItem('pbsOpenIDDeeplink');
+                                    history.replaceState(null, '', `${redirectURL}${deeplink}`);
+                                } else {
+                                    history.replaceState(null, '', `${redirectURL}#pbsDashboard`);
+                                }
                             },
                         });
                     }
