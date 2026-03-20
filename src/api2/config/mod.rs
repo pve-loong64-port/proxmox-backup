@@ -9,6 +9,7 @@ pub mod acme;
 pub mod changer;
 pub mod datastore;
 pub mod drive;
+pub mod encryption_keys;
 pub mod media_pool;
 pub mod metrics;
 pub mod notifications;
@@ -28,6 +29,7 @@ const SUBDIRS: SubdirMap = &sorted!([
     ("changer", &changer::ROUTER),
     ("datastore", &datastore::ROUTER),
     ("drive", &drive::ROUTER),
+    ("encryption-keys", &encryption_keys::ROUTER),
     ("media-pool", &media_pool::ROUTER),
     ("metrics", &metrics::ROUTER),
     ("notifications", &notifications::ROUTER),
