@@ -104,7 +104,7 @@ pbs-api-types = "1.0.10"
 pathpatterns = "1"
 proxmox-acme = "1.1"
 proxmox-acme-api = { version = "1.0.2", features = [ "impl" ] }
-pxar = "1"
+pxar = "1.0.1"
 
 # PBS workspace
 pbs-buildcfg = { path = "pbs-buildcfg" }
