@@ -330,6 +330,22 @@ pub fn read_sync_job(id: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Sync
     Ok(sync_job)
 }
 
+fn keep_previous_key_as_associated(
+    current_active: Option<&String>,
+    associated_keys: &mut Option<Vec<String>>,
+) {
+    if let Some(prev) = current_active {
+        match associated_keys {
+            Some(ref mut keys) => {
+                if !keys.contains(prev) {
+                    keys.push(prev.clone());
+                }
+            }
+            None => *associated_keys = Some(vec![prev.clone()]),
+        }
+    }
+}
+
 #[api()]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -375,6 +391,10 @@ pub enum DeletableProperty {
     SyncDirection,
     /// Delete the worker_threads property,
     WorkerThreads,
+    /// Delete the active encryption key property,
+    ActiveEncryptionKey,
+    /// Delete associated key property,
+    AssociatedKey,
 }
 
 #[api(
@@ -416,7 +436,7 @@ required sync job owned by user. Additionally, remove vanished requires RemoteDa
 #[allow(clippy::too_many_arguments)]
 pub fn update_sync_job(
     id: String,
-    update: SyncJobConfigUpdater,
+    mut update: SyncJobConfigUpdater,
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
@@ -439,6 +459,9 @@ pub fn update_sync_job(
     }
 
     if let Some(delete) = delete {
+        // temporarily hold the previously active key in case of updates,
+        // so it can be readded as associated key afterwards.
+        let mut previous_active_encryption_key = None;
         for delete_prop in delete {
             match delete_prop {
                 DeletableProperty::Remote => {
@@ -501,8 +524,23 @@ pub fn update_sync_job(
                 DeletableProperty::WorkerThreads => {
                     data.worker_threads = None;
                 }
+                DeletableProperty::ActiveEncryptionKey => {
+                    // Previously active encryption keys are always rotated to
+                    // become an associated key in order to hinder unintended
+                    // deletion (e.g. key got rotated for the push, but it still
+                    // is intended to be used for  restore/pull existing snapshots).
+                    previous_active_encryption_key = data.active_encryption_key.take();
+                }
+                DeletableProperty::AssociatedKey => {
+                    // Previous active encryption key might be added as associated below.
+                    data.associated_key = None;
+                }
             }
         }
+        keep_previous_key_as_associated(
+            previous_active_encryption_key.as_ref(),
+            &mut data.associated_key,
+        );
     }
 
     if let Some(comment) = update.comment {
@@ -529,8 +567,18 @@ pub fn update_sync_job(
     if let Some(remote_ns) = update.remote_ns {
         data.remote_ns = Some(remote_ns);
     }
-    if let Some(owner) = update.owner {
-        data.owner = Some(owner);
+    if let Some(owner) = &update.owner {
+        data.owner = Some(owner.clone());
+        // must assure new owner can access pre-configured keys, other cases are
+        // checked on respective key updates
+        if update.active_encryption_key.is_none() {
+            sync_user_can_access_optional_key(data.active_encryption_key.as_deref(), owner, true)?;
+        }
+        if update.associated_key.is_none() {
+            for key in data.associated_key.as_deref().unwrap_or(&[]) {
+                sync_user_can_access_optional_key(Some(key), owner, true)?;
+            }
+        }
     }
     if let Some(group_filter) = update.group_filter {
         data.group_filter = Some(group_filter);
@@ -562,6 +610,36 @@ pub fn update_sync_job(
 
     if let Some(worker_threads) = update.worker_threads {
         data.worker_threads = Some(worker_threads);
+    }
+
+    if let Some(active_encryption_key) = update.active_encryption_key {
+        // owner updated above already, so can use the one in data
+        let owner = data
+            .owner
+            .as_ref()
+            .unwrap_or_else(|| Authid::root_auth_id());
+        sync_user_can_access_optional_key(Some(&active_encryption_key), owner, true)?;
+
+        let associated_keys = if update.associated_key.is_some() {
+            &mut update.associated_key
+        } else {
+            &mut data.associated_key
+        };
+        keep_previous_key_as_associated(data.active_encryption_key.as_ref(), associated_keys);
+        data.active_encryption_key = Some(active_encryption_key);
+    }
+
+    if let Some(associated_key) = update.associated_key {
+        // owner updated above already, so can use the one in data
+        let owner = data
+            .owner
+            .as_ref()
+            .unwrap_or_else(|| Authid::root_auth_id());
+        // Don't allow associating keys the local user/owner can't access
+        for key in &associated_key {
+            sync_user_can_access_optional_key(Some(key), owner, false)?;
+        }
+        data.associated_key = Some(associated_key);
     }
 
     if update.limit.rate_in.is_some() {
@@ -737,6 +815,8 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         unmount_on_done: None,
         sync_direction: None, // use default
         worker_threads: None,
+        active_encryption_key: None,
+        associated_key: None,
     };
 
     // should work without ACLs
