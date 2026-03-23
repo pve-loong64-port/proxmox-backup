@@ -58,16 +58,8 @@ pub(crate) fn log_s3_delete_objects_errors(errors: &[DeleteObjectError]) {
                 .as_ref()
                 .map(|key| key.to_string())
                 .unwrap_or_else(|| "None".into()),
-            error
-                .code
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or_else(|| "None"),
-            error
-                .message
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or_else(|| "None"),
+            error.code.as_deref().unwrap_or("None"),
+            error.message.as_deref().unwrap_or("None"),
         );
     }
 }
