@@ -34,10 +34,12 @@ Ext.define('PBS.window.SyncJobEdit', {
         if (me.syncDirection === 'push') {
             me.subject = gettext('Sync Job - Push Direction');
             me.syncDirectionPush = true;
+            me.syncCryptKeyMultiSelect = false;
             me.syncRemoteLabel = gettext('Target Remote');
             me.syncRemoteDatastore = gettext('Target Datastore');
             me.syncRemoteNamespace = gettext('Target Namespace');
             me.syncLocalOwner = gettext('Local User');
+            me.associatedKeysLabel = gettext('Associated Keys');
             // Sync direction request parameter is only required for creating new jobs,
             // for edit and delete it is derived from the job config given by it's id.
             if (me.isCreate) {
@@ -52,6 +54,7 @@ Ext.define('PBS.window.SyncJobEdit', {
             me.syncRemoteDatastore = gettext('Source Datastore');
             me.syncRemoteNamespace = gettext('Source Namespace');
             me.syncLocalOwner = gettext('Local Owner');
+            me.associatedKeysLabel = gettext('Decryption Keys');
         }
 
         return {};
@@ -568,6 +571,65 @@ Ext.define('PBS.window.SyncJobEdit', {
                     {
                         xtype: 'pbsGroupFilter',
                         name: 'group-filter',
+                    },
+                ],
+            },
+            {
+                xtype: 'inputpanel',
+                title: gettext('Encryption'),
+                column1: [
+                    {
+                        xtype: 'pbsEncryptionKeySelector',
+                        name: 'active-encryption-key',
+                        fieldLabel: gettext('Active Encryption Key'),
+                        multiSelect: false,
+                        cbind: {
+                            deleteEmpty: '{!isCreate}',
+                            disabled: '{!syncDirectionPush}',
+                            hidden: '{!syncDirectionPush}',
+                        },
+                    },
+                    {
+                        xtype: 'pbsEncryptionKeySelector',
+                        name: 'associated-key',
+                        multiSelect: true,
+                        cbind: {
+                            fieldLabel: '{associatedKeysLabel}',
+                            deleteEmpty: '{!isCreate}',
+                        },
+                        extraRequestParams: {
+                            'include-archived': true,
+                        },
+                    },
+                ],
+                column2: [
+                    {
+                        xtype: 'box',
+                        style: {
+                            'inline-size': '325px',
+                            'overflow-wrap': 'break-word',
+                        },
+                        padding: '5',
+                        html: gettext(
+                            'When pushing, the system uses the active encryption key to encrypt unencrypted sources snapshots. It leaves existing encrypted content as-is, and skips partially encrypted content.',
+                        ),
+                        cbind: {
+                            hidden: '{!syncDirectionPush}',
+                        },
+                    },
+                    {
+                        xtype: 'box',
+                        style: {
+                            'inline-size': '325px',
+                            'overflow-wrap': 'break-word',
+                        },
+                        padding: '5',
+                        html: gettext(
+                            'To prevent premature removal, associated keys hold a reference to a key until you explicitly unlink it. When you change your active encryption key, the system automatically associates the old key to protect it from accidental deletion, ensuring you can still decrypt older contents.',
+                        ),
+                        cbind: {
+                            hidden: '{!syncDirectionPush}',
+                        },
                     },
                 ],
             },

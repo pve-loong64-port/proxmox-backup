@@ -55,6 +55,7 @@ JSSRC=							\
 	form/GroupSelector.js				\
 	form/GroupFilter.js				\
 	form/VerifyOutdatedAfter.js			\
+	form/EncryptionKeySelector.js			\
 	data/RunningTasksStore.js			\
 	button/TaskButton.js				\
 	panel/PrunePanel.js				\
