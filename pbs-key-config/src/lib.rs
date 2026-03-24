@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::path::Path;
+use std::os::fd::AsRawFd;
 
 use anyhow::{bail, format_err, Context, Error};
 use serde::{Deserialize, Serialize};
@@ -254,6 +255,7 @@ impl KeyConfig {
                     .open(path)?;
 
                 file.write_all(data.as_bytes())?;
+                nix::unistd::fsync(file.as_raw_fd())?;
             }
 
             Ok(())
