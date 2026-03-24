@@ -3,6 +3,8 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 
 use anyhow::{bail, format_err, Context, Error};
+use nix::sys::stat::Mode;
+use nix::unistd::{Gid, Uid};
 use serde::{Deserialize, Serialize};
 
 use proxmox_lang::try_block;
@@ -237,25 +239,49 @@ impl KeyConfig {
 
     /// Store a KeyConfig to path
     pub fn store<P: AsRef<Path>>(&self, path: P, replace: bool) -> Result<(), Error> {
+        self.store_with(path, replace, None, None, None)
+    }
+
+    /// Store a KeyConfig to path with given ownership and mode.
+    /// Requires the process to run with permissions to do so.
+    pub fn store_with<P: AsRef<Path>>(
+        &self,
+        path: P,
+        replace: bool,
+        mode: Option<Mode>,
+        owner: Option<Uid>,
+        group: Option<Gid>,
+    ) -> Result<(), Error> {
         let path: &Path = path.as_ref();
 
         let data = serde_json::to_string(self)?;
 
         try_block!({
             if replace {
-                let mode = nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR;
-                replace_file(path, data.as_bytes(), CreateOptions::new().perm(mode), true)?;
+                let mode =
+                    mode.unwrap_or(nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR);
+                let mut create_options = CreateOptions::new().perm(mode);
+                if let Some(owner) = owner {
+                    create_options = create_options.owner(owner);
+                }
+                if let Some(group) = group {
+                    create_options = create_options.group(group);
+                }
+                replace_file(path, data.as_bytes(), create_options, true)?;
             } else {
                 use std::os::unix::fs::OpenOptionsExt;
-
+                let mode = mode.map(|m| m.bits()).unwrap_or(0o0600);
                 let mut file = std::fs::OpenOptions::new()
                     .write(true)
-                    .mode(0o0600)
+                    .mode(mode)
                     .create_new(true)
                     .open(path)?;
 
                 file.write_all(data.as_bytes())?;
-                nix::unistd::fsync(file.as_raw_fd())?;
+
+                let fd = file.as_raw_fd();
+                nix::unistd::fchown(fd, owner, group)?;
+                nix::unistd::fsync(fd)?;
             }
 
             Ok(())
