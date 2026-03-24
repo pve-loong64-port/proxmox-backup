@@ -1,6 +1,6 @@
 //! Sync datastore by pushing contents to remote server
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -13,17 +13,17 @@ use tracing::{info, warn, Level};
 
 use pbs_api_types::{
     print_store_and_ns, ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupArchiveName,
-    BackupDir, BackupGroup, BackupGroupDeleteStats, BackupNamespace, GroupFilter, GroupListItem,
-    NamespaceListItem, Operation, RateLimitConfig, Remote, SnapshotListItem, CLIENT_LOG_BLOB_NAME,
-    MANIFEST_BLOB_NAME, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP,
-    PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
+    BackupDir, BackupGroup, BackupGroupDeleteStats, BackupNamespace, CryptMode, GroupFilter,
+    GroupListItem, NamespaceListItem, Operation, RateLimitConfig, Remote, SnapshotListItem,
+    CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
 };
 use pbs_client::{
     BackupRepository, BackupStats, BackupWriter, BackupWriterOptions, HttpClient, IndexType,
     MergedChunkInfo, UploadOptions,
 };
 use pbs_config::CachedUserInfo;
-use pbs_datastore::data_blob::ChunkInfo;
+use pbs_datastore::data_blob::{ChunkInfo, DataChunkBuilder};
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
@@ -1073,7 +1073,41 @@ pub(crate) async fn push_snapshot(
         return Ok(stats);
     }
 
-    let encrypt_using_key = None;
+    let mut encrypt_using_key = None;
+    if params.crypt_config.is_some() {
+        // Check if snapshot is fully encrypted or not encrypted at all:
+        // refuse progress otherwise to upload partially unencrypted contents or mix encryption key.
+        let files = source_manifest.files();
+        let all_unencrypted = files
+            .iter()
+            .all(|f| f.chunk_crypt_mode() == CryptMode::None);
+        let any_unencrypted = files
+            .iter()
+            .any(|f| f.chunk_crypt_mode() == CryptMode::None);
+
+        if all_unencrypted {
+            encrypt_using_key = params.crypt_config.clone();
+            log_sender
+                .log(
+                    Level::INFO,
+                    format!(
+                        "Encrypt source snapshot '{snapshot}' on the fly while pushing to remote"
+                    ),
+                )
+                .await?;
+        } else if any_unencrypted {
+            log_sender.log(
+                Level::WARN,
+                format!("Encountered partially encrypted snapshot '{snapshot}', refuse to re-encrypt and skip"),
+            ).await?;
+            return Ok(stats);
+        } else {
+            log_sender.log(
+                Level::INFO,
+                format!("Snapshot '{snapshot}' already encrypted with client key, not re-encrypting with configured active encryption key"),
+            ).await?;
+        }
+    }
 
     // Writer instance locks the snapshot on the remote side
     let backup_writer = BackupWriter::start(
@@ -1082,7 +1116,9 @@ pub(crate) async fn push_snapshot(
             datastore: params.target.repo.store(),
             ns: &target_ns,
             backup: snapshot,
-            crypt_config: encrypt_using_key.clone(),
+            crypt_config: encrypt_using_key
+                .as_ref()
+                .map(|(_id, conf)| Arc::clone(conf)),
             debug: false,
             benchmark: false,
             no_cache: false,
@@ -1107,19 +1143,20 @@ pub(crate) async fn push_snapshot(
         }
     };
 
-    // Dummy upload options: the actual compression and/or encryption already happened while
-    // the chunks were generated during creation of the backup snapshot, therefore pre-existing
-    // chunks (already compressed and/or encrypted) can be pushed to the target.
+    // Dummy upload options: The actual compression already happened while
+    // the chunks were generated during creation of the backup snapshot,
+    // therefore pre-existing chunks (already compressed) can be pushed to
+    // the target.
+    //
     // Further, these steps are skipped in the backup writer upload stream.
     //
     // Therefore, these values do not need to fit the values given in the manifest.
     // The original manifest is uploaded in the end anyways.
     //
     // Compression is set to true so that the uploaded manifest will be compressed.
-    // Encrypt is set to assure that above files are not encrypted.
     let upload_options = UploadOptions {
         compress: true,
-        encrypt: false,
+        encrypt: encrypt_using_key.is_some(),
         previous_manifest,
         ..UploadOptions::default()
     };
@@ -1140,6 +1177,10 @@ pub(crate) async fn push_snapshot(
                 )
                 .await?;
             let archive_prefix = format!("{prefix}/{archive_name}");
+            let crypt_mode = match &encrypt_using_key {
+                Some(_) => CryptMode::Encrypt,
+                None => entry.chunk_crypt_mode(),
+            };
 
             load_previous_snapshot_known_chunks(
                 params,
@@ -1170,7 +1211,7 @@ pub(crate) async fn push_snapshot(
                         &archive_name,
                         backup_stats.size,
                         backup_stats.csum,
-                        entry.chunk_crypt_mode(),
+                        crypt_mode,
                     )?;
                     log_sender
                         .log(
@@ -1205,6 +1246,9 @@ pub(crate) async fn push_snapshot(
                         &backup_writer,
                         IndexType::Dynamic,
                         known_chunks.clone(),
+                        encrypt_using_key
+                            .as_ref()
+                            .map(|(_id, conf)| Arc::clone(conf)),
                     )
                     .await
                     .with_context(|| archive_prefix.clone())?;
@@ -1213,7 +1257,7 @@ pub(crate) async fn push_snapshot(
                             &archive_name,
                             upload_stats.size,
                             upload_stats.csum,
-                            entry.chunk_crypt_mode(),
+                            crypt_mode,
                         )
                         .with_context(|| archive_prefix.clone())?;
                     log_sender
@@ -1250,6 +1294,9 @@ pub(crate) async fn push_snapshot(
                         &backup_writer,
                         IndexType::Fixed(Some(size)),
                         known_chunks.clone(),
+                        encrypt_using_key
+                            .as_ref()
+                            .map(|(_id, conf)| Arc::clone(conf)),
                     )
                     .await
                     .with_context(|| archive_prefix.clone())?;
@@ -1258,7 +1305,7 @@ pub(crate) async fn push_snapshot(
                             &archive_name,
                             upload_stats.size,
                             upload_stats.csum,
-                            entry.chunk_crypt_mode(),
+                            crypt_mode,
                         )
                         .with_context(|| archive_prefix.clone())?;
                     log_sender
@@ -1315,15 +1362,25 @@ pub(crate) async fn push_snapshot(
 
     // Rewrite manifest for pushed snapshot, recreating manifest from source on target,
     // needs to update all relevant info for new manifest.
-    target_manifest.unprotected = source_manifest.unprotected;
-    target_manifest.signature = source_manifest.signature;
-    let manifest_json = serde_json::to_value(target_manifest)?;
-    let manifest_string = serde_json::to_string_pretty(&manifest_json)?;
+    target_manifest.unprotected = source_manifest.unprotected.clone();
+    let manifest_string = if let Some((_id, crypt_config)) = &encrypt_using_key {
+        let fp = source_manifest.signature(crypt_config)?;
+        target_manifest.set_change_detection_fingerprint(&fp)?;
+        target_manifest.to_string(Some(crypt_config))?
+    } else {
+        target_manifest.signature = source_manifest.signature.clone();
+        let manifest_json = serde_json::to_value(target_manifest)?;
+        serde_json::to_string_pretty(&manifest_json)?
+    };
     let backup_stats = backup_writer
         .upload_blob_from_data(
             manifest_string.into_bytes(),
             MANIFEST_BLOB_NAME.as_ref(),
-            upload_options,
+            UploadOptions {
+                compress: true,
+                encrypt: false,
+                ..UploadOptions::default()
+            },
         )
         .await
         .with_context(|| prefix.to_string())?;
@@ -1367,8 +1424,44 @@ async fn push_index(
     backup_writer: &BackupWriter,
     index_type: IndexType,
     known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    crypt_config: Option<Arc<CryptConfig>>,
 ) -> Result<BackupStats, Error> {
     let (upload_channel_tx, upload_channel_rx) = mpsc::channel(20);
+
+    if let Some(crypt_config) = &crypt_config {
+        spawn_push_index_encrypted_worker(
+            index,
+            chunk_reader,
+            known_chunks,
+            Arc::clone(crypt_config),
+            upload_channel_tx,
+        )?;
+    } else {
+        spawn_push_index_worker(index, chunk_reader, known_chunks, upload_channel_tx)?;
+    }
+
+    let merged_chunk_info_stream = ReceiverStream::new(upload_channel_rx).map_err(Error::from);
+
+    let upload_options = UploadOptions {
+        compress: true,
+        encrypt: crypt_config.is_some(),
+        index_type,
+        ..UploadOptions::default()
+    };
+
+    let upload_stats = backup_writer
+        .upload_index_chunk_info(filename, merged_chunk_info_stream, upload_options)
+        .await?;
+
+    Ok(upload_stats)
+}
+
+fn spawn_push_index_worker(
+    index: impl IndexFile + Send + 'static,
+    chunk_reader: Arc<dyn AsyncReadChunk>,
+    known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    upload_channel_tx: mpsc::Sender<Result<MergedChunkInfo, Error>>,
+) -> Result<(), Error> {
     let mut chunk_infos =
         stream::iter(0..index.index_count()).map(move |pos| index.chunk_info(pos).unwrap());
 
@@ -1406,18 +1499,65 @@ async fn push_index(
         }
     });
 
-    let merged_chunk_info_stream = ReceiverStream::new(upload_channel_rx).map_err(Error::from);
+    Ok(())
+}
 
-    let upload_options = UploadOptions {
-        compress: true,
-        encrypt: false,
-        index_type,
-        ..UploadOptions::default()
-    };
+fn spawn_push_index_encrypted_worker(
+    index: impl IndexFile + Send + 'static,
+    chunk_reader: Arc<dyn AsyncReadChunk>,
+    known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+    crypt_config: Arc<CryptConfig>,
+    upload_channel_tx: mpsc::Sender<Result<MergedChunkInfo, Error>>,
+) -> Result<(), Error> {
+    let mut chunk_infos =
+        stream::iter(0..index.index_count()).map(move |pos| index.chunk_info(pos).unwrap());
 
-    let upload_stats = backup_writer
-        .upload_index_chunk_info(filename, merged_chunk_info_stream, upload_options)
-        .await?;
+    tokio::spawn(async move {
+        let mut encrypted_mapping = HashMap::new();
+        while let Some(chunk_info) = chunk_infos.next().await {
+            // in re-encrypting mode, we need to read and encrypt each chunk once to know
+            // whether we need to upload it
+            let merged_chunk_info =
+                if let Some(encrypted_digest) = encrypted_mapping.get(&chunk_info.digest) {
+                    Ok(MergedChunkInfo::Known(vec![(
+                        // Pass size instead of offset, will be replaced with offset by the backup
+                        // writer
+                        chunk_info.size(),
+                        *encrypted_digest,
+                    )]))
+                } else {
+                    chunk_reader
+                        .read_raw_chunk(&chunk_info.digest)
+                        .await
+                        .and_then(|chunk| {
+                            let data = chunk.decode(None, Some(&chunk_info.digest))?;
+                            let (encrypted_chunk, encrypted_digest) = DataChunkBuilder::new(&data)
+                                .compress(true)
+                                .crypt_config(&crypt_config)
+                                .build()?;
+                            encrypted_mapping.insert(chunk_info.digest, encrypted_digest);
+                            // if this encrypted chunk is already referenced by the previous
+                            // snapshot, the upload can be skipped
+                            if known_chunks.lock().unwrap().contains(&encrypted_digest) {
+                                Ok(MergedChunkInfo::Known(vec![(
+                                    // Pass size instead of offset, will be replaced with offset by the backup
+                                    // writer
+                                    chunk_info.size(),
+                                    encrypted_digest,
+                                )]))
+                            } else {
+                                Ok(MergedChunkInfo::New(ChunkInfo {
+                                    chunk: encrypted_chunk,
+                                    digest: encrypted_digest,
+                                    chunk_len: data.len() as u64,
+                                    offset: chunk_info.range.start,
+                                }))
+                            }
+                        })
+                };
+            let _ = upload_channel_tx.send(merged_chunk_info).await;
+        }
+    });
 
-    Ok(upload_stats)
+    Ok(())
 }
