@@ -18,8 +18,8 @@ use pbs_api_types::{
     PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
 };
 use pbs_client::{
-    BackupRepository, BackupWriter, BackupWriterOptions, HttpClient, IndexType, MergedChunkInfo,
-    UploadOptions,
+    BackupRepository, BackupStats, BackupWriter, BackupWriterOptions, HttpClient, IndexType,
+    MergedChunkInfo, UploadOptions,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::ChunkInfo;
@@ -27,7 +27,7 @@ use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{DataStore, StoreProgress};
+use pbs_datastore::{BackupManifest, DataStore, StoreProgress};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 
@@ -1071,6 +1071,7 @@ pub(crate) async fn push_snapshot(
 
     // Avoid double upload penalty by remembering already seen chunks
     let known_chunks = Arc::new(Mutex::new(HashSet::with_capacity(64 * 1024)));
+    let mut target_manifest = BackupManifest::new(snapshot.clone());
 
     for entry in source_manifest.files() {
         let mut path = backup_dir.full_path();
@@ -1090,6 +1091,12 @@ pub(crate) async fn push_snapshot(
                     let backup_stats = backup_writer
                         .upload_blob(file, archive_name.as_ref())
                         .await?;
+                    target_manifest.add_file(
+                        &archive_name,
+                        backup_stats.size,
+                        backup_stats.csum,
+                        entry.chunk_crypt_mode(),
+                    )?;
                     log_sender
                         .log(
                             Level::INFO,
@@ -1126,7 +1133,7 @@ pub(crate) async fn push_snapshot(
                     let chunk_reader = reader
                         .chunk_reader(entry.chunk_crypt_mode())
                         .context("failed to get chunk reader")?;
-                    let sync_stats = push_index(
+                    let upload_stats = push_index(
                         &archive_name,
                         index,
                         chunk_reader,
@@ -1136,19 +1143,32 @@ pub(crate) async fn push_snapshot(
                     )
                     .await
                     .with_context(|| archive_prefix.clone())?;
+                    target_manifest
+                        .add_file(
+                            &archive_name,
+                            upload_stats.size,
+                            upload_stats.csum,
+                            entry.chunk_crypt_mode(),
+                        )
+                        .with_context(|| archive_prefix.clone())?;
                     log_sender
                         .log(
                             Level::INFO,
                             format!(
                                 "{archive_prefix}: uploaded {} ({}/s)",
-                                HumanByte::from(sync_stats.bytes),
+                                HumanByte::from(upload_stats.size),
                                 HumanByte::new_binary(
-                                    sync_stats.bytes as f64 / sync_stats.elapsed.as_secs_f64()
+                                    upload_stats.size as f64 / upload_stats.duration.as_secs_f64()
                                 ),
                             ),
                         )
                         .await?;
-                    stats.add(sync_stats);
+                    stats.add(SyncStats {
+                        chunk_count: upload_stats.chunk_count as usize,
+                        bytes: upload_stats.size as usize,
+                        elapsed: upload_stats.duration,
+                        removed: None,
+                    });
                 }
                 ArchiveType::FixedIndex => {
                     if let Some(manifest) = upload_options.previous_manifest.as_ref() {
@@ -1167,7 +1187,7 @@ pub(crate) async fn push_snapshot(
                         .context("failed to get chunk reader")
                         .with_context(|| archive_prefix.clone())?;
                     let size = index.index_bytes();
-                    let sync_stats = push_index(
+                    let upload_stats = push_index(
                         &archive_name,
                         index,
                         chunk_reader,
@@ -1177,19 +1197,32 @@ pub(crate) async fn push_snapshot(
                     )
                     .await
                     .with_context(|| archive_prefix.clone())?;
+                    target_manifest
+                        .add_file(
+                            &archive_name,
+                            upload_stats.size,
+                            upload_stats.csum,
+                            entry.chunk_crypt_mode(),
+                        )
+                        .with_context(|| archive_prefix.clone())?;
                     log_sender
                         .log(
                             Level::INFO,
                             format!(
                                 "{archive_prefix}: uploaded {} ({}/s)",
-                                HumanByte::from(sync_stats.bytes),
+                                HumanByte::from(upload_stats.size),
                                 HumanByte::new_binary(
-                                    sync_stats.bytes as f64 / sync_stats.elapsed.as_secs_f64()
+                                    upload_stats.size as f64 / upload_stats.duration.as_secs_f64()
                                 ),
                             ),
                         )
                         .await?;
-                    stats.add(sync_stats);
+                    stats.add(SyncStats {
+                        chunk_count: upload_stats.chunk_count as usize,
+                        bytes: upload_stats.size as usize,
+                        elapsed: upload_stats.duration,
+                        removed: None,
+                    });
                 }
             }
         } else {
@@ -1213,8 +1246,11 @@ pub(crate) async fn push_snapshot(
             .with_context(|| prefix.to_string())?;
     }
 
-    // Rewrite manifest for pushed snapshot, recreating manifest from source on target
-    let manifest_json = serde_json::to_value(source_manifest)?;
+    // Rewrite manifest for pushed snapshot, recreating manifest from source on target,
+    // needs to update all relevant info for new manifest.
+    target_manifest.unprotected = source_manifest.unprotected;
+    target_manifest.signature = source_manifest.signature;
+    let manifest_json = serde_json::to_value(target_manifest)?;
     let manifest_string = serde_json::to_string_pretty(&manifest_json)?;
     let backup_stats = backup_writer
         .upload_blob_from_data(
@@ -1250,7 +1286,7 @@ async fn push_index(
     backup_writer: &BackupWriter,
     index_type: IndexType,
     known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
-) -> Result<SyncStats, Error> {
+) -> Result<BackupStats, Error> {
     let (upload_channel_tx, upload_channel_rx) = mpsc::channel(20);
     let mut chunk_infos =
         stream::iter(0..index.index_count()).map(move |pos| index.chunk_info(pos).unwrap());
@@ -1302,10 +1338,5 @@ async fn push_index(
         .upload_index_chunk_info(filename, merged_chunk_info_stream, upload_options)
         .await?;
 
-    Ok(SyncStats {
-        chunk_count: upload_stats.chunk_count as usize,
-        bytes: upload_stats.size as usize,
-        elapsed: upload_stats.duration,
-        removed: None,
-    })
+    Ok(upload_stats)
 }
