@@ -127,8 +127,8 @@ pub fn check_acl_path(path: &str) -> Result<(), Error> {
                         _ => {}
                     }
                 }
-                "s3-endpoint" => {
-                    // /system/s3-endpoint/{id}
+                "s3-endpoint" | "encryption-keys" => {
+                    // /system/<matched-component>/{id}
                     if components_len <= 3 {
                         return Ok(());
                     }
