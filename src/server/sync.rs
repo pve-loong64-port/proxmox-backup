@@ -92,7 +92,11 @@ impl SyncStats {
 /// and checking whether chunk sync should be skipped.
 pub(crate) trait SyncSourceReader: Send + Sync {
     /// Returns a chunk reader with the specified encryption mode.
-    fn chunk_reader(&self, crypt_mode: CryptMode) -> Result<Arc<dyn AsyncReadChunk>, Error>;
+    fn chunk_reader(
+        &self,
+        crypt_config: Option<Arc<CryptConfig>>,
+        crypt_mode: CryptMode,
+    ) -> Result<Arc<dyn AsyncReadChunk>, Error>;
 
     /// Asynchronously loads a file from the source into a local file.
     /// `filename` is the name of the file to load from the source.
@@ -119,9 +123,17 @@ pub(crate) struct LocalSourceReader {
 
 #[async_trait::async_trait]
 impl SyncSourceReader for RemoteSourceReader {
-    fn chunk_reader(&self, crypt_mode: CryptMode) -> Result<Arc<dyn AsyncReadChunk>, Error> {
-        let chunk_reader =
-            RemoteChunkReader::new(self.backup_reader.clone(), None, crypt_mode, HashMap::new());
+    fn chunk_reader(
+        &self,
+        crypt_config: Option<Arc<CryptConfig>>,
+        crypt_mode: CryptMode,
+    ) -> Result<Arc<dyn AsyncReadChunk>, Error> {
+        let chunk_reader = RemoteChunkReader::new(
+            self.backup_reader.clone(),
+            crypt_config,
+            crypt_mode,
+            HashMap::new(),
+        );
         Ok(Arc::new(chunk_reader))
     }
 
@@ -194,8 +206,12 @@ impl SyncSourceReader for RemoteSourceReader {
 
 #[async_trait::async_trait]
 impl SyncSourceReader for LocalSourceReader {
-    fn chunk_reader(&self, crypt_mode: CryptMode) -> Result<Arc<dyn AsyncReadChunk>, Error> {
-        let chunk_reader = LocalChunkReader::new(self.datastore.clone(), None, crypt_mode)?;
+    fn chunk_reader(
+        &self,
+        crypt_config: Option<Arc<CryptConfig>>,
+        crypt_mode: CryptMode,
+    ) -> Result<Arc<dyn AsyncReadChunk>, Error> {
+        let chunk_reader = LocalChunkReader::new(self.datastore.clone(), crypt_config, crypt_mode)?;
         Ok(Arc::new(chunk_reader))
     }
 

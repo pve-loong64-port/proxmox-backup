@@ -314,6 +314,7 @@ async fn pull_single_archive<'a>(
     snapshot: &'a pbs_datastore::BackupDir,
     archive_info: &'a FileInfo,
     encountered_chunks: Arc<Mutex<EncounteredChunks>>,
+    crypt_config: Option<Arc<CryptConfig>>,
     backend: &DatastoreBackend,
     log_sender: Arc<LogLineSender>,
 ) -> Result<SyncStats, Error> {
@@ -360,7 +361,7 @@ async fn pull_single_archive<'a>(
             } else {
                 let stats = pull_index_chunks(
                     reader
-                        .chunk_reader(archive_info.crypt_mode)
+                        .chunk_reader(crypt_config.clone(), archive_info.crypt_mode)
                         .context("failed to get chunk reader")
                         .with_context(|| archive_prefix.clone())?,
                     snapshot.datastore().clone(),
@@ -392,7 +393,7 @@ async fn pull_single_archive<'a>(
             } else {
                 let stats = pull_index_chunks(
                     reader
-                        .chunk_reader(archive_info.crypt_mode)
+                        .chunk_reader(crypt_config.clone(), archive_info.crypt_mode)
                         .context("failed to get chunk reader")
                         .with_context(|| archive_prefix.clone())?,
                     snapshot.datastore().clone(),
@@ -594,6 +595,7 @@ async fn pull_snapshot<'a>(
             snapshot,
             item,
             encountered_chunks.clone(),
+            None,
             backend,
             Arc::clone(&log_sender),
         )
