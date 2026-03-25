@@ -15,6 +15,7 @@ Ext.define('PBS.data.PermissionPathsStore', {
         { value: '/system' },
         { value: '/system/certificates' },
         { value: '/system/disks' },
+        { value: '/system/encryption-keys' },
         { value: '/system/log' },
         { value: '/system/network' },
         { value: '/system/network/dns' },
