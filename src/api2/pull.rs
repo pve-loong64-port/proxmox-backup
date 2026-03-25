@@ -7,8 +7,8 @@ use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, DATASTORE_SCHEMA,
-    GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
+    Authid, BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, CRYPT_KEY_ID_SCHEMA,
+    DATASTORE_SCHEMA, GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_PRUNE, PRIV_REMOTE_READ, REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA,
     RESYNC_CORRUPT_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA,
     SYNC_WORKER_THREADS_SCHEMA, TRANSFER_LAST_SCHEMA,
@@ -92,6 +92,7 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
             sync_job.verified_only,
             sync_job.resync_corrupt,
             sync_job.worker_threads,
+            sync_job.associated_key.clone(),
         )
     }
 }
@@ -153,6 +154,14 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
                 schema: SYNC_WORKER_THREADS_SCHEMA,
                 optional: true,
             },
+            "decryption-keys": {
+                type: Array,
+                description: "List of decryption keys.",
+                items: {
+                    schema: CRYPT_KEY_ID_SCHEMA,
+                },
+                optional: true,
+            },
         },
     },
     access: {
@@ -181,6 +190,7 @@ async fn pull(
     verified_only: Option<bool>,
     resync_corrupt: Option<bool>,
     worker_threads: Option<usize>,
+    decryption_keys: Option<Vec<String>>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -222,6 +232,7 @@ async fn pull(
         verified_only,
         resync_corrupt,
         worker_threads,
+        decryption_keys,
     )?;
 
     // fixme: set to_stdout to false?

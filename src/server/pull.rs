@@ -32,6 +32,7 @@ use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{check_backup_owner, DataStore, DatastoreBackend, StoreProgress};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
+use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::sha::sha256;
 use proxmox_human_byte::HumanByte;
 use proxmox_parallel_handler::ParallelHandler;
@@ -68,6 +69,8 @@ pub(crate) struct PullParameters {
     resync_corrupt: bool,
     /// Maximum number of worker threads to pull during sync job
     worker_threads: Option<usize>,
+    /// Decryption key ids and configs to decrypt snapshots with matching key fingerprint
+    crypt_configs: Vec<(String, Arc<CryptConfig>)>,
 }
 
 impl PullParameters {
@@ -89,6 +92,7 @@ impl PullParameters {
         verified_only: Option<bool>,
         resync_corrupt: Option<bool>,
         worker_threads: Option<usize>,
+        decryption_keys: Option<Vec<String>>,
     ) -> Result<Self, Error> {
         if let Some(max_depth) = max_depth {
             ns.check_max_depth(max_depth)?;
@@ -130,6 +134,18 @@ impl PullParameters {
 
         let group_filter = group_filter.unwrap_or_default();
 
+        let crypt_configs = if let Some(key_ids) = &decryption_keys {
+            let mut crypt_configs = Vec::with_capacity(key_ids.len());
+            for key_id in key_ids {
+                let crypt_config =
+                    crate::server::sync::check_privs_and_load_key_config(key_id, &owner, false)?;
+                crypt_configs.push((key_id.to_string(), crypt_config));
+            }
+            crypt_configs
+        } else {
+            Vec::new()
+        };
+
         Ok(Self {
             source,
             target,
@@ -142,6 +158,7 @@ impl PullParameters {
             verified_only,
             resync_corrupt,
             worker_threads,
+            crypt_configs,
         })
     }
 }
