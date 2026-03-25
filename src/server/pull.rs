@@ -3,6 +3,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Seek};
+use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -15,6 +16,9 @@ use super::sync::{
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::server::sync::SharedGroupProgress;
 use anyhow::{bail, format_err, Context, Error};
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
+
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
     BackupNamespace, CryptMode, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
@@ -706,7 +710,7 @@ async fn pull_snapshot<'a>(
         Ok::<(), Error>(())
     };
 
-    if manifest_name.exists() && !corrupt {
+    let existing_target_manifest = if manifest_name.exists() && !corrupt {
         let manifest_blob = proxmox_lang::try_block!({
             let mut manifest_file = std::fs::File::open(&manifest_name).map_err(|err| {
                 format_err!("{prefix}: unable to open local manifest {manifest_name:?} - {err}")
@@ -725,9 +729,13 @@ async fn pull_snapshot<'a>(
             cleanup().await?;
             return Ok(sync_stats); // nothing changed
         }
-    }
 
-    let manifest_data = tmp_manifest_blob.raw_data().to_vec();
+        Some(BackupManifest::try_from(manifest_blob).with_context(|| prefix.clone())?)
+    } else {
+        None
+    };
+
+    let mut manifest_data = tmp_manifest_blob.raw_data().to_vec();
     let manifest = BackupManifest::try_from(tmp_manifest_blob).with_context(|| prefix.clone())?;
 
     if ignore_not_verified_or_encrypted(
@@ -744,6 +752,82 @@ async fn pull_snapshot<'a>(
             })?;
         }
         return Ok(sync_stats);
+    }
+
+    let mut crypt_config = None;
+    let mut new_manifest = None;
+    if let Some(key_fp) = manifest.fingerprint().with_context(|| prefix.clone())? {
+        // source is encrypted, find matching key
+        if let Some((key_id, config)) = params
+            .crypt_configs
+            .iter()
+            .find(|(_id, crypt_conf)| crypt_conf.fingerprint() == *key_fp.bytes())
+        {
+            manifest
+                .check_signature(config)
+                .context("failed to check source manifest signature")
+                .with_context(|| prefix.clone())?;
+
+            if let Some(existing_manifest) = existing_target_manifest {
+                if let Some(existing_fingerprint) = existing_manifest
+                    .fingerprint()
+                    .with_context(|| prefix.clone())?
+                {
+                    if existing_fingerprint != key_fp {
+                        bail!("Detected local encrypted snapshot with encryption key mismatch!");
+                    }
+                } else if let Some(source_fp) = manifest
+                    .get_change_detection_fingerprint()
+                    .context("failed to parse change detection fingerprint of source manifest")
+                    .with_context(|| prefix.clone())?
+                {
+                    // Stored fp is HMAC over the unencrypted source's protected fields; recompute
+                    // over the locally decrypted manifest, not the fresh encrypted remote one.
+                    let target_fp = existing_manifest
+                        .signature(config)
+                        .with_context(|| prefix.clone())?;
+                    if target_fp == *source_fp.bytes() {
+                        fetch_log().await?;
+                        cleanup().await?;
+                        return Ok(sync_stats); // nothing changed
+                    }
+
+                    bail!("Change detection fingerprint mismatch, refuse to continue");
+                }
+            } else {
+                log_sender
+                    .log(
+                        Level::INFO,
+                        format!("Found matching key '{key_id}' with fingerprint {key_fp}, decrypt on pull"),
+                    )
+                    .await?;
+                crypt_config = Some(Arc::clone(config));
+                new_manifest = Some(Arc::new(Mutex::new(BackupManifest::new(snapshot.into()))));
+            }
+        } else if let Some(existing_target_manifest) = existing_target_manifest {
+            if let Some(existing_fingerprint) = existing_target_manifest
+                .fingerprint()
+                .with_context(|| prefix.clone())?
+            {
+                if existing_fingerprint != key_fp {
+                    // pre-existing local manifest for encrypted snapshot with key mismatch
+                    bail!("Local encrypted snapshot with different key detected, refuse to sync");
+                }
+            } else {
+                // pre-existing local manifest without key-fingerprint was previously decrypted,
+                // never overwrite with encrypted
+                bail!(
+                    "local snapshot was previously decrypted but no matching decryption key is configured, refuse to sync"
+                );
+            }
+        } else if !params.crypt_configs.is_empty() {
+            log_sender
+                .log(
+                    Level::INFO,
+                    format!("{prefix}: No matching key found, sync without decryption"),
+                )
+                .await?;
+        }
     }
 
     for item in manifest.files() {
@@ -810,13 +894,47 @@ async fn pull_snapshot<'a>(
             snapshot,
             item,
             encountered_chunks.clone(),
-            None,
+            crypt_config.clone(),
             backend,
             Arc::clone(&log_sender),
-            None,
+            new_manifest.clone(),
         )
         .await?;
         sync_stats.add(stats);
+    }
+
+    if let Some(new_manifest) = new_manifest {
+        let mut new_manifest = Arc::try_unwrap(new_manifest)
+            .map_err(|_arc| {
+                format_err!("failed to take ownership of still referenced new manifest")
+            })?
+            .into_inner()
+            .unwrap();
+
+        // copy over notes ecc, but drop encryption key fingerprint and verify state, to be
+        // reverified independent from the sync.
+        new_manifest.unprotected = manifest.unprotected.clone();
+        if let Some(unprotected) = new_manifest.unprotected.as_object_mut() {
+            unprotected.remove("change-detection-fingerprint");
+            unprotected.remove("key-fingerprint");
+            unprotected.remove("verify_state");
+        } else {
+            bail!("Encountered unexpected manifest without 'unprotected' section.");
+        }
+
+        let manifest_string = new_manifest.to_string(None)?;
+        let manifest_blob = DataBlob::encode(manifest_string.as_bytes(), None, true)?;
+        // update contents to be uploaded to backend
+        manifest_data = manifest_blob.raw_data().to_vec();
+
+        let mut tmp_manifest_file = OpenOptions::new()
+            .write(true)
+            .truncate(true) // clear pre-existing manifest content
+            .open(&tmp_manifest_name)
+            .await?;
+        tmp_manifest_file.write_all(&manifest_data).await?;
+        tmp_manifest_file.flush().await?;
+        nix::unistd::fsync(tmp_manifest_file.as_raw_fd())?;
     }
 
     if let Err(err) = std::fs::rename(&tmp_manifest_name, &manifest_name) {
