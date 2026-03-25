@@ -115,3 +115,82 @@ impl std::str::FromStr for BackupRepository {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_datastore_only() {
+        let repo: BackupRepository = "mystore".parse().unwrap();
+        assert_eq!(repo.store(), "mystore");
+        assert_eq!(repo.host(), "localhost");
+        assert_eq!(repo.port(), 8007);
+        assert_eq!(repo.auth_id().to_string(), "root@pam");
+    }
+
+    #[test]
+    fn parse_host_and_datastore() {
+        let repo: BackupRepository = "myhost:mystore".parse().unwrap();
+        assert_eq!(repo.host(), "myhost");
+        assert_eq!(repo.store(), "mystore");
+    }
+
+    #[test]
+    fn parse_full_with_port() {
+        let repo: BackupRepository = "admin@pam@backuphost:8008:tank".parse().unwrap();
+        assert_eq!(repo.auth_id().to_string(), "admin@pam");
+        assert_eq!(repo.host(), "backuphost");
+        assert_eq!(repo.port(), 8008);
+        assert_eq!(repo.store(), "tank");
+    }
+
+    #[test]
+    fn parse_ipv4_with_port() {
+        let repo: BackupRepository = "192.168.1.1:1234:mystore".parse().unwrap();
+        assert_eq!(repo.host(), "192.168.1.1");
+        assert_eq!(repo.port(), 1234);
+    }
+
+    #[test]
+    fn parse_ipv6_with_port() {
+        let repo: BackupRepository = "[ff80::1]:9007:mystore".parse().unwrap();
+        assert_eq!(repo.host(), "[ff80::1]");
+        assert_eq!(repo.port(), 9007);
+    }
+
+    #[test]
+    fn parse_api_token() {
+        let repo: BackupRepository = "user@pbs!token@myhost:mystore".parse().unwrap();
+        assert_eq!(repo.auth_id().to_string(), "user@pbs!token");
+    }
+
+    #[test]
+    fn parse_invalid_url_errors() {
+        assert!("".parse::<BackupRepository>().is_err());
+    }
+
+    #[test]
+    fn display_round_trip() {
+        for url in [
+            "mystore",
+            "myhost:mystore",
+            "admin@pam@backuphost:8008:tank",
+        ] {
+            let repo: BackupRepository = url.parse().unwrap();
+            assert_eq!(repo.to_string(), url, "round-trip failed for '{url}'");
+        }
+    }
+
+    #[test]
+    fn new_wraps_bare_ipv6_in_brackets() {
+        let repo = BackupRepository::new(None, Some("ff80::1".into()), None, "s".into());
+        assert_eq!(repo.host(), "[ff80::1]");
+    }
+
+    #[test]
+    fn new_preserves_already_bracketed_ipv6() {
+        let repo = BackupRepository::new(None, Some("[ff80::1]".into()), None, "s".into());
+        assert_eq!(repo.host(), "[ff80::1]");
+    }
+}
