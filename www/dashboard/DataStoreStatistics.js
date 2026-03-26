@@ -55,6 +55,8 @@ Ext.define('PBS.DatastoreStatistics', {
 
     title: gettext('Datastore Usage'),
     disableSelection: true,
+    stateful: true,
+    stateId: 'grid-datastore-statistics',
 
     emptyText: gettext('No Data'),
 
