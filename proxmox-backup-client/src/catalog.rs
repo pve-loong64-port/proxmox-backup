@@ -7,7 +7,7 @@ use serde_json::Value;
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
-use pbs_api_types::{BackupArchiveName, BackupNamespace, CATALOG_NAME};
+use pbs_api_types::{BackupArchiveName, CATALOG_NAME};
 use pbs_client::pxar::tools::get_remote_pxar_reader;
 use pbs_client::tools::key_source::get_encryption_key_password;
 use pbs_client::{BackupReader, RemoteChunkReader};
@@ -20,20 +20,16 @@ use crate::{
     complete_backup_snapshot, complete_group_or_snapshot, complete_namespace,
     complete_pxar_archive_name, complete_repository, connect, crypto_parameters, decrypt_key,
     dir_or_last_from_group, extract_repository_from_value, format_key_source, optional_ns_param,
-    record_repository, BackupDir, BufferedDynamicReader, CatalogReader, DynamicIndexReader,
-    IndexFile, Shell, KEYFD_SCHEMA, REPO_URL_SCHEMA,
+    record_repository, BackupDir, BackupTargetArgs, BufferedDynamicReader, CatalogReader,
+    DynamicIndexReader, IndexFile, Shell, KEYFD_SCHEMA,
 };
 
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -159,10 +155,6 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
 #[api(
     input: {
         properties: {
-            ns: {
-                type: BackupNamespace,
-                optional: true,
-            },
             "snapshot": {
                 type: String,
                 description: "Group/Snapshot path.",
@@ -170,9 +162,9 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
             "archive-name": {
                 type: BackupArchiveName,
             },
-            "repository": {
-                optional: true,
-                schema: REPO_URL_SCHEMA,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "keyfile": {
                 optional: true,

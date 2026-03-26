@@ -339,6 +339,15 @@ pub fn extract_repository_from_map(param: &HashMap<String, String>) -> Option<Ba
     resolve_repository(cli).ok()
 }
 
+/// Extract a [`BackupNamespace`] from CLI parameters.
+pub fn optional_ns_param(param: &Value) -> Result<BackupNamespace, Error> {
+    Ok(match param.get("ns") {
+        Some(Value::String(ns)) => ns.parse()?,
+        Some(_) => bail!("invalid namespace parameter"),
+        None => BackupNamespace::root(),
+    })
+}
+
 pub fn connect(repo: &BackupRepository) -> Result<HttpClient, Error> {
     let rate_limit = RateLimitConfig::default(); // unlimited
     connect_do(repo.host(), repo.port(), repo.auth_id(), rate_limit)

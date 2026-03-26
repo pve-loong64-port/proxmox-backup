@@ -6,9 +6,9 @@ use proxmox_schema::api;
 
 use crate::{
     complete_backup_group, complete_namespace, complete_repository, merge_group_into,
-    REPO_URL_SCHEMA,
+    BackupTargetArgs,
 };
-use pbs_api_types::{BackupGroup, BackupNamespace};
+use pbs_api_types::BackupGroup;
 use pbs_client::tools::{connect, remove_repository_from_value};
 
 pub fn group_mgmt_cli() -> CliCommandMap {
@@ -29,13 +29,9 @@ pub fn group_mgmt_cli() -> CliCommandMap {
                 type: String,
                 description: "Backup group",
             },
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
         }
     }

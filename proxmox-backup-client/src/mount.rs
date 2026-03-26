@@ -17,11 +17,11 @@ use proxmox_router::{cli::*, ApiHandler, ApiMethod, RpcEnvironment};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 
-use pbs_api_types::{ArchiveType, BackupArchiveName, BackupNamespace};
+use pbs_api_types::{ArchiveType, BackupArchiveName};
 use pbs_client::tools::key_source::{
     crypto_parameters, format_key_source, get_encryption_key_password,
 };
-use pbs_client::{BackupReader, RemoteChunkReader};
+use pbs_client::{BackupReader, BackupTargetArgs, RemoteChunkReader};
 use pbs_datastore::cached_chunk_reader::CachedChunkReader;
 use pbs_datastore::index::IndexFile;
 use pbs_key_config::decrypt_key;
@@ -32,73 +32,83 @@ use crate::helper;
 use crate::{
     complete_group_or_snapshot, complete_img_archive_name, complete_namespace,
     complete_pxar_archive_name, complete_repository, connect, dir_or_last_from_group,
-    extract_repository_from_value, optional_ns_param, record_repository, REPO_URL_SCHEMA,
+    extract_repository_from_value, optional_ns_param, record_repository,
 };
 
 #[sortable]
-const API_METHOD_MOUNT: ApiMethod = ApiMethod::new(
+const API_METHOD_MOUNT: ApiMethod = ApiMethod::new_full(
     &ApiHandler::Sync(&mount),
-    &ObjectSchema::new(
+    ParameterSchema::AllOf(&AllOfSchema::new(
         "Mount pxar archive.",
-        &sorted!([
-            ("ns", true, &BackupNamespace::API_SCHEMA,),
-            (
-                "snapshot",
-                false,
-                &StringSchema::new("Group/Snapshot path.").schema()
-            ),
-            ("archive-name", false, &BackupArchiveName::API_SCHEMA),
-            (
-                "target",
-                false,
-                &StringSchema::new("Target directory path.").schema()
-            ),
-            ("repository", true, &REPO_URL_SCHEMA),
-            (
-                "keyfile",
-                true,
-                &StringSchema::new("Path to encryption key.").schema()
-            ),
-            (
-                "verbose",
-                true,
-                &BooleanSchema::new("Verbose output and stay in foreground.")
-                    .default(false)
-                    .schema()
-            ),
-        ]),
-    ),
+        &[
+            &ObjectSchema::new(
+                "<mount parameters>",
+                &sorted!([
+                    (
+                        "snapshot",
+                        false,
+                        &StringSchema::new("Group/Snapshot path.").schema()
+                    ),
+                    ("archive-name", false, &BackupArchiveName::API_SCHEMA),
+                    (
+                        "target",
+                        false,
+                        &StringSchema::new("Target directory path.").schema()
+                    ),
+                    (
+                        "keyfile",
+                        true,
+                        &StringSchema::new("Path to encryption key.").schema()
+                    ),
+                    (
+                        "verbose",
+                        true,
+                        &BooleanSchema::new("Verbose output and stay in foreground.")
+                            .default(false)
+                            .schema()
+                    ),
+                ]),
+            )
+            .schema(),
+            &BackupTargetArgs::API_SCHEMA,
+        ],
+    )),
 );
 
 #[sortable]
-const API_METHOD_MAP: ApiMethod = ApiMethod::new(
+const API_METHOD_MAP: ApiMethod = ApiMethod::new_full(
     &ApiHandler::Sync(&mount),
-    &ObjectSchema::new(
-        "Map a drive image from a VM backup to a local loopback device. Use 'unmap' to undo.
-WARNING: Only do this with *trusted* backups!",
-        &sorted!([
-            ("ns", true, &BackupNamespace::API_SCHEMA,),
-            (
-                "snapshot",
-                false,
-                &StringSchema::new("Group/Snapshot path.").schema()
-            ),
-            ("archive-name", false, &BackupArchiveName::API_SCHEMA),
-            ("repository", true, &REPO_URL_SCHEMA),
-            (
-                "keyfile",
-                true,
-                &StringSchema::new("Path to encryption key.").schema()
-            ),
-            (
-                "verbose",
-                true,
-                &BooleanSchema::new("Verbose output and stay in foreground.")
-                    .default(false)
-                    .schema()
-            ),
-        ]),
-    ),
+    ParameterSchema::AllOf(&AllOfSchema::new(
+        "Map a drive image from a VM backup to a local loopback device. Use 'unmap' to undo.\n\
+         WARNING: Only do this with *trusted* backups!",
+        &[
+            &ObjectSchema::new(
+                "<map parameters>",
+                &sorted!([
+                    (
+                        "snapshot",
+                        false,
+                        &StringSchema::new("Group/Snapshot path.").schema()
+                    ),
+                    ("archive-name", false, &BackupArchiveName::API_SCHEMA),
+                    (
+                        "keyfile",
+                        true,
+                        &StringSchema::new("Path to encryption key.").schema()
+                    ),
+                    (
+                        "verbose",
+                        true,
+                        &BooleanSchema::new("Verbose output and stay in foreground.")
+                            .default(false)
+                            .schema()
+                    ),
+                ]),
+            )
+            .schema(),
+            &BackupTargetArgs::API_SCHEMA,
+        ],
+    )),
 );
 
 #[sortable]

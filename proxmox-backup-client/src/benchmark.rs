@@ -22,7 +22,7 @@ use pbs_key_config::{load_and_decrypt_key, KeyDerivationConfig};
 use pbs_tools::crypt_config::CryptConfig;
 
 use crate::{
-    connect, extract_repository_from_value, record_repository, KEYFILE_SCHEMA, REPO_URL_SCHEMA,
+    connect, extract_repository_from_value, record_repository, BackupRepositoryArgs, KEYFILE_SCHEMA,
 };
 
 #[api()]
@@ -105,9 +105,9 @@ static BENCHMARK_RESULT_2020_TOP: BenchmarkResult = BenchmarkResult {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
             },
             keyfile: {
                 schema: KEYFILE_SCHEMA,

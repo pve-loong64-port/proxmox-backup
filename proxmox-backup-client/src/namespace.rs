@@ -1,8 +1,7 @@
 use anyhow::{bail, Error};
 use serde_json::{json, Value};
 
-use pbs_api_types::BackupNamespace;
-use pbs_client::tools::REPO_URL_SCHEMA;
+use pbs_client::BackupTargetArgs;
 
 use proxmox_router::cli::{
     format_and_print_result, get_output_format, CliCommand, CliCommandMap, OUTPUT_FORMAT,
@@ -17,13 +16,9 @@ use crate::{
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "max-depth": {
                 description: "maximum recursion depth",
@@ -84,13 +79,9 @@ async fn list_namespaces(param: Value, max_depth: Option<usize>) -> Result<(), E
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
         }
     },
@@ -124,13 +115,9 @@ async fn create_namespace(param: Value) -> Result<(), Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "delete-groups": {
                 description: "Destroys all groups in the hierarchy.",

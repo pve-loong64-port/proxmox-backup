@@ -17,8 +17,8 @@ use pbs_tools::json::required_string_param;
 use crate::{
     api_datastore_list_snapshots, complete_backup_group, complete_backup_snapshot,
     complete_namespace, complete_repository, connect, crypto_parameters,
-    extract_repository_from_value, optional_ns_param, record_repository, BackupDir, KEYFD_SCHEMA,
-    KEYFILE_SCHEMA, REPO_URL_SCHEMA,
+    extract_repository_from_value, optional_ns_param, record_repository, BackupDir,
+    BackupTargetArgs, KEYFD_SCHEMA, KEYFILE_SCHEMA,
 };
 
 fn snapshot_args(ns: &BackupNamespace, snapshot: &BackupDir) -> Result<Value, Error> {
@@ -32,13 +32,9 @@ fn snapshot_args(ns: &BackupNamespace, snapshot: &BackupDir) -> Result<Value, Er
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             group: {
                 type: String,
@@ -108,13 +104,9 @@ async fn list_snapshots(param: Value) -> Result<Value, Error> {
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -161,13 +153,9 @@ async fn list_snapshot_files(param: Value) -> Result<Value, Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -200,13 +188,9 @@ async fn forget_snapshots(param: Value) -> Result<(), Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -281,13 +265,9 @@ async fn upload_log(param: Value) -> Result<Value, Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -338,13 +318,9 @@ async fn show_notes(param: Value) -> Result<Value, Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -380,13 +356,9 @@ async fn update_notes(param: Value) -> Result<Value, Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -437,13 +409,9 @@ async fn show_protection(param: Value) -> Result<(), Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,

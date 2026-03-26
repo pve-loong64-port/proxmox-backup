@@ -19,9 +19,9 @@ use pbs_client::tools::key_source::{
 };
 use pbs_client::tools::{
     complete_archive_name, complete_group_or_snapshot, connect, extract_repository_from_value,
-    REPO_URL_SCHEMA,
+    optional_ns_param,
 };
-use pbs_client::{BackupReader, BackupRepository, RemoteChunkReader};
+use pbs_client::{BackupReader, BackupRepository, BackupTargetArgs, RemoteChunkReader};
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, LocalDynamicReadAt};
 use pbs_datastore::index::IndexFile;
 use pbs_key_config::decrypt_key;
@@ -57,10 +57,6 @@ pub fn diff_commands() -> CommandLineInterface {
 #[api(
     input: {
         properties: {
-            "ns": {
-                type: BackupNamespace,
-                optional: true,
-            },
             "prev-snapshot": {
                 description: "Path for the first snapshot.",
                 type: String,
@@ -72,9 +68,9 @@ pub fn diff_commands() -> CommandLineInterface {
             "archive-name": {
                 type: BackupArchiveName,
             },
-            "repository": {
-                optional: true,
-                schema: REPO_URL_SCHEMA,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "keyfile": {
                 optional: true,
@@ -108,13 +104,12 @@ async fn diff_archive_cmd(
     archive_name: BackupArchiveName,
     compare_content: bool,
     color: Option<ColorMode>,
-    ns: Option<BackupNamespace>,
     param: Value,
 ) -> Result<(), Error> {
     let repo = extract_repository_from_value(&param)?;
 
     let color = color.unwrap_or_default();
-    let namespace = ns.unwrap_or_else(BackupNamespace::root);
+    let namespace = optional_ns_param(&param)?;
 
     let crypto = crypto_parameters(&param)?;
 

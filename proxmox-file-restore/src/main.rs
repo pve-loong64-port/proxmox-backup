@@ -31,9 +31,9 @@ use pbs_client::tools::{
         crypto_parameters_keep_fd, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
         KEYFILE_SCHEMA,
     },
-    REPO_URL_SCHEMA,
+    optional_ns_param,
 };
-use pbs_client::{BackupReader, BackupRepository, RemoteChunkReader};
+use pbs_client::{BackupReader, BackupRepository, BackupTargetArgs, RemoteChunkReader};
 use pbs_datastore::catalog::{ArchiveEntry, CatalogReader, DirEntryAttribute};
 use pbs_datastore::dynamic_index::BufferedDynamicReader;
 use pbs_datastore::index::IndexFile;
@@ -212,13 +212,9 @@ async fn list_files(
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -272,7 +268,6 @@ async fn list_files(
 )]
 /// List a directory from a backup snapshot.
 async fn list(
-    ns: Option<BackupNamespace>,
     snapshot: String,
     path: String,
     base64: bool,
@@ -280,7 +275,7 @@ async fn list(
     param: Value,
 ) -> Result<(), Error> {
     let repo = extract_repository_from_value(&param)?;
-    let ns = ns.unwrap_or_default();
+    let ns = optional_ns_param(&param)?;
     let snapshot: BackupDir = snapshot.parse()?;
     let path = parse_path(path, base64)?;
 
@@ -361,13 +356,9 @@ async fn list(
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -426,7 +417,6 @@ async fn list(
 /// Restore files from a backup snapshot.
 #[allow(clippy::too_many_arguments)]
 async fn extract(
-    ns: Option<BackupNamespace>,
     snapshot: String,
     path: String,
     base64: bool,
@@ -436,7 +426,7 @@ async fn extract(
     param: Value,
 ) -> Result<(), Error> {
     let repo = extract_repository_from_value(&param)?;
-    let namespace = ns.unwrap_or_default();
+    let namespace = optional_ns_param(&param)?;
     let snapshot: BackupDir = snapshot.parse()?;
     let orig_path = path;
     let path = parse_path(orig_path.clone(), base64)?;

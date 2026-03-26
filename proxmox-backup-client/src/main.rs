@@ -27,8 +27,8 @@ use pbs_api_types::{
     ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
     BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPattern,
     PruneJobOptions, PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus,
-    BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
-    CATALOG_NAME, ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
+    BACKUP_ID_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
+    ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
@@ -36,18 +36,19 @@ use pbs_client::tools::{
     complete_archive_name, complete_auth_id, complete_backup_group, complete_backup_snapshot,
     complete_backup_source, complete_chunk_size, complete_group_or_snapshot,
     complete_img_archive_name, complete_namespace, complete_pxar_archive_name, complete_repository,
-    connect, connect_rate_limited, extract_repository_from_value,
+    connect, connect_rate_limited, extract_repository_from_value, remove_repository_from_value,
     key_source::{
         crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
         KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
     },
-    raise_nofile_limit, CHUNK_SIZE_SCHEMA, REPO_URL_SCHEMA,
+    raise_nofile_limit, CHUNK_SIZE_SCHEMA,
 };
 use pbs_client::{
     delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
-    BackupReader, BackupRepository, BackupSpecificationType, BackupStats, BackupWriter,
-    BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, IndexType, InjectionData,
-    PxarBackupStream, RemoteChunkReader, UploadOptions, BACKUP_SOURCE_SCHEMA,
+    BackupReader, BackupRepository, BackupRepositoryArgs, BackupSpecificationType, BackupStats,
+    BackupTargetArgs, BackupWriter, BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient,
+    IndexType, InjectionData, PxarBackupStream, RemoteChunkReader, UploadOptions,
+    BACKUP_SOURCE_SCHEMA,
 };
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogReader, CatalogWriter};
 use pbs_datastore::chunk_store::verify_chunk_size;
@@ -329,24 +330,15 @@ async fn backup_image<P: AsRef<Path>>(
     Ok(stats)
 }
 
-pub fn optional_ns_param(param: &Value) -> Result<BackupNamespace, Error> {
-    Ok(match param.get("ns") {
-        Some(Value::String(ns)) => ns.parse()?,
-        Some(_) => bail!("invalid namespace parameter"),
-        None => BackupNamespace::root(),
-    })
-}
+// Re-export for use by submodules.
+pub use pbs_client::tools::optional_ns_param;
 
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            "ns": {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "output-format": {
                 schema: OUTPUT_FORMAT,
@@ -433,17 +425,13 @@ fn merge_group_into(to: &mut serde_json::Map<String, Value>, group: BackupGroup)
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             group: {
                 type: String,
                 description: "Backup group.",
-            },
-            "ns": {
-                type: BackupNamespace,
-                optional: true,
             },
             "new-owner": {
                 type: Authid,
@@ -453,12 +441,10 @@ fn merge_group_into(to: &mut serde_json::Map<String, Value>, group: BackupGroup)
 )]
 /// Change owner of a backup group
 async fn change_backup_owner(group: String, mut param: Value) -> Result<(), Error> {
-    let repo = extract_repository_from_value(&param)?;
+    let repo = remove_repository_from_value(&mut param)?;
     let ns = optional_ns_param(&param)?;
 
     let client = connect(&repo)?;
-
-    param.as_object_mut().unwrap().remove("repository");
 
     let group: BackupGroup = group.parse()?;
 
@@ -478,9 +464,9 @@ async fn change_backup_owner(group: String, mut param: Value) -> Result<(), Erro
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
             },
         }
    }
@@ -500,9 +486,9 @@ async fn api_login(param: Value) -> Result<Value, Error> {
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
             },
         }
    }
@@ -519,9 +505,9 @@ fn api_logout(param: Value) -> Result<Value, Error> {
 #[api(
    input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
             },
             "output-format": {
                 schema: OUTPUT_FORMAT,
@@ -572,9 +558,9 @@ async fn api_version(param: Value) -> Result<(), Error> {
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
             },
             "output-format": {
                 schema: OUTPUT_FORMAT,
@@ -662,9 +648,9 @@ fn spawn_catalog_upload(
                     schema: BACKUP_SOURCE_SCHEMA,
                 }
             },
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             "include-dev": {
                 description:
@@ -707,10 +693,6 @@ fn spawn_catalog_upload(
                 description: "Skip lost+found directory.",
                 optional: true,
                 default: false,
-            },
-            "ns": {
-                schema: BACKUP_NAMESPACE_SCHEMA,
-                optional: true,
             },
             "backup-type": {
                 schema: BACKUP_TYPE_SCHEMA,
@@ -1439,13 +1421,9 @@ async fn dump_image<W: Write>(
 #[api(
     input: {
         properties: {
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
-            },
-            ns: {
-                type: BackupNamespace,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
             snapshot: {
                 type: String,
@@ -1837,9 +1815,9 @@ async fn restore(
                 default: false,
                 description: "Minimal output - only show removals.",
             },
-            repository: {
-                schema: REPO_URL_SCHEMA,
-                optional: true,
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
             },
         },
     },
@@ -1929,9 +1907,9 @@ async fn prune(
 #[api(
    input: {
        properties: {
-           repository: {
-               schema: REPO_URL_SCHEMA,
-               optional: true,
+           repo: {
+               type: BackupRepositoryArgs,
+               flatten: true,
            },
            "output-format": {
                schema: OUTPUT_FORMAT,
