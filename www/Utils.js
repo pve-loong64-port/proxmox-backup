@@ -433,7 +433,7 @@ Ext.define('PBS.Utils', {
             dircreate: [gettext('Directory Storage'), gettext('Create')],
             dirremove: [gettext('Directory'), gettext('Remove')],
             'eject-media': [gettext('Drive'), gettext('Eject Media')],
-            'format-media': [gettext('Drive'), gettext('Format media')],
+            'format-media': [gettext('Drive'), gettext('Format Media')],
             'forget-group': [gettext('Group'), gettext('Remove Group')],
             garbage_collection: ['Datastore', gettext('Garbage Collect')],
             'realm-sync': ['Realm', gettext('User Sync')],
