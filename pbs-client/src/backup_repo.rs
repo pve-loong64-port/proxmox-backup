@@ -1,8 +1,159 @@
 use std::fmt;
 
-use anyhow::{format_err, Error};
+use anyhow::{bail, format_err, Error};
+use serde::{Deserialize, Serialize};
 
-use pbs_api_types::{Authid, Userid, BACKUP_REPO_URL_REGEX, IP_V6_REGEX};
+use proxmox_schema::*;
+
+use pbs_api_types::{
+    Authid, BackupNamespace, Userid, BACKUP_REPO_URL, BACKUP_REPO_URL_REGEX, DATASTORE_SCHEMA,
+    IP_V6_REGEX,
+};
+
+pub const REPO_URL_SCHEMA: Schema =
+    StringSchema::new("Repository URL: [[auth-id@]server[:port]:]datastore")
+        .format(&BACKUP_REPO_URL)
+        .max_length(256)
+        .schema();
+
+pub const BACKUP_REPO_SERVER_SCHEMA: Schema =
+    StringSchema::new("Backup server address (hostname or IP). Default: localhost")
+        .format(&api_types::DNS_NAME_OR_IP_FORMAT)
+        .max_length(256)
+        .schema();
+
+pub const BACKUP_REPO_PORT_SCHEMA: Schema = IntegerSchema::new("Backup server port. Default: 8007")
+    .minimum(1)
+    .maximum(65535)
+    .default(8007)
+    .schema();
+
+#[api(
+    properties: {
+        repository: {
+            schema: REPO_URL_SCHEMA,
+            optional: true,
+        },
+        server: {
+            schema: BACKUP_REPO_SERVER_SCHEMA,
+            optional: true,
+        },
+        port: {
+            schema: BACKUP_REPO_PORT_SCHEMA,
+            optional: true,
+        },
+        datastore: {
+            schema: DATASTORE_SCHEMA,
+            optional: true,
+        },
+        "auth-id": {
+            type: Authid,
+            optional: true,
+        },
+    },
+)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+/// Backup repository location, specified either as a repository URL or as individual
+/// components (server, port, datastore, auth-id).
+pub struct BackupRepositoryArgs {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datastore: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_id: Option<Authid>,
+}
+
+#[api(
+    properties: {
+        target: {
+            type: BackupRepositoryArgs,
+            flatten: true,
+        },
+        ns: {
+            type: BackupNamespace,
+            optional: true,
+        },
+    },
+)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+/// Backup target for CLI commands, combining the repository location with an
+/// optional namespace.
+pub struct BackupTargetArgs {
+    #[serde(flatten)]
+    pub target: BackupRepositoryArgs,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ns: Option<BackupNamespace>,
+}
+
+impl BackupRepositoryArgs {
+    /// Returns `true` if any atom parameter (server, port, datastore, or auth-id) is set.
+    pub fn has_atoms(&self) -> bool {
+        self.server.is_some()
+            || self.port.is_some()
+            || self.datastore.is_some()
+            || self.auth_id.is_some()
+    }
+
+    /// Check that `--repository` and atom options are not mixed.
+    pub fn check_mutual_exclusion(&self) -> Result<(), Error> {
+        if self.repository.is_some() && self.has_atoms() {
+            bail!("--repository and --server/--port/--datastore/--auth-id are mutually exclusive");
+        }
+        Ok(())
+    }
+
+    /// Merge `self` with `fallback`, using values from `self` where present
+    /// and filling in from `fallback` for fields that are `None`.
+    pub fn merge_from(self, fallback: BackupRepositoryArgs) -> Self {
+        Self {
+            repository: self.repository.or(fallback.repository),
+            server: self.server.or(fallback.server),
+            port: self.port.or(fallback.port),
+            datastore: self.datastore.or(fallback.datastore),
+            auth_id: self.auth_id.or(fallback.auth_id),
+        }
+    }
+}
+
+impl TryFrom<BackupRepositoryArgs> for BackupRepository {
+    type Error = anyhow::Error;
+
+    /// Convert explicit CLI arguments into a [`BackupRepository`].
+    ///
+    /// * If `repository` and any atom are both set, returns an error.
+    /// * If atoms are present, builds the repository from them (requires `datastore`).
+    /// * If only `repository` is set, parses the repo URL.
+    /// * If nothing is set, returns an error - callers must fall back to environment variables /
+    ///   credentials themselves.
+    fn try_from(args: BackupRepositoryArgs) -> Result<Self, Self::Error> {
+        args.check_mutual_exclusion()?;
+
+        if args.has_atoms() {
+            let store = args.datastore.ok_or_else(|| {
+                format_err!("--datastore is required when not using --repository")
+            })?;
+            return Ok(BackupRepository::new(
+                args.auth_id,
+                args.server,
+                args.port,
+                store,
+            ));
+        }
+
+        if let Some(url) = args.repository {
+            return url.parse();
+        }
+
+        bail!("no repository specified")
+    }
+}
 
 /// Reference remote backup locations
 ///
@@ -192,5 +343,95 @@ mod tests {
     fn new_preserves_already_bracketed_ipv6() {
         let repo = BackupRepository::new(None, Some("[ff80::1]".into()), None, "s".into());
         assert_eq!(repo.host(), "[ff80::1]");
+    }
+
+    #[test]
+    fn has_atoms() {
+        assert!(!BackupRepositoryArgs::default().has_atoms());
+
+        let with_server = BackupRepositoryArgs {
+            server: Some("host".into()),
+            ..Default::default()
+        };
+        assert!(with_server.has_atoms());
+
+        let repo_only = BackupRepositoryArgs {
+            repository: Some("myhost:mystore".into()),
+            ..Default::default()
+        };
+        assert!(!repo_only.has_atoms());
+    }
+
+    #[test]
+    fn try_from_atoms_only() {
+        let args = BackupRepositoryArgs {
+            server: Some("pbs.local".into()),
+            port: Some(9000),
+            datastore: Some("tank".into()),
+            auth_id: Some("backup@pam".parse().unwrap()),
+            ..Default::default()
+        };
+        let repo = BackupRepository::try_from(args).unwrap();
+        assert_eq!(repo.host(), "pbs.local");
+        assert_eq!(repo.port(), 9000);
+        assert_eq!(repo.store(), "tank");
+        assert_eq!(repo.auth_id().to_string(), "backup@pam");
+    }
+
+    #[test]
+    fn try_from_atoms_datastore_only() {
+        let args = BackupRepositoryArgs {
+            datastore: Some("local".into()),
+            ..Default::default()
+        };
+        let repo = BackupRepository::try_from(args).unwrap();
+        assert_eq!(repo.store(), "local");
+        assert_eq!(repo.host(), "localhost");
+        assert_eq!(repo.port(), 8007);
+    }
+
+    #[test]
+    fn try_from_url_only() {
+        let args = BackupRepositoryArgs {
+            repository: Some("admin@pam@backuphost:8008:mystore".into()),
+            ..Default::default()
+        };
+        let repo = BackupRepository::try_from(args).unwrap();
+        assert_eq!(repo.host(), "backuphost");
+        assert_eq!(repo.port(), 8008);
+        assert_eq!(repo.store(), "mystore");
+    }
+
+    #[test]
+    fn try_from_mutual_exclusion_error() {
+        let args = BackupRepositoryArgs {
+            repository: Some("somehost:mystore".into()),
+            server: Some("otherhost".into()),
+            ..Default::default()
+        };
+        let err = BackupRepository::try_from(args).unwrap_err();
+        assert!(err.to_string().contains("mutually exclusive"), "got: {err}");
+    }
+
+    #[test]
+    fn try_from_nothing_set_error() {
+        let err = BackupRepository::try_from(BackupRepositoryArgs::default()).unwrap_err();
+        assert!(
+            err.to_string().contains("no repository specified"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn try_from_atoms_without_datastore_error() {
+        let args = BackupRepositoryArgs {
+            server: Some("pbs.local".into()),
+            ..Default::default()
+        };
+        let err = BackupRepository::try_from(args).unwrap_err();
+        assert!(
+            err.to_string().contains("--datastore is required"),
+            "got: {err}"
+        );
     }
 }

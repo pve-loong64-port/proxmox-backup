@@ -17,12 +17,14 @@ use proxmox_router::cli::{complete_file_name, shellword_split};
 use proxmox_schema::*;
 use proxmox_sys::fs::file_get_json;
 
-use pbs_api_types::{
-    Authid, BackupArchiveName, BackupNamespace, RateLimitConfig, UserWithTokens, BACKUP_REPO_URL,
-};
+use pbs_api_types::{Authid, BackupArchiveName, BackupNamespace, RateLimitConfig, UserWithTokens};
 use pbs_datastore::BackupManifest;
 
-use crate::{BackupRepository, HttpClient, HttpClientOptions};
+use crate::{BackupRepository, BackupRepositoryArgs, HttpClient, HttpClientOptions};
+
+// Re-export for backward compatibility; the canonical definition is now in backup_repo alongside
+// BackupRepositoryArgs.
+pub use crate::REPO_URL_SCHEMA;
 
 pub mod key_source;
 
@@ -30,6 +32,10 @@ const ENV_VAR_PBS_FINGERPRINT: &str = "PBS_FINGERPRINT";
 const ENV_VAR_PBS_PASSWORD: &str = "PBS_PASSWORD";
 const ENV_VAR_PBS_ENCRYPTION_PASSWORD: &str = "PBS_ENCRYPTION_PASSWORD";
 const ENV_VAR_PBS_REPOSITORY: &str = "PBS_REPOSITORY";
+const ENV_VAR_PBS_SERVER: &str = "PBS_SERVER";
+const ENV_VAR_PBS_PORT: &str = "PBS_PORT";
+const ENV_VAR_PBS_DATASTORE: &str = "PBS_DATASTORE";
+const ENV_VAR_PBS_AUTH_ID: &str = "PBS_AUTH_ID";
 
 /// Directory with system [credential]s. See systemd-creds(1).
 ///
@@ -43,11 +49,6 @@ const CRED_PBS_PASSWORD: &str = "proxmox-backup-client.password";
 const CRED_PBS_REPOSITORY: &str = "proxmox-backup-client.repository";
 /// Credential name of the the fingerprint.
 const CRED_PBS_FINGERPRINT: &str = "proxmox-backup-client.fingerprint";
-
-pub const REPO_URL_SCHEMA: Schema = StringSchema::new("Repository URL.")
-    .format(&BACKUP_REPO_URL)
-    .max_length(256)
-    .schema();
 
 pub const CHUNK_SIZE_SCHEMA: Schema = IntegerSchema::new("Chunk size in KB. Must be a power of 2.")
     .minimum(64)
@@ -233,41 +234,109 @@ pub fn get_fingerprint() -> Option<String> {
         .unwrap_or_default()
 }
 
-pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
-    if let Some(url) = param
-        .as_object_mut()
-        .ok_or_else(|| format_err!("unable to get repository (parameter is not an object)"))?
-        .remove("repository")
-    {
-        return url
+/// Build [`BackupRepositoryArgs`] from the fields in a JSON Value.
+fn args_from_value(param: &Value) -> BackupRepositoryArgs {
+    BackupRepositoryArgs {
+        repository: param["repository"].as_str().map(String::from),
+        server: param["server"].as_str().map(String::from),
+        port: param["port"].as_u64().map(|p| p as u16),
+        datastore: param["datastore"].as_str().map(String::from),
+        auth_id: param["auth-id"]
             .as_str()
-            .ok_or_else(|| format_err!("invalid repository value (must be a string)"))?
-            .parse();
+            .and_then(|s| s.parse::<Authid>().ok()),
+    }
+}
+
+/// Build [`BackupRepositoryArgs`] from `PBS_*` environment variables.
+fn args_from_env() -> BackupRepositoryArgs {
+    BackupRepositoryArgs {
+        repository: None,
+        server: std::env::var(ENV_VAR_PBS_SERVER).ok(),
+        port: std::env::var(ENV_VAR_PBS_PORT)
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok()),
+        datastore: std::env::var(ENV_VAR_PBS_DATASTORE).ok(),
+        auth_id: std::env::var(ENV_VAR_PBS_AUTH_ID)
+            .ok()
+            .and_then(|s| s.parse::<Authid>().ok()),
+    }
+}
+
+/// Resolve a [`BackupRepository`] from explicit CLI arguments with environment variable fallback.
+///
+/// Resolution:
+/// - `--repository` and CLI atoms are mutually exclusive.
+/// - `--repository` alone is used as-is (env vars ignored).
+/// - CLI atoms are merged with `PBS_*` env atom vars per-field (CLI wins).
+/// - If no CLI args are given, falls back to `PBS_REPOSITORY`, then to
+///   `PBS_*` atom env vars, then errors.
+fn resolve_repository(cli: BackupRepositoryArgs) -> Result<BackupRepository, Error> {
+    cli.check_mutual_exclusion()?;
+
+    if cli.repository.is_some() {
+        return BackupRepository::try_from(cli);
+    }
+    if cli.has_atoms() {
+        let env = args_from_env();
+        return BackupRepository::try_from(cli.merge_from(env));
     }
 
-    get_default_repository()
-        .ok_or_else(|| format_err!("unable to get default repository"))?
-        .parse()
+    // No CLI args at all, try environment.
+    if let Some(url) = get_default_repository() {
+        return url.parse();
+    }
+    let env = args_from_env();
+    if env.has_atoms() {
+        return BackupRepository::try_from(env);
+    }
+    bail!("unable to get (default) repository");
 }
 
+/// Remove repository-related keys from a JSON Value and return the parsed [`BackupRepository`].
+///
+/// This is used by commands that forward the remaining parameters to the server API after stripping
+/// the repository fields.
+pub fn remove_repository_from_value(param: &mut Value) -> Result<BackupRepository, Error> {
+    let map = param
+        .as_object_mut()
+        .ok_or_else(|| format_err!("unable to get repository (parameter is not an object)"))?;
+
+    let to_string = |v: Value| v.as_str().map(String::from);
+
+    let args = BackupRepositoryArgs {
+        repository: map.remove("repository").and_then(to_string),
+        server: map.remove("server").and_then(to_string),
+        port: map
+            .remove("port")
+            .and_then(|v| v.as_u64())
+            .map(|p| p as u16),
+        datastore: map.remove("datastore").and_then(to_string),
+        auth_id: map
+            .remove("auth-id")
+            .and_then(to_string)
+            .map(|s| s.parse::<Authid>())
+            .transpose()?,
+    };
+
+    resolve_repository(args)
+}
+
+/// Extract a [`BackupRepository`] from CLI parameters.
 pub fn extract_repository_from_value(param: &Value) -> Result<BackupRepository, Error> {
-    let repo_url = param["repository"]
-        .as_str()
-        .map(String::from)
-        .or_else(get_default_repository)
-        .ok_or_else(|| format_err!("unable to get (default) repository"))?;
-
-    let repo: BackupRepository = repo_url.parse()?;
-
-    Ok(repo)
+    resolve_repository(args_from_value(param))
 }
 
+/// Extract a [`BackupRepository`] from a parameter map (used for shell completion callbacks).
 pub fn extract_repository_from_map(param: &HashMap<String, String>) -> Option<BackupRepository> {
-    param
-        .get("repository")
-        .map(String::from)
-        .or_else(get_default_repository)
-        .and_then(|repo_url| repo_url.parse::<BackupRepository>().ok())
+    let cli = BackupRepositoryArgs {
+        repository: param.get("repository").cloned(),
+        server: param.get("server").cloned(),
+        port: param.get("port").and_then(|p| p.parse().ok()),
+        datastore: param.get("datastore").cloned(),
+        auth_id: param.get("auth-id").and_then(|s| s.parse().ok()),
+    };
+
+    resolve_repository(cli).ok()
 }
 
 pub fn connect(repo: &BackupRepository) -> Result<HttpClient, Error> {
@@ -756,4 +825,141 @@ pub fn create_tmp_file() -> std::io::Result<std::fs::File> {
             Err(err)
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    const REPO_ENV_VARS: &[&str] = &[
+        ENV_VAR_PBS_REPOSITORY,
+        ENV_VAR_PBS_SERVER,
+        ENV_VAR_PBS_PORT,
+        ENV_VAR_PBS_DATASTORE,
+        ENV_VAR_PBS_AUTH_ID,
+        ENV_VAR_CREDENTIALS_DIRECTORY,
+    ];
+
+    fn with_cleared_repo_env(f: impl FnOnce()) {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        for k in REPO_ENV_VARS {
+            std::env::remove_var(k);
+        }
+        f();
+        for k in REPO_ENV_VARS {
+            std::env::remove_var(k);
+        }
+    }
+
+    #[test]
+    fn extract_repo_from_atoms() {
+        with_cleared_repo_env(|| {
+            let param = json!({"server": "myhost", "datastore": "mystore"});
+            let repo = extract_repository_from_value(&param).unwrap();
+            assert_eq!(repo.host(), "myhost");
+            assert_eq!(repo.store(), "mystore");
+            assert_eq!(repo.port(), 8007);
+        });
+    }
+
+    #[test]
+    fn extract_repo_from_url() {
+        with_cleared_repo_env(|| {
+            let param = json!({"repository": "myhost:mystore"});
+            let repo = extract_repository_from_value(&param).unwrap();
+            assert_eq!(repo.host(), "myhost");
+            assert_eq!(repo.store(), "mystore");
+        });
+    }
+
+    #[test]
+    fn extract_repo_mutual_exclusion_error() {
+        with_cleared_repo_env(|| {
+            let param = json!({"repository": "myhost:mystore", "auth-id": "user@pam"});
+            let err = extract_repository_from_value(&param).unwrap_err();
+            assert!(err.to_string().contains("mutually exclusive"), "got: {err}");
+        });
+    }
+
+    #[test]
+    fn extract_repo_atoms_without_datastore_error() {
+        with_cleared_repo_env(|| {
+            let param = json!({"server": "myhost"});
+            let err = extract_repository_from_value(&param).unwrap_err();
+            assert!(
+                err.to_string().contains("--datastore is required"),
+                "got: {err}"
+            );
+        });
+    }
+
+    #[test]
+    fn extract_repo_nothing_provided_error() {
+        with_cleared_repo_env(|| {
+            let err = extract_repository_from_value(&json!({})).unwrap_err();
+            assert!(err.to_string().contains("unable to get"), "got: {err}");
+        });
+    }
+
+    #[test]
+    fn extract_repo_env_fallback() {
+        with_cleared_repo_env(|| {
+            std::env::set_var(ENV_VAR_PBS_SERVER, "envhost");
+            std::env::set_var(ENV_VAR_PBS_DATASTORE, "envstore");
+            let repo = extract_repository_from_value(&json!({})).unwrap();
+            assert_eq!(repo.host(), "envhost");
+            assert_eq!(repo.store(), "envstore");
+        });
+    }
+
+    #[test]
+    fn extract_repo_pbs_repository_env_takes_precedence() {
+        with_cleared_repo_env(|| {
+            std::env::set_var(ENV_VAR_PBS_REPOSITORY, "repohost:repostore");
+            std::env::set_var(ENV_VAR_PBS_SERVER, "envhost");
+            std::env::set_var(ENV_VAR_PBS_DATASTORE, "envstore");
+            let repo = extract_repository_from_value(&json!({})).unwrap();
+            assert_eq!(repo.host(), "repohost");
+            assert_eq!(repo.store(), "repostore");
+        });
+    }
+
+    #[test]
+    fn extract_repo_cli_overrides_env() {
+        with_cleared_repo_env(|| {
+            std::env::set_var(ENV_VAR_PBS_REPOSITORY, "envhost:envstore");
+            let param = json!({"server": "clihost", "datastore": "clistore"});
+            let repo = extract_repository_from_value(&param).unwrap();
+            assert_eq!(repo.host(), "clihost");
+            assert_eq!(repo.store(), "clistore");
+        });
+    }
+
+    #[test]
+    fn extract_repo_cli_atoms_merge_with_env_atoms() {
+        with_cleared_repo_env(|| {
+            std::env::set_var(ENV_VAR_PBS_SERVER, "envhost");
+            std::env::set_var(ENV_VAR_PBS_DATASTORE, "envstore");
+            let param = json!({"auth-id": "backup@pbs"});
+            let repo = extract_repository_from_value(&param).unwrap();
+            assert_eq!(repo.host(), "envhost");
+            assert_eq!(repo.store(), "envstore");
+            assert_eq!(repo.auth_id().to_string(), "backup@pbs");
+        });
+    }
+
+    #[test]
+    fn extract_repo_cli_atom_overrides_same_env_atom() {
+        with_cleared_repo_env(|| {
+            std::env::set_var(ENV_VAR_PBS_SERVER, "envhost");
+            std::env::set_var(ENV_VAR_PBS_DATASTORE, "envstore");
+            let param = json!({"server": "clihost"});
+            let repo = extract_repository_from_value(&param).unwrap();
+            assert_eq!(repo.host(), "clihost");
+            assert_eq!(repo.store(), "envstore");
+        });
+    }
 }
