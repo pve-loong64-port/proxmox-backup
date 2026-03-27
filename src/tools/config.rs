@@ -177,7 +177,7 @@ fn test() {
     use proxmox_schema::ApiType;
 
     // let's just reuse some schema we actually have available:
-    use crate::config::node::NodeConfig;
+    use pbs_api_types::NodeConfig;
 
     const NODE_CONFIG: &str = "\
         acme: account=pebble\n\
@@ -198,7 +198,7 @@ fn test_with_comment() {
     use proxmox_schema::ApiType;
 
     // let's just reuse some schema we actually have available:
-    use crate::config::node::NodeConfig;
+    use pbs_api_types::NodeConfig;
 
     const NODE_INPUT: &str = "\
         #this should\n\
