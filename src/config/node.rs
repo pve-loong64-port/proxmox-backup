@@ -9,13 +9,11 @@ use pbs_api_types::{
     OPENSSL_CIPHERS_TLS_1_3_SCHEMA,
 };
 use proxmox_acme_api::{AcmeConfig, AcmeDomain, ACME_DOMAIN_PROPERTY_SCHEMA};
-use proxmox_http::ProxyConfig;
+use proxmox_http::{ProxyConfig, HTTP_PROXY_SCHEMA};
 use proxmox_schema::{api, ApiStringFormat, ApiType, Updater};
 
 use pbs_buildcfg::configdir;
 use pbs_config::{open_backup_lockfile, BackupLockGuard};
-
-use crate::api2::types::HTTP_PROXY_SCHEMA;
 
 const CONF_FILE: &str = configdir!("/node.cfg");
 const LOCK_FILE: &str = configdir!("/.node.lck");
