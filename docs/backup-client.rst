@@ -28,6 +28,50 @@ brackets (for example, `[fe80::01]`).
 You can pass the repository with the ``--repository`` command-line option, or
 by setting the ``PBS_REPOSITORY`` environment variable.
 
+Alternatively, you can specify the repository components as separate
+command-line options:
+
+``--server <host>``
+  Backup server address (hostname or IP address). Defaults to ``localhost``.
+  Requires ``--datastore`` to be set as well.
+
+``--port <number>``
+  Backup server port. Defaults to ``8007``.
+
+``--datastore <name>``
+  Name of the target datastore. Required when using component options instead
+  of ``--repository``.
+
+``--auth-id <user@realm[!token]>``
+  Authentication identity, either a user (``user@realm``) or an API token
+  (``user@realm!tokenname``). Defaults to ``root@pam``.
+
+These options are mutually exclusive with ``--repository``. Both forms resolve
+to the same internal representation, so cached login tickets and other session
+state are shared between them. For example, logging in with ``--repository``
+and then running a backup with ``--server``/``--datastore`` (or vice versa)
+reuses the same ticket, as long as the server address and user match.
+
+When component options are used on the command line, they are merged with the
+corresponding ``PBS_*`` environment variables on a per-field basis: CLI options
+take precedence, while unspecified fields fall back to their environment
+variable. For example, with ``PBS_SERVER`` and ``PBS_DATASTORE`` set in the
+environment, passing ``--auth-id 'other@pam'`` on the command line overrides
+just the identity while inheriting the server and datastore from the
+environment.
+
+The component options make it easy to change individual parts of the
+connection, for example switching to a different datastore or server without
+having to rewrite the entire repository string:
+
+.. code-block:: console
+
+  # proxmox-backup-client backup root.pxar:/ \
+      --auth-id 'user@pbs!backup' --server pbs.example.com --datastore store1
+
+.. Note:: Remember to quote API token identifiers on the shell, since the
+   exclamation mark (``!``) is a special character in most shells.
+
 The web interface provides copyable repository text in the datastore summary
 with the `Show Connection Information` button.
 
@@ -69,6 +113,23 @@ Environment Variables
 
 ``PBS_REPOSITORY``
   The default backup repository.
+
+``PBS_SERVER``
+  Backup server address. Provides a default that can be overridden by
+  ``--server``. Requires ``PBS_DATASTORE`` to be set as well (unless
+  ``--datastore`` is given on the command line). Not used when ``--repository``
+  or ``PBS_REPOSITORY`` is set.
+
+``PBS_PORT``
+  Backup server port. Defaults to ``8007`` if unset.
+
+``PBS_DATASTORE``
+  Datastore name. Provides a default that can be overridden by ``--datastore``.
+  Not used when ``--repository`` or ``PBS_REPOSITORY`` is set.
+
+``PBS_AUTH_ID``
+  Authentication identity (``user@realm`` or ``user@realm!tokenname``).
+  Defaults to ``root@pam`` if unset.
 
 ``PBS_PASSWORD``
   When set, this value is used as the password for the backup server.
