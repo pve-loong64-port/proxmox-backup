@@ -34,7 +34,20 @@ pub fn config() -> Result<(NodeConfig, [u8; 32]), Error> {
 
 /// Write the Node Config, requires the write lock to be held.
 pub fn save_config(config: &NodeConfig) -> Result<(), Error> {
-    config.validate()?;
+    let mut domains = HashSet::new();
+    for domain in config.acme_domains() {
+        let domain = domain?;
+        if !domains.insert(domain.domain.to_lowercase()) {
+            bail!("duplicate domain '{}' in ACME config", domain.domain);
+        }
+    }
+    let mut dummy_acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
+    if let Some(ciphers) = config.ciphers_tls_1_3.as_deref() {
+        dummy_acceptor.set_ciphersuites(ciphers)?;
+    }
+    if let Some(ciphers) = config.ciphers_tls_1_2.as_deref() {
+        dummy_acceptor.set_cipher_list(ciphers)?;
+    }
 
     let raw = crate::tools::config::to_bytes(config, &NodeConfig::API_SCHEMA)?;
     pbs_config::replace_backup_config(CONF_FILE, &raw)
@@ -245,26 +258,6 @@ impl NodeConfig {
     /// Sets the HTTP proxy configuration
     pub fn set_http_proxy(&mut self, http_proxy: Option<String>) {
         self.http_proxy = http_proxy;
-    }
-
-    /// Validate the configuration.
-    pub fn validate(&self) -> Result<(), Error> {
-        let mut domains = HashSet::new();
-        for domain in self.acme_domains() {
-            let domain = domain?;
-            if !domains.insert(domain.domain.to_lowercase()) {
-                bail!("duplicate domain '{}' in ACME config", domain.domain);
-            }
-        }
-        let mut dummy_acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
-        if let Some(ciphers) = self.ciphers_tls_1_3.as_deref() {
-            dummy_acceptor.set_ciphersuites(ciphers)?;
-        }
-        if let Some(ciphers) = self.ciphers_tls_1_2.as_deref() {
-            dummy_acceptor.set_cipher_list(ciphers)?;
-        }
-
-        Ok(())
     }
 }
 
