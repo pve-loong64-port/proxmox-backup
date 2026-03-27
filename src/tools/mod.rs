@@ -13,7 +13,6 @@ use proxmox_http::{client::Client, HttpOptions, ProxyConfig};
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::manifest::BackupManifest;
 
-pub mod config;
 pub mod disks;
 pub mod fs;
 pub mod statistics;

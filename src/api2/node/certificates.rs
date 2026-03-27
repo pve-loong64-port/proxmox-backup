@@ -328,7 +328,7 @@ fn spawn_certificate_worker(
     // custom one too hard... We keep the parameter because the widget-toolkit may be using it...
     let _ = force;
 
-    let (node_config, _digest) = crate::config::node::config()?;
+    let (node_config, _digest) = pbs_config::node::config()?;
 
     let auth_id = rpcenv.get_auth_id().unwrap();
 
@@ -381,7 +381,7 @@ fn spawn_certificate_worker(
 /// Renew the current ACME certificate if it expires within 30 days (or always if the `force`
 /// parameter is set).
 pub fn revoke_acme_cert(rpcenv: &mut dyn RpcEnvironment) -> Result<String, Error> {
-    let (node_config, _digest) = crate::config::node::config()?;
+    let (node_config, _digest) = pbs_config::node::config()?;
 
     let cert_pem = get_certificate_pem()?;
 

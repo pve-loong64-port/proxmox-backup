@@ -313,7 +313,7 @@ pub fn remote_client_config(
         options = options.rate_limit(limit);
     }
     if remote.config.use_node_proxy.unwrap_or(false) {
-        let proxy = crate::config::node::node_http_proxy_config()?;
+        let proxy = pbs_config::node::node_http_proxy_config()?;
         options = options.proxy(proxy);
     }
 

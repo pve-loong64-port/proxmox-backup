@@ -15,7 +15,7 @@ use proxmox_sys::fs::{replace_file, CreateOptions};
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA};
 
-use crate::config::node;
+use pbs_config::node;
 
 #[api(
     input: {

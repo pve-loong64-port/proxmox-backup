@@ -12,10 +12,10 @@ use pbs_api_types::{
     Authid, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, SUBSCRIPTION_KEY_SCHEMA,
 };
 
-use crate::config::node;
 use crate::tools::{DEFAULT_USER_AGENT_STRING, PROXMOX_BACKUP_TCP_KEEPALIVE_TIME};
 
 use pbs_buildcfg::PROXMOX_BACKUP_SUBSCRIPTION_FN;
+use pbs_config::node;
 use pbs_config::CachedUserInfo;
 
 const PRODUCT_URL: &str = "https://www.proxmox.com/en/proxmox-backup-server/pricing";

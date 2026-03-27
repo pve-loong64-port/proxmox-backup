@@ -27,7 +27,7 @@ pub const ROUTER: Router = Router::new()
 )]
 /// Get the node configuration
 pub fn get_node_config(rpcenv: &mut dyn RpcEnvironment) -> Result<NodeConfig, Error> {
-    let (config, digest) = crate::config::node::config()?;
+    let (config, digest) = pbs_config::node::config()?;
     rpcenv["digest"] = hex::encode(digest).into();
     Ok(config)
 }
@@ -103,8 +103,8 @@ pub fn update_node_config(
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
 ) -> Result<(), Error> {
-    let _lock = crate::config::node::lock()?;
-    let (mut config, expected_digest) = crate::config::node::config()?;
+    let _lock = pbs_config::node::lock()?;
+    let (mut config, expected_digest) = pbs_config::node::config()?;
     if let Some(digest) = digest {
         // FIXME: GUI doesn't handle our non-inlined digest part here properly...
         if !digest.is_empty() {
@@ -204,7 +204,7 @@ pub fn update_node_config(
         config.consent_text = update.consent_text;
     }
 
-    crate::config::node::save_config(&config)?;
+    pbs_config::node::save_config(&config)?;
 
     update_apt_proxy_config(config.http_proxy().as_ref())?;
 

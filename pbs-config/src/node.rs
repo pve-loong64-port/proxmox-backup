@@ -8,7 +8,8 @@ use proxmox_http::ProxyConfig;
 use proxmox_schema::ApiType;
 
 use pbs_buildcfg::configdir;
-use pbs_config::{open_backup_lockfile, BackupLockGuard};
+
+use crate::{open_backup_lockfile, BackupLockGuard};
 
 const CONF_FILE: &str = configdir!("/node.cfg");
 const LOCK_FILE: &str = configdir!("/.node.lck");
@@ -22,7 +23,7 @@ pub fn config() -> Result<(NodeConfig, [u8; 32]), Error> {
     let content = proxmox_sys::fs::file_read_optional_string(CONF_FILE)?.unwrap_or_default();
 
     let digest = openssl::sha::sha256(content.as_bytes());
-    let data: NodeConfig = crate::tools::config::from_str(&content, &NodeConfig::API_SCHEMA)?;
+    let data: NodeConfig = crate::key_value::from_str(&content, &NodeConfig::API_SCHEMA)?;
 
     Ok((data, digest))
 }
@@ -44,11 +45,11 @@ pub fn save_config(config: &NodeConfig) -> Result<(), Error> {
         dummy_acceptor.set_cipher_list(ciphers)?;
     }
 
-    let raw = crate::tools::config::to_bytes(config, &NodeConfig::API_SCHEMA)?;
-    pbs_config::replace_backup_config(CONF_FILE, &raw)
+    let raw = crate::key_value::to_bytes(config, &NodeConfig::API_SCHEMA)?;
+    crate::replace_backup_config(CONF_FILE, &raw)
 }
 
-pub(crate) fn node_http_proxy_config() -> Result<Option<ProxyConfig>, Error> {
+pub fn node_http_proxy_config() -> Result<Option<ProxyConfig>, Error> {
     let (node_config, _digest) = self::config()?;
     Ok(node_config.http_proxy())
 }

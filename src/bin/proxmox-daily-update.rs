@@ -67,7 +67,7 @@ async fn do_update(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
 }
 
 async fn check_acme_certificates(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
-    let (config, _) = proxmox_backup::config::node::config()?;
+    let (config, _) = pbs_config::node::config()?;
 
     // do we even have any acme domains configures?
     if config.acme_domains().next().is_none() {
