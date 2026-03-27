@@ -445,7 +445,7 @@ impl DataStore {
                     Some(bucket),
                     self.name().to_owned(),
                     Some(rate_limiter_options),
-                    None, //FIXME read from node.cfg
+                    pbs_config::node::node_http_proxy_config()?,
                     Some(request_counter_config),
                 );
                 let s3_client = S3Client::new(options)?;
@@ -2719,7 +2719,7 @@ impl DataStore {
             Some(bucket),
             datastore_config.name.to_owned(),
             Some(rate_limiter_options),
-            None, // FIXME read from node.cfg
+            pbs_config::node::node_http_proxy_config()?,
             Some(request_counter_config),
         );
         let s3_client = S3Client::new(options)

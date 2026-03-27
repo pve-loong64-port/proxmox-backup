@@ -67,7 +67,7 @@ pub async fn check(
         Some(bucket),
         store_prefix,
         None,
-        None, // FIXME read from node.cfg once regular datastore operations do as well
+        pbs_config::node::node_http_proxy_config()?,
         Some(request_counter_config),
     );
 
