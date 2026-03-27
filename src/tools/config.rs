@@ -113,17 +113,6 @@ fn parse_value(value: &str, schema: Option<&'static Schema>) -> Result<Value, Er
     }
 }
 
-/// Parse a string as a property string into a deserializable type. This is just a short wrapper
-/// around deserializing the s
-pub fn from_property_string<T>(input: &str, schema: &'static Schema) -> Result<T, Error>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    Ok(serde_json::from_value(
-        schema.parse_property_string(input)?,
-    )?)
-}
-
 /// Serialize a data structure using a 'key: value' config file format.
 pub fn to_bytes<T: Serialize>(value: &T, schema: &'static Schema) -> Result<Vec<u8>, Error> {
     value_to_bytes(&serde_json::to_value(value)?, schema)
