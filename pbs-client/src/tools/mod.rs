@@ -36,6 +36,7 @@ const ENV_VAR_PBS_SERVER: &str = "PBS_SERVER";
 const ENV_VAR_PBS_PORT: &str = "PBS_PORT";
 const ENV_VAR_PBS_DATASTORE: &str = "PBS_DATASTORE";
 const ENV_VAR_PBS_AUTH_ID: &str = "PBS_AUTH_ID";
+const ENV_VAR_PBS_NAMESPACE: &str = "PBS_NAMESPACE";
 
 /// Directory with system [credential]s. See systemd-creds(1).
 ///
@@ -339,13 +340,17 @@ pub fn extract_repository_from_map(param: &HashMap<String, String>) -> Option<Ba
     resolve_repository(cli).ok()
 }
 
-/// Extract a [`BackupNamespace`] from CLI parameters.
+/// Extract a [`BackupNamespace`] from CLI parameters, falling back to PBS_NAMESPACE.
 pub fn optional_ns_param(param: &Value) -> Result<BackupNamespace, Error> {
-    Ok(match param.get("ns") {
-        Some(Value::String(ns)) => ns.parse()?,
+    match param.get("ns") {
+        Some(Value::String(ns)) => return Ok(ns.parse()?),
         Some(_) => bail!("invalid namespace parameter"),
-        None => BackupNamespace::root(),
-    })
+        None => {}
+    }
+    if let Ok(ns) = std::env::var(ENV_VAR_PBS_NAMESPACE) {
+        return Ok(ns.parse()?);
+    }
+    Ok(BackupNamespace::root())
 }
 
 pub fn connect(repo: &BackupRepository) -> Result<HttpClient, Error> {
@@ -849,6 +854,7 @@ mod tests {
         ENV_VAR_PBS_PORT,
         ENV_VAR_PBS_DATASTORE,
         ENV_VAR_PBS_AUTH_ID,
+        ENV_VAR_PBS_NAMESPACE,
         ENV_VAR_CREDENTIALS_DIRECTORY,
     ];
 

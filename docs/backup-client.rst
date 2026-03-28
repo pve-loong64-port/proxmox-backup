@@ -131,6 +131,9 @@ Environment Variables
   Authentication identity (``user@realm`` or ``user@realm!tokenname``).
   Defaults to ``root@pam`` if unset.
 
+``PBS_NAMESPACE``
+  Backup namespace. Used as a fallback when ``--ns`` is not given.
+
 ``PBS_PASSWORD``
   When set, this value is used as the password for the backup server.
   You can also set this to an API token secret.
