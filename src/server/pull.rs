@@ -17,15 +17,15 @@ use crate::server::sync::SharedGroupProgress;
 use anyhow::{bail, format_err, Context, Error};
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
-    BackupNamespace, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
+    BackupNamespace, CryptMode, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
     VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
     PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::DataBlob;
-use pbs_datastore::dynamic_index::DynamicIndexReader;
-use pbs_datastore::fixed_index::FixedIndexReader;
+use pbs_datastore::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
+use pbs_datastore::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
@@ -171,6 +171,7 @@ async fn pull_index_chunks<I: IndexFile>(
     backend: &DatastoreBackend,
     archive_prefix: &str,
     log_sender: Arc<LogLineSender>,
+    decrypted_index_writer: Option<DecryptedIndexWriter>,
 ) -> Result<SyncStats, Error> {
     use futures::stream::{self, StreamExt, TryStreamExt};
 
@@ -206,55 +207,61 @@ async fn pull_index_chunks<I: IndexFile>(
     let bytes = Arc::new(AtomicUsize::new(0));
     let chunk_count = Arc::new(AtomicUsize::new(0));
 
-    stream
-        .map(|info| {
-            let target = Arc::clone(&target);
-            let chunk_reader = chunk_reader.clone();
-            let bytes = Arc::clone(&bytes);
-            let chunk_count = Arc::clone(&chunk_count);
-            let verify_and_write_channel = verify_and_write_channel.clone();
-            let encountered_chunks = Arc::clone(&encountered_chunks);
+    let stream = stream.map(|info| {
+        let target = Arc::clone(&target);
+        let chunk_reader = chunk_reader.clone();
+        let bytes = Arc::clone(&bytes);
+        let chunk_count = Arc::clone(&chunk_count);
+        let verify_and_write_channel = verify_and_write_channel.clone();
+        let encountered_chunks = Arc::clone(&encountered_chunks);
 
-            Ok::<_, Error>(async move {
-                {
-                    // limit guard scope
-                    let mut guard = encountered_chunks.lock().unwrap();
-                    if let Some(touched) = guard.check_reusable(&info.digest) {
-                        if touched {
-                            return Ok::<_, Error>(());
-                        }
-                        let chunk_exists = proxmox_async::runtime::block_in_place(|| {
-                            target.cond_touch_chunk(&info.digest, false)
-                        })?;
-                        if chunk_exists {
-                            guard.mark_touched(&info.digest);
-                            //info!("chunk {} exists {}", pos, hex::encode(digest));
-                            return Ok::<_, Error>(());
-                        }
+        Ok::<_, Error>(async move {
+            {
+                // limit guard scope
+                let mut guard = encountered_chunks.lock().unwrap();
+                if let Some(touched) = guard.check_reusable(&info.digest) {
+                    if touched {
+                        return Ok::<_, Error>(());
                     }
-                    // mark before actually downloading the chunk, so this happens only once
-                    guard.mark_reusable(&info.digest);
-                    guard.mark_touched(&info.digest);
+                    let chunk_exists = proxmox_async::runtime::block_in_place(|| {
+                        target.cond_touch_chunk(&info.digest, false)
+                    })?;
+                    if chunk_exists {
+                        guard.mark_touched(&info.digest);
+                        //info!("chunk {} exists {}", pos, hex::encode(digest));
+                        return Ok::<_, Error>(());
+                    }
                 }
+                // mark before actually downloading the chunk, so this happens only once
+                guard.mark_reusable(&info.digest);
+                guard.mark_touched(&info.digest);
+            }
 
-                //info!("sync {} chunk {}", pos, hex::encode(digest));
-                let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
-                let raw_size = chunk.raw_size() as usize;
+            //info!("sync {} chunk {}", pos, hex::encode(digest));
+            let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
+            let raw_size = chunk.raw_size() as usize;
 
-                // decode, verify and write in a separate threads to maximize throughput
-                proxmox_async::runtime::block_in_place(|| {
-                    verify_and_write_channel.send((chunk, info.digest, info.size()))
-                })?;
+            // decode, verify and write in a separate threads to maximize throughput
+            proxmox_async::runtime::block_in_place(|| {
+                verify_and_write_channel.send((chunk, info.digest, info.size()))
+            })?;
 
-                bytes.fetch_add(raw_size, Ordering::SeqCst);
-                chunk_count.fetch_add(1, Ordering::SeqCst);
+            bytes.fetch_add(raw_size, Ordering::SeqCst);
+            chunk_count.fetch_add(1, Ordering::SeqCst);
 
-                Ok(())
-            })
+            Ok(())
         })
-        .try_buffer_unordered(20)
-        .try_for_each(|_res| futures::future::ok(()))
-        .await?;
+    });
+
+    if decrypted_index_writer.is_none() {
+        stream
+            .try_buffer_unordered(20)
+            .try_for_each(|_res| futures::future::ok(()))
+            .await?;
+    } else {
+        // must keep chunk order to correctly rewrite index file
+        stream.try_for_each(|item| item).await?;
+    }
 
     drop(verify_and_write_channel);
 
@@ -317,6 +324,7 @@ async fn pull_single_archive<'a>(
     crypt_config: Option<Arc<CryptConfig>>,
     backend: &DatastoreBackend,
     log_sender: Arc<LogLineSender>,
+    new_manifest: Option<Arc<Mutex<BackupManifest>>>,
 ) -> Result<SyncStats, Error> {
     let archive_name = &archive_info.filename;
     let mut path = snapshot.full_path();
@@ -324,6 +332,9 @@ async fn pull_single_archive<'a>(
 
     let mut tmp_path = path.clone();
     tmp_path.set_extension("tmp");
+
+    let mut tmp_dec_path = path.clone();
+    tmp_dec_path.set_extension("tmpdec");
 
     let mut sync_stats = SyncStats::default();
 
@@ -343,6 +354,20 @@ async fn pull_single_archive<'a>(
         .open(&tmp_path)
         .with_context(|| archive_prefix.clone())?;
 
+    let add_to_decrypted_manifest = |csum, size| {
+        if let Some(new_manifest) = new_manifest {
+            let name = archive_name.as_str().try_into()?;
+            // size is identical to original, encrypted index
+            new_manifest
+                .lock()
+                .unwrap()
+                .add_file(&name, size, csum, CryptMode::None)
+                .with_context(|| archive_prefix.clone())
+        } else {
+            Ok(())
+        }
+    };
+
     match ArchiveType::from_path(archive_name)? {
         ArchiveType::DynamicIndex => {
             let index = DynamicIndexReader::new(tmpfile).map_err(|err| {
@@ -351,7 +376,7 @@ async fn pull_single_archive<'a>(
             let (csum, size) = index.compute_csum();
             verify_archive(archive_info, &csum, size).with_context(|| archive_prefix.clone())?;
 
-            if reader.skip_chunk_sync(snapshot.datastore().name()) {
+            if crypt_config.is_none() && reader.skip_chunk_sync(snapshot.datastore().name()) {
                 log_sender
                     .log(
                         Level::INFO,
@@ -359,6 +384,12 @@ async fn pull_single_archive<'a>(
                     )
                     .await?;
             } else {
+                let new_index_writer = if crypt_config.is_some() {
+                    let writer = DynamicIndexWriter::create(&tmp_dec_path)?;
+                    Some(DecryptedIndexWriter::Dynamic(Arc::new(Mutex::new(writer))))
+                } else {
+                    None
+                };
                 let stats = pull_index_chunks(
                     reader
                         .chunk_reader(crypt_config.clone(), archive_info.crypt_mode)
@@ -370,9 +401,15 @@ async fn pull_single_archive<'a>(
                     backend,
                     &archive_prefix,
                     Arc::clone(&log_sender),
+                    new_index_writer.clone(),
                 )
                 .await
                 .with_context(|| archive_prefix.clone())?;
+                if let Some(DecryptedIndexWriter::Dynamic(index)) = &new_index_writer {
+                    let csum = index.lock().unwrap().close()?;
+                    add_to_decrypted_manifest(csum, size)?;
+                }
+
                 sync_stats.add(stats);
             }
         }
@@ -383,7 +420,7 @@ async fn pull_single_archive<'a>(
             let (csum, size) = index.compute_csum();
             verify_archive(archive_info, &csum, size).with_context(|| archive_prefix.clone())?;
 
-            if reader.skip_chunk_sync(snapshot.datastore().name()) {
+            if crypt_config.is_none() && reader.skip_chunk_sync(snapshot.datastore().name()) {
                 log_sender
                     .log(
                         Level::INFO,
@@ -391,6 +428,16 @@ async fn pull_single_archive<'a>(
                     )
                     .await?;
             } else {
+                let new_index_writer = if crypt_config.is_some() {
+                    let writer = FixedIndexWriter::create(
+                        &tmp_dec_path,
+                        Some(size),
+                        index.chunk_size as u32,
+                    )?;
+                    Some(DecryptedIndexWriter::Fixed(Arc::new(Mutex::new(writer))))
+                } else {
+                    None
+                };
                 let stats = pull_index_chunks(
                     reader
                         .chunk_reader(crypt_config.clone(), archive_info.crypt_mode)
@@ -402,9 +449,15 @@ async fn pull_single_archive<'a>(
                     backend,
                     &archive_prefix,
                     Arc::clone(&log_sender),
+                    new_index_writer.clone(),
                 )
                 .await
                 .with_context(|| archive_prefix.clone())?;
+                if let Some(DecryptedIndexWriter::Fixed(index)) = &new_index_writer {
+                    let csum = index.lock().unwrap().close()?;
+                    add_to_decrypted_manifest(csum, size)?;
+                }
+
                 sync_stats.add(stats);
             }
         }
@@ -417,7 +470,15 @@ async fn pull_single_archive<'a>(
             .with_context(|| archive_prefix.clone())?;
         }
     }
-    if let Err(err) = std::fs::rename(&tmp_path, &path) {
+    let source_path = if crypt_config.is_some() {
+        if let Err(err) = std::fs::remove_file(&tmp_path) {
+            bail!("{archive_prefix}: Failed to remove temp. file {tmp_path:?} failed - {err}");
+        }
+        tmp_dec_path
+    } else {
+        tmp_path
+    };
+    if let Err(err) = std::fs::rename(&source_path, &path) {
         bail!("{archive_prefix}: Atomic rename file {path:?} failed - {err}");
     }
 
@@ -629,6 +690,7 @@ async fn pull_snapshot<'a>(
             None,
             backend,
             Arc::clone(&log_sender),
+            None,
         )
         .await?;
         sync_stats.add(stats);
@@ -1496,4 +1558,10 @@ impl EncounteredChunks {
             }
         }
     }
+}
+
+#[derive(Clone)]
+enum DecryptedIndexWriter {
+    Fixed(Arc<Mutex<FixedIndexWriter>>),
+    Dynamic(Arc<Mutex<DynamicIndexWriter>>),
 }
