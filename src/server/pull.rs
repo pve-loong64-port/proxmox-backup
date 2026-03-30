@@ -2,7 +2,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::io::Seek;
+use std::io::{BufReader, Seek};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -29,13 +29,16 @@ use pbs_datastore::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{check_backup_owner, DataStore, DatastoreBackend, StoreProgress};
+use pbs_datastore::{
+    check_backup_owner, DataBlobReader, DataStore, DatastoreBackend, StoreProgress,
+};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::sha::sha256;
 use proxmox_human_byte::HumanByte;
 use proxmox_parallel_handler::ParallelHandler;
+use proxmox_sys::fs::{replace_file, CreateOptions};
 use tracing::{info, Level};
 
 pub(crate) struct PullTarget {
@@ -468,6 +471,29 @@ async fn pull_single_archive<'a>(
                 verify_archive(archive_info, &csum, size)
             })
             .with_context(|| archive_prefix.clone())?;
+
+            if crypt_config.is_some() {
+                let crypt_config = crypt_config.clone();
+
+                let tmp_dec_path = tmp_dec_path.clone();
+
+                let (csum, size) = tokio::task::spawn_blocking(move || {
+                    // must rewind again since after verifying cursor is at the end of the file
+                    tmpfile.rewind()?;
+                    let mut reader = BufReader::new(DataBlobReader::new(tmpfile, crypt_config)?);
+                    let blob = DataBlob::load_from_reader(&mut reader)?;
+                    let mut raw_blob = blob.raw_data();
+
+                    let (csum, size) = sha256(&mut raw_blob)?;
+                    replace_file(tmp_dec_path, raw_blob, CreateOptions::new(), true)?;
+                    Ok((csum, size))
+                })
+                .await?
+                .map_err(|err: Error| format_err!("Failed when decrypting blob {path:?}: {err}"))
+                .with_context(|| archive_prefix.clone())?;
+
+                add_to_decrypted_manifest(csum, size)?;
+            }
         }
     }
     let source_path = if crypt_config.is_some() {
