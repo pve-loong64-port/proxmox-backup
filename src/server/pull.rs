@@ -3,7 +3,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Seek};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
@@ -23,7 +23,7 @@ use pbs_api_types::{
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
-use pbs_datastore::data_blob::DataBlob;
+use pbs_datastore::data_blob::{DataBlob, DataChunkBuilder};
 use pbs_datastore::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use pbs_datastore::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use pbs_datastore::index::IndexFile;
@@ -186,7 +186,16 @@ async fn pull_index_chunks<I: IndexFile>(
             .filter(|info| {
                 let guard = encountered_chunks.lock().unwrap();
                 match guard.check_reusable(&info.digest) {
-                    Some(reusable) => !reusable.touched, // reusable and already touched, can always skip
+                    Some(reusable) => {
+                        if reusable.decrypted_digest.is_some() {
+                            // if there is a mapping, then the chunk digest must be rewritten to
+                            // the index, cannot skip here but optimized when processing the stream
+                            true
+                        } else {
+                            // reusable and already touched, can always skip
+                            !reusable.touched
+                        }
+                    }
                     None => true,
                 }
             }),
@@ -208,6 +217,7 @@ async fn pull_index_chunks<I: IndexFile>(
     let verify_and_write_channel = verify_pool.channel();
 
     let bytes = Arc::new(AtomicUsize::new(0));
+    let offset = Arc::new(AtomicU64::new(0));
     let chunk_count = Arc::new(AtomicUsize::new(0));
 
     let stream = stream.map(|info| {
@@ -217,36 +227,123 @@ async fn pull_index_chunks<I: IndexFile>(
         let chunk_count = Arc::clone(&chunk_count);
         let verify_and_write_channel = verify_and_write_channel.clone();
         let encountered_chunks = Arc::clone(&encountered_chunks);
+        let offset = Arc::clone(&offset);
+        let decrypted_index_writer = decrypted_index_writer.clone();
 
         Ok::<_, Error>(async move {
-            {
-                // limit guard scope
-                let mut guard = encountered_chunks.lock().unwrap();
-                if let Some(reusable) = guard.check_reusable(&info.digest) {
-                    if reusable.touched {
-                        return Ok::<_, Error>(());
-                    }
-                    let chunk_exists = proxmox_async::runtime::block_in_place(|| {
-                        target.cond_touch_chunk(&info.digest, false)
-                    })?;
-                    if chunk_exists {
-                        guard.mark_touched(&info.digest, None);
-                        //info!("chunk {} exists {}", pos, hex::encode(digest));
-                        return Ok::<_, Error>(());
-                    }
-                }
-                // mark before actually downloading the chunk, so this happens only once
-                guard.mark_reusable(&info.digest, None);
-                guard.mark_touched(&info.digest, None);
-            }
-
             //info!("sync {} chunk {}", pos, hex::encode(digest));
-            let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
+            let (chunk, digest, size) = match decrypted_index_writer {
+                Some(DecryptedIndexWriter::Fixed(index)) => {
+                    if let Some(reusable) = encountered_chunks
+                        .lock()
+                        .unwrap()
+                        .check_reusable(&info.digest)
+                    {
+                        if let Some(decrypted_digest) = reusable.decrypted_digest {
+                            // already got the decrypted digest and chunk has been written,
+                            // no need to process again
+                            let size = info.size();
+                            let start_offset = offset.fetch_add(size, Ordering::SeqCst);
+
+                            index.lock().unwrap().add_chunk(
+                                start_offset,
+                                size as u32,
+                                decrypted_digest,
+                            )?;
+
+                            return Ok::<_, Error>(());
+                        }
+                    }
+
+                    let chunk_data = chunk_reader.read_chunk(&info.digest).await?;
+                    let (chunk, digest) =
+                        DataChunkBuilder::new(&chunk_data).compress(true).build()?;
+
+                    let size = chunk_data.len() as u64;
+                    let start_offset = offset.fetch_add(size, Ordering::SeqCst);
+
+                    index
+                        .lock()
+                        .unwrap()
+                        .add_chunk(start_offset, size as u32, &digest)?;
+
+                    encountered_chunks
+                        .lock()
+                        .unwrap()
+                        .mark_reusable(&info.digest, Some(digest));
+
+                    (chunk, digest, size)
+                }
+                Some(DecryptedIndexWriter::Dynamic(index)) => {
+                    if let Some(reusable) = encountered_chunks
+                        .lock()
+                        .unwrap()
+                        .check_reusable(&info.digest)
+                    {
+                        if let Some(decrypted_digest) = reusable.decrypted_digest {
+                            // already got the decrypted digest and chunk has been written,
+                            // no need to process again
+                            let size = info.size();
+                            let start_offset = offset.fetch_add(size, Ordering::SeqCst);
+                            let end_offset = start_offset + size;
+
+                            index
+                                .lock()
+                                .unwrap()
+                                .add_chunk(end_offset, decrypted_digest)?;
+
+                            return Ok::<_, Error>(());
+                        }
+                    }
+
+                    let chunk_data = chunk_reader.read_chunk(&info.digest).await?;
+                    let (chunk, digest) =
+                        DataChunkBuilder::new(&chunk_data).compress(true).build()?;
+
+                    let size = chunk_data.len() as u64;
+                    let start_offset = offset.fetch_add(size, Ordering::SeqCst);
+                    let end_offset = start_offset + size;
+
+                    index.lock().unwrap().add_chunk(end_offset, &digest)?;
+
+                    encountered_chunks
+                        .lock()
+                        .unwrap()
+                        .mark_reusable(&info.digest, Some(digest));
+
+                    (chunk, digest, size)
+                }
+                None => {
+                    {
+                        // limit guard scope
+                        let mut guard = encountered_chunks.lock().unwrap();
+                        if let Some(reusable) = guard.check_reusable(&info.digest) {
+                            if reusable.touched {
+                                return Ok::<_, Error>(());
+                            }
+                            let chunk_exists = proxmox_async::runtime::block_in_place(|| {
+                                target.cond_touch_chunk(&info.digest, false)
+                            })?;
+                            if chunk_exists {
+                                guard.mark_touched(&info.digest, None);
+                                //info!("chunk {} exists {}", pos, hex::encode(digest));
+                                return Ok::<_, Error>(());
+                            }
+                        }
+                        // mark before actually downloading the chunk, so this happens only once
+                        guard.mark_reusable(&info.digest, None);
+                        guard.mark_touched(&info.digest, None);
+                    }
+
+                    let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
+                    (chunk, info.digest, info.size())
+                }
+            };
             let raw_size = chunk.raw_size() as usize;
 
             // decode, verify and write in a separate threads to maximize throughput
             proxmox_async::runtime::block_in_place(|| {
-                verify_and_write_channel.send((chunk, info.digest, info.size()))
+                verify_and_write_channel.send((chunk, digest, size))
             })?;
 
             bytes.fetch_add(raw_size, Ordering::SeqCst);
