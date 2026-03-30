@@ -35,7 +35,7 @@ Below are some examples of valid repositories and their corresponding real
 values:
 
 ================================ ================== ================== ===========
-Example                          User               Host:Port          Datastore
+Example Repository               Auth-ID            Host:Port          Datastore
 ================================ ================== ================== ===========
 mydatastore                      ``root@pam``       localhost:8007     mydatastore
 myhostname:mydatastore           ``root@pam``       myhostname:8007    mydatastore
