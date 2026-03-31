@@ -183,7 +183,7 @@ async fn pull_index_chunks<I: IndexFile>(
             .filter(|info| {
                 let guard = encountered_chunks.lock().unwrap();
                 match guard.check_reusable(&info.digest) {
-                    Some(touched) => !touched, // reusable and already touched, can always skip
+                    Some(reusable) => !reusable.touched, // reusable and already touched, can always skip
                     None => true,
                 }
             }),
@@ -219,22 +219,22 @@ async fn pull_index_chunks<I: IndexFile>(
             {
                 // limit guard scope
                 let mut guard = encountered_chunks.lock().unwrap();
-                if let Some(touched) = guard.check_reusable(&info.digest) {
-                    if touched {
+                if let Some(reusable) = guard.check_reusable(&info.digest) {
+                    if reusable.touched {
                         return Ok::<_, Error>(());
                     }
                     let chunk_exists = proxmox_async::runtime::block_in_place(|| {
                         target.cond_touch_chunk(&info.digest, false)
                     })?;
                     if chunk_exists {
-                        guard.mark_touched(&info.digest);
+                        guard.mark_touched(&info.digest, None);
                         //info!("chunk {} exists {}", pos, hex::encode(digest));
                         return Ok::<_, Error>(());
                     }
                 }
                 // mark before actually downloading the chunk, so this happens only once
-                guard.mark_reusable(&info.digest);
-                guard.mark_touched(&info.digest);
+                guard.mark_reusable(&info.digest, None);
+                guard.mark_touched(&info.digest, None);
             }
 
             //info!("sync {} chunk {}", pos, hex::encode(digest));
@@ -962,7 +962,7 @@ async fn pull_group(
 
                         for pos in 0..index.index_count() {
                             let chunk_info = index.chunk_info(pos).unwrap();
-                            reusable_chunks.mark_reusable(&chunk_info.digest);
+                            reusable_chunks.mark_reusable(&chunk_info.digest, None);
                         }
                     }
                 }
@@ -1502,12 +1502,23 @@ async fn pull_ns(
     Ok((progress, sync_stats, errors))
 }
 
+struct EncounteredChunkInfo {
+    reusable: bool,
+    touched: bool,
+    decrypted_digest: Option<[u8; 32]>,
+}
+
 /// Store the state of encountered chunks, tracking if they can be reused for the
 /// index file currently being pulled and if the chunk has already been touched
 /// during this sync.
 struct EncounteredChunks {
-    // key: digest, value: (reusable, touched)
-    chunk_set: HashMap<[u8; 32], (bool, bool)>,
+    chunk_set: HashMap<[u8; 32], EncounteredChunkInfo>,
+}
+
+/// Propertires of a reusable chunk
+struct ReusableEncounteredChunk<'a> {
+    touched: bool,
+    decrypted_digest: Option<&'a [u8; 32]>,
 }
 
 impl EncounteredChunks {
@@ -1520,41 +1531,64 @@ impl EncounteredChunks {
 
     /// Check if the current state allows to reuse this chunk and if so,
     /// if the chunk has already been touched.
-    fn check_reusable(&self, digest: &[u8; 32]) -> Option<bool> {
-        if let Some((reusable, touched)) = self.chunk_set.get(digest) {
-            if !reusable {
+    fn check_reusable(&self, digest: &[u8; 32]) -> Option<ReusableEncounteredChunk<'_>> {
+        if let Some(chunk_info) = self.chunk_set.get(digest) {
+            if !chunk_info.reusable {
                 None
             } else {
-                Some(*touched)
+                Some(ReusableEncounteredChunk {
+                    touched: chunk_info.touched,
+                    decrypted_digest: chunk_info.decrypted_digest.as_ref(),
+                })
             }
         } else {
             None
         }
     }
 
-    /// Mark chunk as reusable, inserting it as un-touched if not present
-    fn mark_reusable(&mut self, digest: &[u8; 32]) {
+    /// Mark chunk as reusable, inserting it as un-touched if not present.
+    ///
+    /// If the mapping already contains the digest, set the decrypted digest only
+    /// if not already set previously.
+    fn mark_reusable(&mut self, digest: &[u8; 32], decrypted_digest: Option<[u8; 32]>) {
         match self.chunk_set.entry(*digest) {
             Entry::Occupied(mut occupied) => {
-                let (reusable, _touched) = occupied.get_mut();
-                *reusable = true;
+                let chunk_info = occupied.get_mut();
+                chunk_info.reusable = true;
+                if chunk_info.decrypted_digest.is_none() {
+                    chunk_info.decrypted_digest = decrypted_digest;
+                }
             }
             Entry::Vacant(vacant) => {
-                vacant.insert((true, false));
+                vacant.insert(EncounteredChunkInfo {
+                    reusable: true,
+                    touched: false,
+                    decrypted_digest,
+                });
             }
         }
     }
 
     /// Mark chunk as touched during this sync, inserting it as not reusable
     /// but touched if not present.
-    fn mark_touched(&mut self, digest: &[u8; 32]) {
+    ///
+    /// If the mapping already contains the digest, set the decrypted digest only
+    /// if not already set previously.
+    fn mark_touched(&mut self, digest: &[u8; 32], decrypted_digest: Option<[u8; 32]>) {
         match self.chunk_set.entry(*digest) {
             Entry::Occupied(mut occupied) => {
-                let (_reusable, touched) = occupied.get_mut();
-                *touched = true;
+                let chunk_info = occupied.get_mut();
+                chunk_info.touched = true;
+                if chunk_info.decrypted_digest.is_none() {
+                    chunk_info.decrypted_digest = decrypted_digest;
+                }
             }
             Entry::Vacant(vacant) => {
-                vacant.insert((false, true));
+                vacant.insert(EncounteredChunkInfo {
+                    reusable: false,
+                    touched: true,
+                    decrypted_digest,
+                });
             }
         }
     }
