@@ -1,20 +1,16 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    pin::pin,
-    sync::{Arc, OnceLock},
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
+use std::path::Path;
+use std::pin::pin;
+use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 
 use anyhow::Error;
 use tokio::join;
 
 use pbs_api_types::{DataStoreConfig, Operation};
 use proxmox_network_api::{get_network_interfaces, IpLink};
-use proxmox_sys::{
-    fs::FileSystemInformation,
-    linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat},
-};
+use proxmox_sys::fs::FileSystemInformation;
+use proxmox_sys::linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat};
 
 use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
 
