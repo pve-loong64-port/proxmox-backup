@@ -17,6 +17,7 @@ use tracing::{info, warn};
 use proxmox_human_byte::HumanByte;
 use proxmox_s3_client::{
     S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix, S3RateLimiterOptions,
+    S3RequestCounterConfig,
 };
 use proxmox_schema::ApiType;
 
@@ -75,6 +76,8 @@ pub const GROUP_NOTES_FILE_NAME: &str = "notes";
 pub const GROUP_OWNER_FILE_NAME: &str = "owner";
 /// Filename for in-use marker stored on S3 object store backend
 pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
+/// Base directory for storing shared memory mapped s3 request counters
+pub const S3_CLIENT_REQUEST_COUNTER_BASE_PATH: &str = "/var/lib/proxmox-backup/s3-statistics";
 const S3_CLIENT_RATE_LIMITER_BASE_PATH: &str = pbs_buildcfg::rundir!("/s3/shmem/tbf");
 const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 // s3 put request times out after upload_size / 1 Kib/s, so about 2.3 hours for 8 MiB
@@ -426,6 +429,11 @@ impl DataStore {
                     user: pbs_config::backup_user()?,
                     base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
                 };
+                let request_counter_config = S3RequestCounterConfig {
+                    id: format!("{s3_client_id}-{bucket}-{}", self.name()),
+                    user: pbs_config::backup_user()?,
+                    base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
+                };
 
                 let options = S3ClientOptions::from_config(
                     config.config,
@@ -434,6 +442,7 @@ impl DataStore {
                     self.name().to_owned(),
                     Some(rate_limiter_options),
                     None, //FIXME read from node.cfg
+                    Some(request_counter_config),
                 );
                 let s3_client = S3Client::new(options)?;
                 DatastoreBackend::S3(Arc::new(s3_client))
@@ -2652,6 +2661,11 @@ impl DataStore {
             user: pbs_config::backup_user()?,
             base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
         };
+        let request_counter_config = S3RequestCounterConfig {
+            id: format!("{s3_client_id}-{bucket}-{}", datastore_config.name),
+            user: pbs_config::backup_user()?,
+            base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
+        };
 
         let options = S3ClientOptions::from_config(
             client_config.config,
@@ -2660,6 +2674,7 @@ impl DataStore {
             datastore_config.name.to_owned(),
             Some(rate_limiter_options),
             None, // FIXME read from node.cfg
+            Some(request_counter_config),
         );
         let s3_client = S3Client::new(options)
             .context("failed to create s3 client")

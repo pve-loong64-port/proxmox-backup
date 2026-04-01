@@ -6,7 +6,7 @@ use serde_json::Value;
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
 use proxmox_s3_client::{
     S3BucketListItem, S3Client, S3ClientConf, S3ClientConfig, S3ClientConfigUpdater,
-    S3ClientConfigWithoutSecret, S3ClientOptions, S3_CLIENT_ID_SCHEMA,
+    S3ClientConfigWithoutSecret, S3ClientOptions, S3RequestCounterConfig, S3_CLIENT_ID_SCHEMA,
 };
 use proxmox_schema::{api, param_bail, ApiType};
 
@@ -16,6 +16,7 @@ use pbs_api_types::{
 };
 use pbs_config::s3::{self, S3_CFG_TYPE_ID};
 use pbs_config::CachedUserInfo;
+use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 
 #[api(
     input: {
@@ -350,6 +351,11 @@ pub async fn list_buckets(
         .context("config lookup failed")?;
 
     let empty_prefix = String::new();
+    let request_counter_config = S3RequestCounterConfig {
+        id,
+        user: pbs_config::backup_user()?,
+        base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
+    };
     let options = S3ClientOptions::from_config(
         config.config,
         config.secret_key,
@@ -357,6 +363,7 @@ pub async fn list_buckets(
         empty_prefix,
         None,
         None, // FIXME read from node.cfg once regular datastore operations do as well
+        Some(request_counter_config),
     );
     let client = S3Client::new(options).context("client creation failed")?;
     let list_buckets_response = client

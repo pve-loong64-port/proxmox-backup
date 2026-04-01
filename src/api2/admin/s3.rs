@@ -6,8 +6,8 @@ use serde_json::Value;
 use proxmox_http::Body;
 use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_s3_client::{
-    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3_BUCKET_NAME_SCHEMA,
-    S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
+    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3RequestCounterConfig,
+    S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
@@ -15,6 +15,7 @@ use proxmox_sortable_macro::sortable;
 use pbs_api_types::PRIV_SYS_MODIFY;
 
 use pbs_config::s3::S3_CFG_TYPE_ID;
+use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 
 #[api(
     input: {
@@ -48,6 +49,17 @@ pub async fn check(
         .lookup(S3_CFG_TYPE_ID, &s3_client_id)
         .context("config lookup failed")?;
 
+    let request_counter_id = if let Some(store) = &store_prefix {
+        format!("{s3_client_id}-{bucket}-{store}")
+    } else {
+        format!("{s3_client_id}-{bucket}")
+    };
+    let request_counter_config = S3RequestCounterConfig {
+        id: request_counter_id,
+        user: pbs_config::backup_user()?,
+        base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
+    };
+
     let store_prefix = store_prefix.unwrap_or_default();
     let options = S3ClientOptions::from_config(
         config.config,
@@ -56,6 +68,7 @@ pub async fn check(
         store_prefix,
         None,
         None, // FIXME read from node.cfg once regular datastore operations do as well
+        Some(request_counter_config),
     );
 
     let test_object_key =
