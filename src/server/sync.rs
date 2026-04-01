@@ -22,13 +22,15 @@ use proxmox_router::HttpError;
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
     SyncDirection, SyncJobConfig, VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
-    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_SYS_MODIFY,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
+use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{BackupManifest, DataStore, ListNamespacesRecursive, LocalChunkReader};
 use pbs_tools::buffered_logger::LogLineSender;
+use pbs_tools::crypt_config::CryptConfig;
 
 use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
@@ -806,6 +808,30 @@ pub(super) fn exclude_not_verified_or_encrypted(
     }
 
     false
+}
+
+/// Helper to check if user has access to given encryption key and load it from config.
+pub(crate) fn check_privs_and_load_key_config(
+    key_id: &str,
+    user: &Authid,
+    fail_on_archived: bool,
+) -> Result<Arc<CryptConfig>, Error> {
+    let user_info = CachedUserInfo::new()?;
+    user_info.check_privs(
+        user,
+        &["system", "encryption-keys", key_id],
+        PRIV_SYS_MODIFY,
+        true,
+    )?;
+
+    let key_config = pbs_config::encryption_keys::load_key_config(key_id, fail_on_archived)?;
+    // pass empty passphrase to get raw key material of unprotected key
+    let (enc_key, _created, fingerprint) = key_config.decrypt(&|| Ok(Vec::new()))?;
+
+    info!("Loaded encryption key '{key_id}' with fingerprint '{fingerprint}'");
+
+    let crypt_config = Arc::new(CryptConfig::new(enc_key)?);
+    Ok(crypt_config)
 }
 
 /// Track group progress during parallel push/pull in sync jobs
