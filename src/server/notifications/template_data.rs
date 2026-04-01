@@ -119,7 +119,7 @@ pub struct GcErrTemplateData {
     pub common: CommonData,
     /// The datastore.
     pub datastore: String,
-    /// The error that occured during the GC job.
+    /// The error that occurred during the GC job.
     pub error: String,
 }
 
@@ -141,7 +141,7 @@ pub struct AcmeErrTemplateData {
     /// Common properties.
     #[serde(flatten)]
     pub common: CommonData,
-    /// The error that occured when trying to request the certificate.
+    /// The error that occurred when trying to request the certificate.
     pub error: String,
 }
 
@@ -208,7 +208,7 @@ pub struct PruneErrTemplateData {
     pub datastore: String,
     /// The ID of the job.
     pub job_id: String,
-    /// The error that occured during the prune job.
+    /// The error that occurred during the prune job.
     pub error: String,
 }
 
@@ -292,7 +292,7 @@ pub struct TapeBackupErrTemplateData {
     pub used_tapes_list: Vec<String>,
     /// The list of snapshots which were backed up.
     pub snapshot_list: Vec<String>,
-    /// The error that happend during the backup job.
+    /// The error that happened during the backup job.
     pub error: String,
 }
 
