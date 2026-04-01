@@ -400,12 +400,12 @@ Ext.define('PBS.DataStoreSummary', {
             interval: 1000,
         });
 
-        let lastRequestWasFailue = false;
+        let lastRequestFailed = false;
         me.mon(me.statusStore, 'load', (s, records, success) => {
             let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
             let unmountBtn = me.lookupReferenceHolder().lookupReference('unmountButton');
             if (!success) {
-                lastRequestWasFailue = true;
+                lastRequestFailed = true;
 
                 me.statusStore.stopUpdate();
                 me.rrdstore.stopUpdate();
@@ -436,13 +436,13 @@ Ext.define('PBS.DataStoreSummary', {
                 });
             } else {
                 // only trigger on edges, else we couple our interval to the info one
-                if (lastRequestWasFailue) {
+                if (lastRequestFailed) {
                     me.down('pbsDataStoreInfo').fireEvent('activate');
                     me.rrdstore.startUpdate();
                 }
                 unmountBtn.setDisabled(false);
                 mountBtn.setDisabled(true);
-                lastRequestWasFailue = false;
+                lastRequestFailed = false;
 
                 let backendType = s.getById('backend-type').data.value;
                 if (backendType === 's3') {
