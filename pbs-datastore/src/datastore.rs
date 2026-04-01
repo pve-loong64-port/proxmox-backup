@@ -3,12 +3,14 @@ use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{bail, format_err, Context, Error};
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
+use hyper::Method;
 use nix::unistd::{unlinkat, UnlinkatFlags};
 use pbs_tools::lru_cache::LruCache;
 use tokio::io::AsyncWriteExt;
@@ -17,7 +19,7 @@ use tracing::{info, warn};
 use proxmox_human_byte::HumanByte;
 use proxmox_s3_client::{
     S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix, S3RateLimiterOptions,
-    S3RequestCounterConfig,
+    S3RequestCounterConfig, SharedRequestCounters,
 };
 use proxmox_schema::ApiType;
 
@@ -32,7 +34,7 @@ use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
     DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MaintenanceMode,
-    MaintenanceType, Operation, UPID,
+    MaintenanceType, Operation, S3Statistics, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
@@ -177,6 +179,7 @@ pub struct DataStoreImpl {
     /// datastore.cfg cache generation number at lookup time, used to
     /// invalidate this cached `DataStoreImpl`
     config_generation: Option<usize>,
+    request_counters: Option<Arc<SharedRequestCounters>>,
 }
 
 impl DataStoreImpl {
@@ -194,6 +197,7 @@ impl DataStoreImpl {
             lru_store_caching: None,
             thread_settings: Default::default(),
             config_generation: None,
+            request_counters: None,
         })
     }
 }
@@ -456,6 +460,22 @@ impl DataStore {
         self.inner.backend_config.ty.unwrap_or_default()
     }
 
+    /// Get the s3 statistics for this datastore
+    pub fn s3_statistics(&self) -> Option<S3Statistics> {
+        self.inner
+            .request_counters
+            .as_ref()
+            .map(|counters| S3Statistics {
+                get: counters.load(Method::GET, Ordering::Acquire),
+                put: counters.load(Method::PUT, Ordering::Acquire),
+                post: counters.load(Method::POST, Ordering::Acquire),
+                delete: counters.load(Method::DELETE, Ordering::Acquire),
+                head: counters.load(Method::HEAD, Ordering::Acquire),
+                uploaded: counters.get_upload_traffic(Ordering::Acquire),
+                downloaded: counters.get_download_traffic(Ordering::Acquire),
+            })
+    }
+
     pub fn cache(&self) -> Option<&LocalDatastoreLruCache> {
         self.inner.lru_store_caching.as_ref()
     }
@@ -652,32 +672,34 @@ impl DataStore {
                 .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
         )?;
 
-        let lru_store_caching = if DatastoreBackendType::S3 == backend_config.ty.unwrap_or_default()
-        {
-            let mut cache_capacity = 0;
-            if let Ok(fs_info) = proxmox_sys::fs::fs_info(&chunk_store.base_path()) {
-                cache_capacity = fs_info.available / (16 * 1024 * 1024);
-            }
-            if let Some(max_cache_size) = backend_config.max_cache_size {
+        let (lru_store_caching, request_counters) =
+            if DatastoreBackendType::S3 == backend_config.ty.unwrap_or_default() {
+                let mut cache_capacity = 0;
+                if let Ok(fs_info) = proxmox_sys::fs::fs_info(&chunk_store.base_path()) {
+                    cache_capacity = fs_info.available / (16 * 1024 * 1024);
+                }
+                if let Some(max_cache_size) = backend_config.max_cache_size {
+                    info!(
+                        "Got requested max cache size {max_cache_size} for store {}",
+                        config.name
+                    );
+                    let max_cache_capacity = max_cache_size.as_u64() / (16 * 1024 * 1024);
+                    cache_capacity = cache_capacity.min(max_cache_capacity);
+                }
+                let cache_capacity = usize::try_from(cache_capacity).unwrap_or_default();
+
                 info!(
-                    "Got requested max cache size {max_cache_size} for store {}",
+                    "Using datastore cache with capacity {cache_capacity} for store {}",
                     config.name
                 );
-                let max_cache_capacity = max_cache_size.as_u64() / (16 * 1024 * 1024);
-                cache_capacity = cache_capacity.min(max_cache_capacity);
-            }
-            let cache_capacity = usize::try_from(cache_capacity).unwrap_or_default();
 
-            info!(
-                "Using datastore cache with capacity {cache_capacity} for store {}",
-                config.name
-            );
+                let cache = LocalDatastoreLruCache::new(cache_capacity, chunk_store.clone());
+                let request_counters = Self::request_counters(&config, &backend_config)?;
 
-            let cache = LocalDatastoreLruCache::new(cache_capacity, chunk_store.clone());
-            Some(cache)
-        } else {
-            None
-        };
+                (Some(cache), Some(Arc::new(request_counters)))
+            } else {
+                (None, None)
+            };
 
         let thread_settings = DatastoreThreadSettings::new(
             tuning.default_verification_workers,
@@ -695,7 +717,31 @@ impl DataStore {
             lru_store_caching,
             thread_settings,
             config_generation: generation,
+            request_counters,
         })
+    }
+
+    /// Load the shared s3 request counters for given datastore and backend config
+    pub fn request_counters(
+        config: &DataStoreConfig,
+        backend_config: &DatastoreBackendConfig,
+    ) -> Result<SharedRequestCounters, Error> {
+        let path = format!(
+            "{}/{}-{}-{}.shmem",
+            S3_CLIENT_REQUEST_COUNTER_BASE_PATH,
+            backend_config
+                .client
+                .as_ref()
+                .ok_or(format_err!("missing s3 endpoint id"))?,
+            backend_config
+                .bucket
+                .as_ref()
+                .ok_or(format_err!("missing s3 bucket"))?,
+            config.name,
+        );
+        let request_counters =
+            SharedRequestCounters::open_shared_memory_mapped(path, pbs_config::backup_user()?)?;
+        Ok(request_counters)
     }
 
     // Requires obtaining a shared chunk store lock beforehand
