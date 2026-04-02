@@ -1,13 +1,16 @@
 //! S3 bucket operations
 
-use anyhow::{Context, Error};
+use std::path::Path;
+use std::sync::atomic::Ordering;
+
+use anyhow::{bail, Context, Error};
 use serde_json::Value;
 
 use proxmox_http::Body;
 use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
 use proxmox_s3_client::{
     S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3RequestCounterConfig,
-    S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
+    SharedRequestCounters, S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
@@ -96,8 +99,70 @@ pub async fn check(
     Ok(Value::Null)
 }
 
+#[api(
+    input: {
+        properties: {
+            "s3-client-id": {
+                schema: S3_CLIENT_ID_SCHEMA,
+            },
+            bucket: {
+                schema: S3_BUCKET_NAME_SCHEMA,
+            },
+            "store-prefix": {
+                type: String,
+                description: "Store prefix within bucket for S3 object keys (commonly datastore name)",
+                optional: true,
+            },
+        },
+    },
+    access: {
+        permission: &Permission::Privilege(&[], PRIV_SYS_MODIFY, false),
+    },
+)]
+/// Reset the S3 request counters for matching endpoint, bucket or datastore (if prefix is given).
+pub async fn reset_counters(
+    s3_client_id: String,
+    bucket: String,
+    store_prefix: Option<String>,
+    _rpcenv: &mut dyn RpcEnvironment,
+) -> Result<(), Error> {
+    let (config, _digest) = pbs_config::s3::config()?;
+    // only check if the provided endpoint id exists
+    let _config: S3ClientConf = config
+        .lookup(S3_CFG_TYPE_ID, &s3_client_id)
+        .context("config lookup failed")?;
+
+    let request_counter_id = if let Some(store) = &store_prefix {
+        format!("{s3_client_id}-{bucket}-{store}")
+    } else {
+        format!("{s3_client_id}-{bucket}")
+    };
+
+    let path = format!("{S3_CLIENT_REQUEST_COUNTER_BASE_PATH}/{request_counter_id}.shmem");
+    let path = Path::new(&path);
+    // Fail early to not create the file when opening shared memory map below. Accept that
+    // this can race, with a new counter file being created in the mean time, but that is
+    // not an issue.
+    if !path.is_file() {
+        bail!("Cannot find s3 counters file '{path:?}'");
+    }
+
+    let user = pbs_config::backup_user()?;
+    let request_counters = SharedRequestCounters::open_shared_memory_mapped(path, user)
+        .context("failed to open shared request counters")?;
+    request_counters.reset(Ordering::Release);
+
+    Ok(())
+}
+
 #[sortable]
-const S3_OPERATION_SUBDIRS: SubdirMap = &[("check", &Router::new().put(&API_METHOD_CHECK))];
+const S3_OPERATION_SUBDIRS: SubdirMap = &[
+    ("check", &Router::new().put(&API_METHOD_CHECK)),
+    (
+        "reset-counters",
+        &Router::new().put(&API_METHOD_RESET_COUNTERS),
+    ),
+];
 
 const S3_OPERATION_ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(S3_OPERATION_SUBDIRS))
