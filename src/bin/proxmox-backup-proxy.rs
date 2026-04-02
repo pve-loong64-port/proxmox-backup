@@ -46,7 +46,7 @@ use pbs_api_types::{
 
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::server::{self, metric_collection};
-use proxmox_backup::tools::PROXMOX_BACKUP_TCP_KEEPALIVE_TIME;
+use proxmox_backup::tools::{lookup_with, PROXMOX_BACKUP_TCP_KEEPALIVE_TIME};
 
 use proxmox_backup::api2::tape::backup::do_tape_backup_job;
 use proxmox_backup::server::do_prune_job;
@@ -544,7 +544,8 @@ async fn schedule_datastore_garbage_collection() {
 
         {
             // limit datastore scope due to Op::Lookup
-            let datastore = match DataStore::lookup_datastore(&store, Operation::Lookup) {
+            let lookup = lookup_with(&store, Operation::Lookup);
+            let datastore = match DataStore::lookup_datastore(lookup) {
                 Ok(datastore) => datastore,
                 Err(err) => {
                     eprintln!("lookup_datastore failed - {err}");
@@ -587,7 +588,8 @@ async fn schedule_datastore_garbage_collection() {
             Err(_) => continue, // could not get lock
         };
 
-        let datastore = match DataStore::lookup_datastore(&store, Operation::Write) {
+        let lookup = lookup_with(&store, Operation::Write);
+        let datastore = match DataStore::lookup_datastore(lookup) {
             Ok(datastore) => datastore,
             Err(err) => {
                 log::warn!("skipping scheduled GC on {store}, could look it up - {err}");

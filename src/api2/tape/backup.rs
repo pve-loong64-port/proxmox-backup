@@ -152,7 +152,8 @@ pub fn do_tape_backup_job(
 
     let worker_type = job.jobtype().to_string();
 
-    let datastore = DataStore::lookup_datastore(&setup.store, Operation::Read)?;
+    let lookup = crate::tools::lookup_with(&setup.store, Operation::Read);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let (config, _digest) = pbs_config::media_pool::config()?;
     let pool_config: MediaPoolConfig = config.lookup("pool", &setup.pool)?;
@@ -310,7 +311,8 @@ pub fn backup(
 
     check_backup_permission(&auth_id, &setup.store, &setup.pool, &setup.drive)?;
 
-    let datastore = DataStore::lookup_datastore(&setup.store, Operation::Read)?;
+    let lookup = crate::tools::lookup_with(&setup.store, Operation::Read);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let (config, _digest) = pbs_config::media_pool::config()?;
     let pool_config: MediaPoolConfig = config.lookup("pool", &setup.pool)?;

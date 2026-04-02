@@ -6,12 +6,14 @@ use anyhow::{bail, Error};
 use std::collections::HashSet;
 
 use pbs_api_types::{
-    Authid, BackupContent, CryptMode, SnapshotListItem, SnapshotVerifyState, MANIFEST_BLOB_NAME,
+    Authid, BackupContent, CryptMode, Operation, SnapshotListItem, SnapshotVerifyState,
+    MANIFEST_BLOB_NAME,
 };
 use proxmox_http::{client::Client, HttpOptions, ProxyConfig};
 
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::manifest::BackupManifest;
+use pbs_datastore::DataStoreLookup;
 
 pub mod disks;
 pub mod fs;
@@ -171,4 +173,10 @@ pub(crate) fn backup_info_to_snapshot_list_item(
             }
         }
     }
+}
+
+/// Lookup the datastore by name with given operation.
+#[inline(always)]
+pub fn lookup_with<'a>(name: &'a str, operation: Operation) -> DataStoreLookup<'a> {
+    DataStoreLookup::with(name, operation)
 }

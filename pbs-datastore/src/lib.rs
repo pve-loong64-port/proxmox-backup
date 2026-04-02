@@ -217,7 +217,8 @@ pub use store_progress::StoreProgress;
 mod datastore;
 pub use datastore::{
     check_backup_owner, ensure_datastore_is_mounted, get_datastore_mount_status, DataStore,
-    DatastoreBackend, S3_CLIENT_REQUEST_COUNTER_BASE_PATH, S3_DATASTORE_IN_USE_MARKER,
+    DataStoreLookup, DatastoreBackend, S3_CLIENT_REQUEST_COUNTER_BASE_PATH,
+    S3_DATASTORE_IN_USE_MARKER,
 };
 
 mod hierarchy;

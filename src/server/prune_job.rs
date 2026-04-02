@@ -133,7 +133,8 @@ pub fn do_prune_job(
     auth_id: &Authid,
     schedule: Option<String>,
 ) -> Result<String, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+    let lookup = crate::tools::lookup_with(&store, Operation::Write);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let worker_type = job.jobtype().to_string();
     let auth_id = auth_id.clone();

@@ -144,10 +144,12 @@ impl TryFrom<String> for DataStoreMap {
             if let Some(index) = store.find('=') {
                 let mut target = store.split_off(index);
                 target.remove(0); // remove '='
-                let datastore = DataStore::lookup_datastore(&target, Operation::Write)?;
+                let lookup = crate::tools::lookup_with(&target, Operation::Write);
+                let datastore = DataStore::lookup_datastore(lookup)?;
                 map.insert(store, datastore);
             } else if default.is_none() {
-                default = Some(DataStore::lookup_datastore(&store, Operation::Write)?);
+                let lookup = crate::tools::lookup_with(&store, Operation::Write);
+                default = Some(DataStore::lookup_datastore(lookup)?);
             } else {
                 bail!("multiple default stores given");
             }

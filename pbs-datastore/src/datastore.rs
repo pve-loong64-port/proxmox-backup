@@ -202,6 +202,17 @@ impl DataStoreImpl {
     }
 }
 
+pub struct DataStoreLookup<'a> {
+    name: &'a str,
+    operation: Operation,
+}
+
+impl<'a> DataStoreLookup<'a> {
+    pub fn with(name: &'a str, operation: Operation) -> Self {
+        Self { name, operation }
+    }
+}
+
 pub struct DataStore {
     inner: Arc<DataStoreImpl>,
     operation: Option<Operation>,
@@ -498,18 +509,18 @@ impl DataStore {
         Ok(())
     }
 
-    pub fn lookup_datastore(name: &str, operation: Operation) -> Result<Arc<DataStore>, Error> {
+    pub fn lookup_datastore(lookup: DataStoreLookup) -> Result<Arc<DataStore>, Error> {
         // Avoid TOCTOU between checking maintenance mode and updating active operation counter, as
         // we use it to decide whether it is okay to delete the datastore.
         let _config_lock = pbs_config::datastore::lock_config()?;
 
         // Get the current datastore.cfg generation number and cached config
         let (section_config, gen_num) = datastore_section_config_cached(true)?;
-        let config: DataStoreConfig = section_config.lookup("datastore", name)?;
+        let config: DataStoreConfig = section_config.lookup("datastore", lookup.name)?;
 
         if let Some(maintenance_mode) = config.get_maintenance_mode() {
-            if let Err(error) = maintenance_mode.check(operation) {
-                bail!("datastore '{name}' is unavailable: {error}");
+            if let Err(error) = maintenance_mode.check(lookup.operation) {
+                bail!("datastore '{}' is unavailable: {error}", lookup.name);
             }
         }
 
@@ -520,16 +531,16 @@ impl DataStore {
             bail!("datastore '{}' is not mounted", config.name);
         }
 
-        let entry = datastore_cache.get(name);
+        let entry = datastore_cache.get(lookup.name);
 
         // reuse chunk store so that we keep using the same process locker instance!
         let chunk_store = if let Some(datastore) = &entry {
             // Re-use DataStoreImpl
             if datastore.config_generation == gen_num && gen_num.is_some() {
-                update_active_operations(name, operation, 1)?;
+                update_active_operations(lookup.name, lookup.operation, 1)?;
                 return Ok(Arc::new(Self {
                     inner: Arc::clone(datastore),
-                    operation: Some(operation),
+                    operation: Some(lookup.operation),
                 }));
             }
             Arc::clone(&datastore.chunk_store)
@@ -539,7 +550,7 @@ impl DataStore {
                     .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
             )?;
             Arc::new(ChunkStore::open(
-                name,
+                lookup.name,
                 config.absolute_path(),
                 tuning.sync_level.unwrap_or_default(),
             )?)
@@ -548,13 +559,13 @@ impl DataStore {
         let datastore = DataStore::with_store_and_config(chunk_store, config, gen_num)?;
 
         let datastore = Arc::new(datastore);
-        datastore_cache.insert(name.to_string(), datastore.clone());
+        datastore_cache.insert(lookup.name.to_string(), datastore.clone());
 
-        update_active_operations(name, operation, 1)?;
+        update_active_operations(lookup.name, lookup.operation, 1)?;
 
         Ok(Arc::new(Self {
             inner: datastore,
-            operation: Some(operation),
+            operation: Some(lookup.operation),
         }))
     }
 
@@ -580,7 +591,8 @@ impl DataStore {
         {
             // the datastore drop handler does the checking if tasks are running and clears the
             // cache entry, so we just have to trigger it here
-            let _ = DataStore::lookup_datastore(name, Operation::Lookup);
+            let lookup = DataStoreLookup::with(name, Operation::Lookup);
+            let _ = DataStore::lookup_datastore(lookup);
         }
 
         Ok(())

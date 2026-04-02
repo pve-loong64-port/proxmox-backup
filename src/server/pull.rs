@@ -112,12 +112,15 @@ impl PullParameters {
                 client,
             })
         } else {
+            let lookup = crate::tools::lookup_with(remote_store, Operation::Read);
+            let store = DataStore::lookup_datastore(lookup)?;
             Arc::new(LocalSource {
-                store: DataStore::lookup_datastore(remote_store, Operation::Read)?,
+                store,
                 ns: remote_ns,
             })
         };
-        let store = DataStore::lookup_datastore(store, Operation::Write)?;
+        let lookup = crate::tools::lookup_with(store, Operation::Write);
+        let store = DataStore::lookup_datastore(lookup)?;
         let backend = store.backend()?;
         let target = PullTarget { store, ns, backend };
 

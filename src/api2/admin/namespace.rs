@@ -54,7 +54,8 @@ pub fn create_namespace(
 
     check_ns_modification_privs(&store, &ns, &auth_id)?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+    let lookup = crate::tools::lookup_with(&store, Operation::Write);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     datastore.create_namespace(&parent, name)
 }
@@ -97,7 +98,8 @@ pub fn list_namespaces(
     // get result up-front to avoid cloning NS, it's relatively cheap anyway (no IO normally)
     let parent_access = check_ns_privs(&store, &parent, &auth_id, NS_PRIVS_OK);
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let lookup = crate::tools::lookup_with(&store, Operation::Read);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let iter = match datastore.recursive_iter_backup_ns_ok(parent, max_depth) {
         Ok(iter) => iter,
@@ -162,7 +164,8 @@ pub fn delete_namespace(
 
     check_ns_modification_privs(&store, &ns, &auth_id)?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+    let lookup = crate::tools::lookup_with(&store, Operation::Write);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let (removed_all, stats) = datastore.remove_namespace_recursive(&ns, delete_groups)?;
     if !removed_all {

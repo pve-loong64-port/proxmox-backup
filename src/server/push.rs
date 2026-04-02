@@ -110,7 +110,8 @@ impl PushParameters {
         let remove_vanished = remove_vanished.unwrap_or(false);
         let encrypted_only = encrypted_only.unwrap_or(false);
         let verified_only = verified_only.unwrap_or(false);
-        let store = DataStore::lookup_datastore(store, Operation::Read)?;
+        let lookup = crate::tools::lookup_with(store, Operation::Read);
+        let store = DataStore::lookup_datastore(lookup)?;
 
         if !store.namespace_exists(&ns) {
             bail!(

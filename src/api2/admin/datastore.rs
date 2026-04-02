@@ -71,7 +71,9 @@ use crate::api2::backup::optional_ns_param;
 use crate::api2::node::rrd::create_value_from_rrd;
 use crate::backup::{check_ns_privs_full, ListAccessibleBackupGroups, VerifyWorker, NS_PRIVS_OK};
 use crate::server::jobstate::{compute_schedule_status, Job, JobState};
-use crate::tools::{backup_info_to_snapshot_list_item, get_all_snapshot_files, read_backup_index};
+use crate::tools::{
+    backup_info_to_snapshot_list_item, get_all_snapshot_files, lookup_with, read_backup_index,
+};
 
 // helper to unify common sequence of checks:
 // 1. check privs on NS (full or limited access)
@@ -88,7 +90,7 @@ fn check_privs_and_load_store(
 ) -> Result<Arc<DataStore>, Error> {
     let limited = check_ns_privs_full(store, ns, auth_id, full_access_privs, partial_access_privs)?;
 
-    let datastore = DataStore::lookup_datastore(store, operation)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(store, operation))?;
 
     if limited {
         let owner = datastore.get_owner(ns, backup_group)?;
@@ -134,7 +136,7 @@ pub fn list_groups(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
 
     datastore
         .iter_backup_groups(ns.clone())? // FIXME: Namespaces and recursion parameters!
@@ -467,7 +469,7 @@ unsafe fn list_snapshots_blocking(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
 
     // FIXME: filter also owner before collecting, for doing that nicely the owner should move into
     // backup group and provide an error free (Err -> None) accessor
@@ -601,7 +603,7 @@ pub async fn status(
         }
     };
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
 
     let (counts, gc_status) = if verbose {
         let filter_owner = if store_privs & PRIV_DATASTORE_AUDIT != 0 {
@@ -731,7 +733,7 @@ pub fn verify(
         PRIV_DATASTORE_BACKUP,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
     let ignore_verified = ignore_verified.unwrap_or(true);
 
     let worker_id;
@@ -1083,7 +1085,7 @@ pub fn prune_datastore(
         true,
     )?;
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Write))?;
     let ns = prune_options.ns.clone().unwrap_or_default();
     let worker_id = format!("{store}:{ns}");
 
@@ -1121,7 +1123,7 @@ pub fn start_garbage_collection(
     _info: &ApiMethod,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Write))?;
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     let job = Job::new("garbage_collection", &store)
@@ -1168,7 +1170,7 @@ pub fn garbage_collection_status(
         ..Default::default()
     };
 
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
     let status_in_memory = datastore.last_gc_status();
     let state_file = JobState::load("garbage_collection", &store)
         .map_err(|err| log::error!("could not open GC statefile for {store}: {err}"))
@@ -1880,7 +1882,7 @@ pub fn get_rrd_stats(
     cf: RrdMode,
     _param: Value,
 ) -> Result<Value, Error> {
-    let datastore = DataStore::lookup_datastore(&store, Operation::Read)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
     let disk_manager = crate::tools::disks::DiskManage::new();
 
     let mut rrd_fields = vec![
@@ -2267,7 +2269,7 @@ pub async fn set_backup_owner(
             PRIV_DATASTORE_BACKUP,
         )?;
 
-        let datastore = DataStore::lookup_datastore(&store, Operation::Write)?;
+        let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Write))?;
 
         let backup_group = datastore.backup_group(ns, backup_group);
         let owner = backup_group.get_owner()?;
@@ -2752,7 +2754,7 @@ pub fn s3_refresh(store: String, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
 /// Performs an s3 refresh for given datastore. Expects the store to already be in maintenance mode
 /// s3-refresh.
 pub(crate) fn do_s3_refresh(store: &str, worker: &dyn WorkerTaskContext) -> Result<(), Error> {
-    let datastore = DataStore::lookup_datastore(store, Operation::Lookup)?;
+    let datastore = DataStore::lookup_datastore(lookup_with(store, Operation::Lookup))?;
     run_maintenance_locked(store, MaintenanceType::S3Refresh, worker, || {
         proxmox_async::runtime::block_on(datastore.s3_refresh())
     })

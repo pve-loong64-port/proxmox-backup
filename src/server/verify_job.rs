@@ -15,7 +15,8 @@ pub fn do_verification_job(
     schedule: Option<String>,
     to_stdout: bool,
 ) -> Result<String, Error> {
-    let datastore = DataStore::lookup_datastore(&verification_job.store, Operation::Read)?;
+    let lookup = crate::tools::lookup_with(&verification_job.store, Operation::Read);
+    let datastore = DataStore::lookup_datastore(lookup)?;
 
     let outdated_after = verification_job.outdated_after;
     let ignore_verified_snapshots = verification_job.ignore_verified.unwrap_or(true);
