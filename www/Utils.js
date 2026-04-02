@@ -447,6 +447,10 @@ Ext.define('PBS.Utils', {
                 gettext('Datastore'),
                 gettext('sync jobs handler triggered by mount'),
             ],
+            'notification-threshold-counter-reset': [
+                null,
+                gettext('Notification Threshold Counter Reset'),
+            ],
             prune: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Prune')),
             prunejob: (type, id) => PBS.Utils.render_prune_job_worker_id(id, gettext('Prune Job')),
             reader: (type, id) => PBS.Utils.render_datastore_worker_id(id, gettext('Read Objects')),
