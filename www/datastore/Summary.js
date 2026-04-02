@@ -130,6 +130,95 @@ Ext.define('PBS.DataStoreInfo', {
     ],
 });
 
+Ext.define('PBS.DataStoreS3Stats', {
+    extend: 'Ext.panel.Panel',
+    alias: 'widget.pbsDataStoreS3Stats',
+
+    defaults: {
+        xtype: 'pmxInfoWidget',
+    },
+
+    bodyPadding: 20,
+
+    items: [
+        {
+            xtype: 'box',
+            html: `<b>${gettext('S3 traffic:')}</b>`,
+            padding: '10 0 5 0',
+        },
+        {
+            iconCls: 'fa fa-fw fa-arrow-up',
+            title: gettext('Data uploaded'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{uploaded}',
+                },
+            },
+        },
+        {
+            iconCls: 'fa fa-fw fa-arrow-down',
+            title: gettext('Data downloaded'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{downloaded}',
+                },
+            },
+        },
+        {
+            xtype: 'box',
+            html: `<b>${gettext('S3 requests:')}</b>`,
+            padding: '10 0 5 0',
+        },
+        {
+            title: gettext('GET'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{get}',
+                },
+            },
+        },
+        {
+            title: gettext('PUT'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{put}',
+                },
+            },
+        },
+        {
+            title: gettext('POST'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{post}',
+                },
+            },
+        },
+        {
+            title: gettext('HEAD'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{head}',
+                },
+            },
+        },
+        {
+            title: gettext('DELETE'),
+            printBar: false,
+            bind: {
+                data: {
+                    text: '{delete}',
+                },
+            },
+        },
+    ],
+});
+
 Ext.define('PBS.DataStoreSummary', {
     extend: 'Ext.panel.Panel',
     alias: 'widget.pbsDataStoreSummary',
@@ -150,6 +239,7 @@ Ext.define('PBS.DataStoreSummary', {
             usage: {},
             stillbad: 0,
             mountpoint: '',
+            showS3Stats: false,
         },
     },
 
@@ -244,8 +334,17 @@ Ext.define('PBS.DataStoreSummary', {
                 {
                     xtype: 'pbsDataStoreNotes',
                     flex: 1,
+                    padding: '0 10 0 0',
                     cbind: {
                         datastore: '{datastore}',
+                    },
+                },
+                {
+                    xtype: 'pbsDataStoreS3Stats',
+                    flex: 1,
+                    title: gettext('S3 statistics'),
+                    bind: {
+                        visible: '{showS3Stats}',
                     },
                 },
             ],
@@ -463,6 +562,17 @@ Ext.define('PBS.DataStoreSummary', {
                 let dedup = PBS.Utils.calculate_dedup_factor(gcstatus);
                 vm.set('deduplication', dedup.toFixed(2));
                 vm.set('stillbad', gcstatus['still-bad']);
+            }
+            let s3Stats = store.getById('s3-statistics')?.data.value;
+            if (s3Stats) {
+                vm.set('uploaded', Proxmox.Utils.format_size(s3Stats.uploaded));
+                vm.set('downloaded', Proxmox.Utils.format_size(s3Stats.downloaded));
+                vm.set('get', s3Stats.get);
+                vm.set('post', s3Stats.post);
+                vm.set('delete', s3Stats.delete);
+                vm.set('head', s3Stats.head);
+                vm.set('put', s3Stats.put);
+                vm.set('showS3Stats', true);
             }
 
             vm.set('ctcount', countstext(counts.ct));
