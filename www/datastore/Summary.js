@@ -22,6 +22,15 @@ Ext.define('pve-rrd-datastore', {
         'write_ios',
         'write_bytes',
         'io_ticks',
+        's3/uploaded',
+        's3/downloaded',
+        's3/total/uploaded',
+        's3/total/downloaded',
+        's3/total/get',
+        's3/total/put',
+        's3/total/post',
+        's3/total/head',
+        's3/total/delete',
         {
             name: 'io_delay',
             calculate: function (data) {
@@ -348,6 +357,52 @@ Ext.define('PBS.DataStoreSummary', {
                     },
                 },
             ],
+        },
+        {
+            xtype: 'proxmoxRRDChart',
+            title: gettext('S3 API requests'),
+            fields: [
+                's3/total/get',
+                's3/total/put',
+                's3/total/post',
+                's3/total/head',
+                's3/total/delete',
+            ],
+            fieldTitles: [
+                gettext('GET'),
+                gettext('PUT'),
+                gettext('POST'),
+                gettext('HEAD'),
+                gettext('DELETE'),
+            ],
+            bind: {
+                visible: '{showS3Stats}',
+            },
+            seriesConfig: {
+                fill: false,
+                style: {
+                    lineWidth: 3.0,
+                    opacity: 1.0,
+                },
+            },
+        },
+        {
+            xtype: 'proxmoxRRDChart',
+            title: gettext('S3 API download/upload rate (bytes/second)'),
+            fields: ['s3/downloaded', 's3/uploaded'],
+            fieldTitles: [gettext('Download'), gettext('Upload')],
+            bind: {
+                visible: '{showS3Stats}',
+            },
+        },
+        {
+            xtype: 'proxmoxRRDChart',
+            title: gettext('S3 API total download/upload (bytes)'),
+            fields: ['s3/total/downloaded', 's3/total/uploaded'],
+            fieldTitles: [gettext('Download'), gettext('Upload')],
+            bind: {
+                visible: '{showS3Stats}',
+            },
         },
         {
             xtype: 'proxmoxRRDChart',
