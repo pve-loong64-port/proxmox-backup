@@ -23,10 +23,10 @@ const SPOOL_DIR: &str = concatcp!(pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR, "/noti
 mod template_data;
 
 use template_data::{
-    AcmeErrTemplateData, CommonData, GcErrTemplateData, GcOkTemplateData,
-    PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData, SyncErrTemplateData,
-    SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData, TapeLoadTemplateData,
-    VerifyErrTemplateData, VerifyOkTemplateData,
+    AcmeErrTemplateData, CommonData, DatastoreThresholdExceededTemplateData, GcErrTemplateData,
+    GcOkTemplateData, PackageUpdatesTemplateData, PruneErrTemplateData, PruneOkTemplateData,
+    SyncErrTemplateData, SyncOkTemplateData, TapeBackupErrTemplateData, TapeBackupOkTemplateData,
+    TapeLoadTemplateData, VerifyErrTemplateData, VerifyOkTemplateData,
 };
 
 /// Initialize the notification system by setting context in proxmox_notify
@@ -567,6 +567,37 @@ pub fn send_certificate_renewal_mail(result: &Result<(), Error>) -> Result<(), E
     let notification = Notification::from_template(
         Severity::Info,
         "acme-err",
+        serde_json::to_value(template_data)?,
+        metadata,
+    );
+
+    send_notification(notification)?;
+    Ok(())
+}
+
+/// send notification if datastore values are exceeding the set threshold limit.
+pub fn send_datastore_threshold_exceeded(
+    datastore: &str,
+    threshold: &str,
+    limit: u64,
+    value: u64,
+) -> Result<(), Error> {
+    let metadata = HashMap::from([
+        ("datastore".into(), datastore.into()),
+        ("hostname".into(), proxmox_sys::nodename().into()),
+        ("type".into(), "thresholds".into()),
+    ]);
+
+    let template_data = DatastoreThresholdExceededTemplateData::new(
+        datastore.to_string(),
+        threshold.to_string(),
+        limit,
+        value,
+    );
+
+    let notification = Notification::from_template(
+        Severity::Warning,
+        "thresholds-exceeded",
         serde_json::to_value(template_data)?,
         metadata,
     );

@@ -342,3 +342,33 @@ pub struct VerifyErrTemplateData {
     /// The list of snapshots that failed to verify.
     pub failed_snapshot_list: Vec<String>,
 }
+
+/// Template data for the datastore threshold exceeded template.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct DatastoreThresholdExceededTemplateData {
+    /// Common properties.
+    #[serde(flatten)]
+    pub common: CommonData,
+    /// The datastore.
+    pub datastore: String,
+    /// The threshold which value was exceeded.
+    pub threshold: String,
+    /// The set threshold value.
+    pub limit: u64,
+    /// The value exceeding the threshold.
+    pub value: u64,
+}
+
+impl DatastoreThresholdExceededTemplateData {
+    /// Create new a new instance.
+    pub fn new(datastore: String, threshold: String, limit: u64, value: u64) -> Self {
+        Self {
+            common: CommonData::new(),
+            datastore,
+            threshold,
+            limit,
+            value,
+        }
+    }
+}

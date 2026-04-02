@@ -25,6 +25,8 @@ NOTIFICATION_TEMPLATES=						\
 	default/tape-load-subject.txt.hbs		\
 	default/test-body.txt.hbs				\
 	default/test-subject.txt.hbs			\
+	default/thresholds-exceeded-body.txt.hbs	\
+	default/thresholds-exceeded-subject.txt.hbs	\
 	default/verify-err-body.txt.hbs			\
 	default/verify-ok-body.txt.hbs			\
 	default/verify-err-subject.txt.hbs		\

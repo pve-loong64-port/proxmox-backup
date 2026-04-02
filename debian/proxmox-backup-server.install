@@ -67,6 +67,8 @@ usr/share/proxmox-backup/templates/default/tape-load-body.txt.hbs
 usr/share/proxmox-backup/templates/default/tape-load-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/test-body.txt.hbs
 usr/share/proxmox-backup/templates/default/test-subject.txt.hbs
+usr/share/proxmox-backup/templates/default/thresholds-exceeded-body.txt.hbs
+usr/share/proxmox-backup/templates/default/thresholds-exceeded-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/verify-err-body.txt.hbs
 usr/share/proxmox-backup/templates/default/verify-err-subject.txt.hbs
 usr/share/proxmox-backup/templates/default/verify-ok-body.txt.hbs
