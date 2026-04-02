@@ -483,6 +483,7 @@ Ext.define('PBS.Utils', {
             sync: gettext('Sync job'),
             'tape-backup': gettext('Tape backup notifications'),
             'tape-load': gettext('Tape loading request'),
+            thresholds: gettext('Datastore threshold notifications'),
             verify: gettext('Verification job'),
         });
 

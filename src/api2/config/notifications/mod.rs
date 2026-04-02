@@ -190,6 +190,7 @@ pub fn get_values(
         "system-mail",
         "tape-backup",
         "tape-load",
+        "thresholds",
         "verify",
     ] {
         values.push(MatchableValue {
