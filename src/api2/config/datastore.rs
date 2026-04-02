@@ -13,10 +13,11 @@ use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType, DatastoreNotify,
-    DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType, PruneJobConfig,
-    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendConfig, DatastoreBackendType,
+    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType,
+    PruneJobConfig, PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -435,6 +436,8 @@ pub enum DeletableProperty {
     Tuning,
     /// Delete the maintenance-mode property
     MaintenanceMode,
+    /// Delete the notification-thresholds property
+    NotificationThresholds,
 }
 
 #[api(
@@ -530,6 +533,10 @@ pub fn update_datastore(
                 DeletableProperty::MaintenanceMode => {
                     data.set_maintenance_mode(None)?;
                 }
+                DeletableProperty::NotificationThresholds => {
+                    data.notification_thresholds = None;
+                    update_thresholds(&data)?;
+                }
             }
         }
     }
@@ -615,6 +622,11 @@ pub fn update_datastore(
         data.set_maintenance_mode(maintenance_mode)?;
     }
 
+    if update.notification_thresholds.is_some() {
+        data.notification_thresholds = update.notification_thresholds;
+        update_thresholds(&data)?;
+    }
+
     config.set_data(&name, "datastore", &data)?;
 
     pbs_config::datastore::save_config(&config)?;
@@ -644,6 +656,19 @@ pub fn update_datastore(
         });
     }
 
+    Ok(())
+}
+
+fn update_thresholds(config: &DataStoreConfig) -> Result<(), Error> {
+    let backend_config: DatastoreBackendConfig = serde_json::from_value(
+        DatastoreBackendConfig::API_SCHEMA
+            .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
+    )?;
+    if backend_config.ty.unwrap_or_default() == DatastoreBackendType::S3 {
+        let mut request_counters =
+            pbs_datastore::DataStore::request_counters(config, &backend_config)?;
+        pbs_datastore::DataStore::update_notification_thresholds(&mut request_counters, config)?;
+    }
     Ok(())
 }
 

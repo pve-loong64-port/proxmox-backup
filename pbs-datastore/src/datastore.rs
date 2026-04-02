@@ -18,8 +18,8 @@ use tracing::{info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_s3_client::{
-    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix, S3RateLimiterOptions,
-    S3RequestCounterConfig, SharedRequestCounters,
+    RequestCounterThresholds, S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3PathPrefix,
+    S3RateLimiterOptions, S3RequestCounterConfig, SharedRequestCounters,
 };
 use proxmox_schema::ApiType;
 
@@ -706,7 +706,10 @@ impl DataStore {
                 );
 
                 let cache = LocalDatastoreLruCache::new(cache_capacity, chunk_store.clone());
-                let request_counters = Self::request_counters(&config, &backend_config)?;
+
+                let mut request_counters = Self::request_counters(&config, &backend_config)?;
+
+                Self::update_notification_thresholds(&mut request_counters, &config)?;
 
                 (Some(cache), Some(Arc::new(request_counters)))
             } else {
@@ -754,6 +757,24 @@ impl DataStore {
         let request_counters =
             SharedRequestCounters::open_shared_memory_mapped(path, pbs_config::backup_user()?)?;
         Ok(request_counters)
+    }
+
+    /// Update the notification threshold values on the counters by given config
+    pub fn update_notification_thresholds(
+        counters: &mut SharedRequestCounters,
+        config: &DataStoreConfig,
+    ) -> Result<(), Error> {
+        let thresholds: RequestCounterThresholds =
+            if let Some(thresholds) = &config.notification_thresholds {
+                serde_json::from_value(
+                    RequestCounterThresholds::API_SCHEMA.parse_property_string(thresholds)?,
+                )?
+            } else {
+                RequestCounterThresholds::default()
+            };
+
+        counters.update_thresholds(&thresholds);
+        Ok(())
     }
 
     // Requires obtaining a shared chunk store lock beforehand
