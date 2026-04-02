@@ -39,10 +39,10 @@ use pbs_api_types::{
     print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupArchiveName,
     BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
     DataStoreConfig, DataStoreListItem, DataStoreMountStatus, DataStoreStatus,
-    GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus, KeepOptions, MaintenanceMode,
-    MaintenanceType, Operation, PruneJobOptions, SnapshotListItem, SyncJobConfig,
-    BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
-    BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
+    DatastoreBackendType, GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus,
+    KeepOptions, MaintenanceMode, MaintenanceType, Operation, PruneJobOptions, SnapshotListItem,
+    SyncJobConfig, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
     IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT,
     PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ,
     PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
@@ -1898,6 +1898,17 @@ pub fn get_rrd_stats(
         Ok(Some((fs_type, _, _))) if fs_type.as_str() == "zfs" => {}
         _ => rrd_fields.push("io_ticks"),
     };
+    if datastore.backend_type() == DatastoreBackendType::S3 {
+        rrd_fields.push("s3/uploaded");
+        rrd_fields.push("s3/downloaded");
+        rrd_fields.push("s3/total/uploaded");
+        rrd_fields.push("s3/total/downloaded");
+        rrd_fields.push("s3/total/get");
+        rrd_fields.push("s3/total/put");
+        rrd_fields.push("s3/total/post");
+        rrd_fields.push("s3/total/head");
+        rrd_fields.push("s3/total/delete");
+    }
 
     create_value_from_rrd(&format!("datastore/{store}"), &rrd_fields, timeframe, cf)
 }
