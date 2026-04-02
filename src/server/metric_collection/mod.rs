@@ -1,18 +1,27 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::Path;
 use std::pin::pin;
-use std::sync::{Arc, OnceLock};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use anyhow::Error;
+use anyhow::{format_err, Error};
+use hyper::Method;
 use tokio::join;
 
-use pbs_api_types::{DataStoreConfig, Operation};
+use pbs_api_types::{
+    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, Operation, S3Statistics,
+};
+use proxmox_lang::try_block;
 use proxmox_network_api::{get_network_interfaces, IpLink};
+use proxmox_s3_client::SharedRequestCounters;
+use proxmox_schema::ApiType;
 use proxmox_sys::fs::FileSystemInformation;
 use proxmox_sys::linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat};
 
 use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
+use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 
 mod metric_server;
 pub(crate) mod pull_metrics;
@@ -107,6 +116,11 @@ struct DiskStat {
     name: String,
     usage: Option<FileSystemInformation>,
     dev: Option<BlockDevStat>,
+}
+
+struct DatastoreStats {
+    disk: DiskStat,
+    s3_stats: Option<S3Statistics>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
@@ -215,7 +229,52 @@ fn collect_host_stats_sync() -> HostStats {
     }
 }
 
-fn collect_disk_stats_sync() -> (DiskStat, Vec<DiskStat>) {
+static S3_REQUEST_COUNTERS_MAP: LazyLock<Mutex<HashMap<String, SharedRequestCounters>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn collect_s3_stats(
+    store: &str,
+    backend_config: &DatastoreBackendConfig,
+) -> Result<Option<S3Statistics>, Error> {
+    let endpoint_id = backend_config
+        .client
+        .as_ref()
+        .ok_or(format_err!("missing s3 endpoint id"))?;
+    let bucket = backend_config
+        .bucket
+        .as_ref()
+        .ok_or(format_err!("missing s3 bucket name"))?;
+    let path =
+        format!("{S3_CLIENT_REQUEST_COUNTER_BASE_PATH}/{endpoint_id}-{bucket}-{store}.shmem");
+
+    let mut counters = S3_REQUEST_COUNTERS_MAP.lock().unwrap();
+    let s3_stats = match counters.entry(path.clone()) {
+        Entry::Occupied(o) => load_s3_statistics(o.get()),
+        Entry::Vacant(v) => {
+            let user = pbs_config::backup_user()?;
+            let counters = SharedRequestCounters::open_shared_memory_mapped(path, user)?;
+            let s3_stats = load_s3_statistics(&counters);
+            v.insert(counters);
+            s3_stats
+        }
+    };
+
+    Ok(Some(s3_stats))
+}
+
+fn load_s3_statistics(counters: &SharedRequestCounters) -> S3Statistics {
+    S3Statistics {
+        get: counters.load(Method::GET, Ordering::Acquire),
+        put: counters.load(Method::PUT, Ordering::Acquire),
+        post: counters.load(Method::POST, Ordering::Acquire),
+        delete: counters.load(Method::DELETE, Ordering::Acquire),
+        head: counters.load(Method::HEAD, Ordering::Acquire),
+        uploaded: counters.get_upload_traffic(Ordering::Acquire),
+        downloaded: counters.get_download_traffic(Ordering::Acquire),
+    }
+}
+
+fn collect_disk_stats_sync() -> (DiskStat, Vec<DatastoreStats>) {
     let disk_manager = DiskManage::new();
 
     let root = gather_disk_stats(disk_manager.clone(), Path::new("/"), "host");
@@ -239,11 +298,30 @@ fn collect_disk_stats_sync() -> (DiskStat, Vec<DiskStat>) {
                     continue;
                 }
 
-                datastores.push(gather_disk_stats(
+                let s3_stats: Option<S3Statistics> = try_block!({
+                    let backend_config: DatastoreBackendConfig = serde_json::from_value(
+                        DatastoreBackendConfig::API_SCHEMA
+                            .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
+                    )?;
+
+                    if backend_config.ty.unwrap_or_default() == DatastoreBackendType::S3 {
+                        collect_s3_stats(&config.name, &backend_config)
+                    } else {
+                        Ok(None)
+                    }
+                })
+                .unwrap_or_else(|err: Error| {
+                    eprintln!("parsing datastore backend config failed - {err}");
+                    None
+                });
+
+                let disk = gather_disk_stats(
                     disk_manager.clone(),
                     Path::new(&config.absolute_path()),
                     &config.name,
-                ));
+                );
+
+                datastores.push(DatastoreStats { disk, s3_stats });
             }
         }
         Err(err) => {

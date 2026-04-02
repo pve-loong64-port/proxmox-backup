@@ -6,13 +6,14 @@ use nix::sys::stat::Mode;
 use pbs_api_types::{
     MetricDataPoint,
     MetricDataType::{self, Derive, Gauge},
+    S3Statistics,
 };
 use pbs_buildcfg::PROXMOX_BACKUP_RUN_DIR;
 use proxmox_shared_cache::SharedCache;
 use proxmox_sys::fs::CreateOptions;
 use serde::{Deserialize, Serialize};
 
-use super::{DiskStat, HostStats, NetdevType, METRIC_COLLECTION_INTERVAL};
+use super::{DatastoreStats, DiskStat, HostStats, NetdevType, METRIC_COLLECTION_INTERVAL};
 
 const METRIC_CACHE_TIME: Duration = Duration::from_secs(30 * 60);
 const STORED_METRIC_GENERATIONS: u64 =
@@ -89,7 +90,7 @@ pub fn get_all_metrics(start_time: i64) -> Result<Vec<MetricDataPoint>, Error> {
 pub(super) fn update_metrics(
     host: &HostStats,
     hostdisk: &DiskStat,
-    datastores: &[DiskStat],
+    datastores: &[DatastoreStats],
 ) -> Result<(), Error> {
     let mut points = MetricDataPoints::new(proxmox_time::epoch_i64());
 
@@ -129,8 +130,11 @@ pub(super) fn update_metrics(
     update_disk_metrics(&mut points, hostdisk, "host");
 
     for stat in datastores {
-        let id = format!("datastore/{}", stat.name);
-        update_disk_metrics(&mut points, stat, &id);
+        let id = format!("datastore/{}", stat.disk.name);
+        update_disk_metrics(&mut points, &stat.disk, &id);
+        if let Some(stat) = &stat.s3_stats {
+            update_s3_metrics(&mut points, stat, &id);
+        }
     }
 
     get_cache()?.set(&points, Duration::from_secs(2))?;
@@ -156,6 +160,12 @@ fn update_disk_metrics(points: &mut MetricDataPoints, disk: &DiskStat, id: &str)
         points.add(Derive, id, "disk_read", (stat.read_sectors * 512) as f64);
         points.add(Derive, id, "disk_write", (stat.write_sectors * 512) as f64);
     }
+}
+
+fn update_s3_metrics(points: &mut MetricDataPoints, stat: &S3Statistics, id: &str) {
+    let id = format!("{id}/s3");
+    points.add(Gauge, &id, "uploaded", stat.uploaded as f64);
+    points.add(Gauge, &id, "downloaded", stat.downloaded as f64);
 }
 
 #[derive(Serialize, Deserialize)]

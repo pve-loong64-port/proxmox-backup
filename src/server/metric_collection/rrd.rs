@@ -13,10 +13,11 @@ use proxmox_rrd::rrd::{AggregationFn, Archive, DataSourceType, Database};
 use proxmox_rrd::Cache;
 use proxmox_sys::fs::CreateOptions;
 
+use pbs_api_types::S3Statistics;
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 
-use super::{DiskStat, HostStats, NetdevType};
+use super::{DatastoreStats, DiskStat, HostStats, NetdevType};
 
 const RRD_CACHE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/rrdb");
 
@@ -148,7 +149,7 @@ fn update_derive(name: &str, value: f64) {
     }
 }
 
-pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: &[DiskStat]) {
+pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: &[DatastoreStats]) {
     if let Some(stat) = &host.proc {
         update_gauge("host/cpu", stat.cpu);
         update_gauge("host/iowait", stat.iowait_percent);
@@ -182,8 +183,11 @@ pub(super) fn update_metrics(host: &HostStats, hostdisk: &DiskStat, datastores: 
     update_disk_metrics(hostdisk, "host");
 
     for stat in datastores {
-        let rrd_prefix = format!("datastore/{}", stat.name);
-        update_disk_metrics(stat, &rrd_prefix);
+        let rrd_prefix = format!("datastore/{}", stat.disk.name);
+        update_disk_metrics(&stat.disk, &rrd_prefix);
+        if let Some(stats) = &stat.s3_stats {
+            update_s3_metrics(stats, &rrd_prefix);
+        }
     }
 }
 
@@ -211,4 +215,26 @@ fn update_disk_metrics(disk: &DiskStat, rrd_prefix: &str) {
         let rrd_key = format!("{rrd_prefix}/io_ticks");
         update_derive(&rrd_key, (stat.io_ticks as f64) / 1000.0);
     }
+}
+
+fn update_s3_metrics(stats: &S3Statistics, rrd_prefix: &str) {
+    let rrd_key = format!("{rrd_prefix}/s3/total/uploaded");
+    update_gauge(&rrd_key, stats.uploaded as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/total/downloaded");
+    update_gauge(&rrd_key, stats.downloaded as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/uploaded");
+    update_derive(&rrd_key, stats.uploaded as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/downloaded");
+    update_derive(&rrd_key, stats.downloaded as f64);
+
+    let rrd_key = format!("{rrd_prefix}/s3/total/get");
+    update_gauge(&rrd_key, stats.get as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/total/put");
+    update_gauge(&rrd_key, stats.put as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/total/post");
+    update_gauge(&rrd_key, stats.post as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/total/head");
+    update_gauge(&rrd_key, stats.head as f64);
+    let rrd_key = format!("{rrd_prefix}/s3/total/delete");
+    update_gauge(&rrd_key, stats.delete as f64);
 }

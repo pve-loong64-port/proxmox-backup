@@ -5,10 +5,10 @@ use serde_json::{json, Value};
 
 use proxmox_metrics::MetricsData;
 
-use super::{DiskStat, HostStats};
+use super::{DatastoreStats, DiskStat, HostStats};
 
 pub async fn send_data_to_metric_servers(
-    stats: Arc<(HostStats, DiskStat, Vec<DiskStat>)>,
+    stats: Arc<(HostStats, DiskStat, Vec<DatastoreStats>)>,
 ) -> Result<(), Error> {
     let (config, _digest) = pbs_config::metrics::config()?;
     let channel_list = get_metric_server_connections(config)?;
@@ -66,10 +66,10 @@ pub async fn send_data_to_metric_servers(
 
     for datastore in stats.2.iter() {
         values.push(Arc::new(
-            MetricsData::new("blockstat", ctime, datastore.to_value())?
+            MetricsData::new("blockstat", ctime, datastore.disk.to_value())?
                 .tag("object", "host")
                 .tag("host", nodename)
-                .tag("datastore", datastore.name.clone()),
+                .tag("datastore", datastore.disk.name.clone()),
         ));
     }
 
