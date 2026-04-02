@@ -202,14 +202,25 @@ impl DataStoreImpl {
     }
 }
 
+pub type ThresholdsExceededCallback = fn(&str, &str, u64, u64) -> Result<(), Error>;
+
 pub struct DataStoreLookup<'a> {
     name: &'a str,
     operation: Operation,
+    thresholds_exceeded_callback: Option<ThresholdsExceededCallback>,
 }
 
 impl<'a> DataStoreLookup<'a> {
-    pub fn with(name: &'a str, operation: Operation) -> Self {
-        Self { name, operation }
+    pub fn with(
+        name: &'a str,
+        operation: Operation,
+        thresholds_exceeded_callback: Option<ThresholdsExceededCallback>,
+    ) -> Self {
+        Self {
+            name,
+            operation,
+            thresholds_exceeded_callback,
+        }
     }
 }
 
@@ -556,7 +567,12 @@ impl DataStore {
             )?)
         };
 
-        let datastore = DataStore::with_store_and_config(chunk_store, config, gen_num)?;
+        let datastore = DataStore::with_store_and_config(
+            chunk_store,
+            config,
+            gen_num,
+            lookup.thresholds_exceeded_callback,
+        )?;
 
         let datastore = Arc::new(datastore);
         datastore_cache.insert(lookup.name.to_string(), datastore.clone());
@@ -591,7 +607,7 @@ impl DataStore {
         {
             // the datastore drop handler does the checking if tasks are running and clears the
             // cache entry, so we just have to trigger it here
-            let lookup = DataStoreLookup::with(name, Operation::Lookup);
+            let lookup = DataStoreLookup::with(name, Operation::Lookup, None);
             let _ = DataStore::lookup_datastore(lookup);
         }
 
@@ -645,6 +661,7 @@ impl DataStore {
             Arc::new(chunk_store),
             config,
             None,
+            None,
         )?);
 
         if let Some(operation) = operation {
@@ -658,6 +675,7 @@ impl DataStore {
         chunk_store: Arc<ChunkStore>,
         config: DataStoreConfig,
         generation: Option<usize>,
+        thresholds_exceeded_callback: Option<ThresholdsExceededCallback>,
     ) -> Result<DataStoreImpl, Error> {
         let mut gc_status_path = chunk_store.base_path();
         gc_status_path.push(".gc-status");
@@ -710,6 +728,16 @@ impl DataStore {
                 let mut request_counters = Self::request_counters(&config, &backend_config)?;
 
                 Self::update_notification_thresholds(&mut request_counters, &config)?;
+                request_counters.set_thresholds_exceeded_callback(
+                    config.name,
+                    Box::new(move |label, counter_id, threshold, value| {
+                        thresholds_exceeded_callback.map(|cb| {
+                            if let Err(err) = cb(label, counter_id, threshold, value) {
+                                log::error!("failed to send notification: {err:?}");
+                            }
+                        });
+                    }),
+                );
 
                 (Some(cache), Some(Arc::new(request_counters)))
             } else {

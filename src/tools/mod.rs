@@ -178,5 +178,9 @@ pub(crate) fn backup_info_to_snapshot_list_item(
 /// Lookup the datastore by name with given operation.
 #[inline(always)]
 pub fn lookup_with<'a>(name: &'a str, operation: Operation) -> DataStoreLookup<'a> {
-    DataStoreLookup::with(name, operation)
+    DataStoreLookup::with(
+        name,
+        operation,
+        Some(crate::server::notifications::send_datastore_threshold_exceeded),
+    )
 }
