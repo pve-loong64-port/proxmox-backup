@@ -86,6 +86,33 @@ fn list_s3_clients(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
     Ok(Value::Null)
 }
 
+#[api(
+    input: {
+        properties: {
+            "s3-endpoint-id": {
+                schema: S3_CLIENT_ID_SCHEMA,
+            },
+            bucket: {
+                schema: S3_BUCKET_NAME_SCHEMA,
+            },
+            "store-prefix": {
+                type: String,
+                description: "Store prefix within bucket for S3 object keys (commonly datastore name)",
+                optional: true,
+            },
+        },
+    },
+)]
+/// Reset the S3 request counters for matching endpoint, bucket or datastore (if prefix is given).
+async fn reset_counters(
+    s3_endpoint_id: String,
+    bucket: String,
+    store_prefix: Option<String>,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<(), Error> {
+    api2::admin::s3::reset_counters(s3_endpoint_id, bucket, store_prefix, rpcenv).await
+}
+
 pub fn s3_commands() -> CommandLineInterface {
     let endpoint_cmd_def = CliCommandMap::new()
         .insert("list", CliCommand::new(&API_METHOD_LIST_S3_CLIENTS))
@@ -110,6 +137,12 @@ pub fn s3_commands() -> CommandLineInterface {
             "list-buckets",
             CliCommand::new(&API_METHOD_LIST_BUCKETS)
                 .arg_param(&["s3-endpoint-id"])
+                .completion_cb("s3-endpoint-id", pbs_config::s3::complete_s3_client_id),
+        )
+        .insert(
+            "reset-counters",
+            CliCommand::new(&API_METHOD_RESET_COUNTERS)
+                .arg_param(&["s3-endpoint-id", "bucket"])
                 .completion_cb("s3-endpoint-id", pbs_config::s3::complete_s3_client_id),
         );
 
