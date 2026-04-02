@@ -438,6 +438,8 @@ pub enum DeletableProperty {
     MaintenanceMode,
     /// Delete the notification-thresholds property
     NotificationThresholds,
+    /// Delete the counter reset schedule.
+    CounterResetSchedule,
 }
 
 #[api(
@@ -537,6 +539,9 @@ pub fn update_datastore(
                     data.notification_thresholds = None;
                     update_thresholds(&data)?;
                 }
+                DeletableProperty::CounterResetSchedule => {
+                    data.counter_reset_schedule = None;
+                }
             }
         }
     }
@@ -625,6 +630,10 @@ pub fn update_datastore(
     if update.notification_thresholds.is_some() {
         data.notification_thresholds = update.notification_thresholds;
         update_thresholds(&data)?;
+    }
+
+    if update.counter_reset_schedule.is_some() {
+        data.counter_reset_schedule = update.counter_reset_schedule;
     }
 
     config.set_data(&name, "datastore", &data)?;
