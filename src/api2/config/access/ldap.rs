@@ -1,7 +1,6 @@
 use crate::auth::LdapAuthenticator;
 use ::serde::{Deserialize, Serialize};
 use anyhow::{format_err, Error};
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_ldap::Connection;
@@ -119,10 +118,7 @@ pub fn delete_ldap_realm(
 
     let (mut domains, expected_digest) = domains::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if domains.sections.remove(&realm).is_none() {
         http_bail!(NOT_FOUND, "realm '{}' does not exist.", realm);
@@ -242,10 +238,7 @@ pub fn update_ldap_realm(
 
     let (mut domains, expected_digest) = domains::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut config: LdapRealmConfig = domains.lookup("ldap", &realm)?;
 

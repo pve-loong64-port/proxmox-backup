@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, format_err, Context, Error};
-use hex::FromHex;
 use http_body_util::BodyExt;
 use serde_json::Value;
 use tracing::{info, warn};
@@ -479,10 +478,7 @@ pub fn update_datastore(
     // pass/compare digest
     let (mut config, expected_digest) = pbs_config::datastore::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: DataStoreConfig = config.lookup("datastore", &name)?;
 
@@ -696,10 +692,7 @@ pub async fn delete_datastore(
 
     let (config, expected_digest) = pbs_config::datastore::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if !config.sections.contains_key(&name) {
         http_bail!(NOT_FOUND, "datastore '{}' does not exist.", name);

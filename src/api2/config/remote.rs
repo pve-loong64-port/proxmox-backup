@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, format_err, Error};
-use hex::FromHex;
 use pbs_api_types::BackupNamespace;
 use pbs_api_types::NamespaceListItem;
 use proxmox_router::list_subdirs_api_method;
@@ -192,10 +191,7 @@ pub fn update_remote(
 
     let (mut config, expected_digest) = pbs_config::remote::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: Remote = config.lookup("remote", &name)?;
 
@@ -292,10 +288,7 @@ pub fn delete_remote(name: String, digest: Option<String>) -> Result<(), Error> 
 
     let (mut config, expected_digest) = pbs_config::remote::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if config.sections.remove(&name).is_none() {
         http_bail!(NOT_FOUND, "remote '{}' does not exist.", name);

@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
@@ -193,10 +192,7 @@ pub fn update_tape_backup_job(
 
     let mut data: TapeBackupJobConfig = config.lookup("backup", &id)?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if let Some(delete) = delete {
         for delete_prop in delete {
@@ -328,10 +324,7 @@ pub fn delete_tape_backup_job(
 
     let (mut config, expected_digest) = pbs_config::tape_job::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     match config.lookup::<TapeBackupJobConfig>("backup", &id) {
         Ok(_job) => {

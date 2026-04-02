@@ -1,5 +1,4 @@
 use anyhow::Error;
-use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -224,10 +223,7 @@ pub fn update_prune_job(
     // pass/compare digest
     let (mut config, expected_digest) = prune::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: PruneJobConfig = config.lookup("prune", &id)?;
 
@@ -369,10 +365,7 @@ pub fn delete_prune_job(
 
     user_info.check_privs(&auth_id, &job.acl_path(), PRIV_DATASTORE_MODIFY, true)?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if config.sections.remove(&id).is_none() {
         http_bail!(NOT_FOUND, "job '{}' does not exist.", id);

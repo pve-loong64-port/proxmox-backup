@@ -1,7 +1,6 @@
 //! User Management
 
 use anyhow::{bail, format_err, Error};
-use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -269,10 +268,7 @@ pub async fn update_user(
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: User = config.lookup("user", userid.as_str())?;
 
@@ -358,10 +354,7 @@ pub fn delete_user(userid: Userid, digest: Option<String>) -> Result<(), Error> 
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if config.sections.remove(userid.as_str()).is_none() {
         bail!("user '{}' does not exist.", userid);
@@ -496,10 +489,7 @@ pub fn generate_token(
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let tokenid = Authid::from((userid.clone(), Some(token_name.clone())));
     let tokenid_string = tokenid.to_string();
@@ -613,10 +603,7 @@ pub fn update_token(
 
     let (mut config, expected_digest) = pbs_config::user::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let tokenid = Authid::from((userid, Some(token_name)));
     let tokenid_string = tokenid.to_string();
@@ -699,10 +686,7 @@ pub fn delete_token(
 
     let (mut user_config, expected_digest) = pbs_config::user::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let (mut acl_config, _digest) = pbs_config::acl::config()?;
     do_delete_token(token_name, &userid, &mut user_config, &mut acl_config)?;

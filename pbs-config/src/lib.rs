@@ -20,7 +20,8 @@ pub mod verify;
 mod config_version_cache;
 pub use config_version_cache::ConfigVersionCache;
 
-use anyhow::{format_err, Error};
+use anyhow::{bail, format_err, Error};
+use hex::FromHex;
 use nix::unistd::{Gid, Group, Uid, User};
 use proxmox_sys::fs::DirLockGuard;
 use std::os::unix::prelude::AsRawFd;
@@ -146,5 +147,21 @@ pub fn replace_secret_config<P: AsRef<std::path::Path>>(path: P, data: &[u8]) ->
 
     proxmox_sys::fs::replace_file(path, data, options, true)?;
 
+    Ok(())
+}
+
+/// Detect modified configuration files
+///
+/// This function fails with a reasonable error message if checksums do not match.
+pub fn detect_modified_configuration_file<T: AsRef<str>>(
+    digest_str: Option<T>,
+    expected_digest: &[u8; 32],
+) -> Result<(), Error> {
+    if let Some(digest_str) = digest_str {
+        let digest = <[u8; 32]>::from_hex(digest_str.as_ref())?;
+        if &digest != expected_digest {
+            bail!("detected modified configuration - file changed by other user? Try again.");
+        }
+    }
     Ok(())
 }

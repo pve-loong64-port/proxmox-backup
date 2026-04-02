@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
@@ -202,10 +201,7 @@ pub fn update_verification_job(
     // pass/compare digest
     let (mut config, expected_digest) = verify::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: VerificationJobConfig = config.lookup("verification", &id)?;
 
@@ -331,10 +327,7 @@ pub fn delete_verification_job(
     let job: VerificationJobConfig = config.lookup("verification", &id)?;
     user_info.check_privs(&auth_id, &job.acl_path(), PRIV_DATASTORE_VERIFY, true)?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     match config.sections.get(&id) {
         Some(_) => {

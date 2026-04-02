@@ -1,5 +1,4 @@
 use anyhow::{bail, format_err, Error};
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, ApiMethod, Permission, Router, RpcEnvironment};
@@ -115,10 +114,7 @@ pub fn change_passphrase(
 
     let (mut config_map, expected_digest) = load_key_configs()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let key_config = match config_map.get(&fingerprint) {
         Some(key_config) => key_config,
@@ -313,10 +309,7 @@ pub fn delete_key(
     let (mut config_map, expected_digest) = load_key_configs()?;
     let (mut key_map, _) = load_keys()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     match config_map.get(&fingerprint) {
         Some(_) => {

@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, Error};
-use hex::FromHex;
 use pbs_api_types::SyncDirection;
 use serde_json::Value;
 
@@ -398,10 +397,7 @@ pub fn update_sync_job(
 
     let (mut config, expected_digest) = sync::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: SyncJobConfig = config.lookup("sync", &id)?;
 
@@ -617,10 +613,7 @@ pub fn delete_sync_job(
 
     let (mut config, expected_digest) = sync::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     match config.lookup("sync", &id) {
         Ok(job) => {

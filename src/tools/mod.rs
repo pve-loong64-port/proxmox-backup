@@ -29,19 +29,6 @@ pub fn assert_if_modified(digest1: &str, digest2: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Detect modified configuration files
-///
-/// This function fails with a reasonable error message if checksums do not match.
-pub fn detect_modified_configuration_file(
-    digest1: &[u8; 32],
-    digest2: &[u8; 32],
-) -> Result<(), Error> {
-    if digest1 != digest2 {
-        bail!("detected modified configuration - file changed by other user? Try again.");
-    }
-    Ok(())
-}
-
 /// The default 2 hours are far too long for PBS
 pub const PROXMOX_BACKUP_TCP_KEEPALIVE_TIME: u32 = 120;
 pub const DEFAULT_USER_AGENT_STRING: &str = "proxmox-backup-client/1.0";

@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
@@ -183,10 +182,7 @@ pub fn update_changer(
 
     let (mut config, expected_digest) = pbs_config::drive::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: ScsiTapeChanger = config.lookup("changer", &name)?;
 

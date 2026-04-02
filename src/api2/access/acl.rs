@@ -1,7 +1,6 @@
 //! Manage Access Control Lists
 
 use anyhow::{bail, Error};
-use hex::FromHex;
 
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
@@ -218,10 +217,7 @@ pub fn update_acl(
 
     let (mut tree, expected_digest) = pbs_config::acl::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let propagate = propagate.unwrap_or(true);
 

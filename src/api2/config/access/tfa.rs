@@ -2,7 +2,6 @@
 //! If we add more, it should be moved into a sub module.
 
 use anyhow::{format_err, Error};
-use hex::FromHex;
 use serde::{Deserialize, Serialize};
 
 use proxmox_router::list_subdirs_api_method;
@@ -94,13 +93,10 @@ pub fn update_webauthn_config(
     let mut tfa = tfa::read()?;
 
     if let Some(wa) = &mut tfa.webauthn {
-        if let Some(ref digest) = digest {
-            let digest = <[u8; 32]>::from_hex(digest)?;
-            crate::tools::detect_modified_configuration_file(
-                &digest,
-                &crate::config::tfa::webauthn_config_digest(wa)?,
-            )?;
-        }
+        pbs_config::detect_modified_configuration_file(
+            digest,
+            &crate::config::tfa::webauthn_config_digest(wa)?,
+        )?;
 
         if let Some(delete) = delete {
             for delete in delete {

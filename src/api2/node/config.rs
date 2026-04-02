@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
-use hex::FromHex;
 
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
@@ -110,8 +109,7 @@ pub fn update_node_config(
     if let Some(digest) = digest {
         // FIXME: GUI doesn't handle our non-inlined digest part here properly...
         if !digest.is_empty() {
-            let digest = <[u8; 32]>::from_hex(&digest)?;
-            crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
+            pbs_config::detect_modified_configuration_file(Some(digest), &expected_digest)?;
         }
     }
 

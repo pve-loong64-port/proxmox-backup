@@ -1,5 +1,4 @@
 use anyhow::{bail, format_err, Error};
-use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -207,10 +206,7 @@ pub async fn update_ad_realm(
 
     let (mut domains, expected_digest) = domains::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut config: AdRealmConfig = domains.lookup("ad", &realm)?;
 

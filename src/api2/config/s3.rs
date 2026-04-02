@@ -1,6 +1,5 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::{bail, Context, Error};
-use hex::FromHex;
 use serde_json::Value;
 
 use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
@@ -200,10 +199,7 @@ pub fn update_s3_client_config(
     let (mut config, expected_digest) = s3::config()?;
 
     // Secrets are not included in digest concurrent changes therefore not detected.
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     let mut data: S3ClientConf = config.lookup(S3_CFG_TYPE_ID, &id)?;
 
@@ -311,10 +307,7 @@ pub fn delete_s3_client_config(
     let _lock = s3::lock_config()?;
     let (mut config, expected_digest) = s3::config()?;
 
-    if let Some(ref digest) = digest {
-        let digest = <[u8; 32]>::from_hex(digest)?;
-        crate::tools::detect_modified_configuration_file(&digest, &expected_digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &expected_digest)?;
 
     if let Some(datastore) =
         s3_client_in_use(&id).context("failed to check if s3 client is in-use")?
