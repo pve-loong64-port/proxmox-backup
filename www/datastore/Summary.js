@@ -48,104 +48,6 @@ Ext.define('PBS.DataStoreInfo', {
     extend: 'Ext.panel.Panel',
     alias: 'widget.pbsDataStoreInfo',
 
-    viewModel: {
-        data: {
-            countstext: '',
-            usage: {},
-            stillbad: 0,
-            mountpoint: '',
-        },
-    },
-
-    controller: {
-        xclass: 'Ext.app.ViewController',
-
-        onLoad: function (store, data, success) {
-            let me = this;
-            if (!success) {
-                Proxmox.Utils.API2Request({
-                    url: `/config/datastore/${me.view.datastore}`,
-                    success: function (response) {
-                        let maintenanceString = response.result.data['maintenance-mode'];
-                        let removable = !!response.result.data['backing-device'];
-                        if (!maintenanceString && !removable) {
-                            me.view.el.mask(gettext('Datastore is not available'));
-                            return;
-                        }
-
-                        let [_type, msg] = PBS.Utils.parseMaintenanceMode(maintenanceString);
-                        let isUnplugged = !maintenanceString && removable;
-                        let maskMessage = isUnplugged
-                            ? gettext('Datastore is not mounted')
-                            : `${gettext('Datastore is in maintenance mode')}${msg ? ': ' + msg : ''}`;
-
-                        let maskIcon = isUnplugged
-                            ? 'fa pbs-unplugged-mask'
-                            : 'fa pbs-maintenance-mask';
-                        me.view.el.mask(maskMessage, maskIcon);
-                    },
-                });
-                return;
-            }
-            me.view.el.unmask();
-
-            let vm = me.getViewModel();
-
-            let counts = store.getById('counts').data.value;
-            let used = store.getById('used').data.value;
-            let total = store.getById('avail').data.value + used;
-            let backendType = store.getById('backend-type').data.value;
-            if (backendType === 's3') {
-                me.lookup('usage').title = gettext('Local Cache Usage');
-            }
-
-            let usage = Proxmox.Utils.render_size_usage(used, total, true);
-            vm.set('usagetext', usage);
-            vm.set('usage', used / total);
-
-            let countstext = function (count) {
-                count = count || {};
-                return `${count.groups || 0} ${gettext('Groups')}, ${count.snapshots || 0} ${gettext('Snapshots')}`;
-            };
-            let gcstatus = store.getById('gc-status')?.data.value;
-            if (gcstatus) {
-                let dedup = PBS.Utils.calculate_dedup_factor(gcstatus);
-                vm.set('deduplication', dedup.toFixed(2));
-                vm.set('stillbad', gcstatus['still-bad']);
-            }
-
-            vm.set('ctcount', countstext(counts.ct));
-            vm.set('vmcount', countstext(counts.vm));
-            vm.set('hostcount', countstext(counts.host));
-        },
-
-        startStore: function () {
-            this.store.startUpdate();
-        },
-        stopStore: function () {
-            this.store.stopUpdate();
-        },
-        doSingleStoreLoad: function () {
-            this.store.load();
-        },
-
-        init: function (view) {
-            let me = this;
-            let datastore = encodeURIComponent(view.datastore);
-            me.store = Ext.create('Proxmox.data.ObjectStore', {
-                interval: 5 * 1000,
-                url: `/api2/json/admin/datastore/${datastore}/status/?verbose=true`,
-            });
-            me.store.on('load', me.onLoad, me);
-        },
-    },
-
-    listeners: {
-        activate: 'startStore',
-        beforedestroy: 'stopStore',
-        deactivate: 'stopStore',
-    },
-
     defaults: {
         xtype: 'pmxInfoWidget',
     },
@@ -240,6 +142,15 @@ Ext.define('PBS.DataStoreSummary', {
     defaults: {
         columnWidth: 1,
         padding: 5,
+    },
+
+    viewModel: {
+        data: {
+            countstext: '',
+            usage: {},
+            stillbad: 0,
+            mountpoint: '',
+        },
     },
 
     tbar: [
@@ -371,16 +282,19 @@ Ext.define('PBS.DataStoreSummary', {
     listeners: {
         activate: function () {
             this.rrdstore.startUpdate();
+            this.infoStore.startUpdate();
         },
         afterrender: function () {
             this.statusStore.startUpdate();
         },
         deactivate: function () {
             this.rrdstore.stopUpdate();
+            this.infoStore.stopUpdate();
         },
         destroy: function () {
             this.rrdstore.stopUpdate();
             this.statusStore.stopUpdate();
+            this.infoStore.stopUpdate();
         },
         resize: function (panel) {
             Proxmox.Utils.updateColumns(panel);
@@ -400,6 +314,11 @@ Ext.define('PBS.DataStoreSummary', {
             interval: 1000,
         });
 
+        me.infoStore = Ext.create('Proxmox.data.ObjectStore', {
+            interval: 5 * 1000,
+            url: `/api2/json/admin/datastore/${me.datastore}/status/?verbose=true`,
+        });
+
         let lastRequestFailed = false;
         me.mon(me.statusStore, 'load', (s, records, success) => {
             let mountBtn = me.lookupReferenceHolder().lookupReference('mountButton');
@@ -409,10 +328,8 @@ Ext.define('PBS.DataStoreSummary', {
 
                 me.statusStore.stopUpdate();
                 me.rrdstore.stopUpdate();
-
-                let infoPanelController = me.down('pbsDataStoreInfo').getController();
-                infoPanelController.stopStore();
-                infoPanelController.doSingleStoreLoad();
+                me.infoStore.stopUpdate();
+                me.infoStore.load();
 
                 Proxmox.Utils.API2Request({
                     url: `/config/datastore/${me.datastore}`,
@@ -437,7 +354,7 @@ Ext.define('PBS.DataStoreSummary', {
             } else {
                 // only trigger on edges, else we couple our interval to the info one
                 if (lastRequestFailed) {
-                    me.down('pbsDataStoreInfo').fireEvent('activate');
+                    me.infoStore.startUpdate();
                     me.rrdstore.startUpdate();
                 }
                 unmountBtn.setDisabled(false);
@@ -499,6 +416,60 @@ Ext.define('PBS.DataStoreSummary', {
             },
         });
 
+        me.mon(me.infoStore, 'load', (store, records, success) => {
+            if (!success) {
+                Proxmox.Utils.API2Request({
+                    url: `/config/datastore/${me.datastore}`,
+                    success: function (response) {
+                        let maintenanceString = response.result.data['maintenance-mode'];
+                        let removable = !!response.result.data['backing-device'];
+                        if (!maintenanceString && !removable) {
+                            me.down('pbsDataStoreInfo').mask(gettext('Datastore is not available'));
+                            return;
+                        }
+
+                        let [_type, msg] = PBS.Utils.parseMaintenanceMode(maintenanceString);
+                        let isUnplugged = !maintenanceString && removable;
+                        let maskMessage = isUnplugged
+                            ? gettext('Datastore is not mounted')
+                            : `${gettext('Datastore is in maintenance mode')}${msg ? ': ' + msg : ''}`;
+
+                        let maskIcon = isUnplugged
+                            ? 'fa pbs-unplugged-mask'
+                            : 'fa pbs-maintenance-mask';
+                        me.down('pbsDataStoreInfo').mask(maskMessage, maskIcon);
+                    },
+                });
+                return;
+            }
+            me.down('pbsDataStoreInfo').unmask();
+
+            let vm = me.getViewModel();
+
+            let counts = store.getById('counts').data.value;
+            let used = store.getById('used').data.value;
+            let total = store.getById('avail').data.value + used;
+
+            let usage = Proxmox.Utils.render_size_usage(used, total, true);
+            vm.set('usagetext', usage);
+            vm.set('usage', used / total);
+
+            let countstext = function (count) {
+                count = count || {};
+                return `${count.groups || 0} ${gettext('Groups')}, ${count.snapshots || 0} ${gettext('Snapshots')}`;
+            };
+            let gcstatus = store.getById('gc-status')?.data.value;
+            if (gcstatus) {
+                let dedup = PBS.Utils.calculate_dedup_factor(gcstatus);
+                vm.set('deduplication', dedup.toFixed(2));
+                vm.set('stillbad', gcstatus['still-bad']);
+            }
+
+            vm.set('ctcount', countstext(counts.ct));
+            vm.set('vmcount', countstext(counts.vm));
+            vm.set('hostcount', countstext(counts.host));
+        });
+
         me.mon(
             me.rrdstore,
             'load',
@@ -513,7 +484,5 @@ Ext.define('PBS.DataStoreSummary', {
         me.query('proxmoxRRDChart').forEach((chart) => {
             chart.setStore(me.rrdstore);
         });
-
-        me.down('pbsDataStoreInfo').relayEvents(me, ['activate', 'deactivate']);
     },
 });
