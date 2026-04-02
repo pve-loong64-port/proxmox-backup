@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::pin::pin;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, format_err, Context, Error};
@@ -17,6 +18,7 @@ use url::form_urlencoded;
 
 use proxmox_http::Body;
 use proxmox_http::RateLimiterTag;
+use proxmox_human_byte::HumanByte;
 use proxmox_lang::try_block;
 use proxmox_rest_server::{
     cleanup_old_tasks, cookie_from_header, rotate_task_log_archive, ApiConfig, Redirector,
@@ -40,8 +42,8 @@ use pbs_buildcfg::configdir;
 use proxmox_time::CalendarEvent;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncJobConfig, TapeBackupJobConfig,
-    VerificationJobConfig,
+    Authid, DataStoreConfig, DatastoreBackendConfig, Operation, PruneJobConfig, SyncJobConfig,
+    TapeBackupJobConfig, VerificationJobConfig,
 };
 
 use proxmox_backup::auth_helpers::*;
@@ -507,6 +509,7 @@ async fn schedule_tasks() -> Result<(), Error> {
     schedule_datastore_verify_jobs().await;
     schedule_tape_backup_jobs().await;
     schedule_task_log_rotate().await;
+    schedule_notification_threshold_counter_reset().await;
 
     Ok(())
 }
@@ -877,6 +880,80 @@ async fn schedule_task_log_rotate() {
         },
     ) {
         eprintln!("unable to start task log rotation: {err}");
+    }
+}
+
+async fn schedule_notification_threshold_counter_reset() {
+    let config = match pbs_config::datastore::config() {
+        Err(err) => {
+            eprintln!("unable to read datastore config - {err}");
+            return;
+        }
+        Ok((config, _digest)) => config,
+    };
+
+    for (store, (_, store_config)) in config.sections {
+        let store_config: DataStoreConfig = match serde_json::from_value(store_config) {
+            Ok(c) => c,
+            Err(err) => {
+                eprintln!("datastore config from_value failed - {err}");
+                continue;
+            }
+        };
+
+        let event_str = match &store_config.counter_reset_schedule {
+            Some(event_str) => event_str,
+            None => continue,
+        };
+
+        let worker_type = "notification-threshold-counter-reset";
+        if check_schedule(worker_type, event_str, &store) {
+            let mut job = match Job::new(worker_type, &store) {
+                Ok(job) => job,
+                Err(_) => continue, // could not get lock
+            };
+
+            if let Err(err) = WorkerTask::new_thread(
+                worker_type,
+                None,
+                Authid::root_auth_id().to_string(),
+                false,
+                move |worker| {
+                    job.start(&worker.upid().to_string())?;
+                    info!("executing counter reset for {store}");
+
+                    let result = try_block!({
+                        let backend_config: DatastoreBackendConfig =
+                            store_config.backend.as_deref().unwrap_or("").parse()?;
+                        let request_counters =
+                            DataStore::request_counters(&store_config, &backend_config)?;
+                        let last_values = request_counters.reset(Ordering::Release);
+                        info!("Last counter values before reset:");
+                        info!("Request traffic volume:");
+                        info!("Uploaded: {}", HumanByte::from(last_values.upload));
+                        info!("Downloaded: {}", HumanByte::from(last_values.download));
+                        info!("Request count by method:");
+                        info!("GET: {}", last_values.get);
+                        info!("PUT: {}", last_values.put);
+                        info!("POST: {}", last_values.post);
+                        info!("HEAD: {}", last_values.head);
+                        info!("DELETE: {}", last_values.delete);
+
+                        Ok(())
+                    });
+
+                    let status = worker.create_state(&result);
+
+                    if let Err(err) = job.finish(status) {
+                        eprintln!("could not finish job state for {worker_type}: {err}");
+                    }
+
+                    result
+                },
+            ) {
+                eprintln!("unable to start counter reset task: {err}");
+            }
+        }
     }
 }
 
