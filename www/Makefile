@@ -81,6 +81,7 @@ JSSRC=							\
 	window/NamespaceEdit.js				\
 	window/MaintenanceOptions.js			\
 	window/NotesEdit.js				\
+	window/NotificationThresholds.js		\
 	window/RemoteEdit.js				\
 	window/TrafficControlEdit.js			\
 	window/NotifyOptions.js				\

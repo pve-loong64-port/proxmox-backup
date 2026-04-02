@@ -334,5 +334,13 @@ Ext.define('PBS.Datastore.Options', {
                 },
             },
         },
+        'notification-thresholds': {
+            required: true,
+            header: gettext('Notification Thresholds'),
+            renderer: (notificationThresholds) => notificationThresholds ?? gettext('None'),
+            editor: {
+                xtype: 'pbsNotificationThresholdsEdit',
+            },
+        },
     },
 });
