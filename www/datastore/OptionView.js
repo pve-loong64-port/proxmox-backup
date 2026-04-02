@@ -342,5 +342,13 @@ Ext.define('PBS.Datastore.Options', {
                 xtype: 'pbsNotificationThresholdsEdit',
             },
         },
+        'counter-reset-schedule': {
+            required: true,
+            header: gettext('Counter Reset Schedule'),
+            renderer: (schedule) => schedule ?? gettext('None'),
+            editor: {
+                xtype: 'pbsCounterResetScheduleEdit',
+            },
+        },
     },
 });

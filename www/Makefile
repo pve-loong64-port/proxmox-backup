@@ -77,6 +77,7 @@ JSSRC=							\
 	window/ACLEdit.js				\
 	window/BackupGroupChangeOwner.js		\
 	window/CreateDirectory.js			\
+	window/CounterResetScheduleEdit.js		\
 	window/DataStoreEdit.js				\
 	window/NamespaceEdit.js				\
 	window/MaintenanceOptions.js			\
