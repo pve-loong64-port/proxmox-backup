@@ -2,6 +2,7 @@ use std::io::Write;
 
 use anyhow::{bail, Error};
 use openssl::symm::{decrypt_aead, Mode};
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use proxmox_io::{ReadExt, WriteExt};
 
@@ -238,15 +239,26 @@ impl DataBlob {
         }
     }
 
-    /// Load blob from ``reader``, verify CRC
+    /// Load data blob via given sync ``reader`` and verify its CRC
     pub fn load_from_reader(reader: &mut dyn std::io::Read) -> Result<Self, Error> {
         let mut data = Vec::with_capacity(1024 * 1024);
         reader.read_to_end(&mut data)?;
+        Self::from_raw_with_crc_check(data)
+    }
 
-        let blob = Self::from_raw(data)?;
+    /// Load data blob via given async ``reader`` and verify its CRC
+    pub async fn load_from_async_reader(
+        reader: &mut (dyn AsyncRead + Unpin + Send),
+    ) -> Result<Self, Error> {
+        let mut data = Vec::with_capacity(1024 * 1024);
+        reader.read_to_end(&mut data).await?;
+        Self::from_raw_with_crc_check(data)
+    }
 
+    /// Generates a data blob from raw input data and checks for matching CRC in header
+    fn from_raw_with_crc_check(raw_data: Vec<u8>) -> Result<Self, Error> {
+        let blob = Self::from_raw(raw_data)?;
         blob.verify_crc()?;
-
         Ok(blob)
     }
 
