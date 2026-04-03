@@ -1,6 +1,7 @@
 //! Sync datastore by pushing contents to remote server
 
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -27,7 +28,7 @@ use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{BackupManifest, DataStore, StoreProgress};
+use pbs_datastore::{BackupManifest, DataBlob, DataStore, StoreProgress};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use pbs_tools::crypt_config::CryptConfig;
@@ -1034,6 +1035,8 @@ pub(crate) async fn push_snapshot(
         return Ok(stats);
     }
 
+    let encrypt_using_key = None;
+
     // Writer instance locks the snapshot on the remote side
     let backup_writer = BackupWriter::start(
         &params.target.client,
@@ -1041,7 +1044,7 @@ pub(crate) async fn push_snapshot(
             datastore: params.target.repo.store(),
             ns: &target_ns,
             backup: snapshot,
-            crypt_config: None,
+            crypt_config: encrypt_using_key.clone(),
             debug: false,
             benchmark: false,
             no_cache: false,
@@ -1101,10 +1104,20 @@ pub(crate) async fn push_snapshot(
             let archive_prefix = format!("{prefix}/{archive_name}");
             match archive_name.archive_type() {
                 ArchiveType::Blob => {
-                    let file = std::fs::File::open(&path)?;
-                    let backup_stats = backup_writer
-                        .upload_blob(file, archive_name.as_ref())
-                        .await?;
+                    let backup_stats = if encrypt_using_key.is_some() {
+                        reencode_encrypted_and_upload_blob(
+                            path,
+                            &archive_name,
+                            &backup_writer,
+                            &upload_options,
+                        )
+                        .await?
+                    } else {
+                        let file = std::fs::File::open(&path)?;
+                        backup_writer
+                            .upload_blob(file, archive_name.as_ref())
+                            .await?
+                    };
                     target_manifest.add_file(
                         &archive_name,
                         backup_stats.size,
@@ -1287,6 +1300,20 @@ pub(crate) async fn push_snapshot(
     });
 
     Ok(stats)
+}
+
+async fn reencode_encrypted_and_upload_blob<P: AsRef<Path>>(
+    path: P,
+    archive_name: &BackupArchiveName,
+    backup_writer: &BackupWriter,
+    upload_options: &UploadOptions,
+) -> Result<BackupStats, Error> {
+    let mut file = tokio::fs::File::open(&path).await?;
+    let data_blob = DataBlob::load_from_async_reader(&mut file).await?;
+    let raw_data = data_blob.decode(None, None)?;
+    backup_writer
+        .upload_blob_from_data(raw_data, archive_name.as_ref(), upload_options.clone())
+        .await
 }
 
 // Read fixed or dynamic index and push to target by uploading via the backup writer instance
