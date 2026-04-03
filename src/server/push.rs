@@ -1263,14 +1263,25 @@ pub(crate) async fn push_snapshot(
     let client_log_name = &CLIENT_LOG_BLOB_NAME;
     client_log_path.push(client_log_name.as_ref());
     if client_log_path.is_file() {
-        backup_writer
-            .upload_blob_from_file(
-                &client_log_path,
-                client_log_name.as_ref(),
-                upload_options.clone(),
+        if encrypt_using_key.is_some() {
+            reencode_encrypted_and_upload_blob(
+                client_log_path,
+                client_log_name,
+                &backup_writer,
+                &upload_options,
             )
             .await
             .with_context(|| prefix.to_string())?;
+        } else {
+            backup_writer
+                .upload_blob_from_file(
+                    &client_log_path,
+                    client_log_name.as_ref(),
+                    upload_options.clone(),
+                )
+                .await
+                .with_context(|| prefix.to_string())?;
+        }
     }
 
     // Rewrite manifest for pushed snapshot, recreating manifest from source on target,
