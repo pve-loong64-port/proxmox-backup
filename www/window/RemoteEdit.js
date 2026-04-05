@@ -131,7 +131,7 @@ Ext.define('PBS.window.RemoteEdit', {
         advancedColumn1: [
             {
                 xtype: 'proxmoxcheckbox',
-                fieldLabel: gettext("Use node proxy"),
+                fieldLabel: gettext('Use node proxy'),
                 name: 'use-node-proxy',
                 autoEl: {
                     tag: 'div',

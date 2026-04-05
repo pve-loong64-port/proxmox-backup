@@ -76,7 +76,7 @@ Ext.define('PBS.window.VerifyJobEdit', {
             let view = this.getView();
             let nsSelector = view.down('pbsNamespaceSelector');
             nsSelector.setDatastore(value);
-            view.loadThreadDefaults(value)
+            view.loadThreadDefaults(value);
         },
     },
 
