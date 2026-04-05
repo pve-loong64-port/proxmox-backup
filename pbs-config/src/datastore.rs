@@ -6,7 +6,7 @@ use anyhow::Error;
 use proxmox_schema::{AllOfSchema, ApiType};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use pbs_api_types::{DataStoreConfig, DATASTORE_SCHEMA};
+use pbs_api_types::{DataStoreConfig, DatastoreBackendConfig, DATASTORE_SCHEMA};
 
 use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard, ConfigVersionCache};
 
@@ -114,15 +114,15 @@ pub fn complete_calendar_event(_arg: &str, _param: &HashMap<String, String>) -> 
         .collect()
 }
 
-/// Returns the datastore backend type from it's name
+/// Parse the backend configuration from a datastore config.
+pub fn parse_backend_config(config: &DataStoreConfig) -> Result<DatastoreBackendConfig, Error> {
+    Ok(config.backend.as_deref().unwrap_or("").parse()?)
+}
+
+/// Returns the datastore backend type from its name.
 pub fn datastore_backend_type(store: &str) -> Result<pbs_api_types::DatastoreBackendType, Error> {
-    let (config, _) = config()?;
+    let (config, _) = self::config()?;
     let store_config: DataStoreConfig = config.lookup("datastore", store)?;
 
-    let backend_config: pbs_api_types::DatastoreBackendConfig = serde_json::from_value(
-        pbs_api_types::DatastoreBackendConfig::API_SCHEMA
-            .parse_property_string(store_config.backend.as_deref().unwrap_or(""))?,
-    )?;
-
-    Ok(backend_config.ty.unwrap_or_default())
+    Ok(parse_backend_config(&store_config)?.ty.unwrap_or_default())
 }

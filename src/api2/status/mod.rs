@@ -10,8 +10,8 @@ use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreMountStatus, DataStoreStatusListItem, DatastoreBackendConfig,
-    Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+    Authid, DataStoreConfig, DataStoreMountStatus, DataStoreStatusListItem, Operation,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 
 use pbs_config::CachedUserInfo;
@@ -55,8 +55,7 @@ pub async fn datastore_status(
 
         let store_config = config.lookup::<DataStoreConfig>("datastore", store)?;
 
-        let backend_config: DatastoreBackendConfig =
-            store_config.backend.as_deref().unwrap_or("").parse()?;
+        let backend_config = pbs_config::datastore::parse_backend_config(&store_config)?;
         let backend_type = backend_config.ty.unwrap_or_default();
 
         let mount_status = match get_datastore_mount_status(&store_config) {

@@ -42,8 +42,8 @@ use pbs_buildcfg::configdir;
 use proxmox_time::CalendarEvent;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DatastoreBackendConfig, Operation, PruneJobConfig, SyncJobConfig,
-    TapeBackupJobConfig, VerificationJobConfig,
+    Authid, DataStoreConfig, Operation, PruneJobConfig, SyncJobConfig, TapeBackupJobConfig,
+    VerificationJobConfig,
 };
 
 use proxmox_backup::auth_helpers::*;
@@ -923,8 +923,8 @@ async fn schedule_notification_threshold_counter_reset() {
                     info!("executing counter reset for {store}");
 
                     let result = try_block!({
-                        let backend_config: DatastoreBackendConfig =
-                            store_config.backend.as_deref().unwrap_or("").parse()?;
+                        let backend_config =
+                            pbs_config::datastore::parse_backend_config(&store_config)?;
                         let request_counters =
                             DataStore::request_counters(&store_config, &backend_config)?;
                         let last_values = request_counters.reset(Ordering::Release);

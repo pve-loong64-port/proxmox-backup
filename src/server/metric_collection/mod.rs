@@ -16,7 +16,6 @@ use pbs_api_types::{
 use proxmox_lang::try_block;
 use proxmox_network_api::{get_network_interfaces, IpLink};
 use proxmox_s3_client::SharedRequestCounters;
-use proxmox_schema::ApiType;
 use proxmox_sys::fs::FileSystemInformation;
 use proxmox_sys::linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat};
 
@@ -299,10 +298,7 @@ fn collect_disk_stats_sync() -> (DiskStat, Vec<DatastoreStats>) {
                 }
 
                 let s3_stats: Option<S3Statistics> = try_block!({
-                    let backend_config: DatastoreBackendConfig = serde_json::from_value(
-                        DatastoreBackendConfig::API_SCHEMA
-                            .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
-                    )?;
+                    let backend_config = pbs_config::datastore::parse_backend_config(&config)?;
 
                     if backend_config.ty.unwrap_or_default() == DatastoreBackendType::S3 {
                         collect_s3_stats(&config.name, &backend_config)

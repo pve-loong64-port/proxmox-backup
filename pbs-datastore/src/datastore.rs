@@ -697,10 +697,7 @@ impl DataStore {
                 .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
         )?;
 
-        let backend_config: DatastoreBackendConfig = serde_json::from_value(
-            DatastoreBackendConfig::API_SCHEMA
-                .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
-        )?;
+        let backend_config = pbs_config::datastore::parse_backend_config(&config)?;
 
         let (lru_store_caching, request_counters) =
             if DatastoreBackendType::S3 == backend_config.ty.unwrap_or_default() {
@@ -2742,8 +2739,7 @@ impl DataStore {
     pub fn s3_client_and_backend_from_datastore_config(
         datastore_config: &DataStoreConfig,
     ) -> Result<(DatastoreBackendType, Option<S3Client>), Error> {
-        let backend_config: DatastoreBackendConfig =
-            datastore_config.backend.as_deref().unwrap_or("").parse()?;
+        let backend_config = pbs_config::datastore::parse_backend_config(datastore_config)?;
         let backend_type = backend_config.ty.unwrap_or_default();
 
         if backend_type != DatastoreBackendType::S3 {

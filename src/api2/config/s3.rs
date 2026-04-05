@@ -10,8 +10,8 @@ use proxmox_s3_client::{
 use proxmox_schema::{api, param_bail, ApiType};
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, JOB_ID_SCHEMA,
-    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, DataStoreConfig, DatastoreBackendType, JOB_ID_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,
+    PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
 use pbs_config::s3::{self, S3_CFG_TYPE_ID};
 use pbs_config::CachedUserInfo;
@@ -379,10 +379,7 @@ fn s3_client_in_use(id: &str) -> Result<Option<String>, Error> {
     let (config, _digest) = pbs_config::datastore::config()?;
     let list: Vec<DataStoreConfig> = config.convert_to_typed_array("datastore")?;
     for datastore in list {
-        let backend_config: DatastoreBackendConfig = serde_json::from_value(
-            DatastoreBackendConfig::API_SCHEMA
-                .parse_property_string(datastore.backend.as_deref().unwrap_or(""))?,
-        )?;
+        let backend_config = pbs_config::datastore::parse_backend_config(&datastore)?;
         match (backend_config.ty, backend_config.client) {
             (Some(DatastoreBackendType::S3), Some(client)) if client == id => {
                 return Ok(Some(datastore.name.to_owned()))

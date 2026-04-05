@@ -13,11 +13,10 @@ use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendConfig, DatastoreBackendType,
-    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType,
-    PruneJobConfig, PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
-    UPID_SCHEMA,
+    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType, DatastoreNotify,
+    DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType, PruneJobConfig,
+    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
+    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -669,10 +668,7 @@ pub fn update_datastore(
 }
 
 fn update_thresholds(config: &DataStoreConfig) -> Result<(), Error> {
-    let backend_config: DatastoreBackendConfig = serde_json::from_value(
-        DatastoreBackendConfig::API_SCHEMA
-            .parse_property_string(config.backend.as_deref().unwrap_or(""))?,
-    )?;
+    let backend_config = pbs_config::datastore::parse_backend_config(config)?;
     if backend_config.ty.unwrap_or_default() == DatastoreBackendType::S3 {
         let mut request_counters =
             pbs_datastore::DataStore::request_counters(config, &backend_config)?;
