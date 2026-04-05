@@ -23,7 +23,7 @@ use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 #[api(
     input: {
         properties: {
-            "s3-client-id": {
+            "s3-endpoint-id": {
                 schema: S3_CLIENT_ID_SCHEMA,
             },
             bucket: {
@@ -42,20 +42,20 @@ use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 )]
 /// Perform basic sanity check for given s3 client configuration
 pub async fn check(
-    s3_client_id: String,
+    s3_endpoint_id: String,
     bucket: String,
     store_prefix: Option<String>,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
     let (config, _digest) = pbs_config::s3::config()?;
     let config: S3ClientConf = config
-        .lookup(S3_CFG_TYPE_ID, &s3_client_id)
+        .lookup(S3_CFG_TYPE_ID, &s3_endpoint_id)
         .context("config lookup failed")?;
 
     let request_counter_id = if let Some(store) = &store_prefix {
-        format!("{s3_client_id}-{bucket}-{store}")
+        format!("{s3_endpoint_id}-{bucket}-{store}")
     } else {
-        format!("{s3_client_id}-{bucket}")
+        format!("{s3_endpoint_id}-{bucket}")
     };
     let request_counter_config = S3RequestCounterConfig {
         id: request_counter_id,
@@ -102,7 +102,7 @@ pub async fn check(
 #[api(
     input: {
         properties: {
-            "s3-client-id": {
+            "s3-endpoint-id": {
                 schema: S3_CLIENT_ID_SCHEMA,
             },
             bucket: {
@@ -121,7 +121,7 @@ pub async fn check(
 )]
 /// Reset the S3 request counters for matching endpoint, bucket or datastore (if prefix is given).
 pub async fn reset_counters(
-    s3_client_id: String,
+    s3_endpoint_id: String,
     bucket: String,
     store_prefix: Option<String>,
     _rpcenv: &mut dyn RpcEnvironment,
@@ -129,13 +129,13 @@ pub async fn reset_counters(
     let (config, _digest) = pbs_config::s3::config()?;
     // only check if the provided endpoint id exists
     let _config: S3ClientConf = config
-        .lookup(S3_CFG_TYPE_ID, &s3_client_id)
+        .lookup(S3_CFG_TYPE_ID, &s3_endpoint_id)
         .context("config lookup failed")?;
 
     let request_counter_id = if let Some(store) = &store_prefix {
-        format!("{s3_client_id}-{bucket}-{store}")
+        format!("{s3_endpoint_id}-{bucket}-{store}")
     } else {
-        format!("{s3_client_id}-{bucket}")
+        format!("{s3_endpoint_id}-{bucket}")
     };
 
     let path = format!("{S3_CLIENT_REQUEST_COUNTER_BASE_PATH}/{request_counter_id}.shmem");
@@ -168,4 +168,4 @@ const S3_OPERATION_ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(S3_OPERATION_SUBDIRS))
     .subdirs(S3_OPERATION_SUBDIRS);
 
-pub const ROUTER: Router = Router::new().match_all("s3-client-id", &S3_OPERATION_ROUTER);
+pub const ROUTER: Router = Router::new().match_all("s3-endpoint-id", &S3_OPERATION_ROUTER);
