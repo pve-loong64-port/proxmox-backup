@@ -2,7 +2,7 @@
 //!
 //! This is a collection of small and useful tools.
 
-use anyhow::{bail, Error};
+use anyhow::Error;
 use std::collections::HashSet;
 
 use pbs_api_types::{
@@ -22,13 +22,6 @@ pub mod systemd;
 pub mod ticket;
 
 pub mod parallel_handler;
-
-pub fn assert_if_modified(digest1: &str, digest2: &str) -> Result<(), Error> {
-    if digest1 != digest2 {
-        bail!("detected modified configuration - file changed by other user? Try again.");
-    }
-    Ok(())
-}
 
 /// The default 2 hours are far too long for PBS
 pub const PROXMOX_BACKUP_TCP_KEEPALIVE_TIME: u32 = 120;

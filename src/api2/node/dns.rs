@@ -3,6 +3,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use const_format::concatcp;
+use hex::FromHex;
 use openssl::sha;
 use regex::Regex;
 use serde_json::{json, Value};
@@ -134,11 +135,9 @@ pub fn update_dns(
     let _guard = MUTEX.lock();
 
     let mut config = read_etc_resolv_conf()?;
-    let old_digest = config["digest"].as_str().unwrap();
+    let old_digest = <[u8; 32]>::from_hex(config["digest"].as_str().unwrap())?;
 
-    if let Some(digest) = digest {
-        crate::tools::assert_if_modified(old_digest, &digest)?;
-    }
+    pbs_config::detect_modified_configuration_file(digest, &old_digest)?;
 
     if let Some(delete) = delete {
         for delete_prop in delete {
