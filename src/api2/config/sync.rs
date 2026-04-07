@@ -62,6 +62,22 @@ fn is_correct_owner(auth_id: &Authid, job: &SyncJobConfig) -> bool {
     }
 }
 
+// Check access and test key loading works as expected for sync job owner/user.
+fn sync_user_can_access_optional_key(
+    key_id: Option<&str>,
+    owner: &Authid,
+    fail_on_archived: bool,
+) -> Result<(), Error> {
+    if let Some(key_id) = key_id {
+        if crate::server::sync::check_privs_and_load_key_config(key_id, owner, fail_on_archived)
+            .is_err()
+        {
+            bail!("no such key or cannot access key '{key_id}'");
+        }
+    }
+    Ok(())
+}
+
 /// checks whether user can run the corresponding sync job, depending on sync direction
 ///
 /// namespace creation/deletion ACL and backup group ownership checks happen in the pull/push code
@@ -248,6 +264,19 @@ pub fn create_sync_job(
         }
         if let Some(ref ns) = config.remote_ns {
             ns.check_max_depth(max_depth)?;
+        }
+    }
+
+    let owner = config
+        .owner
+        .as_ref()
+        .unwrap_or_else(|| Authid::root_auth_id());
+
+    if sync_direction == SyncDirection::Push {
+        sync_user_can_access_optional_key(config.active_encryption_key.as_deref(), owner, true)?;
+    } else {
+        for key in config.associated_key.as_deref().unwrap_or(&[]) {
+            sync_user_can_access_optional_key(Some(key), owner, false)?;
         }
     }
 
