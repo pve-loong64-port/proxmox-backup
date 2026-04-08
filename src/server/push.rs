@@ -30,6 +30,7 @@ use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{BackupManifest, DataStore, StoreProgress};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
+use pbs_tools::crypt_config::CryptConfig;
 
 use proxmox_human_byte::HumanByte;
 
@@ -91,6 +92,9 @@ pub(crate) struct PushParameters {
     transfer_last: Option<usize>,
     /// Maximum number of worker threads for push during sync job
     worker_threads: Option<usize>,
+    /// Encryption key to use for pushing unencrypted backup snapshots. Does not affect
+    /// already encrypted snapshots.
+    crypt_config: Option<(String, Arc<CryptConfig>)>,
 }
 
 impl PushParameters {
@@ -111,6 +115,7 @@ impl PushParameters {
         limit: RateLimitConfig,
         transfer_last: Option<usize>,
         worker_threads: Option<usize>,
+        active_encryption_key: Option<String>,
     ) -> Result<Self, Error> {
         if let Some(max_depth) = max_depth {
             ns.check_max_depth(max_depth)?;
@@ -164,6 +169,14 @@ impl PushParameters {
         };
         let group_filter = group_filter.unwrap_or_default();
 
+        let crypt_config = if let Some(key_id) = &active_encryption_key {
+            let crypt_config =
+                crate::server::sync::check_privs_and_load_key_config(key_id, &local_user, true)?;
+            Some((key_id.to_string(), crypt_config))
+        } else {
+            None
+        };
+
         Ok(Self {
             source,
             target,
@@ -175,6 +188,7 @@ impl PushParameters {
             verified_only,
             transfer_last,
             worker_threads,
+            crypt_config,
         })
     }
 

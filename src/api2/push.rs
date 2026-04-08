@@ -2,7 +2,7 @@ use anyhow::{format_err, Error};
 use futures::{future::FutureExt, select};
 
 use pbs_api_types::{
-    Authid, BackupNamespace, GroupFilter, RateLimitConfig, DATASTORE_SCHEMA,
+    Authid, BackupNamespace, GroupFilter, RateLimitConfig, CRYPT_KEY_ID_SCHEMA, DATASTORE_SCHEMA,
     GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE,
     REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA,
@@ -112,6 +112,10 @@ fn check_push_privs(
                 schema: SYNC_WORKER_THREADS_SCHEMA,
                 optional: true,
             },
+            "encryption-key": {
+                schema: CRYPT_KEY_ID_SCHEMA,
+                optional: true,
+            },
         },
     },
     access: {
@@ -138,6 +142,7 @@ async fn push(
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
     worker_threads: Option<usize>,
+    encryption_key: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -170,6 +175,7 @@ async fn push(
         limit,
         transfer_last,
         worker_threads,
+        encryption_key,
     )
     .await?;
 

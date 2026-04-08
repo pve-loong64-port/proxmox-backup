@@ -670,6 +670,7 @@ pub fn do_sync_job(
                             sync_job.limit.clone(),
                             sync_job.transfer_last,
                             sync_job.worker_threads,
+                            sync_job.active_encryption_key,
                         )
                         .await?;
                         push_store(push_params).await?
