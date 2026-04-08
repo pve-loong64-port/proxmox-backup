@@ -358,17 +358,26 @@ pub struct DatastoreThresholdExceededTemplateData {
     pub limit: u64,
     /// The value exceeding the threshold.
     pub value: u64,
+    /// Whether the values represent traffic (bytes) rather than counts.
+    pub is_traffic: bool,
 }
 
 impl DatastoreThresholdExceededTemplateData {
-    /// Create new a new instance.
-    pub fn new(datastore: String, threshold: String, limit: u64, value: u64) -> Self {
+    /// Create a new instance.
+    pub fn new(
+        datastore: String,
+        threshold: String,
+        limit: u64,
+        value: u64,
+        is_traffic: bool,
+    ) -> Self {
         Self {
             common: CommonData::new(),
             datastore,
             threshold,
             limit,
             value,
+            is_traffic,
         }
     }
 }

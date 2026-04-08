@@ -575,7 +575,7 @@ pub fn send_certificate_renewal_mail(result: &Result<(), Error>) -> Result<(), E
     Ok(())
 }
 
-/// send notification if datastore values are exceeding the set threshold limit.
+/// Send notification if datastore values are exceeding the set threshold limit.
 pub fn send_datastore_threshold_exceeded(
     datastore: &str,
     threshold: &str,
@@ -588,11 +588,13 @@ pub fn send_datastore_threshold_exceeded(
         ("type".into(), "thresholds".into()),
     ]);
 
+    let is_traffic = threshold == "uploaded" || threshold == "downloaded";
     let template_data = DatastoreThresholdExceededTemplateData::new(
         datastore.to_string(),
         threshold.to_string(),
         limit,
         value,
+        is_traffic,
     );
 
     let notification = Notification::from_template(

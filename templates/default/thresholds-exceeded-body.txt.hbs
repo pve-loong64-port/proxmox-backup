@@ -1,8 +1,12 @@
-Datastore:            {{datastore}}
-Threshold:            {{threshold}}
-Limit:                {{limit}}
+Datastore '{{datastore}}' exceeded the configured {{threshold}} threshold.
 
-Threshold {{threshold}}: limit {{limit}} exceeded by value {{value}}.
+{{#if is-traffic}}
+Limit: {{human-bytes limit}}
+Value: {{human-bytes value}}
+{{else}}
+Limit: {{limit}}
+Value: {{value}}
+{{/if}}
 
 Please visit the web interface for further details:
 
