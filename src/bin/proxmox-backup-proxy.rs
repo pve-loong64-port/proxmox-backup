@@ -906,6 +906,18 @@ async fn schedule_notification_threshold_counter_reset() {
             None => continue,
         };
 
+        let backend_config = match pbs_config::datastore::parse_backend_config(&store_config) {
+            Ok(c) => c,
+            Err(err) => {
+                eprintln!("failed to parse backend config for '{store}' - {err}");
+                continue;
+            }
+        };
+        if backend_config.ty.unwrap_or_default() != pbs_api_types::DatastoreBackendType::S3 {
+            eprintln!("ignoring threshold reset schedule for non-S3 datastore '{store}'");
+            continue;
+        }
+
         let worker_type = "notification-threshold-reset";
         if check_schedule(worker_type, event_str, &store) {
             let mut job = match Job::new(worker_type, &store) {
