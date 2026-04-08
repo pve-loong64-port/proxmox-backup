@@ -77,7 +77,6 @@ JSSRC=							\
 	window/ACLEdit.js				\
 	window/BackupGroupChangeOwner.js		\
 	window/CreateDirectory.js			\
-	window/CounterResetScheduleEdit.js		\
 	window/DataStoreEdit.js				\
 	window/NamespaceEdit.js				\
 	window/MaintenanceOptions.js			\
@@ -85,6 +84,7 @@ JSSRC=							\
 	window/NotificationThresholds.js		\
 	window/RemoteEdit.js				\
 	window/TrafficControlEdit.js			\
+	window/ThresholdResetScheduleEdit.js		\
 	window/NotifyOptions.js				\
 	window/SyncJobEdit.js				\
 	window/PruneJobEdit.js				\

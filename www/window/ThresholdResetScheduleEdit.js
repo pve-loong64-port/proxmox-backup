@@ -1,12 +1,12 @@
-Ext.define('PBS.window.CounterResetScheduleEdit', {
+Ext.define('PBS.window.ThresholdResetScheduleEdit', {
     extend: 'Proxmox.window.Edit',
-    alias: 'widget.pbsCounterResetScheduleEdit',
+    alias: 'widget.pbsThresholdResetScheduleEdit',
     mixins: ['Proxmox.Mixin.CBind'],
 
     userid: undefined,
     isAdd: false,
 
-    subject: gettext('Counter Reset Schedule'),
+    subject: gettext('Threshold Reset Schedule'),
 
     cbindData: function (initial) {
         let me = this;
@@ -21,7 +21,7 @@ Ext.define('PBS.window.CounterResetScheduleEdit', {
     items: {
         xtype: 'pbsCalendarEvent',
         name: 'counter-reset-schedule',
-        fieldLabel: gettext('Counter Reset Schedule'),
+        fieldLabel: gettext('Threshold Reset Schedule'),
         emptyText: gettext('none (disabled)'),
     },
 });

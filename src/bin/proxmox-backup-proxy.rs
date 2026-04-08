@@ -906,7 +906,7 @@ async fn schedule_notification_threshold_counter_reset() {
             None => continue,
         };
 
-        let worker_type = "notification-threshold-counter-reset";
+        let worker_type = "notification-threshold-reset";
         if check_schedule(worker_type, event_str, &store) {
             let mut job = match Job::new(worker_type, &store) {
                 Ok(job) => job,

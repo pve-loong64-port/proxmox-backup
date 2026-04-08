@@ -344,10 +344,10 @@ Ext.define('PBS.Datastore.Options', {
         },
         'counter-reset-schedule': {
             required: true,
-            header: gettext('Counter Reset Schedule'),
+            header: gettext('Threshold Reset Schedule'),
             renderer: (schedule) => schedule ?? gettext('None'),
             editor: {
-                xtype: 'pbsCounterResetScheduleEdit',
+                xtype: 'pbsThresholdResetScheduleEdit',
             },
         },
     },
