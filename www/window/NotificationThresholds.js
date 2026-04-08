@@ -34,7 +34,7 @@ Ext.define('PBS.window.NotificationThresholds', {
         items: [
             {
                 xtype: 'box',
-                html: `<b>${gettext('S3 requests count:')}</b>`,
+                html: `<b>${gettext('S3 requests:')}</b>`,
                 padding: '10 0 5 0',
             },
             {
@@ -87,7 +87,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             },
             {
                 xtype: 'box',
-                html: `<b>${gettext('S3 traffic volume:')}</b>`,
+                html: `<b>${gettext('S3 traffic:')}</b>`,
                 padding: '10 0 5 0',
             },
             {
