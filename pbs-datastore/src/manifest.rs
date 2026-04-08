@@ -236,6 +236,24 @@ impl BackupManifest {
         }
         Ok(Some(serde_json::from_value::<SnapshotVerifyState>(verify)?))
     }
+
+    /// Set the fingerprint used to detect changes for encrypted -> decrypted syncs
+    pub fn set_change_detection_fingerprint(
+        &mut self,
+        fingerprint: &[u8; 32],
+    ) -> Result<(), Error> {
+        let fp_str = Fingerprint::new(*fingerprint);
+        self.unprotected["change-detection-fingerprint"] = serde_json::to_value(fp_str)?;
+        Ok(())
+    }
+
+    /// Get the fingerprint used to detect changes for encrypted -> decrypted syncs
+    pub fn get_change_detection_fingerprint(&self) -> Result<Option<Fingerprint>, Error> {
+        match &self.unprotected["change-detection-fingerprint"] {
+            Value::Null => Ok(None),
+            value => Ok(Some(Deserialize::deserialize(value)?)),
+        }
+    }
 }
 
 impl TryFrom<super::DataBlob> for BackupManifest {
