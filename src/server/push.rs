@@ -977,6 +977,44 @@ pub(crate) async fn push_group(
     Ok(stats)
 }
 
+async fn load_previous_snapshot_known_chunks(
+    params: &PushParameters,
+    upload_options: &UploadOptions,
+    backup_writer: &BackupWriter,
+    archive_name: &BackupArchiveName,
+    known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
+) {
+    if let Some(manifest) = upload_options.previous_manifest.as_ref() {
+        if let Some((_id, crypt_config)) = &params.crypt_config {
+            // no fingerprint in previous manifest -> no reuse possible
+            let Ok(Some(fingerprint)) = manifest.fingerprint() else {
+                return;
+            };
+
+            if *fingerprint.bytes() != crypt_config.fingerprint() {
+                // key mismatch -> no reuse possible
+                return;
+            }
+        }
+
+        // Add known chunks, ignore errors since archive might not be present and it is better
+        // to proceed on unrelated errors than to fail here.
+        match archive_name.archive_type() {
+            ArchiveType::FixedIndex => {
+                let _res = backup_writer
+                    .download_previous_fixed_index(archive_name, manifest, known_chunks)
+                    .await;
+            }
+            ArchiveType::DynamicIndex => {
+                let _res = backup_writer
+                    .download_previous_dynamic_index(archive_name, manifest, known_chunks)
+                    .await;
+            }
+            ArchiveType::Blob => (),
+        };
+    }
+}
+
 /// Push snapshot to target
 ///
 /// Creates a new snapshot on the target and pushes the content of the source snapshot to the
@@ -1102,6 +1140,16 @@ pub(crate) async fn push_snapshot(
                 )
                 .await?;
             let archive_prefix = format!("{prefix}/{archive_name}");
+
+            load_previous_snapshot_known_chunks(
+                params,
+                &upload_options,
+                &backup_writer,
+                &archive_name,
+                known_chunks.clone(),
+            )
+            .await;
+
             match archive_name.archive_type() {
                 ArchiveType::Blob => {
                     let backup_stats = if encrypt_using_key.is_some() {
@@ -1145,16 +1193,6 @@ pub(crate) async fn push_snapshot(
                     });
                 }
                 ArchiveType::DynamicIndex => {
-                    if let Some(manifest) = upload_options.previous_manifest.as_ref() {
-                        // Add known chunks, ignore errors since archive might not be present
-                        let _res = backup_writer
-                            .download_previous_dynamic_index(
-                                &archive_name,
-                                manifest,
-                                known_chunks.clone(),
-                            )
-                            .await;
-                    }
                     let index =
                         DynamicIndexReader::open(&path).with_context(|| prefix.to_string())?;
                     let chunk_reader = reader
@@ -1198,17 +1236,8 @@ pub(crate) async fn push_snapshot(
                     });
                 }
                 ArchiveType::FixedIndex => {
-                    if let Some(manifest) = upload_options.previous_manifest.as_ref() {
-                        // Add known chunks, ignore errors since archive might not be present
-                        let _res = backup_writer
-                            .download_previous_fixed_index(
-                                &archive_name,
-                                manifest,
-                                known_chunks.clone(),
-                            )
-                            .await;
-                    }
-                    let index = FixedIndexReader::open(&path)?;
+                    let index =
+                        FixedIndexReader::open(&path).with_context(|| prefix.to_string())?;
                     let chunk_reader = reader
                         .chunk_reader(entry.chunk_crypt_mode())
                         .context("failed to get chunk reader")
