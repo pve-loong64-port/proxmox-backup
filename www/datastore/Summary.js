@@ -341,14 +341,6 @@ Ext.define('PBS.DataStoreSummary', {
                     },
                 },
                 {
-                    xtype: 'pbsDataStoreNotes',
-                    flex: 1,
-                    padding: '0 10 0 0',
-                    cbind: {
-                        datastore: '{datastore}',
-                    },
-                },
-                {
                     xtype: 'pbsDataStoreS3Stats',
                     flex: 1,
                     title: gettext('S3 statistics'),
@@ -357,6 +349,13 @@ Ext.define('PBS.DataStoreSummary', {
                     },
                 },
             ],
+        },
+        {
+            xtype: 'pbsDataStoreNotes',
+            height: 300,
+            cbind: {
+                datastore: '{datastore}',
+            },
         },
         {
             xtype: 'proxmoxRRDChart',
