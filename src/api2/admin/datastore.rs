@@ -1262,11 +1262,16 @@ pub fn get_datastore_list(
                 None => DataStoreMountStatus::NonRemovable,
             };
 
+            let backend_type = pbs_config::datastore::parse_backend_config(&store_config)
+                .map(|c| c.ty.unwrap_or_default())
+                .unwrap_or_default();
+
             list.push(DataStoreListItem {
                 store: store.clone(),
                 comment: store_config.comment.filter(|_| allowed),
                 mount_status,
                 maintenance: store_config.maintenance_mode,
+                backend_type,
             });
         }
     }

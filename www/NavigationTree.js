@@ -1,6 +1,6 @@
 Ext.define('pbs-datastore-list', {
     extend: 'Ext.data.Model',
-    fields: ['name', 'comment', 'maintenance'],
+    fields: ['name', 'comment', 'maintenance', 'backend-type'],
     proxy: {
         type: 'proxmox',
         url: '/api2/json/admin/datastore',
