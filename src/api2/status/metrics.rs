@@ -67,15 +67,11 @@ pub fn get_metrics(
         if id == "host" {
             return has_host_audit_privs;
         } else if let Some(datastore_id) = id.strip_prefix("datastore/") {
-            if !datastore_id.contains('/') {
-                // Now, check whether we have permissions for the individual datastore
-                let user_privs = CachedUserInfo::lookup_privs(
-                    &user_info,
-                    &auth_id,
-                    &["datastore", datastore_id],
-                );
-                return (user_privs & PRIV_DATASTORE_AUDIT) != 0;
-            }
+            // strip any sub-path (e.g. "/s3") to get the datastore name
+            let datastore_name = datastore_id.split('/').next().unwrap_or(datastore_id);
+            let user_privs =
+                CachedUserInfo::lookup_privs(&user_info, &auth_id, &["datastore", datastore_name]);
+            return (user_privs & PRIV_DATASTORE_AUDIT) != 0;
         }
         log::error!("invalid metric object id: {id:?}");
         false
