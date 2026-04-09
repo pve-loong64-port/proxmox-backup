@@ -100,7 +100,11 @@ Ext.define('PBS.Datastore.Options', {
             url: `/api2/extjs/config/datastore/${me.datastore}`,
             datastore: me.datastore,
         };
-        return {};
+        let listStore = Ext.data.StoreManager.lookup('pbs-datastore-list');
+        let record = listStore.findRecord('store', me.datastore, 0, false, true, true);
+        return {
+            s3Visible: record?.get('backend-type') === 's3' ? undefined : false,
+        };
     },
 
     controller: {
@@ -120,6 +124,7 @@ Ext.define('PBS.Datastore.Options', {
                 activeTasks.read = data?.[0]?.data.value ?? 0;
                 activeTasks.write = data?.[1]?.data.value ?? 0;
             });
+
         },
 
         edit: function () {
@@ -182,6 +187,7 @@ Ext.define('PBS.Datastore.Options', {
     },
 
     rows: {
+        cbind: {},
         backend: {
             required: false,
             visible: false,
@@ -338,6 +344,9 @@ Ext.define('PBS.Datastore.Options', {
             required: true,
             header: gettext('Notification Thresholds'),
             renderer: (notificationThresholds) => notificationThresholds ?? gettext('None'),
+            cbind: {
+                visible: '{s3Visible}',
+            },
             editor: {
                 xtype: 'pbsNotificationThresholdsEdit',
             },
@@ -346,6 +355,9 @@ Ext.define('PBS.Datastore.Options', {
             required: true,
             header: gettext('Threshold Reset Schedule'),
             renderer: (schedule) => schedule ?? gettext('None'),
+            cbind: {
+                visible: '{s3Visible}',
+            },
             editor: {
                 xtype: 'pbsThresholdResetScheduleEdit',
             },
