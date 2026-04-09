@@ -180,6 +180,7 @@ pub struct DataStoreImpl {
     /// invalidate this cached `DataStoreImpl`
     config_generation: Option<usize>,
     request_counters: Option<Arc<SharedRequestCounters>>,
+    thresholds_exceeded_callback: Option<ThresholdsExceededCallback>,
 }
 
 impl DataStoreImpl {
@@ -198,6 +199,7 @@ impl DataStoreImpl {
             thread_settings: Default::default(),
             config_generation: None,
             request_counters: None,
+            thresholds_exceeded_callback: None,
         })
     }
 }
@@ -461,7 +463,7 @@ impl DataStore {
                     base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
                 };
 
-                let options = S3ClientOptions::from_config(
+                let mut options = S3ClientOptions::from_config(
                     config.config,
                     config.secret_key,
                     Some(bucket),
@@ -470,6 +472,15 @@ impl DataStore {
                     pbs_config::node::node_http_proxy_config()?,
                     Some(request_counter_config),
                 );
+                if let Some(notify) = self.inner.thresholds_exceeded_callback {
+                    let name = self.name().to_owned();
+                    options.threshold_callback =
+                        Some(Box::new(move |counter_id, threshold, value| {
+                            if let Err(err) = notify(&name, counter_id, threshold, value) {
+                                log::error!("failed to send notification: {err:?}");
+                            }
+                        }));
+                }
                 let s3_client = S3Client::new(options)?;
                 DatastoreBackend::S3(Arc::new(s3_client))
             }
@@ -725,16 +736,6 @@ impl DataStore {
                 let mut request_counters = Self::request_counters(&config, &backend_config)?;
 
                 Self::update_notification_thresholds(&mut request_counters, &config)?;
-                request_counters.set_thresholds_exceeded_callback(
-                    config.name,
-                    Box::new(move |label, counter_id, threshold, value| {
-                        thresholds_exceeded_callback.map(|cb| {
-                            if let Err(err) = cb(label, counter_id, threshold, value) {
-                                log::error!("failed to send notification: {err:?}");
-                            }
-                        });
-                    }),
-                );
 
                 (Some(cache), Some(Arc::new(request_counters)))
             } else {
@@ -758,6 +759,7 @@ impl DataStore {
             thread_settings,
             config_generation: generation,
             request_counters,
+            thresholds_exceeded_callback,
         })
     }
 
