@@ -645,6 +645,12 @@ Ext.define('PBS.DataStoreSummary', {
             { single: true },
         );
 
+        let listStore = Ext.data.StoreManager.lookup('pbs-datastore-list');
+        let record = listStore?.findRecord('store', me.datastore, 0, false, true, true);
+        if (record?.get('backend-type') === 's3') {
+            me.getViewModel().set('showS3Stats', true);
+        }
+
         me.query('proxmoxRRDChart').forEach((chart) => {
             chart.setStore(me.rrdstore);
         });
