@@ -66,6 +66,9 @@ pub enum JobState {
         state: TaskState,
         updated: Option<i64>,
     },
+    /// The job's state could not be determined (e.g. because the state file was corrupted, does not
+    /// exist)
+    Unknown,
 }
 
 /// Represents a Job and holds the correct lock
@@ -76,6 +79,9 @@ pub struct Job {
     pub state: JobState,
     _lock: BackupLockGuard,
 }
+
+/// Fallback offset (in seconds) used for job schedules when the last run time is unknown
+pub const SCHEDULE_FALLBACK_OFFSET: i64 = 30;
 
 const JOB_STATE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/jobstates");
 
@@ -155,6 +161,7 @@ pub fn update_job_last_run_time(jobtype: &str, jobname: &str) -> Result<(), Erro
             state,
             updated: Some(time),
         },
+        JobState::Unknown => bail!("cannot update last run time for unknown job state"),
     };
     job.write_state()
 }
@@ -179,6 +186,7 @@ pub fn last_run_time(jobtype: &str, jobname: &str) -> Result<i64, Error> {
                 .map_err(|err| format_err!("could not parse upid from state: {err}"))?;
             Ok(upid.starttime)
         }
+        JobState::Unknown => bail!("statefile could not be parsed or was empty"),
     }
 }
 
@@ -191,11 +199,23 @@ impl JobState {
     /// This does not update the state in the file.
     pub fn load(jobtype: &str, jobname: &str) -> Result<Self, Error> {
         if let Some(state) = file_read_optional_string(get_path(jobtype, jobname))? {
-            match serde_json::from_str(&state)? {
+            let job_state = match serde_json::from_str(&state) {
+                Ok(parsed_state) => parsed_state,
+                Err(err) => {
+                    log::error!("could not parse statefile for {jobname}: {err}");
+                    return Ok(JobState::Unknown);
+                }
+            };
+
+            match job_state {
                 JobState::Started { upid } => {
-                    let parsed: UPID = upid
-                        .parse()
-                        .map_err(|err| format_err!("error parsing upid: {err}"))?;
+                    let parsed: UPID = match upid.parse() {
+                        Ok(parsed) => parsed,
+                        Err(err) => {
+                            log::error!("error parsing upid for {jobname}: {err}");
+                            return Ok(JobState::Unknown);
+                        }
+                    };
 
                     if !worker_is_active_local(&parsed) {
                         let state = upid_read_status(&parsed).unwrap_or(TaskState::Unknown {
@@ -211,11 +231,26 @@ impl JobState {
                         Ok(JobState::Started { upid })
                     }
                 }
+                JobState::Finished {
+                    upid,
+                    state,
+                    updated,
+                } => {
+                    if let Err(err) = upid.parse::<UPID>() {
+                        log::error!("error parsing upid for {jobname}: {err}");
+                        return Ok(JobState::Unknown);
+                    }
+                    Ok(JobState::Finished {
+                        upid,
+                        state,
+                        updated,
+                    })
+                }
                 other => Ok(other),
             }
         } else {
             Ok(JobState::Created {
-                time: proxmox_time::epoch_i64() - 30,
+                time: proxmox_time::epoch_i64() - SCHEDULE_FALLBACK_OFFSET,
             })
         }
     }
@@ -263,6 +298,7 @@ impl Job {
             JobState::Created { .. } => bail!("cannot finish when not started"),
             JobState::Started { upid } => upid,
             JobState::Finished { upid, .. } => upid,
+            JobState::Unknown => bail!("cannot finish job with unknown status"),
         }
         .to_string();
 
@@ -305,8 +341,15 @@ pub fn compute_schedule_status(
     jobname: &str,
     schedule: Option<&str>,
 ) -> Result<JobScheduleStatus, Error> {
-    let job_state = JobState::load(jobtype, jobname)
-        .map_err(|err| format_err!("could not open statefile for {jobname}: {err}"))?;
+    let job_state = match JobState::load(jobtype, jobname) {
+        Ok(job_state) => job_state,
+        Err(err) => {
+            log::error!(
+                "could not open statefile for {jobname}: {err} - falling back to default job schedule status",
+            );
+            return Ok(JobScheduleStatus::default());
+        }
+    };
 
     let (upid, endtime, state, last) = match job_state {
         JobState::Created { time } => (None, None, None, time),
@@ -327,6 +370,12 @@ pub fn compute_schedule_status(
                 last,
             )
         }
+        JobState::Unknown => (
+            None,
+            None,
+            None,
+            proxmox_time::epoch_i64() - SCHEDULE_FALLBACK_OFFSET,
+        ),
     };
 
     let mut status = JobScheduleStatus {
