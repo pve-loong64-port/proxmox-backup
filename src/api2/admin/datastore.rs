@@ -1172,19 +1172,14 @@ pub fn garbage_collection_status(
 
     let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
     let status_in_memory = datastore.last_gc_status();
-    let state_file = JobState::load("garbage_collection", &store)
-        .map_err(|err| log::error!("could not open GC statefile for {store}: {err}"))
-        .ok();
 
     let mut last = proxmox_time::epoch_i64();
 
+    let jobtype = "garbage_collection";
+
     if let Some(ref upid) = status_in_memory.upid {
-        let mut computed_schedule: JobScheduleStatus = JobScheduleStatus::default();
-        if let Some(state) = state_file {
-            if let Ok(cs) = compute_schedule_status(&state, Some(upid)) {
-                computed_schedule = cs;
-            }
-        }
+        let computed_schedule: JobScheduleStatus =
+            compute_schedule_status(jobtype, &store, Some(upid))?;
 
         if let Some(endtime) = computed_schedule.last_run_endtime {
             last = endtime;
@@ -1196,6 +1191,8 @@ pub fn garbage_collection_status(
         info.next_run = computed_schedule.next_run;
         info.last_run_endtime = computed_schedule.last_run_endtime;
         info.last_run_state = computed_schedule.last_run_state;
+    } else if let Err(err) = JobState::load(jobtype, &store) {
+        log::error!("could not open statefile for {store}: {err}");
     }
 
     info.next_run = info

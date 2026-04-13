@@ -1,6 +1,6 @@
 //! Datastore Synchronization Job Management
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Error};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -19,7 +19,7 @@ use pbs_config::CachedUserInfo;
 
 use crate::{
     api2::config::sync::{check_sync_job_modify_access, check_sync_job_read_access},
-    server::jobstate::{compute_schedule_status, Job, JobState},
+    server::jobstate::{compute_schedule_status, Job},
     server::sync::do_sync_job,
 };
 
@@ -112,10 +112,7 @@ pub fn list_config_sync_jobs(
             continue;
         }
 
-        let last_state = JobState::load("syncjob", &job.id)
-            .map_err(|err| format_err!("could not open statefile for {}: {}", &job.id, err))?;
-
-        let status = compute_schedule_status(&last_state, job.schedule.as_deref())?;
+        let status = compute_schedule_status("syncjob", &job.id, job.schedule.as_deref())?;
 
         list.push(SyncJobStatus {
             config: job,

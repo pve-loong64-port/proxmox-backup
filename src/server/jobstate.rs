@@ -301,11 +301,15 @@ impl Job {
 }
 
 pub fn compute_schedule_status(
-    job_state: &JobState,
+    jobtype: &str,
+    jobname: &str,
     schedule: Option<&str>,
 ) -> Result<JobScheduleStatus, Error> {
+    let job_state = JobState::load(jobtype, jobname)
+        .map_err(|err| format_err!("could not open statefile for {jobname}: {err}"))?;
+
     let (upid, endtime, state, last) = match job_state {
-        JobState::Created { time } => (None, None, None, *time),
+        JobState::Created { time } => (None, None, None, time),
         JobState::Started { upid } => {
             let parsed_upid: UPID = upid.parse()?;
             (Some(upid), None, None, parsed_upid.starttime)
@@ -326,7 +330,7 @@ pub fn compute_schedule_status(
     };
 
     let mut status = JobScheduleStatus {
-        last_run_upid: upid.map(String::from),
+        last_run_upid: upid,
         last_run_state: state,
         last_run_endtime: endtime,
         ..Default::default()

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Error};
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -23,7 +23,7 @@ use pbs_datastore::{DataStore, StoreProgress};
 use crate::tape::{assert_datastore_type, TapeNotificationMode};
 use crate::{
     server::{
-        jobstate::{compute_schedule_status, Job, JobState},
+        jobstate::{compute_schedule_status, Job},
         TapeBackupJobSummary,
     },
     tape::{
@@ -97,10 +97,7 @@ pub fn list_tape_backup_jobs(
             continue;
         }
 
-        let last_state = JobState::load("tape-backup-job", &job.id)
-            .map_err(|err| format_err!("could not open statefile for {}: {}", &job.id, err))?;
-
-        let status = compute_schedule_status(&last_state, job.schedule.as_deref())?;
+        let status = compute_schedule_status("tape-backup-job", &job.id, job.schedule.as_deref())?;
 
         let next_run = status.next_run.unwrap_or(current_time);
 

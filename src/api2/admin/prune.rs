@@ -1,6 +1,6 @@
 //! Datastore Prune Job Management
 
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use serde_json::Value;
 
 use proxmox_router::{
@@ -18,7 +18,7 @@ use pbs_config::CachedUserInfo;
 
 use crate::server::{
     do_prune_job,
-    jobstate::{compute_schedule_status, Job, JobState},
+    jobstate::{compute_schedule_status, Job},
 };
 
 #[api(
@@ -73,10 +73,7 @@ pub fn list_prune_jobs(
     let mut list = Vec::new();
 
     for job in job_config_iter {
-        let last_state = JobState::load("prunejob", &job.id)
-            .map_err(|err| format_err!("could not open statefile for {}: {}", &job.id, err))?;
-
-        let mut status = compute_schedule_status(&last_state, Some(&job.schedule))?;
+        let mut status = compute_schedule_status("prunejob", &job.id, Some(&job.schedule))?;
         if job.disable {
             status.next_run = None;
         }

@@ -1,6 +1,6 @@
 //! Datastore Verify Job Management
 
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use serde_json::Value;
 
 use proxmox_router::{
@@ -19,7 +19,7 @@ use pbs_config::CachedUserInfo;
 
 use crate::server::{
     do_verification_job,
-    jobstate::{compute_schedule_status, Job, JobState},
+    jobstate::{compute_schedule_status, Job},
 };
 
 #[api(
@@ -73,10 +73,7 @@ pub fn list_verification_jobs(
     let mut list = Vec::new();
 
     for job in job_config_iter {
-        let last_state = JobState::load("verificationjob", &job.id)
-            .map_err(|err| format_err!("could not open statefile for {}: {}", &job.id, err))?;
-
-        let status = compute_schedule_status(&last_state, job.schedule.as_deref())?;
+        let status = compute_schedule_status("verificationjob", &job.id, job.schedule.as_deref())?;
 
         list.push(VerificationJobStatus {
             config: job,
