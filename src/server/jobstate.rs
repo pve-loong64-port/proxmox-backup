@@ -161,7 +161,7 @@ pub fn update_job_last_run_time(jobtype: &str, jobname: &str) -> Result<(), Erro
             state,
             updated: Some(time),
         },
-        JobState::Unknown => bail!("cannot update last run time for unknown job state"),
+        JobState::Unknown => JobState::Created { time },
     };
     job.write_state()
 }

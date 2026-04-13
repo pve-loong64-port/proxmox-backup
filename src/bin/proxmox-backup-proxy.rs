@@ -33,7 +33,7 @@ use pbs_datastore::DataStore;
 use proxmox_backup::{
     server::{
         auth::check_pbs_auth,
-        jobstate::{self, Job},
+        jobstate::{self, Job, SCHEDULE_FALLBACK_OFFSET},
     },
     traffic_control_cache::{SharedRateLimit, TRAFFIC_CONTROL_CACHE},
 };
@@ -567,6 +567,7 @@ async fn schedule_datastore_garbage_collection() {
             Ok(time) => time,
             Err(err) => {
                 eprintln!("could not get last run time of {worker_type} {store}: {err}");
+                let _ = jobstate::update_job_last_run_time(worker_type, &store);
                 continue;
             }
         };
@@ -1026,7 +1027,8 @@ fn check_schedule(worker_type: &str, event_str: &str, id: &str) -> bool {
         Ok(time) => time,
         Err(err) => {
             eprintln!("could not get last run time of {worker_type} {id}: {err}");
-            return false;
+            let _ = jobstate::update_job_last_run_time(worker_type, id);
+            proxmox_time::epoch_i64() - SCHEDULE_FALLBACK_OFFSET
         }
     };
 
