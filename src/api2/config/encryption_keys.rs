@@ -126,8 +126,8 @@ pub fn create_key(
         permission: &Permission::Privilege(&["system", "encryption-keys", "{id}"], PRIV_SYS_MODIFY, false),
     },
 )]
-/// Mark the key by given id as archived, no longer usable to encrypt contents.
-pub fn archive_key(
+/// Toggle the archive state for the key by given id, archived keys are no longer usable to encrypt contents.
+pub fn toggle_key_archive_state(
     id: String,
     digest: Option<String>,
     _rpcenv: &mut dyn RpcEnvironment,
@@ -140,15 +140,13 @@ pub fn archive_key(
     let mut key: CryptKey = config.lookup(ENCRYPTION_KEYS_CFG_TYPE_ID, &id)?;
 
     if key.archived_at.is_some() {
-        bail!("key already marked as archived");
+        key.archived_at = None;
     } else {
         check_encryption_key_in_use(&id, false)?;
+        key.archived_at = Some(proxmox_time::epoch_i64());
     }
 
-    key.archived_at = Some(proxmox_time::epoch_i64());
-
     config.set_data(&id, ENCRYPTION_KEYS_CFG_TYPE_ID, &key)?;
-    // drops config lock
     encryption_keys::save_config(&config)?;
 
     Ok(())
@@ -221,7 +219,7 @@ fn check_encryption_key_in_use(id: &str, include_associated: bool) -> Result<(),
 }
 
 const ITEM_ROUTER: Router = Router::new()
-    .post(&API_METHOD_ARCHIVE_KEY)
+    .post(&API_METHOD_TOGGLE_KEY_ARCHIVE_STATE)
     .delete(&API_METHOD_DELETE_KEY);
 
 pub const ROUTER: Router = Router::new()

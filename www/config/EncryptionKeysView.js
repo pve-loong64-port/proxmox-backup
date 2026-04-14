@@ -38,7 +38,7 @@ Ext.define('PBS.config.EncryptionKeysView', {
             }).show();
         },
 
-        archiveEncryptionKey: function () {
+        toggleEncryptionKeyArchiveState: function () {
             let me = this;
             let view = me.getView();
             let selection = view.getSelection();
@@ -246,14 +246,24 @@ Ext.define('PBS.config.EncryptionKeysView', {
         '-',
         {
             xtype: 'proxmoxButton',
-            text: gettext('Archive'),
-            handler: 'archiveEncryptionKey',
+            text: gettext('Toggle Archived'),
+            handler: 'toggleEncryptionKeyArchiveState',
             dangerous: true,
-            confirmMsg: Ext.String.format(
-                gettext('Archiving will render the key unusable to encrypt new content, proceed?'),
-            ),
+            confirmMsg: (item) => {
+                let msg;
+                if (item.data['archived-at']) {
+                    msg = gettext(
+                        'Are you sure you want to restore the archived key to be active again?',
+                    );
+                } else {
+                    msg = gettext(
+                        'Archiving will render the key unusable to encrypt new content, proceed?',
+                    );
+                }
+                return Ext.String.format(msg);
+            },
             disabled: true,
-            enableFn: (item) => item.data.type === 'sync' && !item.data['archived-at'],
+            enableFn: (item) => item.data.type === 'sync',
         },
         '-',
         {
