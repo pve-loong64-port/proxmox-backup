@@ -311,3 +311,57 @@ The following permissions are required for a sync job in push direction:
 
 .. note:: Sync jobs in push direction require namespace support on the remote
    Proxmox Backup Server instance (minimum version 2.2).
+
+Server Side Encryption/Decryption During Sync
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sync job in push direction allow to encrypt unencrypted snapshots when syncing
+to a less trusted remote Proxmox Backup Server instance. For this, a server side
+encryption key can be assigned to the sync job. This key will then be used to
+encrypt the contents before pushing them to the remote, analogous to performing
+a backup with an encryption key. Already encrypted snapshots are not re-encrypted
+but rather pushed unmodified. Snapshots containing only partially encrypted
+contents are skipped for security reasons.
+
+Therefore, sync jobs using the ``encrypted-only`` flag will never use the
+``active-encryption-key`` when pushing snapshots, since only already encrypted
+snapshots are being synced.
+
+On the other hand, sync jobs in pull direction allow to assign a number of
+associated keys, which will be used to decrypt snapshot contents if the key
+fingerprint of one of the listed keys matches the one used to encrypt the
+backup snapshot. The active encryption key has no effect for sync jobs in pull
+direction and should not be set.
+
+In order to configure the sync job, as well as for sync job owner/local user
+to access the keys during sync, ``System.Modify`` permissions are required on
+the ``/system/encryption-keys/{key}`` path.
+
+.. note:: Encryption key handling comes with a few risks, especially with key
+   rotation. Therefore, only active keys can be used to encrypt new snapshot
+   contents during push sync. If an active encryption key is changed, the key is
+   kept back as associated key on the sync job, in order to protect it from
+   accidental removal. Further, any encryption key can be archived, rendering it
+   no longer usable for encryption, only to decrypt pre-existing contents. Any
+   encryption key usable for sync jobs must therefore be marked as archived and
+   disassociated from any sync job still associated to it, before being able to
+   remove it.
+
+The following command can be used to assign the active encryption key for a sync
+job.
+
+.. code-block:: console
+
+    # proxmox-backup-manager sync-job update pbs2-push --active-encryption-key key0
+
+Setting the associated keys will drop any key not present in the given key list,
+with exception of the previously assigned active encryption key, if it is updated
+as well. The previously assigned encryption key (in the example above ``key0``)
+will always be pushed to the list of associated keys on rotation. For example,
+since ``key0`` is currently the active encryption key, below command would assign
+``key1`` as the new active encryption key and result in ``key0,key2,key3`` as
+associated keys for the sync job.
+
+.. code-block:: console
+
+    # proxmox-backup-manager sync-job update pbs2-push --active-encryption-key key1 --associated-key key2 --associated-key key3
