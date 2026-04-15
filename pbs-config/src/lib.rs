@@ -59,6 +59,7 @@ pub fn priv_user() -> Result<nix::unistd::User, Error> {
     }
 }
 
+#[must_use = "lock guard must be used to keep file locked"]
 pub struct BackupLockGuard {
     file: Option<std::fs::File>,
     // TODO: Remove `_legacy_dir` with PBS 5
