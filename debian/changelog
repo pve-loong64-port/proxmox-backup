@@ -1,47 +1,50 @@
-rust-proxmox-backup (4.1.7-1) trixie; urgency=medium
+rust-proxmox-backup (4.1.7-2) trixie; urgency=medium
 
-  * bump pxar dependency, adding consistency check for payload reference
-    offsets in split archives
+  * bump pxar dependency, adding a consistency check for payload reference
+    offsets in split archives.
 
   * fix #7382: correctly anchor nested paths for include/exclude patterns.
+    Anchored patterns in subdirectories were not matched because the leading
+    slash was not prepended to the match path.
 
-  * fix #7329: api: avoid overwriting existing IPv6 config method
+  * fix #7329: api: avoid overwriting existing IPv6 config method. Setting
+    IPv4 configuration could silently reset the IPv6 method to manual, causing
+    the inet6 stanza to be dropped from the interfaces file.
 
-  * report: adapt to zarcstat renaming
+  * system report: adapt to the ZFS arcstat CLI tool getting renamed to
+    zarcstat.
 
-  * fix #7412: ui: dashboard: persist datastore usage column state
+  * fix #7412: ui: dashboard: persist datastore usage column configuration
+    across page reloads and navigations.
 
-  * ui: task descriptions: use title case also for 'Format Media' task
+  * ui: task descriptions: use title case also for 'Format Media' task.
 
-  * s3: use proxmox-s3-client 1.4.0, changing the Content-Type of
-    put_object/copy_object requests to `application/octet-stream` instead of
-    `binary/octet`.
+  * s3: bump proxmox-s3-client to 1.4.0, fixing the Content-Type for object
+    upload and copy requests to `application/octet-stream` instead of the
+    non-standard `binary/octet`.
 
-  * config: move node config into pbs-config, including helper tools
+  * fix #6716: pass node http proxy config to s3 backend, so that S3
+    operations respect the configured HTTP proxy.
 
-  * fix #6716: pass node http proxy config to s3 backend
+  * s3: add request statistics with configurable notification thresholds and
+    scheduled counter resets, allowing to monitor and alert on S3 backend
+    traffic.
 
-  * s3: add request statistics and thresholds
+  * partially fix #6563: ui: expose s3 rrd charts in datastore summary.
 
-  * partially fix #6563: ui: expose s3 rrd charts in datastore summary
+  * api: metrics: support sub-path metric object IDs, so that S3 sub-metrics
+    inherit their parent datastore's permissions.
 
-  * ui: datastore summary: move store to be part of summary panel
+  * api: datastore: include backend type in listing response, allowing the UI
+    to distinguish backends without loading the full config.
 
-  * api: metrics: support sub-path metric object IDs
+  * ui: s3: hide S3-only options for non-S3 datastores.
 
-  * ui: reformat JS code with proxmox-biome
+  * ui: datastore summary improvements:
+    - give notes panel its own full row.
+    - use backend-type from datastore list API for immediate S3 detection.
 
-  * api: datastore: include backend type in listing response
-
-  * ui: s3: hide S3-only options for non-S3 datastores
-
-  * ui: datastore summary: give notes panel its own row
-
-  * ui: datastore summary: use listing for immediate S3 detection
-
-  * docs: substitute `Proxmox Backup` with full `Proxmox Backup Server`
-
- -- Proxmox Support Team <support@proxmox.com>  Wed, 15 Apr 2026 14:08:43 +0200
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 15 Apr 2026 16:22:30 +0200
 
 rust-proxmox-backup (4.1.6-1) trixie; urgency=medium
 
