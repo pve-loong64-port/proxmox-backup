@@ -1,3 +1,48 @@
+rust-proxmox-backup (4.1.7-1) trixie; urgency=medium
+
+  * bump pxar dependency, adding consistency check for payload reference
+    offsets in split archives
+
+  * fix #7382: correctly anchor nested paths for include/exclude patterns.
+
+  * fix #7329: api: avoid overwriting existing IPv6 config method
+
+  * report: adapt to zarcstat renaming
+
+  * fix #7412: ui: dashboard: persist datastore usage column state
+
+  * ui: task descriptions: use title case also for 'Format Media' task
+
+  * s3: use proxmox-s3-client 1.4.0, changing the Content-Type of
+    put_object/copy_object requests to `application/octet-stream` instead of
+    `binary/octet`.
+
+  * config: move node config into pbs-config, including helper tools
+
+  * fix #6716: pass node http proxy config to s3 backend
+
+  * s3: add request statistics and thresholds
+
+  * partially fix #6563: ui: expose s3 rrd charts in datastore summary
+
+  * ui: datastore summary: move store to be part of summary panel
+
+  * api: metrics: support sub-path metric object IDs
+
+  * ui: reformat JS code with proxmox-biome
+
+  * api: datastore: include backend type in listing response
+
+  * ui: s3: hide S3-only options for non-S3 datastores
+
+  * ui: datastore summary: give notes panel its own row
+
+  * ui: datastore summary: use listing for immediate S3 detection
+
+  * docs: substitute `Proxmox Backup` with full `Proxmox Backup Server`
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 15 Apr 2026 14:08:43 +0200
+
 rust-proxmox-backup (4.1.6-1) trixie; urgency=medium
 
   * fix #3723: api: remote: optionally use node proxy config for http client
