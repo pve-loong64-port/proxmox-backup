@@ -7,7 +7,7 @@ use proxmox_s3_client::{
     S3BucketListItem, S3Client, S3ClientConf, S3ClientConfig, S3ClientConfigUpdater,
     S3ClientConfigWithoutSecret, S3ClientOptions, S3RequestCounterConfig, S3_CLIENT_ID_SCHEMA,
 };
-use proxmox_schema::{api, param_bail, ApiType};
+use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
     Authid, DataStoreConfig, DatastoreBackendType, JOB_ID_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,
