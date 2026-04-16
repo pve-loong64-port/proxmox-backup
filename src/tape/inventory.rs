@@ -547,7 +547,7 @@ impl Inventory {
             RetentionPolicy::KeepForever => i64::MAX,
             RetentionPolicy::OverwriteAlways => max_use_time,
             RetentionPolicy::ProtectFor(time_span) => {
-                let seconds = f64::from(time_span.clone()) as i64;
+                let seconds = f64::from(*time_span) as i64;
                 max_use_time + seconds
             }
         }
