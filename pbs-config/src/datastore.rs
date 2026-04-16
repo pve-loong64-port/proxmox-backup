@@ -116,7 +116,7 @@ pub fn complete_calendar_event(_arg: &str, _param: &HashMap<String, String>) -> 
 
 /// Parse the backend configuration from a datastore config.
 pub fn parse_backend_config(config: &DataStoreConfig) -> Result<DatastoreBackendConfig, Error> {
-    Ok(config.backend.as_deref().unwrap_or("").parse()?)
+    config.backend.as_deref().unwrap_or("").parse()
 }
 
 /// Returns the datastore backend type from its name.
