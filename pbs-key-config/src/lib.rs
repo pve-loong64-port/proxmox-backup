@@ -1,6 +1,6 @@
 use std::io::Write;
-use std::path::Path;
 use std::os::fd::AsRawFd;
+use std::path::Path;
 
 use anyhow::{bail, format_err, Context, Error};
 use serde::{Deserialize, Serialize};
