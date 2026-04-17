@@ -1,3 +1,4 @@
+pub mod async_lru_cache;
 pub mod cert;
 pub mod crypt_config;
 pub mod format;
@@ -5,8 +6,6 @@ pub mod json;
 pub mod lru_cache;
 pub mod nom;
 pub mod sha;
-
-pub mod async_lru_cache;
 
 /// Set MMAP_THRESHOLD to a fixed value (128 KiB)
 ///
