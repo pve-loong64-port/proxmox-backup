@@ -1046,6 +1046,47 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
     Ok(sync_stats)
 }
 
+/// Get and exclusive lock on the backup group, check ownership matches
+/// sync job owner and pull group contents.
+async fn lock_and_pull_group(
+    params: &PullParameters,
+    group: &BackupGroup,
+    namespace: &BackupNamespace,
+    target_namespace: &BackupNamespace,
+    progress: &mut StoreProgress,
+) -> Result<SyncStats, Error> {
+    let (owner, _lock_guard) =
+        match params
+            .target
+            .store
+            .create_locked_backup_group(target_namespace, group, &params.owner)
+        {
+            Ok(res) => res,
+            Err(err) => {
+                info!("sync group {group} failed - group lock failed: {err}");
+                info!("create_locked_backup_group failed");
+                return Err(err);
+            }
+        };
+
+    if params.owner != owner {
+        // only the owner is allowed to create additional snapshots
+        info!(
+            "sync group {group} failed - owner check failed ({} != {owner})",
+            params.owner
+        );
+        return Err(format_err!("owner check failed"));
+    }
+
+    match pull_group(params, namespace, group, progress).await {
+        Ok(stats) => Ok(stats),
+        Err(err) => {
+            info!("sync group {group} failed - {err:#}");
+            Err(err)
+        }
+    }
+}
+
 /// Pulls a namespace according to `params`.
 ///
 /// Pulling a namespace consists of the following steps:
@@ -1094,38 +1135,9 @@ async fn pull_ns(
         progress.done_snapshots = 0;
         progress.group_snapshots = 0;
 
-        let (owner, _lock_guard) =
-            match params
-                .target
-                .store
-                .create_locked_backup_group(&target_ns, &group, &params.owner)
-            {
-                Ok(result) => result,
-                Err(err) => {
-                    info!("sync group {} failed - group lock failed: {err}", &group);
-                    errors = true;
-                    // do not stop here, instead continue
-                    info!("create_locked_backup_group failed");
-                    continue;
-                }
-            };
-
-        // permission check
-        if params.owner != owner {
-            // only the owner is allowed to create additional snapshots
-            info!(
-                "sync group {} failed - owner check failed ({} != {owner})",
-                &group, params.owner
-            );
-            errors = true; // do not stop here, instead continue
-        } else {
-            match pull_group(params, namespace, &group, &mut progress).await {
-                Ok(stats) => sync_stats.add(stats),
-                Err(err) => {
-                    info!("sync group {} failed - {err:#}", &group);
-                    errors = true; // do not stop here, instead continue
-                }
-            }
+        match lock_and_pull_group(params, &group, &namespace, &target_ns, &mut progress).await {
+            Ok(stats) => sync_stats.add(stats),
+            Err(_err) => errors = true,
         }
     }
 
