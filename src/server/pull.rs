@@ -376,7 +376,7 @@ async fn pull_single_archive<'a>(
 ///   -- if not, pull it from the remote
 /// - Download log if not already existing
 async fn pull_snapshot<'a>(
-    params: &PullParameters,
+    params: Arc<PullParameters>,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     encountered_chunks: Arc<Mutex<EncounteredChunks>>,
@@ -554,7 +554,7 @@ async fn pull_snapshot<'a>(
 /// The `reader` is configured to read from the source backup directory, while the
 /// `snapshot` is pointing to the local datastore and target namespace.
 async fn pull_snapshot_from<'a>(
-    params: &PullParameters,
+    params: Arc<PullParameters>,
     reader: Arc<dyn SyncSourceReader + 'a>,
     snapshot: &'a pbs_datastore::BackupDir,
     encountered_chunks: Arc<Mutex<EncounteredChunks>>,
@@ -612,7 +612,7 @@ async fn pull_snapshot_from<'a>(
 /// - remote snapshot access is checked by remote (twice: query and opening the backup reader)
 /// - local group owner is already checked by pull_store
 async fn pull_group(
-    params: &PullParameters,
+    params: Arc<PullParameters>,
     source_namespace: &BackupNamespace,
     group: &BackupGroup,
     progress: &mut StoreProgress,
@@ -793,7 +793,7 @@ async fn pull_group(
             .reader(source_namespace, &from_snapshot)
             .await?;
         let result = pull_snapshot_from(
-            params,
+            Arc::clone(&params),
             reader,
             &to_snapshot,
             encountered_chunks.clone(),
@@ -981,6 +981,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
     let (mut groups, mut snapshots) = (0, 0);
     let mut synced_ns = HashSet::with_capacity(namespaces.len());
     let mut sync_stats = SyncStats::default();
+    let params = Arc::new(params);
 
     for namespace in namespaces {
         let source_store_ns_str = print_store_and_ns(params.source.get_store(), &namespace);
@@ -1003,7 +1004,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
             }
         }
 
-        match pull_ns(&namespace, &mut params).await {
+        match pull_ns(&namespace, Arc::clone(&params)).await {
             Ok((ns_progress, ns_sync_stats, ns_errors)) => {
                 errors |= ns_errors;
 
@@ -1049,7 +1050,7 @@ pub(crate) async fn pull_store(mut params: PullParameters) -> Result<SyncStats, 
 /// Get and exclusive lock on the backup group, check ownership matches
 /// sync job owner and pull group contents.
 async fn lock_and_pull_group(
-    params: &PullParameters,
+    params: Arc<PullParameters>,
     group: &BackupGroup,
     namespace: &BackupNamespace,
     target_namespace: &BackupNamespace,
@@ -1101,7 +1102,7 @@ async fn lock_and_pull_group(
 /// - owner check for vanished groups done here
 async fn pull_ns(
     namespace: &BackupNamespace,
-    params: &mut PullParameters,
+    params: Arc<PullParameters>,
 ) -> Result<(StoreProgress, SyncStats, bool), Error> {
     let list: Vec<BackupGroup> = params.source.list_groups(namespace, &params.owner).await?;
 
@@ -1135,7 +1136,15 @@ async fn pull_ns(
         progress.done_snapshots = 0;
         progress.group_snapshots = 0;
 
-        match lock_and_pull_group(params, &group, &namespace, &target_ns, &mut progress).await {
+        match lock_and_pull_group(
+            Arc::clone(&params),
+            &group,
+            namespace,
+            &target_ns,
+            &mut progress,
+        )
+        .await
+        {
             Ok(stats) => sync_stats.add(stats),
             Err(_err) => errors = true,
         }
