@@ -401,6 +401,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
 
     let (mut groups, mut snapshots) = (0, 0);
     let mut stats = SyncStats::default();
+    let params = Arc::new(params);
     for source_namespace in &source_namespaces {
         let source_store_and_ns = print_store_and_ns(params.source.store.name(), source_namespace);
         let target_namespace = params.map_to_target(source_namespace)?;
@@ -424,7 +425,7 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
             continue;
         }
 
-        match push_namespace(source_namespace, &params).await {
+        match push_namespace(source_namespace, Arc::clone(&params)).await {
             Ok((sync_progress, sync_stats, sync_errors)) => {
                 errors |= sync_errors;
                 stats.add(sync_stats);
@@ -519,11 +520,11 @@ pub(crate) async fn push_store(mut params: PushParameters) -> Result<SyncStats, 
 /// Iterate over all backup groups in the namespace and push them to the target.
 pub(crate) async fn push_namespace(
     namespace: &BackupNamespace,
-    params: &PushParameters,
+    params: Arc<PushParameters>,
 ) -> Result<(StoreProgress, SyncStats, bool), Error> {
     let target_namespace = params.map_to_target(namespace)?;
     // Check if user is allowed to perform backups on remote datastore
-    check_ns_remote_datastore_privs(params, &target_namespace, PRIV_REMOTE_DATASTORE_BACKUP)
+    check_ns_remote_datastore_privs(&params, &target_namespace, PRIV_REMOTE_DATASTORE_BACKUP)
         .context("Pushing to remote namespace not allowed")?;
 
     let mut list: Vec<BackupGroup> = params
@@ -551,7 +552,7 @@ pub(crate) async fn push_namespace(
     let mut stats = SyncStats::default();
 
     let (owned_target_groups, not_owned_target_groups) =
-        fetch_target_groups(params, &target_namespace).await?;
+        fetch_target_groups(&params, &target_namespace).await?;
 
     for (done, group) in list.into_iter().enumerate() {
         progress.done_groups = done as u64;
@@ -567,7 +568,7 @@ pub(crate) async fn push_namespace(
         }
         synced_groups.insert(group.clone());
 
-        match push_group(params, namespace, &group, &mut progress).await {
+        match push_group(Arc::clone(&params), namespace, &group, &mut progress).await {
             Ok(sync_stats) => stats.add(sync_stats),
             Err(err) => {
                 warn!("Encountered errors: {err:#}");
@@ -587,7 +588,7 @@ pub(crate) async fn push_namespace(
                 continue;
             }
 
-            match remove_target_group(params, &target_namespace, &target_group).await {
+            match remove_target_group(&params, &target_namespace, &target_group).await {
                 Ok(delete_stats) => {
                     info!("Removed vanished group {target_group} from remote");
                     if delete_stats.protected_snapshots() > 0 {
@@ -669,7 +670,7 @@ async fn forget_target_snapshot(
 /// - Iterate the snapshot list and push each snapshot individually
 /// - (Optional): Remove vanished groups if `remove_vanished` flag is set
 pub(crate) async fn push_group(
-    params: &PushParameters,
+    params: Arc<PushParameters>,
     namespace: &BackupNamespace,
     group: &BackupGroup,
     progress: &mut StoreProgress,
@@ -688,7 +689,7 @@ pub(crate) async fn push_group(
     }
 
     let target_namespace = params.map_to_target(namespace)?;
-    let mut target_snapshots = fetch_target_snapshots(params, &target_namespace, group).await?;
+    let mut target_snapshots = fetch_target_snapshots(&params, &target_namespace, group).await?;
     target_snapshots.sort_unstable_by_key(|a| a.backup.time);
 
     let last_snapshot_time = target_snapshots
@@ -745,8 +746,13 @@ pub(crate) async fn push_group(
     let mut stats = SyncStats::default();
     let mut fetch_previous_manifest = !target_snapshots.is_empty();
     for (pos, source_snapshot) in snapshots.into_iter().enumerate() {
-        let result =
-            push_snapshot(params, namespace, &source_snapshot, fetch_previous_manifest).await;
+        let result = push_snapshot(
+            &params,
+            namespace,
+            &source_snapshot,
+            fetch_previous_manifest,
+        )
+        .await;
         fetch_previous_manifest = true;
 
         progress.done_snapshots = pos as u64 + 1;
@@ -769,7 +775,7 @@ pub(crate) async fn push_group(
                 );
                 continue;
             }
-            match forget_target_snapshot(params, &target_namespace, &snapshot.backup).await {
+            match forget_target_snapshot(&params, &target_namespace, &snapshot.backup).await {
                 Ok(()) => {
                     info!(
                         "Removed vanished snapshot {name} from remote",
