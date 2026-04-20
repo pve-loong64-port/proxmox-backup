@@ -36,12 +36,12 @@ use pbs_client::tools::{
     complete_archive_name, complete_auth_id, complete_backup_group, complete_backup_snapshot,
     complete_backup_source, complete_chunk_size, complete_group_or_snapshot,
     complete_img_archive_name, complete_namespace, complete_pxar_archive_name, complete_repository,
-    connect, connect_rate_limited, extract_repository_from_value, remove_repository_from_value,
+    connect, connect_rate_limited, extract_repository_from_value,
     key_source::{
         crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
         KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
     },
-    raise_nofile_limit, CHUNK_SIZE_SCHEMA,
+    raise_nofile_limit, remove_repository_from_value, CHUNK_SIZE_SCHEMA,
 };
 use pbs_client::{
     delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
