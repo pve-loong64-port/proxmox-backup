@@ -104,6 +104,7 @@ Ext.define('PBS.Datastore.Options', {
         let record = listStore.findRecord('store', me.datastore, 0, false, true, true);
         return {
             s3Visible: record?.get('backend-type') === 's3' ? undefined : false,
+            removableVisible: record?.get('mount-status') !== 'nonremovable' ? undefined : false,
         };
     },
 
@@ -220,6 +221,28 @@ Ext.define('PBS.Datastore.Options', {
                     xtype: 'proxmoxcheckbox',
                     name: 'verify-new',
                     boxLabel: gettext('Verify new backups immediately after completion'),
+                    defaultValue: false,
+                    deleteDefaultValue: true,
+                    deleteEmpty: true,
+                },
+            },
+        },
+        'gc-on-unmount': {
+            required: true,
+            header: gettext('GC on Unmount'),
+            defaultValue: false,
+            renderer: Proxmox.Utils.format_boolean,
+            cbind: {
+                visible: '{removableVisible}',
+            },
+            editor: {
+                xtype: 'proxmoxWindowEdit',
+                title: gettext('GC on Unmount'),
+                width: 350,
+                items: {
+                    xtype: 'proxmoxcheckbox',
+                    name: 'gc-on-unmount',
+                    boxLabel: gettext('Run garbage collection before unmounting'),
                     defaultValue: false,
                     deleteDefaultValue: true,
                     deleteEmpty: true,
