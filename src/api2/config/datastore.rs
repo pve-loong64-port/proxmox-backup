@@ -409,6 +409,8 @@ pub enum DeletableProperty {
     Comment,
     /// Delete the garbage collection schedule.
     GcSchedule,
+    /// Delete the gc-on-unmount property.
+    GcOnUnmount,
     /// Delete the prune job schedule.
     PruneSchedule,
     /// Delete the keep-last property
@@ -495,6 +497,9 @@ pub fn update_datastore(
                 DeletableProperty::GcSchedule => {
                     data.gc_schedule = None;
                 }
+                DeletableProperty::GcOnUnmount => {
+                    data.gc_on_unmount = None;
+                }
                 DeletableProperty::PruneSchedule => {
                     data.prune_schedule = None;
                 }
@@ -558,6 +563,10 @@ pub fn update_datastore(
     if update.gc_schedule.is_some() {
         gc_schedule_changed = data.gc_schedule != update.gc_schedule;
         data.gc_schedule = update.gc_schedule;
+    }
+
+    if update.gc_on_unmount.is_some() {
+        data.gc_on_unmount = update.gc_on_unmount;
     }
 
     macro_rules! prune_disabled {

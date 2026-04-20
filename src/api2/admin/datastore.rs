@@ -2641,15 +2641,32 @@ fn do_unmount_device(
 }
 
 async fn do_unmount(store: String, auth_id: Authid, to_stdout: bool) -> Result<Value, Error> {
-    let _lock = pbs_config::datastore::lock_config()?;
-    let (mut section_config, _digest) = pbs_config::datastore::config()?;
-    let mut datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
+    let (section_config, _digest) = pbs_config::datastore::config()?;
+    let datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
 
     if datastore.backing_device.is_none() {
         bail!("datastore '{store}' is not removable");
     }
 
     ensure_datastore_is_mounted(&datastore)?;
+
+    // Setting gc-on-unmount requires Datastore.Modify (or Datastore.Allocate at creation), the
+    // same level needed to start GC directly, so no privilege escalation from triggering it here.
+    if datastore.gc_on_unmount.unwrap_or(false) {
+        let client = crate::client_helpers::connect_to_localhost()
+            .context("failed to connect to localhost for starting GC")?;
+        match client
+            .post(&format!("api2/json/admin/datastore/{store}/gc"), None)
+            .await
+        {
+            Ok(_) => info!("started garbage collection, unmount will wait for it to finish"),
+            Err(err) => warn!("unable to start garbage collection before unmount: {err}"),
+        }
+    }
+
+    let _lock = pbs_config::datastore::lock_config()?;
+    let (mut section_config, _digest) = pbs_config::datastore::config()?;
+    let mut datastore: DataStoreConfig = section_config.lookup("datastore", &store)?;
 
     datastore.set_maintenance_mode(Some(MaintenanceMode {
         ty: MaintenanceType::Unmount,
