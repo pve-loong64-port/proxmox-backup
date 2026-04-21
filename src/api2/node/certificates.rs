@@ -306,16 +306,33 @@ pub fn new_acme_cert(force: bool, rpcenv: &mut dyn RpcEnvironment) -> Result<Str
 /// parameter is set).
 pub fn renew_acme_cert(force: bool, rpcenv: &mut dyn RpcEnvironment) -> Result<String, Error> {
     if !cert_expires_soon()? && !force {
-        bail!("Certificate does not expire within the next 30 days and 'force' is not set.")
+        let lead = cert_renew_lead_time()? / (24 * 60 * 60);
+        bail!("Certificate does not expire within the next {lead} days and 'force' is not set.")
     }
 
     spawn_certificate_worker("acme-renew-cert", force, rpcenv)
 }
 
+/// When to start checking for new certs.
+pub fn cert_renew_lead_time() -> Result<i64, Error> {
+    let cert = pem_to_cert_info(get_certificate_pem()?.as_bytes())?;
+    if let (Some(notafter), Some(notbefore)) =
+        (cert.not_after_unix().ok(), cert.not_before_unix().ok())
+    {
+        // gets usually checked every day by the daily-update service,
+        // start checking at least 3 days before expiry
+        let lifetime = notafter - notbefore;
+        let lead = std::cmp::max(lifetime / 3, 3 * 24 * 60 * 60);
+        Ok(lead)
+    } else {
+        Ok(30 * 24 * 60 * 60)
+    }
+}
+
 /// Check whether the current certificate expires within the next 30 days.
 pub fn cert_expires_soon() -> Result<bool, Error> {
     let cert = pem_to_cert_info(get_certificate_pem()?.as_bytes())?;
-    cert.is_expired_after_epoch(proxmox_time::epoch_i64() + 30 * 24 * 60 * 60)
+    cert.is_expired_after_epoch(proxmox_time::epoch_i64() + cert_renew_lead_time()?)
         .map_err(|err| format_err!("Failed to check certificate expiration date: {}", err))
 }
 
