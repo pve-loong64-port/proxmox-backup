@@ -26,6 +26,7 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{check_backup_owner, DataStore, DatastoreBackend, StoreProgress};
+use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::sha::sha256;
 
 use super::sync::{
@@ -34,6 +35,7 @@ use super::sync::{
     SkipReason, SyncSource, SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
+use crate::server::sync::SharedGroupProgress;
 use crate::tools::parallel_handler::ParallelHandler;
 
 pub(crate) struct PullTarget {
@@ -619,7 +621,7 @@ async fn pull_group(
     params: Arc<PullParameters>,
     source_namespace: &BackupNamespace,
     group: &BackupGroup,
-    progress: &mut StoreProgress,
+    shared_group_progress: Arc<SharedGroupProgress>,
 ) -> Result<SyncStats, Error> {
     let mut already_synced_skip_info = SkipInfo::new(SkipReason::AlreadySynced);
     let mut transfer_last_skip_info = SkipInfo::new(SkipReason::TransferLast);
@@ -782,7 +784,8 @@ async fn pull_group(
         }
     }
 
-    progress.group_snapshots = list.len() as u64;
+    let mut local_progress = StoreProgress::new(shared_group_progress.total_groups());
+    local_progress.group_snapshots = list.len() as u64;
 
     let mut sync_stats = SyncStats::default();
 
@@ -805,8 +808,10 @@ async fn pull_group(
         )
         .await;
 
-        progress.done_snapshots = pos as u64 + 1;
-        info!("percentage done: {progress}");
+        // Update done groups progress by other parallel running pulls
+        local_progress.done_groups = shared_group_progress.load_done();
+        local_progress.done_snapshots = pos as u64 + 1;
+        info!("percentage done: group {group}: {local_progress}");
 
         let stats = result?; // stop on error
         sync_stats.add(stats);
@@ -842,6 +847,8 @@ async fn pull_group(
             }));
         }
     }
+
+    shared_group_progress.increment_done();
 
     Ok(sync_stats)
 }
@@ -1058,7 +1065,7 @@ async fn lock_and_pull_group(
     group: &BackupGroup,
     namespace: &BackupNamespace,
     target_namespace: &BackupNamespace,
-    progress: &mut StoreProgress,
+    shared_group_progress: Arc<SharedGroupProgress>,
 ) -> Result<SyncStats, Error> {
     let (owner, _lock_guard) =
         match params
@@ -1083,7 +1090,7 @@ async fn lock_and_pull_group(
         return Err(format_err!("owner check failed"));
     }
 
-    match pull_group(params, namespace, group, progress).await {
+    match pull_group(params, namespace, group, shared_group_progress).await {
         Ok(stats) => Ok(stats),
         Err(err) => {
             info!("sync group {group} failed - {err:#}");
@@ -1135,23 +1142,45 @@ async fn pull_ns(
 
     let target_ns = namespace.map_prefix(&params.source.get_ns(), &params.target.ns)?;
 
-    for (done, group) in list.into_iter().enumerate() {
-        progress.done_groups = done as u64;
-        progress.done_snapshots = 0;
-        progress.group_snapshots = 0;
+    let shared_group_progress = Arc::new(SharedGroupProgress::with_total_groups(list.len()));
+    let mut group_workers = BoundedJoinSet::new(params.worker_threads.unwrap_or(1));
 
-        match lock_and_pull_group(
-            Arc::clone(&params),
-            &group,
-            namespace,
-            &target_ns,
-            &mut progress,
-        )
-        .await
-        {
-            Ok(stats) => sync_stats.add(stats),
-            Err(_err) => errors = true,
+    let mut process_results = |results| {
+        for result in results {
+            progress.done_groups = shared_group_progress.increment_done();
+            match result {
+                Ok(stats) => {
+                    sync_stats.add(stats);
+                }
+                Err(_err) => errors = true,
+            }
         }
+    };
+
+    for group in list.into_iter() {
+        let namespace = namespace.clone();
+        let target_ns = target_ns.clone();
+        let params = Arc::clone(&params);
+        let group_progress_cloned = Arc::clone(&shared_group_progress);
+        let results = group_workers
+            .spawn_task(async move {
+                lock_and_pull_group(
+                    Arc::clone(&params),
+                    &group,
+                    &namespace,
+                    &target_ns,
+                    group_progress_cloned,
+                )
+                .await
+            })
+            .await
+            .map_err(|err| format_err!("failed to join on worker task: {err:#}"))?;
+        process_results(results);
+    }
+
+    while let Some(result) = group_workers.join_next().await {
+        let result = result.map_err(|err| format_err!("failed to join on worker task: {err:#}"))?;
+        process_results(vec![result]);
     }
 
     if params.remove_vanished {

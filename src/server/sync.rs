@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::{Seek, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -791,4 +792,35 @@ pub(super) fn exclude_not_verified_or_encrypted(
     }
 
     false
+}
+
+/// Track group progress during parallel push/pull in sync jobs
+pub(crate) struct SharedGroupProgress {
+    done: AtomicUsize,
+    total: usize,
+}
+
+impl SharedGroupProgress {
+    /// Create a new instance to track group progress with expected total number of groups
+    pub(crate) fn with_total_groups(total: usize) -> Self {
+        Self {
+            done: AtomicUsize::new(0),
+            total,
+        }
+    }
+
+    /// Return current counter value for done groups
+    pub(crate) fn load_done(&self) -> u64 {
+        self.done.load(Ordering::Acquire) as u64
+    }
+
+    /// Increment counter for done groups and return new value
+    pub(crate) fn increment_done(&self) -> u64 {
+        self.done.fetch_add(1, Ordering::AcqRel) as u64 + 1
+    }
+
+    /// Return the number of total backup groups
+    pub(crate) fn total_groups(&self) -> u64 {
+        self.total as u64
+    }
 }
