@@ -2653,14 +2653,20 @@ async fn do_unmount(store: String, auth_id: Authid, to_stdout: bool) -> Result<V
     // Setting gc-on-unmount requires Datastore.Modify (or Datastore.Allocate at creation), the
     // same level needed to start GC directly, so no privilege escalation from triggering it here.
     if datastore.gc_on_unmount.unwrap_or(false) {
-        let client = crate::client_helpers::connect_to_localhost()
-            .context("failed to connect to localhost for starting GC")?;
-        match client
-            .post(&format!("api2/json/admin/datastore/{store}/gc"), None)
-            .await
-        {
-            Ok(_) => info!("started garbage collection, unmount will wait for it to finish"),
-            Err(err) => warn!("unable to start garbage collection before unmount: {err}"),
+        let gc_running = matches!(
+            JobState::load("garbage_collection", &store),
+            Ok(JobState::Started { .. })
+        );
+        if gc_running {
+            info!("garbage collection is already running, unmount will wait for it to finish");
+        } else {
+            let client = crate::client_helpers::connect_to_localhost()
+                .context("failed to connect to localhost for starting GC")?;
+            client
+                .post(&format!("api2/json/admin/datastore/{store}/gc"), None)
+                .await
+                .context("unable to start garbage collection before unmount")?;
+            info!("started garbage collection, unmount will wait for it to finish");
         }
     }
 
