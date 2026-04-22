@@ -288,6 +288,95 @@ pub async fn delete_group(
                 type: BackupNamespace,
                 optional: true,
             },
+            group: {
+                type: pbs_api_types::BackupGroup,
+                flatten: true,
+            },
+            "target-ns": {
+                type: BackupNamespace,
+                optional: true,
+            },
+            "merge-group": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "If the group already exists in the target namespace, merge \
+                    snapshots into it. Requires matching ownership and non-overlapping \
+                    snapshot times.",
+            },
+        },
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::Anybody,
+        description: "Requires DATASTORE_MODIFY or DATASTORE_PRUNE (+ group ownership) on the \
+            source namespace and DATASTORE_MODIFY or DATASTORE_BACKUP (+ group ownership) on \
+            the target namespace.",
+    },
+)]
+/// Move a backup group to a different namespace within the same datastore.
+pub fn move_group(
+    store: String,
+    ns: Option<BackupNamespace>,
+    group: pbs_api_types::BackupGroup,
+    target_ns: Option<BackupNamespace>,
+    merge_group: bool,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<Value, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let ns = ns.unwrap_or_default();
+    let target_ns = target_ns.unwrap_or_default();
+
+    let source_limited = check_ns_privs_full(
+        &store,
+        &ns,
+        &auth_id,
+        PRIV_DATASTORE_MODIFY,
+        PRIV_DATASTORE_PRUNE,
+    )?;
+    let target_limited = check_ns_privs_full(
+        &store,
+        &target_ns,
+        &auth_id,
+        PRIV_DATASTORE_MODIFY,
+        PRIV_DATASTORE_BACKUP,
+    )?;
+
+    let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Write))?;
+
+    if source_limited || target_limited {
+        let owner = datastore.get_owner(&ns, &group)?;
+        check_backup_owner(&owner, &auth_id)?;
+    }
+
+    // Best-effort pre-checks for a fast synchronous error before spawning a worker.
+    // The worker re-runs the same check post-lock, which is the authoritative gate.
+    datastore.check_move_group(&ns, &target_ns, &group, merge_group)?;
+
+    let worker_id = format!("{store}:{ns}/{group}:{target_ns}");
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    let upid_str = WorkerTask::new_thread(
+        "move-group",
+        Some(worker_id),
+        auth_id.to_string(),
+        to_stdout,
+        move |_worker| datastore.move_group(&ns, &group, &target_ns, merge_group),
+    )?;
+
+    Ok(json!(upid_str))
+}
+
+#[api(
+    input: {
+        properties: {
+            store: { schema: DATASTORE_SCHEMA },
+            ns: {
+                type: BackupNamespace,
+                optional: true,
+            },
             backup_dir: {
                 type: pbs_api_types::BackupDir,
                 flatten: true,
@@ -2872,6 +2961,7 @@ const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
             .delete(&API_METHOD_DELETE_GROUP),
     ),
     ("mount", &Router::new().post(&API_METHOD_MOUNT)),
+    ("move-group", &Router::new().post(&API_METHOD_MOVE_GROUP)),
     (
         "namespace",
         // FIXME: move into datastore:: sub-module?!
