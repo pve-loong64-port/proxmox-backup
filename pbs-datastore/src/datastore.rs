@@ -1179,6 +1179,301 @@ impl DataStore {
         Ok((removed_all_requested, stats))
     }
 
+    /// Validate a namespace-move request without touching locks.
+    ///
+    /// Fast pre-flight check used by the API endpoint so we can fail synchronously before
+    /// spawning a worker. Re-run inside [`Self::move_namespace`] to close the TOCTOU gap between
+    /// the API-level pre-check and the worker; since there is no namespace lock, that re-run is
+    /// the authoritative gate for namespace-level invariants. Per-group authoritative checks
+    /// live in [`Self::lock_and_move_group`].
+    pub fn check_move_namespace(
+        self: &Arc<Self>,
+        source_ns: &BackupNamespace,
+        target_ns: &BackupNamespace,
+    ) -> Result<(), Error> {
+        if source_ns.is_root() {
+            bail!("cannot move root namespace");
+        }
+        if source_ns == target_ns {
+            bail!("source and target namespace must be different");
+        }
+        if !self.namespace_exists(source_ns) {
+            bail!("source namespace '{source_ns}' does not exist");
+        }
+        if !target_ns.is_root() && !self.namespace_exists(target_ns) {
+            bail!("target namespace '{target_ns}' does not exist");
+        }
+        if source_ns.contains(target_ns).is_some() {
+            bail!(
+                "cannot move namespace '{source_ns}' into its own subtree (target: '{target_ns}')"
+            );
+        }
+        Ok(())
+    }
+
+    /// Move a backup namespace (including all child namespaces and groups) to a new location.
+    ///
+    /// Groups are moved one at a time. For each group, exclusive locks on the group and all its
+    /// snapshots (locked and moved in batches) ensure no concurrent operations are active. Groups
+    /// that cannot be locked (because a backup, verify, or other task is running) are deferred and
+    /// retried once, then reported in the error.
+    ///
+    /// If the target namespace already exists, groups are moved into it. Groups that fail (lock
+    /// conflict, merge invariant violation, or I/O error) are skipped and reported at the end -
+    /// they remain at the source and can be retried individually.
+    ///
+    /// `max_depth` limits how many levels of child namespaces below `source_ns` are included.
+    /// `None` means unlimited (move the entire subtree). `Some(0)` moves only the groups directly
+    /// in `source_ns` (no child namespaces).
+    ///
+    /// When `delete_source` is true, source namespace directories are removed once they are empty.
+    /// Sources kept behind because of `max_depth`-excluded children or failed moves stay in place.
+    /// When false the (now empty) sources are kept regardless.
+    ///
+    /// When `merge_groups` is true and a source group already exists in the target namespace, the
+    /// snapshots are merged into the existing target group (provided ownership matches and source
+    /// snapshots are strictly newer). When false the operation fails for that group.
+    pub fn move_namespace(
+        self: &Arc<Self>,
+        source_ns: &BackupNamespace,
+        target_ns: &BackupNamespace,
+        max_depth: Option<usize>,
+        delete_source: bool,
+        merge_groups: bool,
+    ) -> Result<(), Error> {
+        if *OLD_LOCKING {
+            bail!("move operations require new-style file-based locking");
+        }
+
+        // Re-run the pre-flight checks inside the worker to close the gap between the API-level
+        // pre-check and here (e.g. source namespace deleted in between).
+        self.check_move_namespace(source_ns, target_ns)?;
+
+        // Collect the source subtree for up-front depth-limit validation and for later cleanup.
+        // Groups are iterated lazily per-namespace below.
+        let depth = max_depth.unwrap_or(MAX_NAMESPACE_DEPTH);
+        let attempted_ns: Vec<BackupNamespace> =
+            ListNamespacesRecursive::new_max_depth(Arc::clone(self), source_ns.clone(), depth)?
+                .collect::<Result<Vec<_>, Error>>()?;
+
+        check_namespace_depth_limit(source_ns, target_ns, &attempted_ns)?;
+
+        let backend = self.backend()?;
+
+        log::info!(
+            "moving namespace '{source_ns}' -> '{target_ns}': {} namespaces",
+            attempted_ns.len(),
+        );
+
+        // Create target namespaces parent-before-child so `create_namespace` can validate each
+        // parent exists. `create_namespace` also creates the S3 marker when applicable.
+        let mut create_order: Vec<&BackupNamespace> = attempted_ns.iter().collect();
+        create_order.sort_by_key(|ns| ns.depth());
+        for ns in create_order {
+            let target_child = ns.map_prefix(source_ns, target_ns)?;
+            if target_child.is_root() || self.namespace_exists(&target_child) {
+                continue;
+            }
+            let name = target_child
+                .components()
+                .last()
+                .ok_or_else(|| format_err!("cannot determine last component of '{target_child}'"))?
+                .to_owned();
+            self.create_namespace(&target_child.parent(), name)
+                .with_context(|| format!("failed to create target namespace '{target_child}'"))?;
+        }
+
+        // Move groups one namespace at a time. Iterating lazily (rather than collecting all groups
+        // up-front) keeps each group's lock window short and avoids serialising the move behind a
+        // long enumeration phase.
+        let mut failed_fatal: Vec<(BackupNamespace, String)> = Vec::new();
+        let mut failed_retryable: Vec<(BackupNamespace, String)> = Vec::new();
+        let mut failed_ns: HashSet<BackupNamespace> = HashSet::new();
+        let mut deferred: Vec<BackupGroup> = Vec::new();
+        let mut moved_count: usize = 0;
+
+        for ns in &attempted_ns {
+            let iter = match self.iter_backup_groups(ns.clone()) {
+                Ok(iter) => iter,
+                Err(err) => {
+                    warn!("failed to list groups in '{ns}': {err:#}");
+                    failed_ns.insert(ns.clone());
+                    continue;
+                }
+            };
+            for group in iter {
+                let group = match group {
+                    Ok(g) => g,
+                    Err(err) => {
+                        warn!("failed to read group entry in '{ns}': {err:#}");
+                        failed_ns.insert(ns.clone());
+                        continue;
+                    }
+                };
+                match self.lock_and_move_group(source_ns, &group, target_ns, &backend, merge_groups)
+                {
+                    Ok(()) => {
+                        moved_count += 1;
+                        log::info!(
+                            "moved group {moved_count} ('{}' in '{}')",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                    }
+                    Err(BackupGroupOpError::Soft(err)) => {
+                        log::info!(
+                            "deferring group '{}' in '{}' - lock conflict, will retry: {err:#}",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                        deferred.push(group);
+                    }
+                    Err(BackupGroupOpError::Hard(err)) => {
+                        warn!(
+                            "failed to move group '{}' in '{}': {err:#}",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                        failed_fatal.push((group.backup_ns().clone(), group.group().to_string()));
+                        failed_ns.insert(group.backup_ns().clone());
+                    }
+                }
+            }
+        }
+
+        // Retry deferred groups once.
+        if !deferred.is_empty() {
+            log::info!("retrying {} deferred group(s)...", deferred.len());
+            for group in &deferred {
+                match self.lock_and_move_group(source_ns, group, target_ns, &backend, merge_groups)
+                {
+                    Ok(()) => {
+                        moved_count += 1;
+                        log::info!(
+                            "moved group {moved_count} ('{}' in '{}') on retry",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                    }
+                    Err(BackupGroupOpError::Soft(err)) => {
+                        warn!(
+                            "still locked after retry: group '{}' in '{}': {err:#}",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                        failed_retryable
+                            .push((group.backup_ns().clone(), group.group().to_string()));
+                        failed_ns.insert(group.backup_ns().clone());
+                    }
+                    Err(BackupGroupOpError::Hard(err)) => {
+                        warn!(
+                            "failed to move group '{}' in '{}' on retry: {err:#}",
+                            group.group(),
+                            group.backup_ns(),
+                        );
+                        failed_fatal.push((group.backup_ns().clone(), group.group().to_string()));
+                        failed_ns.insert(group.backup_ns().clone());
+                    }
+                }
+            }
+        }
+
+        // Clean up source namespaces when requested. Process deepest-first so child directories
+        // are removed before their parents.
+        if delete_source {
+            let attempted_set: HashSet<&BackupNamespace> = attempted_ns.iter().collect();
+
+            for ns in attempted_ns.iter().rev() {
+                // Skip any namespace on the path to a failed group - those groups still exist at
+                // source and the namespace is therefore not empty.
+                if failed_ns
+                    .iter()
+                    .any(|failed| failed == ns || ns.contains(failed).is_some())
+                {
+                    log::warn!(
+                        "skipping source namespace '{ns}' cleanup: contains groups that failed to move",
+                    );
+                    continue;
+                }
+                // A child of this namespace that's not in `attempted_set` either
+                //  - sits below the user's max-depth, so we intentionally did not move it, or
+                //  - appeared after we started (concurrent creation).
+                // Either way the source is non-empty and must stay. Warn only for the concurrent
+                // case (depth-limit skips are an explicit user choice).
+                let max_attempted_depth = source_ns.depth() + depth;
+                let mut concurrent_child: Option<BackupNamespace> = None;
+                let mut depth_limited_child = false;
+                for child in self.iter_backup_ns_ok(ns.clone())? {
+                    if attempted_set.contains(&child) {
+                        continue;
+                    }
+                    if child.depth() <= max_attempted_depth {
+                        concurrent_child = Some(child);
+                        break;
+                    }
+                    depth_limited_child = true;
+                }
+                if let Some(child) = concurrent_child {
+                    log::warn!(
+                        "skipping source namespace '{ns}' cleanup: child namespace '{child}' \
+                        was created after the move started",
+                    );
+                    continue;
+                }
+                if depth_limited_child {
+                    log::debug!(
+                        "keeping source namespace '{ns}': contains namespaces excluded by max-depth",
+                    );
+                    continue;
+                }
+
+                // All groups moved and all children already cleaned up: drop the now-empty
+                // namespace. Single-level cleanup since we drive traversal ourselves.
+                match self.remove_namespace(ns, false) {
+                    Ok((true, _)) => {}
+                    Ok((false, _)) => {
+                        log::warn!(
+                            "source namespace '{ns}' was not fully removed (non-empty after move)",
+                        );
+                    }
+                    Err(err) => {
+                        log::warn!("failed to remove source namespace '{ns}': {err:#}");
+                    }
+                }
+            }
+        }
+
+        if !failed_fatal.is_empty() || !failed_retryable.is_empty() {
+            let fmt = |list: &[(BackupNamespace, String)]| -> String {
+                list.iter()
+                    .map(|(ns, group)| format!("'{group}' in '{ns}'"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let total = failed_fatal.len() + failed_retryable.len();
+            let mut msg = format!(
+                "namespace move partially completed; {total} group(s) could not be moved and remain at source"
+            );
+            if !failed_fatal.is_empty() {
+                msg.push_str(&format!(
+                    "; {} with a fatal error (investigate before retrying): {}",
+                    failed_fatal.len(),
+                    fmt(&failed_fatal),
+                ));
+            }
+            if !failed_retryable.is_empty() {
+                msg.push_str(&format!(
+                    "; {} still lock-conflicted (rerun move-namespace or move-group may succeed): {}",
+                    failed_retryable.len(),
+                    fmt(&failed_retryable),
+                ));
+            }
+            bail!("{msg}");
+        }
+
+        Ok(())
+    }
+
     /// Remove a complete backup group including all snapshots.
     ///
     /// Returns `BackupGroupDeleteStats`, containing the number of deleted snapshots
