@@ -1800,6 +1800,24 @@ impl DataStore {
             warn!("Found {strange_paths_count} index files outside of expected directory scheme");
         }
 
+        // Drain the move journal under an exclusive flock. Any index file whose path
+        // was recorded before its rename is processed here even if the namespace
+        // iteration missed it at both its old and new locations. See `move_journal`
+        // for details.
+        crate::move_journal::drain_move_journal(self.name(), |path| {
+            let Some(index) = self.open_index_reader(path)? else {
+                return Ok(());
+            };
+            self.index_mark_used_chunks(
+                index,
+                path,
+                &mut chunk_lru_cache,
+                status,
+                worker,
+                s3_client.as_ref().cloned(),
+            )
+        })?;
+
         Ok(())
     }
 

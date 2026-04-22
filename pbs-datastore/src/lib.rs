@@ -192,6 +192,7 @@ pub mod data_blob_reader;
 pub mod file_formats;
 pub mod index;
 pub mod manifest;
+pub mod move_journal;
 pub mod paperkey;
 pub mod prune;
 pub mod read_chunk;
