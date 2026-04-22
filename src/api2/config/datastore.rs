@@ -302,6 +302,9 @@ pub fn create_datastore(
             config.path
         );
     }
+    if config.backing_device.is_none() && config.gc_on_unmount.unwrap_or(false) {
+        param_bail!("gc-on-unmount", "only supported on removable datastores",);
+    }
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
@@ -566,6 +569,9 @@ pub fn update_datastore(
     }
 
     if update.gc_on_unmount.is_some() {
+        if data.backing_device.is_none() && update.gc_on_unmount.unwrap_or(false) {
+            param_bail!("gc-on-unmount", "only supported on removable datastores",);
+        }
         data.gc_on_unmount = update.gc_on_unmount;
     }
 
