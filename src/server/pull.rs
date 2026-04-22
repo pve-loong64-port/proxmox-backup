@@ -482,6 +482,46 @@ async fn pull_snapshot<'a>(
         return Ok(sync_stats);
     };
 
+    let backend = &params.target.backend;
+
+    let fetch_log = async || {
+        if !client_log_name.exists() {
+            reader
+                .try_download_client_log(&client_log_name)
+                .await
+                .with_context(|| prefix.clone())?;
+            if client_log_name.exists() {
+                if let DatastoreBackend::S3(s3_client) = backend {
+                    let object_key = pbs_datastore::s3::object_key_from_path(
+                        &snapshot.relative_path(),
+                        CLIENT_LOG_BLOB_NAME.as_ref(),
+                    )
+                    .context("invalid archive object key")
+                    .with_context(|| prefix.clone())?;
+
+                    let data = tokio::fs::read(&client_log_name)
+                        .await
+                        .context("failed to read log file contents")
+                        .with_context(|| prefix.clone())?;
+                    let contents = hyper::body::Bytes::from(data);
+                    let _is_duplicate = s3_client
+                        .upload_replace_with_retry(object_key, contents)
+                        .await
+                        .context("failed to upload client log to s3 backend")
+                        .with_context(|| prefix.clone())?;
+                }
+            }
+        }
+        Ok::<(), Error>(())
+    };
+    let cleanup = async || {
+        log_sender
+            .log(Level::INFO, format!("{prefix}: no data changes"))
+            .await?;
+        let _ = std::fs::remove_file(&tmp_manifest_name);
+        Ok::<(), Error>(())
+    };
+
     if manifest_name.exists() && !corrupt {
         let manifest_blob = proxmox_lang::try_block!({
             let mut manifest_file = std::fs::File::open(&manifest_name).map_err(|err| {
@@ -497,16 +537,8 @@ async fn pull_snapshot<'a>(
         })?;
 
         if manifest_blob.raw_data() == tmp_manifest_blob.raw_data() {
-            if !client_log_name.exists() {
-                reader
-                    .try_download_client_log(&client_log_name)
-                    .await
-                    .with_context(|| prefix.clone())?;
-            };
-            log_sender
-                .log(Level::INFO, format!("{prefix}: no data changes"))
-                .await?;
-            let _ = std::fs::remove_file(&tmp_manifest_name);
+            fetch_log().await?;
+            cleanup().await?;
             return Ok(sync_stats); // nothing changed
         }
     }
@@ -530,7 +562,6 @@ async fn pull_snapshot<'a>(
         return Ok(sync_stats);
     }
 
-    let backend = &params.target.backend;
     for item in manifest.files() {
         let mut path = snapshot.full_path();
         path.push(&item.filename);
@@ -621,33 +652,8 @@ async fn pull_snapshot<'a>(
             .with_context(|| prefix.clone())?;
     }
 
-    if !client_log_name.exists() {
-        reader
-            .try_download_client_log(&client_log_name)
-            .await
-            .with_context(|| prefix.clone())?;
-        if client_log_name.exists() {
-            if let DatastoreBackend::S3(s3_client) = backend {
-                let object_key = pbs_datastore::s3::object_key_from_path(
-                    &snapshot.relative_path(),
-                    CLIENT_LOG_BLOB_NAME.as_ref(),
-                )
-                .context("invalid archive object key")
-                .with_context(|| prefix.clone())?;
+    fetch_log().await?;
 
-                let data = tokio::fs::read(&client_log_name)
-                    .await
-                    .context("failed to read log file contents")
-                    .with_context(|| prefix.clone())?;
-                let contents = hyper::body::Bytes::from(data);
-                let _is_duplicate = s3_client
-                    .upload_replace_with_retry(object_key, contents)
-                    .await
-                    .context("failed to upload client log to s3 backend")
-                    .with_context(|| prefix.clone())?;
-            }
-        }
-    };
     snapshot
         .cleanup_unreferenced_files(&manifest)
         .map_err(|err| format_err!("{prefix}: failed to cleanup unreferenced files - {err}"))?;
