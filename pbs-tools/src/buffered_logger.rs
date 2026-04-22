@@ -139,13 +139,15 @@ impl BufferedLogger {
     fn run_log_collection(mut self) {
         let future = async move {
             loop {
-                for (label, (last_logged, log_lines)) in self.buffer_map.iter_mut() {
-                    if !log_lines.is_empty()
-                        && Instant::now().duration_since(*last_logged) > self.max_aggregation_time
-                    {
+                let max_aggregation_time = self.max_aggregation_time;
+                self.buffer_map.retain(|label, (last_logged, log_lines)| {
+                    if Instant::now().duration_since(*last_logged) > max_aggregation_time {
                         Self::flush_by_label(label, log_lines);
+                        false
+                    } else {
+                        true
                     }
-                }
+                });
 
                 match tokio::time::timeout(self.max_aggregation_time, self.receive_log_line()).await
                 {
@@ -215,6 +217,8 @@ impl BufferedLogger {
         for (label, (_last_logged, log_lines)) in self.buffer_map.iter_mut() {
             Self::flush_by_label(label, log_lines);
         }
+        // drop the now-empty entries avoids unbounded growth - one label per group on parallel sync
+        self.buffer_map.clear();
     }
 
     /// Flush all currently buffered contents without ordering, but grouped by label
