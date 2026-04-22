@@ -1,4 +1,5 @@
 pub mod async_lru_cache;
+pub mod buffered_logger;
 pub mod cert;
 pub mod crypt_config;
 pub mod format;
