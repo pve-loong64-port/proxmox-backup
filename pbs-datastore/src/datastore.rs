@@ -1035,46 +1035,111 @@ impl DataStore {
             removed_all_groups = removed_all_groups && delete_stats.all_removed();
         }
 
+        Ok((removed_all_groups, stats))
+    }
+
+    /// Remove a single namespace level (no recursion into children).
+    ///
+    /// If `delete_groups` is true, destroys all groups in this namespace. Otherwise only
+    /// an empty namespace directory is pruned. Returns `(removed_all_requested, stats)`
+    /// where `removed_all_requested` is true if nothing was protected and the directory
+    /// was removed.
+    pub fn remove_namespace(
+        self: &Arc<Self>,
+        ns: &BackupNamespace,
+        delete_groups: bool,
+    ) -> Result<(bool, BackupGroupDeleteStats), Error> {
+        let mut removed_all_requested = true;
+        let mut stats = BackupGroupDeleteStats::default();
+        let backend = self.backend()?;
+
+        if delete_groups {
+            log::info!("removing groups in namespace {}:/{ns}", self.name());
+            let (removed_ns_groups, delete_stats) = self.remove_namespace_groups(ns)?;
+            stats.add(&delete_stats);
+            removed_all_requested = removed_all_requested && removed_ns_groups;
+        }
+
         let base_file = std::fs::File::open(self.base_path())?;
         let base_fd = base_file.as_raw_fd();
+
+        // Best-effort cleanup of empty type subdirectories (e.g. `host/`). These can be
+        // left behind after groups are destroyed (aside from protected snapshots) or after
+        // groups have been moved out, and would otherwise prevent the namespace directory
+        // below from being removed. ENOTEMPTY is expected (protected snapshots, or
+        // groups still present when `delete_groups` is false) and silently skipped.
         for ty in BackupType::iter() {
             let mut ty_dir = ns.path();
             ty_dir.push(ty.to_string());
-            // best effort only, but we probably should log the error
             if let Err(err) = unlinkat(Some(base_fd), &ty_dir, UnlinkatFlags::RemoveDir) {
-                if err != nix::errno::Errno::ENOENT {
-                    log::error!("failed to remove backup type {ty} in {ns} - {err}");
+                if err != nix::errno::Errno::ENOENT && err != nix::errno::Errno::ENOTEMPTY {
+                    log::warn!("failed to remove empty backup type dir {ty} in {ns} - {err}");
                 }
             }
         }
 
-        Ok((removed_all_groups, stats))
+        let mut ns_dir = ns.path();
+        ns_dir.push("ns");
+        let _ = unlinkat(Some(base_fd), &ns_dir, UnlinkatFlags::RemoveDir);
+
+        if !ns.is_root() {
+            match unlinkat(Some(base_fd), &ns.path(), UnlinkatFlags::RemoveDir) {
+                Ok(()) => log::debug!("removed namespace {ns}"),
+                Err(nix::errno::Errno::ENOENT) => {
+                    log::debug!("namespace {ns} already removed")
+                }
+                Err(nix::errno::Errno::ENOTEMPTY) if !delete_groups => {
+                    removed_all_requested = false;
+                    log::debug!("skip removal of non-empty namespace {ns}")
+                }
+                Err(err) => {
+                    removed_all_requested = false;
+                    log::warn!("failed to remove namespace {ns} - {err}")
+                }
+            }
+            if let DatastoreBackend::S3(s3_client) = &backend {
+                // Only remove the namespace marker, if it was empty,
+                // than this is the same as the namespace being removed.
+                let object_key =
+                    crate::s3::object_key_from_path(&ns.path(), NAMESPACE_MARKER_FILENAME)
+                        .context("invalid namespace marker object key")?;
+                proxmox_async::runtime::block_on(s3_client.delete_object(object_key))?;
+            }
+        }
+
+        Ok((removed_all_requested, stats))
     }
 
-    /// Remove a complete backup namespace optionally including all it's, and child namespaces',
-    /// groups. If  `removed_groups` is false this only prunes empty namespaces.
+    /// Remove a complete backup namespace subtree including all child namespaces.
     ///
-    /// Returns true if everything requested, and false if some groups were protected or if some
-    /// namespaces weren't empty even though all groups were deleted (race with new backup)
+    /// If `delete_groups` is false this only prunes empty namespaces. Returns true if
+    /// everything requested was removed, and false if some groups were protected or some
+    /// namespaces weren't empty even though all groups were deleted (race with new backup).
     pub fn remove_namespace_recursive(
         self: &Arc<Self>,
         ns: &BackupNamespace,
         delete_groups: bool,
     ) -> Result<(bool, BackupGroupDeleteStats), Error> {
         let store = self.name();
-        let mut removed_all_requested = true;
-        let mut stats = BackupGroupDeleteStats::default();
-        let backend = self.backend()?;
+        log::info!(
+            "{} namespace recursively below {store}:/{ns}",
+            if delete_groups {
+                "removing whole"
+            } else {
+                "pruning empty"
+            },
+        );
 
+        let mut children = self
+            .recursive_iter_backup_ns(ns.to_owned())?
+            .collect::<Result<Vec<BackupNamespace>, Error>>()?;
+        // Process deepest first so a parent's rmdir sees an empty directory.
+        children.sort_by_key(|b| std::cmp::Reverse(b.depth()));
+
+        // When destroying the full subtree, a bulk S3 delete under the root prefix catches
+        // any orphaned group-level metadata (owner/notes) before per-level cleanup iterates.
         if delete_groups {
-            log::info!("removing whole namespace recursively below {store}:/{ns}",);
-            for ns in self.recursive_iter_backup_ns(ns.to_owned())? {
-                let (removed_ns_groups, delete_stats) = self.remove_namespace_groups(&ns?)?;
-                stats.add(&delete_stats);
-                removed_all_requested = removed_all_requested && removed_ns_groups;
-            }
-
-            if let DatastoreBackend::S3(s3_client) = &backend {
+            if let DatastoreBackend::S3(s3_client) = &self.backend()? {
                 let ns_dir = ns.path();
                 let ns_prefix = ns_dir
                     .to_str()
@@ -1092,50 +1157,14 @@ impl DataStore {
                     bail!("deleting objects failed");
                 }
             }
-        } else {
-            log::info!("pruning empty namespace recursively below {store}:/{ns}");
         }
 
-        // now try to delete the actual namespaces, bottom up so that we can use safe rmdir that
-        // will choke if a new backup/group appeared in the meantime (but not on an new empty NS)
-        let mut children = self
-            .recursive_iter_backup_ns(ns.to_owned())?
-            .collect::<Result<Vec<BackupNamespace>, Error>>()?;
-
-        children.sort_by_key(|b| std::cmp::Reverse(b.depth()));
-
-        let base_file = std::fs::File::open(self.base_path())?;
-        let base_fd = base_file.as_raw_fd();
-
-        for ns in children.iter() {
-            let mut ns_dir = ns.path();
-            ns_dir.push("ns");
-            let _ = unlinkat(Some(base_fd), &ns_dir, UnlinkatFlags::RemoveDir);
-
-            if !ns.is_root() {
-                match unlinkat(Some(base_fd), &ns.path(), UnlinkatFlags::RemoveDir) {
-                    Ok(()) => log::debug!("removed namespace {ns}"),
-                    Err(nix::errno::Errno::ENOENT) => {
-                        log::debug!("namespace {ns} already removed")
-                    }
-                    Err(nix::errno::Errno::ENOTEMPTY) if !delete_groups => {
-                        removed_all_requested = false;
-                        log::debug!("skip removal of non-empty namespace {ns}")
-                    }
-                    Err(err) => {
-                        removed_all_requested = false;
-                        log::warn!("failed to remove namespace {ns} - {err}")
-                    }
-                }
-                if let DatastoreBackend::S3(s3_client) = &backend {
-                    // Only remove the namespace marker, if it was empty,
-                    // than this is the same as the namespace being removed.
-                    let object_key =
-                        crate::s3::object_key_from_path(&ns.path(), NAMESPACE_MARKER_FILENAME)
-                            .context("invalid namespace marker object key")?;
-                    proxmox_async::runtime::block_on(s3_client.delete_object(object_key))?;
-                }
-            }
+        let mut removed_all_requested = true;
+        let mut stats = BackupGroupDeleteStats::default();
+        for child in &children {
+            let (removed, delete_stats) = self.remove_namespace(child, delete_groups)?;
+            stats.add(&delete_stats);
+            removed_all_requested = removed_all_requested && removed;
         }
 
         Ok((removed_all_requested, stats))
