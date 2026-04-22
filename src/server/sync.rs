@@ -135,13 +135,13 @@ impl SyncSourceReader for RemoteSourceReader {
                 Some(HttpError { code, message }) => match *code {
                     StatusCode::NOT_FOUND => {
                         info!(
-                            "skipping snapshot {} - vanished since start of sync",
+                            "Snapshot {}: skipped because vanished since start of sync",
                             &self.dir
                         );
                         return Ok(None);
                     }
                     _ => {
-                        bail!("HTTP error {code} - {message}");
+                        bail!("Snapshot {}: HTTP error {code} - {message}", &self.dir);
                     }
                 },
                 None => {
@@ -175,7 +175,8 @@ impl SyncSourceReader for RemoteSourceReader {
                 bail!("Atomic rename file {to_path:?} failed - {err}");
             }
             info!(
-                "got backup log file {client_log_name}",
+                "Snapshot {snapshot}: got backup log file {client_log_name}",
+                snapshot = &self.dir,
                 client_log_name = client_log_name.deref()
             );
         }
