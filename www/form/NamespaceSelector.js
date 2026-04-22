@@ -90,6 +90,17 @@ Ext.define('PBS.form.NamespaceSelector', {
             },
         });
 
+        if (me.excludeNs) {
+            me.store.addFilter(
+                new Ext.util.Filter({
+                    filterFn: (rec) => {
+                        let ns = rec.data.ns;
+                        return ns !== me.excludeNs && !ns.startsWith(`${me.excludeNs}/`);
+                    },
+                }),
+            );
+        }
+
         me.callParent();
     },
 });

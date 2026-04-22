@@ -83,6 +83,7 @@ JSSRC=							\
 	window/DataStoreEdit.js				\
 	window/EncryptionKeysEdit.js			\
 	window/NamespaceEdit.js				\
+	window/NamespaceMove.js				\
 	window/MaintenanceOptions.js			\
 	window/NotesEdit.js				\
 	window/NotificationThresholds.js		\

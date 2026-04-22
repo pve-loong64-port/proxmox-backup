@@ -668,6 +668,34 @@ Ext.define('PBS.DataStoreContent', {
             });
         },
 
+        moveNS: function () {
+            let me = this;
+            let view = me.getView();
+            if (!view.namespace || view.namespace === '') {
+                return;
+            }
+            let win = Ext.create('PBS.window.NamespaceMove', {
+                datastore: view.datastore,
+                namespace: view.namespace,
+                taskDone: (success) => {
+                    if (success) {
+                        let newNs = win.getNewNamespace();
+                        // update view.namespace and reload the content grid directly rather than
+                        // going through the NS selector's change event, which may not fire if the
+                        // selector's tree store does not know about the just-created target
+                        // namespace yet.
+                        view.namespace = newNs;
+                        me.reload();
+                        let selector = view.down('pbsNamespaceSelector');
+                        selector?.store?.load({
+                            callback: () => selector.setValue(newNs),
+                        });
+                    }
+                },
+            });
+            win.show();
+        },
+
         moveGroup: function (data) {
             let me = this;
             let view = me.getView();
@@ -686,6 +714,8 @@ Ext.define('PBS.DataStoreContent', {
             let me = this;
             if (data.ty === 'group') {
                 me.moveGroup(data);
+            } else if (data.ty === 'ns') {
+                me.moveNS();
             }
         },
 
@@ -1114,13 +1144,22 @@ Ext.define('PBS.DataStoreContent', {
                         if (data.ty === 'group') {
                             return Ext.String.format(gettext("Move group '{0}'"), v);
                         }
-                        return '';
+                        return Ext.String.format(gettext("Move namespace '{0}'"), v);
                     },
                     getClass: (v, m, { data }) => {
                         if (data.ty === 'group') { return 'fa fa-arrows'; }
+                        if (data.ty === 'ns' && !data.isRootNS && data.ns === undefined) {
+                            return 'fa fa-arrows';
+                        }
                         return 'pmx-hidden';
                     },
-                    isActionDisabled: (v, r, c, i, { data }) => data.ty !== 'group',
+                    isActionDisabled: (v, r, c, i, { data }) => {
+                        if (data.ty === 'group') { return false; }
+                        if (data.ty === 'ns' && !data.isRootNS && data.ns === undefined) {
+                            return false;
+                        }
+                        return true;
+                    },
                 },
                 {
                     handler: 'onChangeOwner',
