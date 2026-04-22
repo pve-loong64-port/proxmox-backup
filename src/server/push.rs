@@ -27,6 +27,7 @@ use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{DataStore, StoreProgress};
+use pbs_tools::bounded_join_set::BoundedJoinSet;
 
 use super::sync::{
     check_namespace_depth_limit, exclude_not_verified_or_encrypted,
@@ -34,6 +35,7 @@ use super::sync::{
     SyncSource, SyncStats,
 };
 use crate::api2::config::remote;
+use crate::server::sync::SharedGroupProgress;
 
 /// Target for backups to be pushed to
 pub(crate) struct PushTarget {
@@ -551,41 +553,62 @@ pub(crate) async fn push_namespace(
 
     let mut errors = false;
     // Remember synced groups, remove others when the remove vanished flag is set
-    let mut synced_groups = HashSet::new();
+    let synced_groups = Arc::new(Mutex::new(HashSet::new()));
     let mut progress = StoreProgress::new(list.len() as u64);
     let mut stats = SyncStats::default();
 
     let (owned_target_groups, not_owned_target_groups) =
         fetch_target_groups(&params, &target_namespace).await?;
+    let not_owned_target_groups = Arc::new(not_owned_target_groups);
 
-    for (done, group) in list.into_iter().enumerate() {
-        progress.done_groups = done as u64;
-        progress.done_snapshots = 0;
-        progress.group_snapshots = 0;
+    let mut group_workers = BoundedJoinSet::new(params.worker_threads.unwrap_or(1));
+    let shared_group_progress = Arc::new(SharedGroupProgress::with_total_groups(list.len()));
 
-        if not_owned_target_groups.contains(&group) {
-            warn!(
-                "Group '{group}' not owned by remote user '{}' on target, skipping upload",
-                params.target.remote_user(),
-            );
-            continue;
-        }
-        synced_groups.insert(group.clone());
+    let mut process_results = |results| {
+        for result in results {
+            progress.done_groups = shared_group_progress.increment_done();
 
-        match push_group(Arc::clone(&params), namespace, &group, &mut progress).await {
-            Ok(sync_stats) => stats.add(sync_stats),
-            Err(err) => {
-                warn!("Encountered errors: {err:#}");
-                warn!("Failed to push group {group} to remote!");
-                errors = true;
+            match result {
+                Ok(sync_stats) => {
+                    stats.add(sync_stats);
+                }
+                Err(()) => errors = true,
             }
         }
+    };
+
+    for group in list.into_iter() {
+        let namespace = namespace.clone();
+        let params = Arc::clone(&params);
+        let not_owned_target_groups = Arc::clone(&not_owned_target_groups);
+        let synced_groups = Arc::clone(&synced_groups);
+        let group_progress_cloned = Arc::clone(&shared_group_progress);
+        let results = group_workers
+            .spawn_task(async move {
+                push_group_do(
+                    params,
+                    &namespace,
+                    &group,
+                    group_progress_cloned,
+                    synced_groups,
+                    not_owned_target_groups,
+                )
+                .await
+            })
+            .await
+            .map_err(|err| format_err!("failed to join on worker task: {err:#}"))?;
+        process_results(results);
+    }
+
+    while let Some(result) = group_workers.join_next().await {
+        let result = result.map_err(|err| format_err!("failed to join on worker task: {err:#}"))?;
+        process_results(vec![result]);
     }
 
     if params.remove_vanished {
         // only ever allow to prune owned groups on target
         for target_group in owned_target_groups {
-            if synced_groups.contains(&target_group) {
+            if synced_groups.lock().unwrap().contains(&target_group) {
                 continue;
             }
             if !target_group.apply_filters(&params.group_filter) {
@@ -664,6 +687,32 @@ async fn forget_target_snapshot(
     Ok(())
 }
 
+async fn push_group_do(
+    params: Arc<PushParameters>,
+    namespace: &BackupNamespace,
+    group: &BackupGroup,
+    shared_group_progress: Arc<SharedGroupProgress>,
+    synced_groups: Arc<Mutex<HashSet<BackupGroup>>>,
+    not_owned_target_groups: Arc<HashSet<BackupGroup>>,
+) -> Result<SyncStats, ()> {
+    if not_owned_target_groups.contains(group) {
+        warn!(
+            "Group '{group}' not owned by remote user '{}' on target, skipping upload",
+            params.target.remote_user(),
+        );
+        shared_group_progress.increment_done();
+        return Ok(SyncStats::default());
+    }
+
+    synced_groups.lock().unwrap().insert(group.clone());
+    push_group(params, namespace, group, Arc::clone(&shared_group_progress))
+        .await
+        .map_err(|err| {
+            warn!("Group {group}: Encountered errors: {err:#}");
+            warn!("Failed to push group {group} to remote!");
+        })
+}
+
 /// Push group including all snaphshots to target
 ///
 /// Iterate over all snapshots in the group and push them to the target.
@@ -677,7 +726,7 @@ pub(crate) async fn push_group(
     params: Arc<PushParameters>,
     namespace: &BackupNamespace,
     group: &BackupGroup,
-    progress: &mut StoreProgress,
+    shared_group_progress: Arc<SharedGroupProgress>,
 ) -> Result<SyncStats, Error> {
     let mut already_synced_skip_info = SkipInfo::new(SkipReason::AlreadySynced);
     let mut transfer_last_skip_info = SkipInfo::new(SkipReason::TransferLast);
@@ -745,7 +794,8 @@ pub(crate) async fn push_group(
         transfer_last_skip_info.reset();
     }
 
-    progress.group_snapshots = snapshots.len() as u64;
+    let mut local_progress = StoreProgress::new(shared_group_progress.total_groups());
+    local_progress.group_snapshots = snapshots.len() as u64;
 
     let mut stats = SyncStats::default();
     let mut fetch_previous_manifest = !target_snapshots.is_empty();
@@ -759,8 +809,10 @@ pub(crate) async fn push_group(
         .await;
         fetch_previous_manifest = true;
 
-        progress.done_snapshots = pos as u64 + 1;
-        info!("Percentage done: {progress}");
+        // Update done groups progress by other parallel running pushes
+        local_progress.done_groups = shared_group_progress.load_done();
+        local_progress.done_snapshots = pos as u64 + 1;
+        info!("Percentage done: group {group}: {local_progress}");
 
         // stop on error
         let sync_stats = result?;
@@ -801,6 +853,8 @@ pub(crate) async fn push_group(
             }));
         }
     }
+
+    shared_group_progress.increment_done();
 
     Ok(stats)
 }
