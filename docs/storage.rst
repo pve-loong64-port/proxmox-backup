@@ -535,7 +535,65 @@ For backup groups, the existing privilege rules still apply. You either need a
 privileged enough permission or to be the owner of the backup group; nothing
 changed here.
 
-.. todo:: continue
+.. _storage_move_namespaces_groups:
+
+Moving Namespaces and Groups
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Backup groups can be moved between namespaces within the same datastore.
+This is useful for reorganizing backup hierarchies without having to
+re-run backups.
+
+A single group can be moved with ``move-group``. To relocate an entire
+namespace subtree (including all child namespaces and their groups), use
+``move-namespace``.
+
+.. code-block:: console
+
+  # proxmox-backup-manager datastore move-group <store> --ns <source> --target-ns <target> --backup-type <type> --backup-id <id>
+  # proxmox-backup-manager datastore move-namespace <store> --ns <source> --target-ns <target>
+
+If the target namespace already exists, groups are moved into it. When a
+group with the same type and ID already exists in the target and
+``merge-groups`` is enabled, the snapshots are merged into the existing
+group provided:
+
+- both groups have the same owner
+- the oldest source snapshot is newer than the newest target snapshot
+
+Groups that cannot be merged or locked are skipped and reported in the
+task log. They remain at the source and can be retried individually with
+``move-group``.
+
+.. note::
+
+  With defaults, ``move-namespace`` merges into existing target groups
+  (``merge-groups=true``) and removes source namespaces once they are empty
+  (``delete-source=true``). Pass ``--merge-groups false`` or
+  ``--delete-source false`` to opt out.
+
+Optional parameters for ``move-namespace``:
+
+``merge-groups``
+  Allow merging snapshots into groups that already exist in the target
+  namespace with the same type and ID. Defaults to true.
+
+``max-depth``
+  Limits how many levels of child namespaces below the source are
+  included. When not set, the entire subtree is moved.
+
+``delete-source``
+  Controls whether the source namespace directories are removed after
+  all groups have been moved out. Defaults to true. Set to false to
+  keep the (now empty) source namespace structure.
+
+Required privileges:
+
+- ``move-group``: ``DATASTORE_PRUNE`` on the source namespace and
+  ``DATASTORE_BACKUP`` on the target namespace, plus ownership of the
+  backup group; or ``DATASTORE_MODIFY`` on both.
+- ``move-namespace``: ``DATASTORE_MODIFY`` on the parent of both the
+  source and the target namespace.
 
 
 Options

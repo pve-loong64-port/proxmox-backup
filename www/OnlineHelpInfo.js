@@ -299,6 +299,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/storage.html#storage-namespaces",
     "title": "Backup Namespaces"
   },
+  "storage-move-namespaces-groups": {
+    "link": "/docs/storage.html#storage-move-namespaces-groups",
+    "title": "Moving Namespaces and Groups"
+  },
   "datastore-tuning-options": {
     "link": "/docs/storage.html#datastore-tuning-options",
     "title": "Tuning"
