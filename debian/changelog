@@ -1,3 +1,36 @@
+rust-proxmox-backup (4.1.8-1) trixie; urgency=medium
+
+  * fix #4182: sync jobs: allow pulling or pushing backup groups in parallel,
+    configurable via the new 'worker-threads' sync job property (1 to 32,
+    defaults to 1 for sequential). Significantly improves throughput on
+    high-latency connections where the single HTTP/2 connection to the source
+    was limited by head-of-line blocking.
+
+  * sync jobs: in parallel mode prefix log messages by group and buffer them
+    briefly, so lines from concurrent groups stay readable and do not
+    interleave excessively.
+
+  * ui: sync job edit: expose the new parallel group worker count setting.
+
+  * api: datastore: add 'gc-on-unmount' option for removable datastores,
+    which runs garbage collection automatically before unmounting. This gives
+    setups relying on auto-unmount a natural point to run GC. The unmount
+    waits for the GC run, or an already running one, to complete. Rejected
+    on non-removable datastores.
+
+  * ui: datastore options: expose the new 'gc-on-unmount' toggle for
+    removable datastores.
+
+  * tools: move ParallelHandler to the new proxmox-parallel-handler crate in
+    the proxmox-rs workspace, for reuse across Proxmox products.
+
+  * bump proxmox-shared-memory to 1.0.2, which immediately flushes the
+    contents of newly created mmap files, avoiding a possible race between
+    a file being initialized and another consumer opening it while checking
+    its header.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 22 Apr 2026 20:00:25 +0200
+
 rust-proxmox-backup (4.1.7-2) trixie; urgency=medium
 
   * bump pxar dependency, adding a consistency check for payload reference
