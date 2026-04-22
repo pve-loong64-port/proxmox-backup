@@ -1027,7 +1027,10 @@ impl DataStore {
         for group in self.iter_backup_groups(ns.to_owned())? {
             let group = group?;
             let backend = self.backend()?;
-            let delete_stats = group.destroy(&backend)?;
+            let guard = group
+                .lock()
+                .with_context(|| format!("while destroying group '{group:?}'"))?;
+            let delete_stats = group.destroy(guard, &backend)?;
             stats.add(&delete_stats);
             removed_all_groups = removed_all_groups && delete_stats.all_removed();
         }
@@ -1148,8 +1151,11 @@ impl DataStore {
         backup_group: &pbs_api_types::BackupGroup,
     ) -> Result<BackupGroupDeleteStats, Error> {
         let backup_group = self.backup_group(ns.clone(), backup_group.clone());
+        let guard = backup_group
+            .lock()
+            .with_context(|| format!("while destroying group '{backup_group:?}'"))?;
 
-        backup_group.destroy(&self.backend()?)
+        backup_group.destroy(guard, &self.backend()?)
     }
 
     /// Remove a backup directory including all content

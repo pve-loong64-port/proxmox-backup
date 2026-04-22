@@ -217,17 +217,18 @@ impl BackupGroup {
         crate::ListSnapshots::new(self.clone())
     }
 
-    /// Destroy the group inclusive all its backup snapshots (BackupDir's)
+    /// Destroy the group inclusive all its backup snapshots (BackupDir's).
+    ///
+    /// Consumes the group lock. The caller is responsible for acquiring it via
+    /// [`Self::lock`] beforehand.
     ///
     /// Returns `BackupGroupDeleteStats`, containing the number of deleted snapshots
     /// and number of protected snaphsots, which therefore were not removed.
     pub(crate) fn destroy(
         &self,
+        _lock_guard: BackupLockGuard,
         backend: &DatastoreBackend,
     ) -> Result<BackupGroupDeleteStats, Error> {
-        let _guard = self
-            .lock()
-            .with_context(|| format!("while destroying group '{self:?}'"))?;
         let path = self.full_group_path();
 
         log::info!("removing backup group {:?}", path);
