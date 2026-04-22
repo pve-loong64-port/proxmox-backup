@@ -344,6 +344,8 @@ pub enum DeletableProperty {
     UnmountOnDone,
     /// Delete the sync_direction property,
     SyncDirection,
+    /// Delete the worker_threads property,
+    WorkerThreads,
 }
 
 #[api(
@@ -467,6 +469,9 @@ pub fn update_sync_job(
                 DeletableProperty::SyncDirection => {
                     data.sync_direction = None;
                 }
+                DeletableProperty::WorkerThreads => {
+                    data.worker_threads = None;
+                }
             }
         }
     }
@@ -524,6 +529,10 @@ pub fn update_sync_job(
     }
     if let Some(sync_direction) = update.sync_direction {
         data.sync_direction = Some(sync_direction);
+    }
+
+    if let Some(worker_threads) = update.worker_threads {
+        data.worker_threads = Some(worker_threads);
     }
 
     if update.limit.rate_in.is_some() {
@@ -698,6 +707,7 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
         run_on_mount: None,
         unmount_on_done: None,
         sync_direction: None, // use default
+        worker_threads: None,
     };
 
     // should work without ACLs

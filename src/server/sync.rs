@@ -675,6 +675,7 @@ pub fn do_sync_job(
                             sync_job.verified_only,
                             sync_job.limit.clone(),
                             sync_job.transfer_last,
+                            sync_job.worker_threads,
                         )
                         .await?;
                         push_store(push_params).await?

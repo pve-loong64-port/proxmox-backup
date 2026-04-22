@@ -65,6 +65,8 @@ pub(crate) struct PullParameters {
     verified_only: bool,
     /// Whether to re-sync corrupted snapshots
     resync_corrupt: bool,
+    /// Maximum number of worker threads to pull during sync job
+    worker_threads: Option<usize>,
 }
 
 impl PullParameters {
@@ -85,6 +87,7 @@ impl PullParameters {
         encrypted_only: Option<bool>,
         verified_only: Option<bool>,
         resync_corrupt: Option<bool>,
+        worker_threads: Option<usize>,
     ) -> Result<Self, Error> {
         if let Some(max_depth) = max_depth {
             ns.check_max_depth(max_depth)?;
@@ -137,6 +140,7 @@ impl PullParameters {
             encrypted_only,
             verified_only,
             resync_corrupt,
+            worker_threads,
         })
     }
 }

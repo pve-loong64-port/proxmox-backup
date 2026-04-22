@@ -11,7 +11,7 @@ use pbs_api_types::{
     GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_PRUNE, PRIV_REMOTE_READ, REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA,
     RESYNC_CORRUPT_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA,
-    TRANSFER_LAST_SCHEMA,
+    SYNC_WORKER_THREADS_SCHEMA, TRANSFER_LAST_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
 use proxmox_rest_server::WorkerTask;
@@ -91,6 +91,7 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
             sync_job.encrypted_only,
             sync_job.verified_only,
             sync_job.resync_corrupt,
+            sync_job.worker_threads,
         )
     }
 }
@@ -148,6 +149,10 @@ impl TryFrom<&SyncJobConfig> for PullParameters {
                 schema: RESYNC_CORRUPT_SCHEMA,
                 optional: true,
             },
+            "worker-threads": {
+                schema: SYNC_WORKER_THREADS_SCHEMA,
+                optional: true,
+            },
         },
     },
     access: {
@@ -175,6 +180,7 @@ async fn pull(
     encrypted_only: Option<bool>,
     verified_only: Option<bool>,
     resync_corrupt: Option<bool>,
+    worker_threads: Option<usize>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -215,6 +221,7 @@ async fn pull(
         encrypted_only,
         verified_only,
         resync_corrupt,
+        worker_threads,
     )?;
 
     // fixme: set to_stdout to false?

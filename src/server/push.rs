@@ -83,6 +83,8 @@ pub(crate) struct PushParameters {
     verified_only: bool,
     /// How many snapshots should be transferred at most (taking the newest N snapshots)
     transfer_last: Option<usize>,
+    /// Maximum number of worker threads for push during sync job
+    worker_threads: Option<usize>,
 }
 
 impl PushParameters {
@@ -102,6 +104,7 @@ impl PushParameters {
         verified_only: Option<bool>,
         limit: RateLimitConfig,
         transfer_last: Option<usize>,
+        worker_threads: Option<usize>,
     ) -> Result<Self, Error> {
         if let Some(max_depth) = max_depth {
             ns.check_max_depth(max_depth)?;
@@ -165,6 +168,7 @@ impl PushParameters {
             encrypted_only,
             verified_only,
             transfer_last,
+            worker_threads,
         })
     }
 

@@ -6,7 +6,7 @@ use pbs_api_types::{
     GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
     PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE,
     REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA,
-    SYNC_VERIFIED_ONLY_SCHEMA, TRANSFER_LAST_SCHEMA,
+    SYNC_VERIFIED_ONLY_SCHEMA, SYNC_WORKER_THREADS_SCHEMA, TRANSFER_LAST_SCHEMA,
 };
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment};
@@ -108,6 +108,10 @@ fn check_push_privs(
                 schema: TRANSFER_LAST_SCHEMA,
                 optional: true,
             },
+            "worker-threads": {
+                schema: SYNC_WORKER_THREADS_SCHEMA,
+                optional: true,
+            },
         },
     },
     access: {
@@ -133,6 +137,7 @@ async fn push(
     verified_only: Option<bool>,
     limit: RateLimitConfig,
     transfer_last: Option<usize>,
+    worker_threads: Option<usize>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<String, Error> {
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -164,6 +169,7 @@ async fn push(
         verified_only,
         limit,
         transfer_last,
+        worker_threads,
     )
     .await?;
 
