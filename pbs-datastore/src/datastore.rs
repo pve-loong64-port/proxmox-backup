@@ -88,6 +88,15 @@ const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 const S3_DELETE_BATCH_LIMIT: usize = 100;
 // max defer time for s3 batch deletions
 const S3_DELETE_DEFER_LIMIT_SECONDS: Duration = Duration::from_secs(60 * 5);
+// upper bound on concurrent snapshot locks during move operations to avoid exhausting FDs
+const MAX_SNAPSHOT_LOCKS: usize = 512;
+
+/// Error from a locked per-group operation. Soft errors (e.g. lock conflicts)
+/// are retryable, hard errors are not.
+pub(crate) enum BackupGroupOpError {
+    Soft(Error),
+    Hard(Error),
+}
 
 /// Check that moving/syncing `namespaces` from `source` to `target` stays within
 /// `MAX_NAMESPACE_DEPTH`.
@@ -1187,6 +1196,174 @@ impl DataStore {
         backup_group.destroy(guard, &self.backend()?)
     }
 
+    /// Validate a group-move request without touching locks.
+    ///
+    /// Fast pre-flight check used by the API endpoint so we can fail synchronously before spawning
+    /// a worker. The authoritative post-lock gate lives in [`Self::lock_and_move_group`]. This
+    /// function does *not* replace it, and it does *not* check ownership - the caller handles
+    /// that.
+    pub fn check_move_group(
+        self: &Arc<Self>,
+        source_ns: &BackupNamespace,
+        target_ns: &BackupNamespace,
+        group: &pbs_api_types::BackupGroup,
+        merge_group: bool,
+    ) -> Result<(), Error> {
+        if source_ns == target_ns {
+            bail!("source and target namespace must be different");
+        }
+        if !self.namespace_exists(target_ns) {
+            bail!("target namespace '{target_ns}' does not exist");
+        }
+        if !self.backup_group(source_ns.clone(), group.clone()).exists() {
+            bail!("group '{group}' does not exist in namespace '{source_ns}'");
+        }
+        if self.backup_group(target_ns.clone(), group.clone()).exists() && !merge_group {
+            bail!(
+                "group '{group}' already exists in target namespace '{target_ns}' \
+                and merge-group is disabled"
+            );
+        }
+        Ok(())
+    }
+
+    /// Move a single backup group to a different namespace within the same datastore.
+    pub fn move_group(
+        self: &Arc<Self>,
+        source_ns: &BackupNamespace,
+        group: &pbs_api_types::BackupGroup,
+        target_ns: &BackupNamespace,
+        merge_group: bool,
+    ) -> Result<(), Error> {
+        if *OLD_LOCKING {
+            bail!("move operations require new-style file-based locking");
+        }
+
+        let source_group = self.backup_group(source_ns.clone(), group.clone());
+        let backend = self.backend()?;
+
+        self.lock_and_move_group(source_ns, &source_group, target_ns, &backend, merge_group)
+            .map_err(|err| match err {
+                BackupGroupOpError::Soft(err) | BackupGroupOpError::Hard(err) => err,
+            })
+    }
+
+    /// Lock and move a single group. Acquires exclusive locks on both source and target groups,
+    /// then moves snapshots in batches - each batch is locked, moved, and released before the next
+    /// batch starts. This ensures no concurrent readers (e.g. verify) can operate on snapshots
+    /// being moved, without exhausting file descriptors.
+    ///
+    /// `source_ns` is the subtree root of the caller's operation, not necessarily the group's own
+    /// namespace: for a namespace move, a group can live deeper than `source_ns`, so the prefix is
+    /// rewritten to its new target location.
+    ///
+    /// Returns a `BackupGroupOpError` on failure, indicating whether the failure was a transient
+    /// lock conflict (retryable) or a hard error.
+    fn lock_and_move_group(
+        self: &Arc<Self>,
+        source_ns: &BackupNamespace,
+        group: &BackupGroup,
+        target_ns: &BackupNamespace,
+        backend: &DatastoreBackend,
+        merge_groups: bool,
+    ) -> Result<(), BackupGroupOpError> {
+        let target_group_ns = group
+            .backup_ns()
+            .map_prefix(source_ns, target_ns)
+            .map_err(BackupGroupOpError::Hard)?;
+
+        // Lock the source first so concurrent lock conflicts are detected before we touch the
+        // target structure. Acquisition order is source -> target (via
+        // `create_locked_backup_group_do` below). `.lock()` is non-blocking, so two concurrent
+        // mirror moves (A -> B and B -> A on same-named groups) fail fast with `Soft` rather than
+        // deadlocking.
+        let source_guard = group.lock().map_err(BackupGroupOpError::Soft)?;
+
+        // Post-lock validation: re-runs the pre-flight checks now that we hold the source lock,
+        // closing the TOCTOU gap between the API-level pre-check and the worker. This also stops
+        // the target-group create below from silently creating a missing target namespace
+        // (intentional for backup/pull/tape-restore, not for move).
+        self.check_move_group(
+            group.backup_ns(),
+            &target_group_ns,
+            group.group(),
+            merge_groups,
+        )
+        .map_err(BackupGroupOpError::Hard)?;
+
+        let source_owner = group.get_owner().map_err(BackupGroupOpError::Hard)?;
+
+        // Create-or-open the target group under lock. Reports whether the group was created (= no
+        // merge) or already existed (= merge), and differentiates a target lock conflict (Soft)
+        // from other failures (Hard).
+        let (_, created, _target_guard) =
+            self.create_locked_backup_group_do(&target_group_ns, group.group(), &source_owner)?;
+        let target_group = self.backup_group(target_group_ns.clone(), group.group().clone());
+        let merge = !created;
+
+        if merge && !merge_groups {
+            return Err(BackupGroupOpError::Hard(format_err!(
+                "group '{}' already exists in target namespace '{target_group_ns}' \
+                and merging is disabled",
+                group.group(),
+            )));
+        }
+        if merge {
+            group
+                .check_merge_invariants(&target_group)
+                .map_err(BackupGroupOpError::Hard)?;
+        }
+
+        let mut snapshots: Vec<_> = group
+            .iter_snapshots()
+            .map_err(BackupGroupOpError::Hard)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BackupGroupOpError::Hard)?;
+        // Sort by time so a partial failure (e.g. batch N succeeds but N+1 fails) leaves a clean
+        // time-ordered split: all moved snapshots are older than all remaining ones. This keeps
+        // the merge invariant (source oldest > target newest) valid on retry.
+        snapshots.sort_by_key(|s| s.backup_time());
+
+        log::info!(
+            "{} group '{}/{}' from '{}' to '{target_group_ns}'",
+            if merge { "merging" } else { "moving" },
+            group.group().ty,
+            group.group().id,
+            group.backup_ns(),
+        );
+
+        // Each batch is locked, moved, and released before the next to exclude concurrent readers.
+        // `move_to` writes to the per-datastore move journal before each rename so a concurrent
+        // GC phase-1 drain can still mark the moved chunks; see `move_journal` for the race.
+        for chunk in snapshots.chunks(MAX_SNAPSHOT_LOCKS) {
+            let _batch_locks: Vec<BackupLockGuard> = chunk
+                .iter()
+                .map(|snap| snap.lock().map_err(BackupGroupOpError::Soft))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            for snap in chunk {
+                snap.move_to(&target_group, backend)
+                    .map_err(BackupGroupOpError::Hard)?;
+            }
+            // batch locks released here
+        }
+
+        // Move the group notes file (local rename + S3 upload). Diverging notes during a merge are
+        // kept on the target and logged.
+        group
+            .move_notes_to(&target_group, backend)
+            .map_err(BackupGroupOpError::Hard)?;
+
+        // All snapshots and notes are at the target. The source group holds only owner/lock
+        // metadata now, so hand the source lock to `destroy()` to clean up the owner, the group
+        // directory, and any group-level S3 objects in one place.
+        group
+            .destroy(source_guard, backend)
+            .map_err(BackupGroupOpError::Hard)?;
+
+        Ok(())
+    }
+
     /// Remove a backup directory including all content
     pub fn remove_backup_dir(
         self: &Arc<Self>,
@@ -1308,37 +1485,66 @@ impl DataStore {
         backup_group: &pbs_api_types::BackupGroup,
         auth_id: &Authid,
     ) -> Result<(Authid, BackupLockGuard), Error> {
+        let (owner, _created, guard) = self
+            .create_locked_backup_group_do(ns, backup_group, auth_id)
+            .map_err(|err| match err {
+                BackupGroupOpError::Soft(err) | BackupGroupOpError::Hard(err) => err,
+            })?;
+        Ok((owner, guard))
+    }
+
+    /// Inner variant of [`Self::create_locked_backup_group`] that also reports whether the group
+    /// directory was newly created, and distinguishes a transient lock conflict
+    /// ([`BackupGroupOpError::Soft`]) from other errors ([`BackupGroupOpError::Hard`]).
+    pub(crate) fn create_locked_backup_group_do(
+        self: &Arc<Self>,
+        ns: &BackupNamespace,
+        backup_group: &pbs_api_types::BackupGroup,
+        auth_id: &Authid,
+    ) -> Result<(Authid, bool, BackupLockGuard), BackupGroupOpError> {
         let backup_group = self.backup_group(ns.clone(), backup_group.clone());
 
-        // create intermediate path first
         let full_path = backup_group.full_group_path();
 
         std::fs::create_dir_all(full_path.parent().ok_or_else(|| {
-            format_err!("could not construct parent path for group {backup_group:?}")
-        })?)?;
+            BackupGroupOpError::Hard(format_err!(
+                "could not construct parent path for group {backup_group:?}"
+            ))
+        })?)
+        .map_err(|err| BackupGroupOpError::Hard(err.into()))?;
 
-        // now create the group, this allows us to check whether it existed before
-        match std::fs::create_dir(&full_path) {
-            Ok(_) => {
-                let guard = backup_group.lock().with_context(|| {
-                    format!("while creating new locked backup group '{backup_group:?}'")
-                })?;
-                if let Err(err) = self.set_owner(ns, backup_group.group(), auth_id, false) {
-                    let _ = std::fs::remove_dir(&full_path);
-                    return Err(err);
-                }
-                let owner = self.get_owner(ns, backup_group.group())?; // just to be sure
-                Ok((owner, guard))
+        // Try to create the group directory. This lets us distinguish "created" from "already
+        // existed".
+        let created = match std::fs::create_dir(&full_path) {
+            Ok(_) => true,
+            Err(ref err) if err.kind() == io::ErrorKind::AlreadyExists => false,
+            Err(err) => {
+                return Err(BackupGroupOpError::Hard(format_err!(
+                    "unable to create backup group {full_path:?} - {err}"
+                )))
             }
-            Err(ref err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                let guard = backup_group.lock().with_context(|| {
-                    format!("while creating locked backup group '{backup_group:?}'")
-                })?;
-                let owner = self.get_owner(ns, backup_group.group())?; // just to be sure
-                Ok((owner, guard))
+        };
+
+        let guard = backup_group.lock().map_err(|err| {
+            if created {
+                let _ = std::fs::remove_dir(&full_path);
             }
-            Err(err) => bail!("unable to create backup group {:?} - {}", full_path, err),
+            BackupGroupOpError::Soft(err.context(format!(
+                "while {} locked backup group '{backup_group:?}'",
+                if created { "creating new" } else { "creating" },
+            )))
+        })?;
+
+        if created {
+            if let Err(err) = self.set_owner(ns, backup_group.group(), auth_id, false) {
+                let _ = std::fs::remove_dir(&full_path);
+                return Err(BackupGroupOpError::Hard(err));
+            }
         }
+        let owner = self
+            .get_owner(ns, backup_group.group())
+            .map_err(BackupGroupOpError::Hard)?;
+        Ok((owner, created, guard))
     }
 
     /// Creates a new backup snapshot inside a BackupGroup
