@@ -165,6 +165,15 @@ If the ``unmount-on-done`` flag is set, the datastore will be automatically unmo
 after the sync job finishes. This option is only available for sync jobs triggered by
 mounting (``run-on-mount``), enabling fully automated external drive workflows.
 
+Setting the ``worker-threads`` option to a value greater than ``1`` (up to ``32``,
+default ``1``) synchronizes multiple backup groups in parallel. This can
+significantly improve throughput on high-latency connections, where a single
+HTTP/2 connection to the source is otherwise bottlenecked by head-of-line
+blocking. Log output from concurrent groups is prefixed with the group and
+buffered briefly to keep related lines together. Note that the memory and
+connection count on both endpoints grow roughly linearly with the number of
+workers, so higher values are not always better.
+
 Namespace Support
 ^^^^^^^^^^^^^^^^^
 
