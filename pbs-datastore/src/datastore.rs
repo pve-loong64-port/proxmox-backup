@@ -34,7 +34,7 @@ use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
     DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MaintenanceMode,
-    MaintenanceType, Operation, S3Statistics, UPID,
+    MaintenanceType, Operation, S3Statistics, MAX_NAMESPACE_DEPTH, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
@@ -88,6 +88,29 @@ const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 const S3_DELETE_BATCH_LIMIT: usize = 100;
 // max defer time for s3 batch deletions
 const S3_DELETE_DEFER_LIMIT_SECONDS: Duration = Duration::from_secs(60 * 5);
+
+/// Check that moving/syncing `namespaces` from `source` to `target` stays within
+/// `MAX_NAMESPACE_DEPTH`.
+pub fn check_namespace_depth_limit(
+    source: &BackupNamespace,
+    target: &BackupNamespace,
+    namespaces: &[BackupNamespace],
+) -> Result<(), Error> {
+    let target_depth = target.depth();
+    let sub_depth = namespaces
+        .iter()
+        .map(BackupNamespace::depth)
+        .max()
+        .map_or(0, |v| v - source.depth());
+
+    if sub_depth + target_depth > MAX_NAMESPACE_DEPTH {
+        bail!(
+            "namespace depth limit exceeded: source subtree depth ({sub_depth}) + target \
+            depth ({target_depth}) would exceed max ({MAX_NAMESPACE_DEPTH})",
+        );
+    }
+    Ok(())
+}
 
 /// checks if auth_id is owner, or, if owner is a token, if
 /// auth_id is the user of the token

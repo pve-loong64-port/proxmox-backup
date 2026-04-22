@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use super::sync::{
-    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
-    ignore_not_verified_or_encrypted, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
-    SkipReason, SyncSource, SyncSourceReader, SyncStats,
+    exclude_not_verified_or_encrypted, filter_out_in_progress, ignore_not_verified_or_encrypted,
+    LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo, SkipReason, SyncSource,
+    SyncSourceReader, SyncStats,
 };
 use crate::backup::{check_ns_modification_privs, check_ns_privs};
 use crate::server::sync::SharedGroupProgress;
@@ -34,7 +34,8 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{
-    check_backup_owner, DataBlobReader, DataStore, DatastoreBackend, StoreProgress,
+    check_backup_owner, check_namespace_depth_limit, DataBlobReader, DataStore, DatastoreBackend,
+    StoreProgress,
 };
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};

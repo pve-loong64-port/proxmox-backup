@@ -28,7 +28,9 @@ use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{BackupManifest, DataBlob, DataStore, StoreProgress};
+use pbs_datastore::{
+    check_namespace_depth_limit, BackupManifest, DataBlob, DataStore, StoreProgress,
+};
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use pbs_tools::crypt_config::CryptConfig;
@@ -36,9 +38,8 @@ use pbs_tools::crypt_config::CryptConfig;
 use proxmox_human_byte::HumanByte;
 
 use super::sync::{
-    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
-    ignore_not_verified_or_encrypted, LocalSource, RemovedVanishedStats, SkipInfo, SkipReason,
-    SyncSource, SyncStats,
+    exclude_not_verified_or_encrypted, filter_out_in_progress, ignore_not_verified_or_encrypted,
+    LocalSource, RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncStats,
 };
 use crate::api2::config::remote;
 use crate::server::sync::SharedGroupProgress;
