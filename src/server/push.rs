@@ -974,24 +974,24 @@ pub(crate) async fn push_snapshot(
     snapshot: &BackupDir,
     fetch_previous_manifest: bool,
     log_sender: Arc<LogLineSender>,
-    prefix: &String,
+    prefix: &str,
 ) -> Result<SyncStats, Error> {
     let mut stats = SyncStats::default();
     let target_ns = params
         .map_to_target(namespace)
-        .with_context(|| prefix.clone())?;
+        .with_context(|| prefix.to_string())?;
     let backup_dir = params
         .source
         .store
         .backup_dir(namespace.clone(), snapshot.clone())
-        .with_context(|| prefix.clone())?;
+        .with_context(|| prefix.to_string())?;
 
     // Reader locks the snapshot
     let reader = params
         .source
         .reader(namespace, snapshot)
         .await
-        .with_context(|| prefix.clone())?;
+        .with_context(|| prefix.to_string())?;
 
     // Does not lock the manifest, but the reader already assures a locked snapshot
     let source_manifest = match backup_dir.load_manifest() {
@@ -1034,7 +1034,7 @@ pub(crate) async fn push_snapshot(
         },
     )
     .await
-    .with_context(|| prefix.clone())?;
+    .with_context(|| prefix.to_string())?;
 
     let mut previous_manifest = None;
     // Use manifest of previous snapshots in group on target for chunk upload deduplication
@@ -1121,7 +1121,8 @@ pub(crate) async fn push_snapshot(
                             )
                             .await;
                     }
-                    let index = DynamicIndexReader::open(&path).with_context(|| prefix.clone())?;
+                    let index =
+                        DynamicIndexReader::open(&path).with_context(|| prefix.to_string())?;
                     let chunk_reader = reader
                         .chunk_reader(entry.chunk_crypt_mode())
                         .context("failed to get chunk reader")?;
@@ -1209,7 +1210,7 @@ pub(crate) async fn push_snapshot(
                 upload_options.clone(),
             )
             .await
-            .with_context(|| prefix.clone())?;
+            .with_context(|| prefix.to_string())?;
     }
 
     // Rewrite manifest for pushed snapshot, recreating manifest from source on target
@@ -1222,11 +1223,11 @@ pub(crate) async fn push_snapshot(
             upload_options,
         )
         .await
-        .with_context(|| prefix.clone())?;
+        .with_context(|| prefix.to_string())?;
     backup_writer
         .finish()
         .await
-        .with_context(|| prefix.clone())?;
+        .with_context(|| prefix.to_string())?;
 
     stats.add(SyncStats {
         chunk_count: backup_stats.chunk_count as usize,
