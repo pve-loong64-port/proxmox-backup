@@ -139,6 +139,22 @@ Ext.define('PBS.DataStoreContent', {
             });
         },
 
+        makeGroupEntry: function (btype, backupId) {
+            let cls = PBS.Utils.get_type_icon_cls(btype);
+            if (cls === '') {
+                return null;
+            }
+            return {
+                text: btype + '/' + backupId,
+                leaf: false,
+                iconCls: 'fa ' + cls,
+                expanded: false,
+                backup_type: btype,
+                backup_id: backupId,
+                children: [],
+            };
+        },
+
         getRecordGroups: function (records) {
             let groups = {};
 
@@ -150,27 +166,20 @@ Ext.define('PBS.DataStoreContent', {
                     continue;
                 }
 
-                let cls = PBS.Utils.get_type_icon_cls(btype);
-                if (cls === '') {
+                let entry = this.makeGroupEntry(btype, item.data['backup-id']);
+                if (entry === null) {
                     console.warn(`got unknown backup-type '${btype}'`);
                     continue; // FIXME: auto render? what do?
                 }
 
-                groups[group] = {
-                    text: group,
-                    leaf: false,
-                    iconCls: 'fa ' + cls,
-                    expanded: false,
-                    backup_type: item.data['backup-type'],
-                    backup_id: item.data['backup-id'],
-                    children: [],
-                };
+                groups[group] = entry;
             }
 
             return groups;
         },
 
-        updateGroupNotes: async function (view) {
+        loadGroups: async function () {
+            let view = this.getView();
             try {
                 let url = `/api2/extjs/admin/datastore/${view.datastore}/groups`;
                 if (view.namespace && view.namespace !== '') {
@@ -179,19 +188,24 @@ Ext.define('PBS.DataStoreContent', {
                 let {
                     result: { data: groups },
                 } = await Proxmox.Async.api2({ url });
-                let map = {};
-                for (const group of groups) {
-                    map[`${group['backup-type']}/${group['backup-id']}`] = group.comment;
-                }
-                view.getRootNode().cascade((node) => {
-                    if (node.data.ty === 'group') {
-                        let group = `${node.data.backup_type}/${node.data.backup_id}`;
-                        node.set('comment', map[group], { dirty: false });
-                    }
-                });
+                return groups;
             } catch (err) {
                 console.debug(err);
             }
+            return [];
+        },
+
+        updateGroupNotes: function (view, groupList) {
+            let map = {};
+            for (const group of groupList) {
+                map[`${group['backup-type']}/${group['backup-id']}`] = group.comment;
+            }
+            view.getRootNode().cascade((node) => {
+                if (node.data.ty === 'group') {
+                    let group = `${node.data.backup_type}/${node.data.backup_id}`;
+                    node.set('comment', map[group], { dirty: false });
+                }
+            });
         },
 
         loadNamespaceFromSameLevel: async function () {
@@ -215,7 +229,10 @@ Ext.define('PBS.DataStoreContent', {
             let me = this;
             let view = this.getView();
 
-            let namespaces = await me.loadNamespaceFromSameLevel();
+            let [namespaces, groupList] = await Promise.all([
+                me.loadNamespaceFromSameLevel(),
+                me.loadGroups(),
+            ]);
 
             if (!success) {
                 // TODO also check error code for != 403 ?
@@ -231,6 +248,22 @@ Ext.define('PBS.DataStoreContent', {
             }
 
             let groups = this.getRecordGroups(records);
+
+            for (const item of groupList) {
+                let btype = item['backup-type'];
+                let group = btype + '/' + item['backup-id'];
+                if (groups[group] !== undefined) {
+                    continue;
+                }
+                let entry = me.makeGroupEntry(btype, item['backup-id']);
+                if (entry === null) {
+                    continue;
+                }
+                entry.leaf = true;
+                entry.comment = item.comment;
+                entry.owner = item.owner;
+                groups[group] = entry;
+            }
 
             let selected;
             let expanded = {};
@@ -399,7 +432,7 @@ Ext.define('PBS.DataStoreContent', {
                 );
             }
 
-            this.updateGroupNotes(view);
+            this.updateGroupNotes(view, groupList);
 
             if (selected !== undefined) {
                 let selection = view.getRootNode().findChildBy(
@@ -985,7 +1018,7 @@ Ext.define('PBS.DataStoreContent', {
             flex: 1,
             renderer: (v, meta, record) => {
                 let data = record.data;
-                if (!data || data.leaf || data.root) {
+                if (!data || (data.leaf && data.ty !== 'group') || data.root) {
                     return '';
                 }
 
@@ -1029,7 +1062,7 @@ Ext.define('PBS.DataStoreContent', {
                 },
                 dblclick: function (tree, el, row, col, ev, rec) {
                     let data = rec.data || {};
-                    if (data.leaf || data.root) {
+                    if ((data.leaf && data.ty !== 'group') || data.root) {
                         return;
                     }
                     let view = tree.up();
@@ -1065,7 +1098,7 @@ Ext.define('PBS.DataStoreContent', {
                     getTip: (v, m, rec) => Ext.String.format(gettext("Prune '{0}'"), v),
                     getClass: (v, m, { data }) =>
                         data.ty === 'group' ? 'fa fa-scissors' : 'pmx-hidden',
-                    isActionDisabled: (v, r, c, i, { data }) => data.ty !== 'group',
+                    isActionDisabled: (v, r, c, i, { data }) => data.ty !== 'group' || !!data.leaf,
                 },
                 {
                     handler: 'onProtectionChange',
@@ -1230,7 +1263,7 @@ Ext.define('PBS.DataStoreContent', {
                     return ''; // TODO: accumulate verify of all groups into root NS node?
                 }
                 let i = (cls, txt) => `<i class="fa fa-fw fa-${cls}"></i> ${txt}`;
-                if (v === undefined || v === null) {
+                if (v === undefined || v === null || record.data.count === 0) {
                     return record.data.leaf ? '' : i('question-circle-o warning', gettext('None'));
                 }
                 let tip, iconCls, txt;
