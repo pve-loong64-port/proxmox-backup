@@ -64,18 +64,4 @@ impl<T: Send + 'static> BoundedJoinSet<T> {
     pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
         self.workers.join_next().await
     }
-
-    /// Wait on all spawned tasks to run to completion.
-    ///
-    /// Returns the results for each task in order of completion or a `JoinError`
-    /// if joining failed.
-    pub async fn join_spawned_tasks(&mut self) -> Result<Vec<T>, JoinError> {
-        let mut results = Vec::with_capacity(self.workers.len());
-
-        while let Some(result) = self.workers.join_next().await {
-            results.push(result?);
-        }
-
-        Ok(results)
-    }
 }

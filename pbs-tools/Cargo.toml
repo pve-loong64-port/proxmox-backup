@@ -8,7 +8,6 @@ description = "common tools used throughout pbs"
 # This must not depend on any subcrates more closely related to pbs itself.
 [dependencies]
 anyhow.workspace = true
-async-trait.workspace = true
 bytes.workspace = true
 foreign-types.workspace = true
 hex.workspace = true
