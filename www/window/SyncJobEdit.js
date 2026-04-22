@@ -449,6 +449,17 @@ Ext.define('PBS.window.SyncJobEdit', {
                         },
                     },
                     {
+                        xtype: 'proxmoxintegerfield',
+                        name: 'worker-threads',
+                        fieldLabel: gettext('# of Group Workers'),
+                        emptyText: '1',
+                        minValue: 1,
+                        maxValue: 32,
+                        cbind: {
+                            deleteEmpty: '{!isCreate}',
+                        },
+                    },
+                    {
                         xtype: 'proxmoxcheckbox',
                         fieldLabel: gettext('Re-sync Corrupt'),
                         name: 'resync-corrupt',
