@@ -233,6 +233,14 @@ datastore is not mounted when they are scheduled. Sync jobs start, but fail
 with an error saying the datastore was not mounted. The reason is that syncs
 not happening as scheduled should at least be noticeable.
 
+Setups that rely on ``unmount-on-done`` (see :ref:`syncjobs`) have no natural
+point to run garbage collection, since the device is detached right after the
+sync finishes. Enabling the ``gc-on-unmount`` option on the datastore makes
+the unmount trigger a garbage collection first and wait for it to complete
+before actually unmounting. If a garbage collection run is already in
+progress when the unmount fires (for example from an overlapping scheduled
+GC job), that run is waited on instead.
+
 .. _datastore_s3_backend:
 
 Datastores with S3 Backend
