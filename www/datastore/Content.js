@@ -668,6 +668,27 @@ Ext.define('PBS.DataStoreContent', {
             });
         },
 
+        moveGroup: function (data) {
+            let me = this;
+            let view = me.getView();
+            let group = `${data.backup_type}/${data.backup_id}`;
+            Ext.create('PBS.window.GroupMove', {
+                datastore: view.datastore,
+                namespace: view.namespace,
+                backupType: data.backup_type,
+                backupId: data.backup_id,
+                group,
+                taskDone: () => me.reload(),
+            }).show();
+        },
+
+        onMove: function (table, rI, cI, item, e, { data }) {
+            let me = this;
+            if (data.ty === 'group') {
+                me.moveGroup(data);
+            }
+        },
+
         forgetGroup: function (data) {
             let me = this;
             let view = me.getView();
@@ -972,6 +993,7 @@ Ext.define('PBS.DataStoreContent', {
                     onVerify: createControllerCallback('onVerify'),
                     onChangeOwner: createControllerCallback('onChangeOwner'),
                     onPrune: createControllerCallback('onPrune'),
+                    onMove: createControllerCallback('onMove'),
                     onForget: createControllerCallback('onForget'),
                 });
             } else if (record.data.ty === 'dir') {
@@ -1085,6 +1107,20 @@ Ext.define('PBS.DataStoreContent', {
                             ? 'pve-icon-verify-lettering'
                             : 'pmx-hidden',
                     isActionDisabled: (v, r, c, i, rec) => !!rec.data.leaf,
+                },
+                {
+                    handler: 'onMove',
+                    getTip: (v, m, { data }) => {
+                        if (data.ty === 'group') {
+                            return Ext.String.format(gettext("Move group '{0}'"), v);
+                        }
+                        return '';
+                    },
+                    getClass: (v, m, { data }) => {
+                        if (data.ty === 'group') { return 'fa fa-arrows'; }
+                        return 'pmx-hidden';
+                    },
+                    isActionDisabled: (v, r, c, i, { data }) => data.ty !== 'group',
                 },
                 {
                     handler: 'onChangeOwner',
@@ -1438,6 +1474,7 @@ Ext.define('PBS.datastore.GroupCmdMenu', {
     onVerify: undefined,
     onChangeOwner: undefined,
     onPrune: undefined,
+    onMove: undefined,
     onForget: undefined,
 
     items: [
@@ -1459,6 +1496,16 @@ Ext.define('PBS.datastore.GroupCmdMenu', {
             },
             cbind: {
                 hidden: '{!onVerify}',
+            },
+        },
+        {
+            text: gettext('Move'),
+            iconCls: 'fa fa-arrows',
+            handler: function () {
+                this.up('menu').onMove();
+            },
+            cbind: {
+                hidden: '{!onMove}',
             },
         },
         {

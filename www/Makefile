@@ -78,6 +78,7 @@ JSSRC=							\
 	config/PruneAndGC.js				\
 	window/ACLEdit.js				\
 	window/BackupGroupChangeOwner.js		\
+	window/GroupMove.js				\
 	window/CreateDirectory.js			\
 	window/DataStoreEdit.js				\
 	window/EncryptionKeysEdit.js			\
