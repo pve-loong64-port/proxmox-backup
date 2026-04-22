@@ -13,7 +13,7 @@ use futures::{future::FutureExt, select};
 use hyper::http::StatusCode;
 use pbs_config::BackupLockGuard;
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::{info, warn, Level};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_rest_server::WorkerTask;
@@ -28,6 +28,7 @@ use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{BackupManifest, DataStore, ListNamespacesRecursive, LocalChunkReader};
+use pbs_tools::buffered_logger::LogLineSender;
 
 use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
@@ -375,18 +376,7 @@ impl SyncSource for RemoteSource {
 
         let mut result = self.client.get(&path, Some(args)).await?;
         let snapshot_list: Vec<SnapshotListItem> = serde_json::from_value(result["data"].take())?;
-        Ok(snapshot_list
-            .into_iter()
-            .filter_map(|item: SnapshotListItem| {
-                // in-progress backups can't be synced
-                if item.size.is_none() {
-                    info!("skipping snapshot {} - in-progress backup", item.backup);
-                    return None;
-                }
-
-                Some(item)
-            })
-            .collect::<Vec<SnapshotListItem>>())
+        Ok(snapshot_list)
     }
 
     fn get_ns(&self) -> BackupNamespace {
@@ -734,6 +724,29 @@ pub fn do_sync_job(
     )?;
 
     Ok(upid_str)
+}
+
+pub(super) async fn filter_out_in_progress(
+    snapshots: Vec<SnapshotListItem>,
+    log_sender: Arc<LogLineSender>,
+) -> Result<Vec<SnapshotListItem>, Error> {
+    let mut filtered = Vec::with_capacity(snapshots.len());
+
+    for item in snapshots {
+        // in-progress backups can't be synced
+        if item.size.is_none() {
+            log_sender
+                .log(
+                    Level::INFO,
+                    format!("skipping snapshot {} - in-progress backup", item.backup),
+                )
+                .await?;
+        } else {
+            filtered.push(item);
+        }
+    }
+
+    Ok(filtered)
 }
 
 pub(super) fn ignore_not_verified_or_encrypted(

@@ -31,7 +31,7 @@ use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use pbs_tools::sha::sha256;
 
 use super::sync::{
-    check_namespace_depth_limit, exclude_not_verified_or_encrypted,
+    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
     ignore_not_verified_or_encrypted, LocalSource, RemoteSource, RemovedVanishedStats, SkipInfo,
     SkipReason, SyncSource, SyncSourceReader, SyncStats,
 };
@@ -732,6 +732,7 @@ async fn pull_group(
         .source
         .list_backup_snapshots(source_namespace, group)
         .await?;
+    raw_list = filter_out_in_progress(raw_list, Arc::clone(&log_sender)).await?;
     raw_list.sort_unstable_by_key(|a| a.backup.time);
 
     let target_ns = source_namespace.map_prefix(&params.source.get_ns(), &params.target.ns)?;

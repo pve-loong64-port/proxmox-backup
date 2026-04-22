@@ -34,7 +34,7 @@ use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
 use proxmox_human_byte::HumanByte;
 
 use super::sync::{
-    check_namespace_depth_limit, exclude_not_verified_or_encrypted,
+    check_namespace_depth_limit, exclude_not_verified_or_encrypted, filter_out_in_progress,
     ignore_not_verified_or_encrypted, LocalSource, RemovedVanishedStats, SkipInfo, SkipReason,
     SyncSource, SyncStats,
 };
@@ -777,6 +777,7 @@ pub(crate) async fn push_group(
         .source
         .list_backup_snapshots(namespace, group)
         .await?;
+    snapshots = filter_out_in_progress(snapshots, Arc::clone(&log_sender)).await?;
     snapshots.sort_unstable_by_key(|a| a.backup.time);
 
     if snapshots.is_empty() {
