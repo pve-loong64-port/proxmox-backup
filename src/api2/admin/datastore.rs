@@ -2963,6 +2963,10 @@ const DATASTORE_INFO_SUBDIRS: SubdirMap = &[
     ("mount", &Router::new().post(&API_METHOD_MOUNT)),
     ("move-group", &Router::new().post(&API_METHOD_MOVE_GROUP)),
     (
+        "move-namespace",
+        &Router::new().post(&crate::api2::admin::namespace::API_METHOD_MOVE_NAMESPACE),
+    ),
+    (
         "namespace",
         // FIXME: move into datastore:: sub-module?!
         &crate::api2::admin::namespace::ROUTER,

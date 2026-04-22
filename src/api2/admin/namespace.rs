@@ -1,12 +1,16 @@
 use anyhow::{bail, Error};
 
 use pbs_config::CachedUserInfo;
-use proxmox_router::{http_bail, ApiMethod, Permission, Router, RpcEnvironment};
+use proxmox_rest_server::WorkerTask;
+use proxmox_router::{
+    http_bail, ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType,
+};
 use proxmox_schema::*;
+use serde_json::{json, Value};
 
 use pbs_api_types::{
     Authid, BackupGroupDeleteStats, BackupNamespace, NamespaceListItem, Operation,
-    DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA, PROXMOX_SAFE_ID_FORMAT,
+    DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA, PROXMOX_SAFE_ID_FORMAT, UPID_SCHEMA,
 };
 
 use pbs_datastore::DataStore;
@@ -190,6 +194,83 @@ pub fn delete_namespace(
     }
 
     Ok(stats)
+}
+
+#[api(
+    input: {
+        properties: {
+            store: { schema: DATASTORE_SCHEMA },
+            ns: {
+                type: BackupNamespace,
+            },
+            "target-ns": {
+                type: BackupNamespace,
+            },
+            "max-depth": {
+                schema: NS_MAX_DEPTH_SCHEMA,
+                optional: true,
+            },
+            "delete-source": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "Remove the source namespace after moving all contents. \
+                    Defaults to true.",
+            },
+            "merge-groups": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "If a group with the same name already exists in the target \
+                    namespace, merge snapshots into it. Requires matching ownership and \
+                    non-overlapping snapshot times.",
+            },
+        },
+    },
+    returns: {
+        schema: UPID_SCHEMA,
+    },
+    access: {
+        permission: &Permission::Anybody,
+        description: "Requires DATASTORE_MODIFY on the parent of 'ns' and on the parent of 'target-ns'.",
+    },
+)]
+/// Move a backup namespace (including all child namespaces and groups) to a new location.
+pub fn move_namespace(
+    store: String,
+    ns: BackupNamespace,
+    target_ns: BackupNamespace,
+    max_depth: Option<usize>,
+    delete_source: bool,
+    merge_groups: bool,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<Value, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+
+    check_ns_modification_privs(&store, &ns, &auth_id)?;
+    check_ns_modification_privs(&store, &target_ns, &auth_id)?;
+
+    let datastore =
+        DataStore::lookup_datastore(crate::tools::lookup_with(&store, Operation::Write))?;
+
+    // Best-effort pre-checks for a fast synchronous error before spawning a worker.
+    // The worker re-runs the same check, which is the authoritative gate.
+    datastore.check_move_namespace(&ns, &target_ns)?;
+
+    let worker_id = format!("{store}:{ns}:{target_ns}");
+    let to_stdout = rpcenv.env_type() == RpcEnvironmentType::CLI;
+
+    let upid_str = WorkerTask::new_thread(
+        "move-namespace",
+        Some(worker_id),
+        auth_id.to_string(),
+        to_stdout,
+        move |_worker| {
+            datastore.move_namespace(&ns, &target_ns, max_depth, delete_source, merge_groups)
+        },
+    )?;
+
+    Ok(json!(upid_str))
 }
 
 pub const ROUTER: Router = Router::new()
