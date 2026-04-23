@@ -333,6 +333,7 @@ Ext.define('PBS.config.EncryptionKeysView', {
         {
             dataIndex: 'archived-at',
             header: gettext('Archived'),
+            emptyCellText: '-',
             renderer: (val) => (val ? Proxmox.Utils.render_timestamp(val) : ''),
             flex: 2,
         },
