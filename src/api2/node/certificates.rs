@@ -302,8 +302,8 @@ pub fn new_acme_cert(force: bool, rpcenv: &mut dyn RpcEnvironment) -> Result<Str
     },
     protected: true,
 )]
-/// Renew the current ACME certificate if it expires within 30 days (or always if the `force`
-/// parameter is set).
+/// Renew the current ACME certificate if it is within its renewal lead time (or always if the
+/// `force` parameter is set).
 pub fn renew_acme_cert(force: bool, rpcenv: &mut dyn RpcEnvironment) -> Result<String, Error> {
     if !cert_expires_soon()? && !force {
         let lead = cert_renew_lead_time()? / (24 * 60 * 60);
@@ -329,7 +329,7 @@ pub fn cert_renew_lead_time() -> Result<i64, Error> {
     }
 }
 
-/// Check whether the current certificate expires within the next 30 days.
+/// Check whether the current certificate expires within its renewal lead time.
 pub fn cert_expires_soon() -> Result<bool, Error> {
     let cert = pem_to_cert_info(get_certificate_pem()?.as_bytes())?;
     cert.is_expired_after_epoch(proxmox_time::epoch_i64() + cert_renew_lead_time()?)
