@@ -74,7 +74,7 @@ proxmox-metrics = "1"
 proxmox-network-api = "1"
 proxmox-network-types = "1.0.1"
 proxmox-notify = "1"
-proxmox-openid = "1"
+proxmox-openid = "1.0.3"
 proxmox-parallel-handler = "1"
 proxmox-product-config = "1"
 proxmox-rate-limiter = "1.0.0"
@@ -99,7 +99,7 @@ proxmox-time = "2"
 proxmox-upgrade-checks = "1"
 proxmox-uuid = { version = "1", features = [ "serde" ] }
 proxmox-worker-task = "1"
-pbs-api-types = "1.0.15"
+pbs-api-types = "1.0.16"
 
 # other proxmox crates
 pathpatterns = "1"

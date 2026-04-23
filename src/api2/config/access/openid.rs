@@ -159,6 +159,8 @@ pub enum DeletableProperty {
     Prompt,
     /// Delete the acr_values property
     AcrValues,
+    /// Delete the audiences property
+    Audiences,
 }
 
 #[api(
@@ -231,6 +233,9 @@ pub fn update_openid_realm(
                 DeletableProperty::AcrValues => {
                     config.acr_values = None;
                 }
+                DeletableProperty::Audiences => {
+                    config.audiences = None;
+                }
             }
         }
     }
@@ -272,6 +277,9 @@ pub fn update_openid_realm(
     }
     if update.acr_values.is_some() {
         config.acr_values = update.acr_values;
+    }
+    if update.audiences.is_some() {
+        config.audiences = update.audiences;
     }
 
     domains.set_data(&realm, "openid", &config)?;
