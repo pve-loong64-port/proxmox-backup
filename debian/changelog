@@ -1,3 +1,76 @@
+rust-proxmox-backup (4.1.9-1) trixie; urgency=medium
+
+  * s3: graduate the S3 datastore backend from technology preview to a fully
+    supported feature; drop the corresponding preview note from the docs.
+
+  * fix #7251: sync jobs: support server-side encryption of snapshots using
+    encryption keys stored on the datastore server. Push sync jobs can encrypt
+    previously unencrypted source snapshots on the fly while uploading to the
+    remote; pull sync jobs can decrypt snapshots with a matching key and store
+    them unencrypted locally. Adds a new 'encryption-keys' section-config plus
+    CRUD API for managing keys, and sync job properties for referencing one
+    active encryption key and an optional list of associated (decryption-only)
+    keys.
+
+  * config: add 'encryption-keys' as ACL subpath under 'system' for more
+    granular access control over individual encryption keys.
+
+  * ui: expose encryption key management via a new menu (list, create,
+    archive/unarchive and delete keys) and allow assigning an active
+    encryption key and associated decryption keys in the sync job editors.
+
+  * fix: sync: pull: also upload the client log to s3-backed target datastores
+    in the "no data changes" fast-path; this was previously only done on full
+    resync.
+
+  * docs: add chapter on server-side encryption for sync jobs, covering key
+    management, associated keys and requirements for removing keys.
+
+  * ui: sync job edit: show a direction-specific hint in the encryption panel,
+    since pull sync jobs only use configured keys to decrypt and never
+    encrypt, which is easy to miss without an explicit note.
+
+  * api/ui: sync job: reject setting the active encryption key on pull sync
+    jobs (including switching a push job with an active key over to pull
+    without clearing it first), since the active key is only consumed by the
+    push side and would otherwise be silently ignored.
+
+  * add move operations for backup groups and entire namespace subtrees within
+    the same datastore, covering both filesystem and S3 backends and
+    preserving group notes. Snapshots can be merged into an existing target
+    group when ownership matches and source snapshots are strictly newer.
+    Exposed via new API endpoints, UI actions on groups and namespaces, and
+    'proxmox-backup-manager datastore move-group' / 'move-namespace' CLI
+    commands.
+
+  * datastore: add a per-datastore move journal consumed by the mark phase of
+    garbage collection, closing a race where a concurrent move-group or
+    move-namespace could cause the mark phase to miss a relocated index, which
+    would let the sweep phase remove its still-referenced chunks.
+
+  * docs: add section on moving namespaces and groups.
+
+  * ui: show empty backup groups. Previously, removing the last snapshot of a
+    group also removed the group itself, discarding group-level metadata like
+    notes; it also prevented cleaning up groups left behind by a partially
+    failed move on an S3-backed datastore without going through the API.
+
+  * partially fix #6372: acme: scale certificate renewal check cadence with
+    certificate lifetime. Start renewing once 2/3 of the total lifetime have
+    passed instead of the hard-coded 30 days, with a minimum of 3 days
+    remaining to still cope with transient failures. This lets short-lived
+    (e.g. 7-day STAR) certificates be renewed in time, while matching the
+    previous behavior for common 90-day certificates. The certificate is now
+    parsed only once per renewal check, and a warning is logged when falling
+    back to the 30-day default because the lifetime could not be determined.
+
+  * docs: sync: document the new 'worker-threads' option for parallel sync
+    jobs.
+
+  * docs: storage: document the 'gc-on-unmount' flag for removable datastores.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 23 Apr 2026 22:26:59 +0200
+
 rust-proxmox-backup (4.1.8-1) trixie; urgency=medium
 
   * fix #4182: sync jobs: allow pulling or pushing backup groups in parallel,
