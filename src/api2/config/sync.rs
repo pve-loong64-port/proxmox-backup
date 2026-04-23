@@ -257,6 +257,9 @@ pub fn create_sync_job(
     if sync_direction == SyncDirection::Push && config.resync_corrupt.is_some() {
         bail!("push jobs do not support resync-corrupt option");
     }
+    if sync_direction != SyncDirection::Push && config.active_encryption_key.is_some() {
+        bail!("'active-encryption-key' only applies to push sync jobs");
+    }
 
     if let Some(max_depth) = config.max_depth {
         if let Some(ref ns) = config.ns {
@@ -605,6 +608,12 @@ pub fn update_sync_job(
         data.unmount_on_done = Some(unmount_on_done);
     }
     if let Some(sync_direction) = update.sync_direction {
+        if sync_direction != SyncDirection::Push && data.active_encryption_key.is_some() {
+            bail!(
+                "cannot switch to pull direction while 'active-encryption-key' is set; delete \
+                 it in the same request or clear it first"
+            );
+        }
         data.sync_direction = Some(sync_direction);
     }
 
@@ -613,6 +622,9 @@ pub fn update_sync_job(
     }
 
     if let Some(active_encryption_key) = update.active_encryption_key {
+        if data.sync_direction.unwrap_or_default() != SyncDirection::Push {
+            bail!("'active-encryption-key' only applies to push sync jobs");
+        }
         // owner updated above already, so can use the one in data
         let owner = data
             .owner
