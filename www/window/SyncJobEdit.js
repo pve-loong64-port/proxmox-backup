@@ -602,14 +602,12 @@ Ext.define('PBS.window.SyncJobEdit', {
                         },
                     },
                 ],
-                column2: [
+                columnB: [
                     {
                         xtype: 'box',
                         style: {
-                            'inline-size': '325px',
                             'overflow-wrap': 'break-word',
                         },
-                        padding: '5',
                         html: gettext(
                             'When pushing, the system uses the active encryption key to encrypt unencrypted sources snapshots. It leaves existing encrypted content as-is, and skips partially encrypted content.',
                         ),
@@ -620,10 +618,8 @@ Ext.define('PBS.window.SyncJobEdit', {
                     {
                         xtype: 'box',
                         style: {
-                            'inline-size': '325px',
                             'overflow-wrap': 'break-word',
                         },
-                        padding: '5',
                         html: gettext(
                             'To prevent premature removal, associated keys hold a reference to a key until you explicitly unlink it. When you change your active encryption key, the system automatically associates the old key to protect it from accidental deletion, ensuring you can still decrypt older contents.',
                         ),
@@ -634,10 +630,8 @@ Ext.define('PBS.window.SyncJobEdit', {
                     {
                         xtype: 'box',
                         style: {
-                            'inline-size': '325px',
                             'overflow-wrap': 'break-word',
                         },
-                        padding: '5',
                         html: gettext(
                             'When pulling, the system uses the configured decryption keys to decrypt source snapshots with a matching key fingerprint and stores them unencrypted locally. Snapshots without a matching key are stored as received; pull never encrypts snapshots.',
                         ),
