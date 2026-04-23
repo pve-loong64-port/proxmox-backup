@@ -413,11 +413,12 @@ pub fn plugin_cli() -> CommandLineInterface {
 )]
 /// Order a new ACME certificate.
 async fn order_acme_cert(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
-    if !param["force"].as_bool().unwrap_or(false) && !api2::node::certificates::cert_expires_soon()?
-    {
-        let lead = api2::node::certificates::cert_renew_lead_time()? / (24 * 60 * 60);
-        println!("Certificate does not expire within the next {lead} days, not renewing.");
-        return Ok(());
+    if !param["force"].as_bool().unwrap_or(false) {
+        let (expires_soon, lead_days) = api2::node::certificates::check_renewal_needed()?;
+        if !expires_soon {
+            println!("Certificate does not expire within the next {lead_days} days, not renewing.");
+            return Ok(());
+        }
     }
 
     let info = &api2::node::certificates::API_METHOD_RENEW_ACME_CERT;

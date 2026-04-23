@@ -74,9 +74,9 @@ async fn check_acme_certificates(rpcenv: &mut dyn RpcEnvironment) -> Result<(), 
         return Ok(());
     }
 
-    if !api2::node::certificates::cert_expires_soon()? {
-        let lead = api2::node::certificates::cert_renew_lead_time()? / (24 * 60 * 60);
-        log::info!("Certificate does not expire within the next {lead} days, not renewing.");
+    let (expires_soon, lead_days) = api2::node::certificates::check_renewal_needed()?;
+    if !expires_soon {
+        log::info!("Certificate does not expire within the next {lead_days} days, not renewing.");
         return Ok(());
     }
 
