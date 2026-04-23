@@ -294,7 +294,6 @@ Ext.define('PBS.config.EncryptionKeysView', {
             dataIndex: 'id',
             header: gettext('Key ID'),
             renderer: Ext.String.htmlEncode,
-            sortable: true,
             width: 200,
         },
         {
@@ -313,33 +312,28 @@ Ext.define('PBS.config.EncryptionKeysView', {
                 }
                 return `<i class="${iconCls}"></i> ${label}`;
             },
-            sortable: true,
             width: 50,
         },
         {
             dataIndex: 'hint',
             header: gettext('Hint'),
-            sortable: true,
             width: 100,
         },
         {
             dataIndex: 'fingerprint',
             header: gettext('Fingerprint'),
-            sortable: false,
             width: 600,
         },
         {
             dataIndex: 'created',
             header: gettext('Created'),
             renderer: Proxmox.Utils.render_timestamp,
-            sortable: true,
             flex: 1,
         },
         {
             dataIndex: 'archived-at',
             header: gettext('Archived'),
             renderer: (val) => (val ? Proxmox.Utils.render_timestamp(val) : ''),
-            sortable: true,
             flex: 1,
         },
     ],
