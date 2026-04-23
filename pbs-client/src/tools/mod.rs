@@ -343,12 +343,12 @@ pub fn extract_repository_from_map(param: &HashMap<String, String>) -> Option<Ba
 /// Extract a [`BackupNamespace`] from CLI parameters, falling back to PBS_NAMESPACE.
 pub fn optional_ns_param(param: &Value) -> Result<BackupNamespace, Error> {
     match param.get("ns") {
-        Some(Value::String(ns)) => return Ok(ns.parse()?),
+        Some(Value::String(ns)) => return ns.parse(),
         Some(_) => bail!("invalid namespace parameter"),
         None => {}
     }
     if let Ok(ns) = std::env::var(ENV_VAR_PBS_NAMESPACE) {
-        return Ok(ns.parse()?);
+        return ns.parse();
     }
     Ok(BackupNamespace::root())
 }
