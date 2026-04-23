@@ -195,34 +195,39 @@ impl BackupManifest {
         crypt_config: Option<&CryptConfig>,
     ) -> Result<BackupManifest, Error> {
         let json: Value = serde_json::from_slice(data)?;
-        let signature = json["signature"].as_str().map(String::from);
+        let manifest: BackupManifest = serde_json::from_value(json)?;
 
         if let Some(crypt_config) = crypt_config {
-            if let Some(signature) = signature {
-                let expected_signature = hex::encode(Self::json_signature(&json, crypt_config)?);
-
-                let fingerprint = &json["unprotected"]["key-fingerprint"];
-                if fingerprint != &Value::Null {
-                    let fingerprint = Fingerprint::deserialize(fingerprint)?;
-                    let config_fp = Fingerprint::new(crypt_config.fingerprint());
-                    if config_fp != fingerprint {
-                        bail!(
-                            "wrong key - unable to verify signature since manifest's key {} does not match provided key {}",
-                            fingerprint,
-                            config_fp
-                        );
-                    }
-                }
-                if signature != expected_signature {
-                    bail!("wrong signature in manifest");
-                }
-            } else {
-                // not signed: warn/fail?
-            }
+            manifest.check_signature(crypt_config)?;
         }
 
-        let manifest: BackupManifest = serde_json::from_value(json)?;
         Ok(manifest)
+    }
+
+    /// Verify the signature of the manifest by given crypt config.
+    pub fn check_signature(&self, crypt_config: &CryptConfig) -> Result<(), Error> {
+        if let Some(signature) = &self.signature {
+            let expected_signature = hex::encode(self.signature(crypt_config)?);
+
+            let fingerprint = &self.unprotected["key-fingerprint"];
+            if fingerprint != &Value::Null {
+                let fingerprint = Fingerprint::deserialize(fingerprint)?;
+                let config_fp = Fingerprint::new(crypt_config.fingerprint());
+                if config_fp != fingerprint {
+                    bail!(
+                        "wrong key - unable to verify signature since manifest's key {} does not match provided key {}",
+                        fingerprint,
+                        config_fp
+                    );
+                }
+            }
+            if *signature != expected_signature {
+                bail!("wrong signature in manifest");
+            }
+        } else {
+            // not signed: warn/fail?
+        }
+        Ok(())
     }
 
     /// Get the verify state of the snapshot
