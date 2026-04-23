@@ -631,6 +631,20 @@ Ext.define('PBS.window.SyncJobEdit', {
                             hidden: '{!syncDirectionPush}',
                         },
                     },
+                    {
+                        xtype: 'box',
+                        style: {
+                            'inline-size': '325px',
+                            'overflow-wrap': 'break-word',
+                        },
+                        padding: '5',
+                        html: gettext(
+                            'When pulling, the system uses the configured decryption keys to decrypt source snapshots with a matching key fingerprint and stores them unencrypted locally. Snapshots without a matching key are stored as received; pull never encrypts snapshots.',
+                        ),
+                        cbind: {
+                            hidden: '{syncDirectionPush}',
+                        },
+                    },
                 ],
             },
         ],
