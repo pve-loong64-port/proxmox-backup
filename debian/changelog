@@ -29,6 +29,36 @@ rust-proxmox-backup (4.1.8-1) trixie; urgency=medium
     a file being initialized and another consumer opening it while checking
     its header.
 
+  * client: add --server, --port, --datastore, --auth-id and --ns as
+    per-field alternatives to the compound --repository URL across all
+    client tools (proxmox-backup-client, proxmox-file-restore,
+    proxmox-backup-debug). Each has a matching PBS_SERVER, PBS_PORT,
+    PBS_DATASTORE, PBS_AUTH_ID environment variable that merges with the
+    CLI per-field, with CLI options overriding the environment.
+
+  * fix #5340: client: add PBS_NAMESPACE environment variable as a
+    per-tool fallback for --ns, consistent with the other PBS_* atom
+    environment variables.
+
+  * docs: document the new per-field client repository options, their
+    mutual exclusion with --repository, and the corresponding PBS_*
+    environment variables.
+
+  * fix #7337: ui: preserve the target deep link when redirecting through
+    an OpenID login round-trip. The hash was previously dropped, sending
+    users to the dashboard instead of their originally requested view
+    after logging in.
+
+  * fix #7400: handle corrupted or missing job statefiles gracefully. The
+    API no longer errors out when the statefile cannot be parsed (a
+    default schedule status is returned instead), and the scheduler loops
+    actively overwrite corrupted statefiles on the next run so affected
+    jobs resume normally.
+
+  * pbs-key-config: fsync() newly stored encryption keys to match the
+    replace path, so a crash between key creation and the next filesystem
+    flush cannot leave the key partially written on disk.
+
  -- Proxmox Support Team <support@proxmox.com>  Wed, 22 Apr 2026 20:00:25 +0200
 
 rust-proxmox-backup (4.1.7-2) trixie; urgency=medium
