@@ -456,16 +456,13 @@ async fn pull_snapshot<'a>(
 
     let mut tmp_manifest_name = manifest_name.clone();
     tmp_manifest_name.set_extension("tmp");
-    let tmp_manifest_blob;
-    if let Some(data) = reader
+    let Some(tmp_manifest_blob) = reader
         .load_file_into(MANIFEST_BLOB_NAME.as_ref(), &tmp_manifest_name)
         .await
         .with_context(|| prefix.clone())?
-    {
-        tmp_manifest_blob = data;
-    } else {
+    else {
         return Ok(sync_stats);
-    }
+    };
 
     if manifest_name.exists() && !corrupt {
         let manifest_blob = proxmox_lang::try_block!({
