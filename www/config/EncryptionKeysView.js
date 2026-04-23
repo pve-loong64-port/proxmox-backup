@@ -312,29 +312,29 @@ Ext.define('PBS.config.EncryptionKeysView', {
                 }
                 return `<i class="${iconCls}"></i> ${label}`;
             },
-            width: 50,
+            width: 75,
         },
         {
             dataIndex: 'hint',
             header: gettext('Hint'),
-            width: 100,
+            flex: 1,
         },
         {
             dataIndex: 'fingerprint',
             header: gettext('Fingerprint'),
-            width: 600,
+            width: 580,
         },
         {
             dataIndex: 'created',
             header: gettext('Created'),
             renderer: Proxmox.Utils.render_timestamp,
-            flex: 1,
+            flex: 2,
         },
         {
             dataIndex: 'archived-at',
             header: gettext('Archived'),
             renderer: (val) => (val ? Proxmox.Utils.render_timestamp(val) : ''),
-            flex: 1,
+            flex: 2,
         },
     ],
 });
