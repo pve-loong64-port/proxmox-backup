@@ -325,6 +325,9 @@ pub fn cert_renew_lead_time() -> Result<i64, Error> {
         let lead = std::cmp::max(lifetime / 3, 3 * 24 * 60 * 60);
         Ok(lead)
     } else {
+        log::warn!(
+            "certificate notBefore/notAfter unavailable, falling back to 30-day renewal lead time"
+        );
         Ok(30 * 24 * 60 * 60)
     }
 }
