@@ -32,9 +32,39 @@ fn get_node_config(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Valu
     Ok(Value::Null)
 }
 
+#[api(
+    input: {
+        properties: {
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        }
+    }
+)]
+/// Return the server identity information for this Proxmox Backup Server.
+fn get_server_identity(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<Value, Error> {
+    let output_format = get_output_format(&param);
+
+    let info = &api2::node::API_METHOD_GET_IDENTITY;
+    let mut data = match info.handler {
+        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
+        _ => unreachable!(),
+    };
+
+    let options = default_table_format_options();
+    format_and_print_result_full(&mut data, &info.returns, &output_format, &options);
+
+    Ok(Value::Null)
+}
+
 pub fn node_commands() -> CommandLineInterface {
     let cmd_def = CliCommandMap::new()
         .insert("show", CliCommand::new(&API_METHOD_GET_NODE_CONFIG))
+        .insert(
+            "server-identity",
+            CliCommand::new(&API_METHOD_GET_SERVER_IDENTITY),
+        )
         .insert(
             "update",
             CliCommand::new(&api2::node::config::API_METHOD_UPDATE_NODE_CONFIG)
