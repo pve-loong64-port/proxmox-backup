@@ -755,95 +755,28 @@ async fn pull_snapshot<'a>(
         return Ok(sync_stats);
     }
 
-    let mut crypt_config = None;
-    let mut new_manifest = None;
-    if let Some(key_fp) = manifest.fingerprint().with_context(|| prefix.clone())? {
-        // source got key fingerprint, expect contents to be signed or encrypted
-        if let Some((key_id, config)) = params
-            .crypt_configs
-            .iter()
-            .find(|(_id, crypt_conf)| crypt_conf.fingerprint() == *key_fp.bytes())
-        {
-            // check if source is encrypted or contents signed
-            if !manifest
-                .files()
-                .iter()
-                .all(|f| f.chunk_crypt_mode() == CryptMode::Encrypt)
-            {
-                log_sender
-                    .log(
-                        Level::WARN,
-                        format!("Snapshot not fully encrypted, sync as is despite matching key '{key_id}' with fingerprint {key_fp}"),
-                    )
-                    .await?;
-            } else {
-                manifest
-                    .check_signature(config)
-                    .context("failed to check source manifest signature")
-                    .with_context(|| prefix.clone())?;
-
-                if let Some(existing_manifest) = existing_target_manifest {
-                    if let Some(existing_fingerprint) = existing_manifest
-                        .fingerprint()
-                        .with_context(|| prefix.clone())?
-                    {
-                        if existing_fingerprint != key_fp {
-                            bail!("Detected local encrypted or signed snapshot with encryption key mismatch!");
-                        }
-                    } else if let Some(source_fp) = manifest
-                        .get_change_detection_fingerprint()
-                        .context("failed to parse change detection fingerprint of source manifest")
-                        .with_context(|| prefix.clone())?
-                    {
-                        // Stored fp is HMAC over the unencrypted source's protected fields; recompute
-                        // over the locally decrypted manifest, not the fresh encrypted remote one.
-                        let target_fp = existing_manifest
-                            .signature(config)
-                            .with_context(|| prefix.clone())?;
-                        if target_fp == *source_fp.bytes() {
-                            fetch_log().await?;
-                            cleanup().await?;
-                            return Ok(sync_stats); // nothing changed
-                        }
-
-                        bail!("Change detection fingerprint mismatch, refuse to continue");
-                    }
-                } else {
-                    log_sender
-                        .log(
-                            Level::INFO,
-                            format!("Found matching key '{key_id}' with fingerprint {key_fp}, decrypt on pull"),
-                        )
-                        .await?;
-                    crypt_config = Some(Arc::clone(config));
-                    new_manifest = Some(Arc::new(Mutex::new(BackupManifest::new(snapshot.into()))));
-                }
-            }
-        } else if let Some(existing_target_manifest) = existing_target_manifest {
-            if let Some(existing_fingerprint) = existing_target_manifest
-                .fingerprint()
-                .with_context(|| prefix.clone())?
-            {
-                if existing_fingerprint != key_fp {
-                    // pre-existing local manifest for encrypted snapshot with key mismatch
-                    bail!("Local encrypted or signed snapshot with different key detected, refuse to sync");
-                }
-            } else {
-                // pre-existing local manifest without key-fingerprint was previously decrypted,
-                // never overwrite with encrypted
-                bail!(
-                    "local snapshot was previously decrypted but no matching decryption key is configured, refuse to sync"
-                );
-            }
-        } else if !params.crypt_configs.is_empty() {
-            log_sender
-                .log(
-                    Level::INFO,
-                    format!("{prefix}: No matching key found, sync without decryption"),
-                )
-                .await?;
+    let (crypt_config, new_manifest) = match optionally_use_decryption_key(
+        Arc::clone(&params),
+        &manifest,
+        existing_target_manifest.as_ref(),
+        prefix.clone(),
+        Arc::clone(&log_sender),
+    )
+    .await?
+    {
+        (None, false) => (None, None), // regular pull without decryption
+        (Some(crypt_config), false) => {
+            // decrypt while pull
+            let new_manifest = Arc::new(Mutex::new(BackupManifest::new(snapshot.into())));
+            (Some(crypt_config), Some(new_manifest))
         }
-    }
+        (_, true) => {
+            // nothing changed
+            fetch_log().await?;
+            cleanup().await?;
+            return Ok(sync_stats);
+        }
+    };
 
     for item in manifest.files() {
         let mut path = snapshot.full_path();
@@ -977,6 +910,122 @@ async fn pull_snapshot<'a>(
         .map_err(|err| format_err!("{prefix}: failed to cleanup unreferenced files - {err}"))?;
 
     Ok(sync_stats)
+}
+
+/// Check if the decryption key should be used to decrypt the snapshot during
+/// pull based on given pull parameter, source and optionally already present
+/// target manifest.
+///
+/// The boolean flag in the returned tuple indicates whether the pull can be
+/// skipped altogether, since the already existing target is unchanged.
+/// If decryption should happen, the matching decryption key is returned.
+async fn optionally_use_decryption_key(
+    params: Arc<PullParameters>,
+    manifest: &BackupManifest,
+    existing_target_manifest: Option<&BackupManifest>,
+    prefix: String,
+    log_sender: Arc<LogLineSender>,
+) -> Result<(Option<Arc<CryptConfig>>, bool), Error> {
+    let key_fp = match manifest.fingerprint().with_context(|| prefix.clone())? {
+        Some(key_fp) => key_fp,
+        None => return Ok((None, false)), // no fingerprint on source, regular pull
+    };
+
+    // source got key fingerprint, expect contents to be signed or encrypted
+    let (key_id, config) = match params
+        .crypt_configs
+        .iter()
+        .find(|(_id, crypt_conf)| crypt_conf.fingerprint() == *key_fp.bytes())
+    {
+        Some(key_id_and_config) => key_id_and_config,
+        None => {
+            // no matching key found in list of configured ones
+            if let Some(existing_target_manifest) = existing_target_manifest {
+                if let Some(existing_fingerprint) = existing_target_manifest
+                    .fingerprint()
+                    .with_context(|| prefix.clone())?
+                {
+                    if existing_fingerprint != key_fp {
+                        // pre-existing local manifest for encrypted snapshot with key mismatch
+                        bail!(
+                            "Local encrypted or signed snapshot with different key detected, refuse to sync"
+                        );
+                    }
+                } else {
+                    // pre-existing local manifest without key-fingerprint was previously decrypted,
+                    // never overwrite with encrypted
+                    bail!(
+                        "local snapshot was previously decrypted but no matching decryption key is configured, refuse to sync"
+                    );
+                }
+            } else if !params.crypt_configs.is_empty() {
+                log_sender
+                    .log(
+                        Level::INFO,
+                        format!("{prefix}: No matching key found, sync without decryption"),
+                    )
+                    .await?;
+            }
+            return Ok((None, false));
+        }
+    };
+
+    // check if source is encrypted or contents signed
+    if !manifest
+        .files()
+        .iter()
+        .all(|f| f.chunk_crypt_mode() == CryptMode::Encrypt)
+    {
+        log_sender
+            .log(
+                Level::WARN,
+                format!("Snapshot not fully encrypted, sync as is despite matching key '{key_id}' with fingerprint {key_fp}"),
+            )
+            .await?;
+        return Ok((None, false));
+    }
+
+    manifest
+        .check_signature(config)
+        .context("failed to check source manifest signature")
+        .with_context(|| prefix.clone())?;
+
+    // avoid overwriting pre-existing target manifest
+    if let Some(existing_manifest) = existing_target_manifest {
+        if let Some(existing_fingerprint) = existing_manifest
+            .fingerprint()
+            .with_context(|| prefix.clone())?
+        {
+            if existing_fingerprint != key_fp {
+                bail!("Detected local encrypted or signed snapshot with encryption key mismatch!");
+            }
+        } else if let Some(source_fp) = manifest
+            .get_change_detection_fingerprint()
+            .context("failed to parse change detection fingerprint of source manifest")
+            .with_context(|| prefix.clone())?
+        {
+            // Stored fp is HMAC over the unencrypted source's protected fields; recompute
+            // over the locally decrypted manifest, not the fresh encrypted remote one.
+            let target_fp = existing_manifest
+                .signature(config)
+                .with_context(|| prefix.clone())?;
+            if target_fp == *source_fp.bytes() {
+                return Ok((None, true));
+            }
+
+            bail!("Change detection fingerprint mismatch, refuse to continue!");
+        }
+        return Ok((None, false));
+    }
+
+    log_sender
+        .log(
+            Level::INFO,
+            format!("Found matching key '{key_id}' with fingerprint {key_fp}, decrypt on pull"),
+        )
+        .await?;
+
+    Ok((Some(Arc::clone(config)), false))
 }
 
 /// Pulls a `snapshot`, removing newly created ones on error, but keeping existing ones in any case.
