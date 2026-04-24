@@ -112,7 +112,7 @@ Ext.define('PBS.config.EncryptionKeysView', {
             }).show();
         },
 
-        restoreEncryptionKey: function () {
+        restoreTapeEncryptionKey: function () {
             Ext.create('Proxmox.window.Edit', {
                 title: gettext('Restore Key'),
                 isCreate: true,
@@ -275,13 +275,11 @@ Ext.define('PBS.config.EncryptionKeysView', {
                 (item.data.type === 'sync' && !!item.data['archived-at']) ||
                 item.data.type === 'tape',
         },
-        '-',
+        '->',
         {
-            text: gettext('Restore Key'),
-            xtype: 'proxmoxButton',
-            handler: 'restoreEncryptionKey',
-            disabled: true,
-            enableFn: (item) => item.data.type === 'tape',
+            text: gettext('Restore Tape Key'),
+            xtype: 'button',
+            handler: 'restoreTapeEncryptionKey',
         },
     ],
 
