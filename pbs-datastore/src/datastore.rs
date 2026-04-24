@@ -1200,8 +1200,9 @@ impl DataStore {
         if !self.namespace_exists(source_ns) {
             bail!("source namespace '{source_ns}' does not exist");
         }
-        if !target_ns.is_root() && !self.namespace_exists(target_ns) {
-            bail!("target namespace '{target_ns}' does not exist");
+        let target_parent = target_ns.parent();
+        if !target_ns.is_root() && !self.namespace_exists(&target_parent) {
+            bail!("target parent namespace '{target_parent}' does not exist");
         }
         if source_ns.contains(target_ns).is_some() {
             bail!(
