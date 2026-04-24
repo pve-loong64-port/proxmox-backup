@@ -319,14 +319,16 @@ pub fn renew_acme_cert(force: bool, rpcenv: &mut dyn RpcEnvironment) -> Result<S
 
 /// Renewal lead time in seconds for the given certificate.
 ///
-/// A cert is due for renewal once 2/3 of its lifetime has elapsed, with a 3-day floor so the
-/// daily-update service can retry transient renewal failures.
+/// Long-lived certs are renewed once 2/3 of their lifetime has elapsed; short-lived ones (under
+/// ten days) already at 1/2, following Let's Encrypt's integration guide. A 3-day floor still
+/// applies so the daily-update service has a couple of chances to retry transient failures.
 fn cert_renew_lead_time(cert: &cert::CertInfo) -> i64 {
     if let (Some(notafter), Some(notbefore)) =
         (cert.not_after_unix().ok(), cert.not_before_unix().ok())
     {
         let lifetime = notafter - notbefore;
-        std::cmp::max(lifetime / 3, 3 * SECONDS_PER_DAY)
+        let scale = if lifetime < 10 * SECONDS_PER_DAY { 2 } else { 3 };
+        std::cmp::max(lifetime / scale, 3 * SECONDS_PER_DAY)
     } else {
         log::warn!(
             "certificate notBefore/notAfter unavailable, falling back to 30-day renewal lead time"
