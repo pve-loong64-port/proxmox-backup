@@ -17,6 +17,8 @@ use pbs_tools::cert;
 
 use crate::server::send_certificate_renewal_mail;
 
+const SECONDS_PER_DAY: i64 = 24 * 60 * 60;
+
 pub const ROUTER: Router = Router::new()
     .get(&list_subdirs_api_method!(SUBDIRS))
     .subdirs(SUBDIRS);
@@ -324,12 +326,12 @@ fn cert_renew_lead_time(cert: &cert::CertInfo) -> i64 {
         (cert.not_after_unix().ok(), cert.not_before_unix().ok())
     {
         let lifetime = notafter - notbefore;
-        std::cmp::max(lifetime / 3, 3 * 24 * 60 * 60)
+        std::cmp::max(lifetime / 3, 3 * SECONDS_PER_DAY)
     } else {
         log::warn!(
             "certificate notBefore/notAfter unavailable, falling back to 30-day renewal lead time"
         );
-        30 * 24 * 60 * 60
+        30 * SECONDS_PER_DAY
     }
 }
 
@@ -343,7 +345,7 @@ pub fn check_renewal_needed() -> Result<(bool, i64), Error> {
     let expires_soon = cert
         .is_expired_after_epoch(proxmox_time::epoch_i64() + lead)
         .map_err(|err| format_err!("Failed to check certificate expiration date: {}", err))?;
-    Ok((expires_soon, lead / (24 * 60 * 60)))
+    Ok((expires_soon, lead / SECONDS_PER_DAY))
 }
 
 fn spawn_certificate_worker(
