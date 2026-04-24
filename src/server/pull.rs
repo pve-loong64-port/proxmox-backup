@@ -930,32 +930,43 @@ async fn optionally_use_decryption_key(
         return Ok((None, false)); // no fingerprint on source, regular pull
     };
 
+    // check if source is encrypted or contents signed
+    let encrypted = manifest
+        .files()
+        .iter()
+        .all(|f| f.chunk_crypt_mode() == CryptMode::Encrypt);
+
+    if let Some(existing_manifest) = existing_target_manifest {
+        if let Some(existing_fingerprint) = existing_manifest.fingerprint()? {
+            if existing_fingerprint == key_fp {
+                let target_encrypted = existing_manifest
+                    .files()
+                    .iter()
+                    .all(|f| f.chunk_crypt_mode() == CryptMode::Encrypt);
+                if encrypted == target_encrypted {
+                    // both sides are signed or encrypted with the same key, just resync
+                    return Ok((None, false));
+                }
+            } else {
+                // pre-existing local manifest for encrypted snapshot with key mismatch
+                bail!("Local encrypted or signed snapshot with different key detected, refuse to sync");
+            }
+        }
+    };
+
     // source got key fingerprint, expect contents to be signed or encrypted
     let Some((key_id, config)) = params
         .crypt_configs
         .iter()
         .find(|(_id, crypt_conf)| crypt_conf.fingerprint() == *key_fp.bytes())
     else {
-        // no matching key found in list of configured ones
-        if let Some(existing_target_manifest) = existing_target_manifest {
-            if let Some(existing_fingerprint) = existing_target_manifest
-                .fingerprint()
-                .with_context(|| prefix.clone())?
-            {
-                if existing_fingerprint != key_fp {
-                    // pre-existing local manifest for encrypted snapshot with key mismatch
-                    bail!(
-                            "Local encrypted or signed snapshot with different key detected, refuse to sync"
-                        );
-                }
-            } else {
-                // pre-existing local manifest without key-fingerprint was previously decrypted,
-                // never overwrite with encrypted
-                bail!(
-                        "local snapshot was previously decrypted but no matching decryption key is configured, refuse to sync"
-                    );
-            }
-        } else if !params.crypt_configs.is_empty() {
+        // all the other cases are handled above
+        if encrypted && existing_target_manifest.is_some() {
+            bail!("No matching key found, refusing sync");
+        }
+
+        // regular sync
+        if !params.crypt_configs.is_empty() {
             log_sender
                 .log(
                     Level::INFO,
@@ -963,15 +974,12 @@ async fn optionally_use_decryption_key(
                 )
                 .await?;
         }
+
         return Ok((None, false));
     };
 
     // check if source is encrypted or contents signed
-    if !manifest
-        .files()
-        .iter()
-        .all(|f| f.chunk_crypt_mode() == CryptMode::Encrypt)
-    {
+    if !encrypted {
         log_sender
             .log(
                 Level::WARN,
@@ -986,16 +994,11 @@ async fn optionally_use_decryption_key(
         .context("failed to check source manifest signature")
         .with_context(|| prefix.clone())?;
 
+    let mut skip_resync = false;
+
     // avoid overwriting pre-existing target manifest
     if let Some(existing_manifest) = existing_target_manifest {
-        if let Some(existing_fingerprint) = existing_manifest
-            .fingerprint()
-            .with_context(|| prefix.clone())?
-        {
-            if existing_fingerprint != key_fp {
-                bail!("Detected local encrypted or signed snapshot with encryption key mismatch!");
-            }
-        } else if let Some(source_fp) = manifest
+        if let Some(source_fp) = manifest
             .get_change_detection_fingerprint()
             .context("failed to parse change detection fingerprint of source manifest")
             .with_context(|| prefix.clone())?
@@ -1006,12 +1009,13 @@ async fn optionally_use_decryption_key(
                 .signature(config)
                 .with_context(|| prefix.clone())?;
             if target_fp == *source_fp.bytes() {
-                return Ok((None, true));
+                skip_resync = true;
+            } else {
+                bail!("Change detection fingerprint mismatch, refuse to continue!");
             }
-
-            bail!("Change detection fingerprint mismatch, refuse to continue!");
+        } else {
+            bail!("No change detection fingerprint found, refuse to continue!");
         }
-        return Ok((None, false));
     }
 
     log_sender
@@ -1021,7 +1025,7 @@ async fn optionally_use_decryption_key(
         )
         .await?;
 
-    Ok((Some(Arc::clone(config)), false))
+    Ok((Some(Arc::clone(config)), skip_resync))
 }
 
 /// Pulls a `snapshot`, removing newly created ones on error, but keeping existing ones in any case.
