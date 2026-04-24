@@ -327,7 +327,11 @@ fn cert_renew_lead_time(cert: &cert::CertInfo) -> i64 {
         (cert.not_after_unix().ok(), cert.not_before_unix().ok())
     {
         let lifetime = notafter - notbefore;
-        let scale = if lifetime < 10 * SECONDS_PER_DAY { 2 } else { 3 };
+        let scale = if lifetime < 10 * SECONDS_PER_DAY {
+            2
+        } else {
+            3
+        };
         std::cmp::max(lifetime / scale, 3 * SECONDS_PER_DAY)
     } else {
         log::warn!(
