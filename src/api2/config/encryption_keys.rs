@@ -195,15 +195,17 @@ fn check_encryption_key_in_use(id: &str, include_associated: bool) -> Result<(),
     let mut used_by_jobs = Vec::new();
 
     let job_list: Vec<SyncJobConfig> = config.convert_to_typed_array("sync")?;
+
+    let contains_associated_key = |job: &SyncJobConfig| {
+        job.associated_key
+            .as_deref()
+            .unwrap_or(&[])
+            .contains(&id.to_string())
+    };
+
     for job in job_list {
-        if job.active_encryption_key.as_deref() == Some(id) {
-            used_by_jobs.push(job.id.clone());
-        } else if include_associated
-            && job
-                .associated_key
-                .as_deref()
-                .unwrap_or(&[])
-                .contains(&id.to_string())
+        if job.active_encryption_key.as_deref() == Some(id)
+            || (include_associated && contains_associated_key(&job))
         {
             used_by_jobs.push(job.id.clone());
         }
