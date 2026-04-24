@@ -1,3 +1,51 @@
+rust-proxmox-backup (4.1.10-1) trixie; urgency=medium
+
+  * api: add new '/nodes/localhost/identity' endpoint that returns a stable,
+    unique instance ID derived from /etc/machine-id, for uniquely identifying
+    a PBS node. Primarily useful for matching PBS storages in a PVE cluster to
+    PBS remotes in PDM.
+
+  * client, manager: add 'server-identity' CLI subcommand to query the
+    instance ID from the backup client and admin tools.
+
+  * cli: migrate the 'move-group' and 'move-namespace' commands introduced in
+    4.1.9 from the manager to the backup client, exposed as 'group move' and
+    'namespace move' respectively, where they fit better alongside the other
+    group and namespace subcommands. This also implicitly fixes any permission
+    issue of the manager code having called the API handler directly without
+    going over the daemon.
+
+  * api: namespace move: create the target namespace automatically if it does
+    not exist yet (its parent namespace must still exist), matching what a
+    plain file 'mv' does.
+
+  * fix: sync: pull: distinguish signed-only from fully encrypted snapshots
+    when deciding whether to decrypt on pull. The mere presence of a key
+    fingerprint on the source manifest was previously taken as proof of
+    encryption, which could cause pull sync jobs with a matching decryption
+    key to fail on signed-only snapshots. Pull sync now decrypts only if all
+    registered files are actually encrypted, and falls back to a regular pull
+    with a warning otherwise.
+
+  * partially fix #6372: acme: also pick a shorter renewal lead of half the
+    certificate lifetime for short-lived certificates (under ten days total),
+    following the Let's Encrypt integration guide. The previous 1/3 fraction
+    still applies for longer-lived certificates.
+
+  * ui: datastore create: drop the now outdated 'technology preview' label for
+    S3-backed datastores.
+
+  * ui: tape: tune vertical alignment of the tape icon in tree views so it
+    sits better next to the surrounding text.
+
+  * docs: describe the S3 request counters, how they can trigger
+    notifications, and the periodic threshold reset schedule.
+
+  * docs: list previously missing entries under the configuration subtree with
+    a short description of each.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 24 Apr 2026 22:59:22 +0200
+
 rust-proxmox-backup (4.1.9-1) trixie; urgency=medium
 
   * s3: graduate the S3 datastore backend from technology preview to a fully
