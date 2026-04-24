@@ -26,8 +26,8 @@ use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 use pbs_api_types::{
     ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
     BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPattern,
-    PruneJobOptions, PruneListItem, RateLimitConfig, SnapshotListItem, StorageStatus,
-    BACKUP_ID_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
+    PruneJobOptions, PruneListItem, RateLimitConfig, ServerIdentity, SnapshotListItem,
+    StorageStatus, BACKUP_ID_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
     ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
 };
 use pbs_client::catalog_shell::Shell;
@@ -138,6 +138,40 @@ fn record_repository(repo: &BackupRepository) {
         CreateOptions::new(),
         false,
     );
+}
+
+#[api(
+    input: {
+        properties: {
+            repo: {
+                type: BackupRepositoryArgs,
+                flatten: true,
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        },
+    },
+)]
+/// Return the server identity information for this Proxmox Backup Server.
+async fn get_server_identity(param: Value) -> Result<Value, Error> {
+    let repo = extract_repository_from_value(&param)?;
+    let output_format = get_output_format(&param);
+    let client = connect(&repo)?;
+
+    let mut result = client
+        .get("api2/json/nodes/localhost/identity", None)
+        .await?;
+
+    let id: ServerIdentity = serde_json::from_value(result["data"].take())?;
+
+    if output_format == "text" {
+        println!("pbs-instance-id: {}", id.pbs_instance_id);
+    } else {
+        format_and_print_result(&id, &output_format);
+    }
+    Ok(Value::Null)
 }
 
 async fn api_datastore_list_snapshots(
@@ -2054,6 +2088,9 @@ fn main() {
     let version_cmd_def =
         CliCommand::new(&API_METHOD_API_VERSION).completion_cb("repository", complete_repository);
 
+    let server_identity_cmd_def = CliCommand::new(&API_METHOD_GET_SERVER_IDENTITY)
+        .completion_cb("repository", complete_repository);
+
     let change_owner_cmd_def = CliCommand::new(&API_METHOD_CHANGE_BACKUP_OWNER)
         .arg_param(&["group", "new-owner"])
         .completion_cb("ns", complete_namespace)
@@ -2064,6 +2101,7 @@ fn main() {
     let cmd_def = CliCommandMap::new()
         .insert("backup", backup_cmd_def)
         .insert("garbage-collect", garbage_collect_cmd_def)
+        .insert("server-identity", server_identity_cmd_def)
         .insert("list", list_cmd_def)
         .insert("login", login_cmd_def)
         .insert("logout", logout_cmd_def)
