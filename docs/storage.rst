@@ -593,6 +593,7 @@ Required privileges:
 - ``move-namespace``: ``DATASTORE_MODIFY`` on the parent of both the
   source and the target namespace.
 
+.. _datastore_options:
 
 Options
 ~~~~~~~
@@ -606,6 +607,9 @@ There are a few per-datastore options:
 
 * :ref:`Notification mode and legacy notification settings <notification_mode>`
 * :ref:`Maintenance Mode <maintenance_mode>`
+* :ref:`Maintenance Mode <maintenance_mode>`
+* :ref:`Notification Thresholds (S3 datastores only) <s3_notification_thresholds>`
+* :ref:`Threshold Reset Schedule (S3 datastores only) <s3_notification_thresholds>`
 * Verification of incoming backups
 
 .. _datastore_tuning_options:

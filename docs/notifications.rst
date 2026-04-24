@@ -371,3 +371,50 @@ The template files follow the naming convention of
 ``gc-err-body.txt.hbs`` contains the template for rendering notifications for
 garbage collection errors, while ``package-updates-subject.txt.hbs`` is used to
 render the subject line of notifications for available package updates.
+
+.. _s3_notification_thresholds:
+
+Notification Thresholds and Reset Schedule (S3 Datastores Only)
+---------------------------------------------------------------
+
+Datastores of type S3 keep track of the number of requests being send to the
+corresponding S3 endpoint and the amount of data being send. Proxmox Backup
+Server allows to configure threshold for these request and traffic counters to
+send out notifications if one of the set threshold values is exceeded.
+
+The notification threshold value can be set individually by request method or
+traffic volume. Notifications will be send out only once per threshold when the
+threshold has been exceeded. A counter reset is required to bring it below the
+threshold again in order to get further notifications. Therefore, it is possible
+to define a threshold reset schedule so request and traffic counters get
+periodically reset.
+
+Per datastore notification thresholds and their reset schedule are configurable
+in the :ref:`Datastore Options <datastore_options>` for S3 backed datastores.
+
+The following counters thresholds are available for configuration:
+
+==================== ==========================================================
+Counter Threshold    Description and Usage
+==================== ==========================================================
+``s3-get``           Number of ``GET`` requests: Mainly used for download of
+                     data and metadata among the following operations: restore,
+                     verification, S3 refresh, garbage collection.
+``s3-put``           Number of ``PUT`` requests: Mainly used for upload of data
+                     and metadata among the following operations: backup, syncs,
+                     metadata changes, content moves.
+``s3-post``          Number of ``POST`` requests: Mainly used for modification
+                     of data and metadata among the following operations: bulk
+                     deletion during garbage collection, content moves.
+``s3-head``          Number of ``HEAD`` requests: Mainly used to check for
+                     access and existence among which the following operations:
+                     checking bucket access, fetching of metadata.
+``s3-delete``        Number of ``DELETE`` requests: Mainly used for deleting
+                     single objects by the following operations: garbage
+                     collection, content moves.
+``s3-upload``        Amount of bytes uploaded to the S3 endpoint, independent of
+                     request method.
+``s3-download``      Amount of bytes downloaded from the S3 endpoint,
+                     independent of request method.
+==================== ==========================================================
+
