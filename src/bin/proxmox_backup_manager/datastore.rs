@@ -325,7 +325,6 @@ async fn uuid_mount(mut param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Resul
 }
 
 #[api(
-    protected: true,
     input: {
         properties: {
             store: {
@@ -356,28 +355,27 @@ async fn uuid_mount(mut param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Resul
                     namespace, merge snapshots into it. Requires matching ownership and \
                     non-overlapping snapshot times.",
             },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
         },
     },
 )]
 /// Move a backup namespace to a new location within the same datastore.
-async fn cli_move_namespace(
-    mut param: Value,
-    rpcenv: &mut dyn RpcEnvironment,
-) -> Result<(), Error> {
-    param["node"] = "localhost".into();
+async fn cli_move_namespace(store: String, mut param: Value) -> Result<(), Error> {
+    let output_format = extract_output_format(&mut param);
 
-    let info = &api2::admin::namespace::API_METHOD_MOVE_NAMESPACE;
-    let result = match info.handler {
-        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
-        _ => unreachable!(),
-    };
+    let client = connect_to_localhost()?;
+    let path = format!("api2/json/admin/datastore/{store}/move-namespace");
+    let result = client.post(&path, Some(param)).await?;
 
-    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    view_task_result(&client, result, &output_format).await?;
+
     Ok(())
 }
 
 #[api(
-    protected: true,
     input: {
         properties: {
             store: {
@@ -401,20 +399,23 @@ async fn cli_move_namespace(
                     snapshots into it. Requires matching ownership and non-overlapping \
                     snapshot times.",
             },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
         },
     },
 )]
 /// Move a backup group to a different namespace within the same datastore.
-async fn cli_move_group(mut param: Value, rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
-    param["node"] = "localhost".into();
+async fn cli_move_group(store: String, mut param: Value) -> Result<(), Error> {
+    let output_format = extract_output_format(&mut param);
 
-    let info = &api2::admin::datastore::API_METHOD_MOVE_GROUP;
-    let result = match info.handler {
-        ApiHandler::Sync(handler) => (handler)(param, info, rpcenv)?,
-        _ => unreachable!(),
-    };
+    let client = connect_to_localhost()?;
+    let path = format!("api2/json/admin/datastore/{store}/move-group");
+    let result = client.post(&path, Some(param)).await?;
 
-    crate::wait_for_local_worker(result.as_str().unwrap()).await?;
+    view_task_result(&client, result, &output_format).await?;
+
     Ok(())
 }
 
