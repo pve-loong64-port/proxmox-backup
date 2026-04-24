@@ -93,9 +93,15 @@ WebAuthn, and HTTP proxy configuration. It also contains the following
 subsections:
 
 * **Access Control**: Add and manage users, API tokens, and the permissions
-  associated with these items
-* **Remotes**: Add, edit and remove remotes (see :term:`Remote`)
+  associated with these items.
+* **Remotes**: Add, edit and remove remotes (see :term:`Remote`).
+* **S3 Endpoints**: Add, edit and remove S3 endpoints to be used by datastores.
+* **Traffic Control**: Manage rules for traffic limits on users, networks and
+  timeframes.
 * **Certificates**: Manage ACME accounts and create SSL certificates.
+* **Encryptioin Keys**: Manage encryption keys for tape backups and sync jobs.
+* **Notifications**: Configure notification targets and control when
+  notifications should be send by defining match rules.
 * **Subscription**: Upload a subscription key, view subscription status and
   access a text-based system report.
 
