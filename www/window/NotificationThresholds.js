@@ -40,6 +40,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             {
                 xtype: 'proxmoxintegerfield',
                 name: 's3-get',
+                // TRANSLATORS: GET, like the HTTP method
                 fieldLabel: gettext('GET'),
                 emptyText: gettext('none'),
                 fieldStyle: 'text-align: right',
@@ -49,6 +50,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             {
                 xtype: 'proxmoxintegerfield',
                 name: 's3-put',
+                // TRANSLATORS: PUT, like the HTTP method
                 fieldLabel: gettext('PUT'),
                 emptyText: gettext('none'),
                 fieldStyle: 'text-align: right',
@@ -58,6 +60,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             {
                 xtype: 'proxmoxintegerfield',
                 name: 's3-post',
+                // TRANSLATORS: POST, like the HTTP method
                 fieldLabel: gettext('POST'),
                 emptyText: gettext('none'),
                 fieldStyle: 'text-align: right',
@@ -67,6 +70,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             {
                 xtype: 'proxmoxintegerfield',
                 name: 's3-head',
+                // TRANSLATORS: HEAD, like the HTTP method
                 fieldLabel: gettext('HEAD'),
                 emptyText: gettext('none'),
                 fieldStyle: 'text-align: right',
@@ -76,6 +80,7 @@ Ext.define('PBS.window.NotificationThresholds', {
             {
                 xtype: 'proxmoxintegerfield',
                 name: 's3-delete',
+                // TRANSLATORS: DELETE, like the HTTP method
                 fieldLabel: gettext('DELETE'),
                 emptyText: gettext('none'),
                 fieldStyle: 'text-align: right',

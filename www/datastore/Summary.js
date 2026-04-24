@@ -181,6 +181,7 @@ Ext.define('PBS.DataStoreS3Stats', {
             padding: '10 0 5 0',
         },
         {
+            // TRANSLATORS: GET, like the HTTP method
             title: gettext('GET'),
             printBar: false,
             bind: {
@@ -190,6 +191,7 @@ Ext.define('PBS.DataStoreS3Stats', {
             },
         },
         {
+            // TRANSLATORS: PUT, like the HTTP method
             title: gettext('PUT'),
             printBar: false,
             bind: {
@@ -199,6 +201,7 @@ Ext.define('PBS.DataStoreS3Stats', {
             },
         },
         {
+            // TRANSLATORS: POST, like the HTTP method
             title: gettext('POST'),
             printBar: false,
             bind: {
@@ -208,6 +211,7 @@ Ext.define('PBS.DataStoreS3Stats', {
             },
         },
         {
+            // TRANSLATORS: HEAD, like the HTTP method
             title: gettext('HEAD'),
             printBar: false,
             bind: {
@@ -217,6 +221,7 @@ Ext.define('PBS.DataStoreS3Stats', {
             },
         },
         {
+            // TRANSLATORS: DELETE, like the HTTP method
             title: gettext('DELETE'),
             printBar: false,
             bind: {
@@ -368,10 +373,15 @@ Ext.define('PBS.DataStoreSummary', {
                 's3/total/delete',
             ],
             fieldTitles: [
+                // TRANSLATORS: GET, like the HTTP method
                 gettext('GET'),
+                // TRANSLATORS: PUT, like the HTTP method
                 gettext('PUT'),
+                // TRANSLATORS: POST, like the HTTP method
                 gettext('POST'),
+                // TRANSLATORS: HEAD, like the HTTP method
                 gettext('HEAD'),
+                // TRANSLATORS: DELETE, like the HTTP method
                 gettext('DELETE'),
             ],
             bind: {
