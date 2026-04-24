@@ -926,48 +926,44 @@ async fn optionally_use_decryption_key(
     prefix: String,
     log_sender: Arc<LogLineSender>,
 ) -> Result<(Option<Arc<CryptConfig>>, bool), Error> {
-    let key_fp = match manifest.fingerprint().with_context(|| prefix.clone())? {
-        Some(key_fp) => key_fp,
-        None => return Ok((None, false)), // no fingerprint on source, regular pull
+    let Some(key_fp) = manifest.fingerprint().with_context(|| prefix.clone())? else {
+        return Ok((None, false)); // no fingerprint on source, regular pull
     };
 
     // source got key fingerprint, expect contents to be signed or encrypted
-    let (key_id, config) = match params
+    let Some((key_id, config)) = params
         .crypt_configs
         .iter()
         .find(|(_id, crypt_conf)| crypt_conf.fingerprint() == *key_fp.bytes())
-    {
-        Some(key_id_and_config) => key_id_and_config,
-        None => {
-            // no matching key found in list of configured ones
-            if let Some(existing_target_manifest) = existing_target_manifest {
-                if let Some(existing_fingerprint) = existing_target_manifest
-                    .fingerprint()
-                    .with_context(|| prefix.clone())?
-                {
-                    if existing_fingerprint != key_fp {
-                        // pre-existing local manifest for encrypted snapshot with key mismatch
-                        bail!(
+    else {
+        // no matching key found in list of configured ones
+        if let Some(existing_target_manifest) = existing_target_manifest {
+            if let Some(existing_fingerprint) = existing_target_manifest
+                .fingerprint()
+                .with_context(|| prefix.clone())?
+            {
+                if existing_fingerprint != key_fp {
+                    // pre-existing local manifest for encrypted snapshot with key mismatch
+                    bail!(
                             "Local encrypted or signed snapshot with different key detected, refuse to sync"
                         );
-                    }
-                } else {
-                    // pre-existing local manifest without key-fingerprint was previously decrypted,
-                    // never overwrite with encrypted
-                    bail!(
+                }
+            } else {
+                // pre-existing local manifest without key-fingerprint was previously decrypted,
+                // never overwrite with encrypted
+                bail!(
                         "local snapshot was previously decrypted but no matching decryption key is configured, refuse to sync"
                     );
-                }
-            } else if !params.crypt_configs.is_empty() {
-                log_sender
-                    .log(
-                        Level::INFO,
-                        format!("{prefix}: No matching key found, sync without decryption"),
-                    )
-                    .await?;
             }
-            return Ok((None, false));
+        } else if !params.crypt_configs.is_empty() {
+            log_sender
+                .log(
+                    Level::INFO,
+                    format!("{prefix}: No matching key found, sync without decryption"),
+                )
+                .await?;
         }
+        return Ok((None, false));
     };
 
     // check if source is encrypted or contents signed
