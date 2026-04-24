@@ -1,25 +1,38 @@
 use anyhow::{bail, Error};
 use serde_json::Value;
 
-use proxmox_router::cli::{CliCommand, CliCommandMap, Confirmation};
+use proxmox_router::cli::{
+    extract_output_format, CliCommand, CliCommandMap, Confirmation, OUTPUT_FORMAT,
+};
 use proxmox_schema::api;
 
 use crate::{
     complete_backup_group, complete_namespace, complete_repository, merge_group_into,
-    BackupTargetArgs,
+    optional_ns_param, record_repository, BackupTargetArgs,
 };
-use pbs_api_types::BackupGroup;
+use pbs_api_types::{BackupGroup, BackupNamespace};
 use pbs_client::tools::{connect, remove_repository_from_value};
+use pbs_client::view_task_result;
 
 pub fn group_mgmt_cli() -> CliCommandMap {
-    CliCommandMap::new().insert(
-        "forget",
-        CliCommand::new(&API_METHOD_FORGET_GROUP)
-            .arg_param(&["group"])
-            .completion_cb("ns", complete_namespace)
-            .completion_cb("repository", complete_repository)
-            .completion_cb("group", complete_backup_group),
-    )
+    CliCommandMap::new()
+        .insert(
+            "forget",
+            CliCommand::new(&API_METHOD_FORGET_GROUP)
+                .arg_param(&["group"])
+                .completion_cb("ns", complete_namespace)
+                .completion_cb("repository", complete_repository)
+                .completion_cb("group", complete_backup_group),
+        )
+        .insert(
+            "move",
+            CliCommand::new(&API_METHOD_MOVE_GROUP)
+                .arg_param(&["group"])
+                .completion_cb("ns", complete_namespace)
+                .completion_cb("target-ns", complete_namespace)
+                .completion_cb("repository", complete_repository)
+                .completion_cb("group", complete_backup_group),
+        )
 }
 
 #[api(
@@ -75,6 +88,57 @@ async fn forget_group(group: String, mut param: Value) -> Result<(), Error> {
     } else {
         println!("Abort.");
     }
+
+    Ok(())
+}
+
+#[api(
+    input: {
+        properties: {
+            group: {
+                type: String,
+                description: "Backup group.",
+            },
+            repo: {
+                type: BackupTargetArgs,
+                flatten: true,
+            },
+            "target-ns": {
+                type: BackupNamespace,
+            },
+            "merge-group": {
+                type: bool,
+                optional: true,
+                default: true,
+                description: "If the group already exists in the target namespace, merge \
+                    snapshots into it. Requires matching ownership and non-overlapping \
+                    snapshot times.",
+            },
+            "output-format": {
+                schema: OUTPUT_FORMAT,
+                optional: true,
+            },
+        }
+    }
+)]
+/// Move a backup group to a different namespace within the same datastore.
+async fn move_group(group: String, mut param: Value) -> Result<(), Error> {
+    let output_format = extract_output_format(&mut param);
+    let backup_group: BackupGroup = group.parse()?;
+    let repo = remove_repository_from_value(&mut param)?;
+    let ns = optional_ns_param(&param)?;
+    if !ns.is_root() {
+        param["ns"] = serde_json::to_value(&ns)?;
+    }
+    merge_group_into(param.as_object_mut().unwrap(), backup_group);
+
+    let client = connect(&repo)?;
+    let path = format!("api2/json/admin/datastore/{}/move-group", repo.store());
+    let result = client.post(&path, Some(param)).await?;
+
+    record_repository(&repo);
+
+    view_task_result(&client, result, &output_format).await?;
 
     Ok(())
 }

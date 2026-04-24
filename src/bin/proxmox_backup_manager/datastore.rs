@@ -1,6 +1,5 @@
 use pbs_api_types::{
-    BackupNamespace, DataStoreConfig, DataStoreConfigUpdater, DATASTORE_SCHEMA,
-    NS_MAX_DEPTH_SCHEMA, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    DataStoreConfig, DataStoreConfigUpdater, DATASTORE_SCHEMA, PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
 use pbs_client::view_task_result;
 use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
@@ -325,101 +324,6 @@ async fn uuid_mount(mut param: Value, _rpcenv: &mut dyn RpcEnvironment) -> Resul
 }
 
 #[api(
-    input: {
-        properties: {
-            store: {
-                schema: DATASTORE_SCHEMA,
-            },
-            ns: {
-                type: BackupNamespace,
-            },
-            "target-ns": {
-                type: BackupNamespace,
-            },
-            "max-depth": {
-                schema: NS_MAX_DEPTH_SCHEMA,
-                optional: true,
-            },
-            "delete-source": {
-                type: bool,
-                optional: true,
-                default: true,
-                description: "Remove the source namespace after moving all contents. \
-                    Defaults to true.",
-            },
-            "merge-groups": {
-                type: bool,
-                optional: true,
-                default: true,
-                description: "If a group with the same name already exists in the target \
-                    namespace, merge snapshots into it. Requires matching ownership and \
-                    non-overlapping snapshot times.",
-            },
-            "output-format": {
-                schema: OUTPUT_FORMAT,
-                optional: true,
-            },
-        },
-    },
-)]
-/// Move a backup namespace to a new location within the same datastore.
-async fn cli_move_namespace(store: String, mut param: Value) -> Result<(), Error> {
-    let output_format = extract_output_format(&mut param);
-
-    let client = connect_to_localhost()?;
-    let path = format!("api2/json/admin/datastore/{store}/move-namespace");
-    let result = client.post(&path, Some(param)).await?;
-
-    view_task_result(&client, result, &output_format).await?;
-
-    Ok(())
-}
-
-#[api(
-    input: {
-        properties: {
-            store: {
-                schema: DATASTORE_SCHEMA,
-            },
-            ns: {
-                type: BackupNamespace,
-            },
-            group: {
-                type: pbs_api_types::BackupGroup,
-                flatten: true,
-            },
-            "target-ns": {
-                type: BackupNamespace,
-            },
-            "merge-group": {
-                type: bool,
-                optional: true,
-                default: true,
-                description: "If the group already exists in the target namespace, merge \
-                    snapshots into it. Requires matching ownership and non-overlapping \
-                    snapshot times.",
-            },
-            "output-format": {
-                schema: OUTPUT_FORMAT,
-                optional: true,
-            },
-        },
-    },
-)]
-/// Move a backup group to a different namespace within the same datastore.
-async fn cli_move_group(store: String, mut param: Value) -> Result<(), Error> {
-    let output_format = extract_output_format(&mut param);
-
-    let client = connect_to_localhost()?;
-    let path = format!("api2/json/admin/datastore/{store}/move-group");
-    let result = client.post(&path, Some(param)).await?;
-
-    view_task_result(&client, result, &output_format).await?;
-
-    Ok(())
-}
-
-#[api(
     protected: true,
     input: {
         properties: {
@@ -503,22 +407,6 @@ pub fn datastore_commands() -> CommandLineInterface {
             CliCommand::new(&API_METHOD_DELETE_DATASTORE)
                 .arg_param(&["name"])
                 .completion_cb("name", pbs_config::datastore::complete_datastore_name),
-        )
-        .insert(
-            "move-namespace",
-            CliCommand::new(&API_METHOD_CLI_MOVE_NAMESPACE)
-                .arg_param(&["store"])
-                .completion_cb("store", pbs_config::datastore::complete_datastore_name)
-                .completion_cb("ns", crate::complete_sync_local_datastore_namespace)
-                .completion_cb("target-ns", crate::complete_sync_local_datastore_namespace),
-        )
-        .insert(
-            "move-group",
-            CliCommand::new(&API_METHOD_CLI_MOVE_GROUP)
-                .arg_param(&["store"])
-                .completion_cb("store", pbs_config::datastore::complete_datastore_name)
-                .completion_cb("ns", crate::complete_sync_local_datastore_namespace)
-                .completion_cb("target-ns", crate::complete_sync_local_datastore_namespace),
         );
 
     cmd_def.into()
