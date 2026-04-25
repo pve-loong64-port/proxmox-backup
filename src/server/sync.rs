@@ -262,9 +262,13 @@ impl SyncSourceReader for LocalSourceReader {
         crypt_config: Option<Arc<CryptConfig>>,
         log_sender: Arc<LogLineSender>,
     ) -> Result<(), Error> {
+        let mut from_path = self.dir.full_path();
+        from_path.push(CLIENT_LOG_BLOB_NAME.as_ref());
+        // be silent if there is no log, matching the remote source reader's behavior
+        if !from_path.exists() {
+            return Ok(());
+        }
         if let Some(crypt_config) = &crypt_config {
-            let mut from_path = self.dir.full_path();
-            from_path.push(CLIENT_LOG_BLOB_NAME.as_ref());
             let blob_file = tokio::fs::File::open(from_path).await?;
             let blob_file = blob_file.into_std().await;
             let (_csum, _size) = decrypt_encrypted_data_blob(
