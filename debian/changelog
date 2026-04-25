@@ -1,3 +1,26 @@
+rust-proxmox-backup (4.1.11-1) trixie; urgency=medium
+
+  * ui: encryption keys: always enable the tape key restore button and rename
+    it to 'Restore Tape Key'.
+
+  * sync: implement client log fetching for local sync jobs, which was
+    previously not supported.
+
+  * sync: decrypt encrypted client logs on the fly when a matching decryption
+    key is configured, instead of storing them as opaque encrypted blobs on
+    the target.
+
+  * sync: pull: fix double blob decoding that broke on-the-fly decryption of
+    pulled blob files.
+
+  * sync: pull: skip client log fetch silently if the source snapshot has
+    none, instead of failing the snapshot pull.
+
+  * sync: pull: clean up temporary encrypted client log file after successful
+    decryption.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sun, 26 Apr 2026 01:52:39 +0200
+
 rust-proxmox-backup (4.1.10-1) trixie; urgency=medium
 
   * api: add new '/nodes/localhost/identity' endpoint that returns a stable,
