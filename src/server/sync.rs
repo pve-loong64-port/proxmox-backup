@@ -103,8 +103,8 @@ pub(crate) trait SyncSourceReader: Send + Sync {
     /// `into` is the path of the local file to load the source file into.
     async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error>;
 
-    /// Tries to download the client log from the source and save it into a local file.
-    async fn try_download_client_log(&self, to_path: &Path) -> Result<(), Error>;
+    /// Tries to fetch the client log from the source and save it into a local file.
+    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error>;
 
     fn skip_chunk_sync(&self, target_store_name: &str) -> bool;
 }
@@ -168,7 +168,7 @@ impl SyncSourceReader for RemoteSourceReader {
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_download_client_log(&self, to_path: &Path) -> Result<(), Error> {
+    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error> {
         let mut tmp_path = to_path.to_owned();
         tmp_path.set_extension("tmp");
 
@@ -229,7 +229,9 @@ impl SyncSourceReader for LocalSourceReader {
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_download_client_log(&self, _to_path: &Path) -> Result<(), Error> {
+    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error> {
+        self.load_file_into(CLIENT_LOG_BLOB_NAME.as_ref(), to_path)
+            .await?;
         Ok(())
     }
 

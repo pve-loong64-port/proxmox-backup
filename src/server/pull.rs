@@ -679,7 +679,7 @@ async fn pull_snapshot<'a>(
     let fetch_log = async || {
         if !client_log_name.exists() {
             reader
-                .try_download_client_log(&client_log_name)
+                .try_fetch_client_log(&client_log_name)
                 .await
                 .with_context(|| prefix.clone())?;
             if client_log_name.exists() {
