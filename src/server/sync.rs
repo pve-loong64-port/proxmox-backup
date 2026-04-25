@@ -207,6 +207,9 @@ impl SyncSourceReader for RemoteSourceReader {
                     to_path.to_path_buf(),
                 )
                 .await?;
+                if let Err(err) = std::fs::remove_file(&tmp_path) {
+                    bail!("Removing encrypted leftover tempfile {tmp_path:?} failed - {err}");
+                }
             } else if let Err(err) = std::fs::rename(&tmp_path, to_path) {
                 bail!("Atomic rename file {to_path:?} failed - {err}");
             }
