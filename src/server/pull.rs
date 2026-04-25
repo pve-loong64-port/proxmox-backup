@@ -2,7 +2,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::io::{BufReader, Seek};
+use std::io::{Read, Seek};
 use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -582,12 +582,15 @@ async fn pull_single_archive<'a>(
                 let (csum, size) = tokio::task::spawn_blocking(move || {
                     // must rewind again since after verifying cursor is at the end of the file
                     tmpfile.rewind()?;
-                    let mut reader = BufReader::new(DataBlobReader::new(tmpfile, crypt_config)?);
-                    let blob = DataBlob::load_from_reader(&mut reader)?;
-                    let mut raw_blob = blob.raw_data();
+                    let mut reader = DataBlobReader::new(tmpfile, crypt_config)?;
+                    let mut dec_raw_data = Vec::new();
+                    reader.read_to_end(&mut dec_raw_data)?;
+                    reader.finish()?;
 
-                    let (csum, size) = sha256(&mut raw_blob)?;
-                    replace_file(tmp_dec_path, raw_blob, CreateOptions::new(), true)?;
+                    let blob = DataBlob::encode(&dec_raw_data, None, true)?;
+
+                    let (csum, size) = sha256(&mut blob.raw_data())?;
+                    replace_file(tmp_dec_path, blob.raw_data(), CreateOptions::new(), true)?;
                     Ok((csum, size))
                 })
                 .await?
