@@ -679,9 +679,10 @@ async fn pull_snapshot<'a>(
     let fetch_log = async || {
         if !client_log_name.exists() {
             reader
-                .try_fetch_client_log(&client_log_name)
+                .try_fetch_client_log(&client_log_name, Arc::clone(&log_sender))
                 .await
                 .with_context(|| prefix.clone())?;
+
             if client_log_name.exists() {
                 if let DatastoreBackend::S3(s3_client) = backend {
                     let object_key = pbs_datastore::s3::object_key_from_path(
@@ -704,6 +705,7 @@ async fn pull_snapshot<'a>(
                 }
             }
         }
+
         Ok::<(), Error>(())
     };
     let cleanup = async || {

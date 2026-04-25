@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::io::{Seek, Write};
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -104,7 +104,11 @@ pub(crate) trait SyncSourceReader: Send + Sync {
     async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error>;
 
     /// Tries to fetch the client log from the source and save it into a local file.
-    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error>;
+    async fn try_fetch_client_log(
+        &self,
+        to_path: &Path,
+        log_sender: Arc<LogLineSender>,
+    ) -> Result<(), Error>;
 
     fn skip_chunk_sync(&self, target_store_name: &str) -> bool;
 }
@@ -117,8 +121,7 @@ pub(crate) struct RemoteSourceReader {
 pub(crate) struct LocalSourceReader {
     // must not be accessed/made pub, this is just a hack for Send+Sync
     _dir_lock: Arc<Mutex<BackupLockGuard>>,
-    pub(crate) path: PathBuf,
-    pub(crate) datastore: Arc<DataStore>,
+    pub(crate) dir: pbs_datastore::BackupDir,
 }
 
 #[async_trait::async_trait]
@@ -168,7 +171,11 @@ impl SyncSourceReader for RemoteSourceReader {
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error> {
+    async fn try_fetch_client_log(
+        &self,
+        to_path: &Path,
+        log_sender: Arc<LogLineSender>,
+    ) -> Result<(), Error> {
         let mut tmp_path = to_path.to_owned();
         tmp_path.set_extension("tmp");
 
@@ -189,11 +196,16 @@ impl SyncSourceReader for RemoteSourceReader {
             if let Err(err) = std::fs::rename(&tmp_path, to_path) {
                 bail!("Atomic rename file {to_path:?} failed - {err}");
             }
-            info!(
-                "Snapshot {snapshot}: got backup log file {client_log_name}",
-                snapshot = &self.dir,
-                client_log_name = client_log_name.deref()
-            );
+            log_sender
+                .log(
+                    Level::INFO,
+                    format!(
+                        "Snapshot {}: got backup log file {}",
+                        self.dir,
+                        client_log_name.deref()
+                    ),
+                )
+                .await?;
         }
 
         Ok(())
@@ -211,7 +223,8 @@ impl SyncSourceReader for LocalSourceReader {
         crypt_config: Option<Arc<CryptConfig>>,
         crypt_mode: CryptMode,
     ) -> Result<Arc<dyn AsyncReadChunk>, Error> {
-        let chunk_reader = LocalChunkReader::new(self.datastore.clone(), crypt_config, crypt_mode)?;
+        let chunk_reader =
+            LocalChunkReader::new(self.dir.datastore().clone(), crypt_config, crypt_mode)?;
         Ok(Arc::new(chunk_reader))
     }
 
@@ -222,21 +235,35 @@ impl SyncSourceReader for LocalSourceReader {
             .truncate(true)
             .read(true)
             .open(into)?;
-        let mut from_path = self.path.clone();
+        let mut from_path = self.dir.full_path();
         from_path.push(filename);
         tmp_file.write_all(std::fs::read(from_path)?.as_slice())?;
         tmp_file.rewind()?;
         Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
     }
 
-    async fn try_fetch_client_log(&self, to_path: &Path) -> Result<(), Error> {
+    async fn try_fetch_client_log(
+        &self,
+        to_path: &Path,
+        log_sender: Arc<LogLineSender>,
+    ) -> Result<(), Error> {
         self.load_file_into(CLIENT_LOG_BLOB_NAME.as_ref(), to_path)
+            .await?;
+        log_sender
+            .log(
+                Level::INFO,
+                format!(
+                    "Snapshot {}: got backup log file {}",
+                    self.dir.dir(),
+                    CLIENT_LOG_BLOB_NAME.as_ref(),
+                ),
+            )
             .await?;
         Ok(())
     }
 
     fn skip_chunk_sync(&self, target_store_name: &str) -> bool {
-        self.datastore.name() == target_store_name
+        self.dir.datastore().name() == target_store_name
     }
 }
 
@@ -496,8 +523,7 @@ impl SyncSource for LocalSource {
             .with_context(|| format!("while reading snapshot '{dir:?}' for a sync job"))?;
         Ok(Arc::new(LocalSourceReader {
             _dir_lock: Arc::new(Mutex::new(guard)),
-            path: dir.full_path(),
-            datastore: dir.datastore().clone(),
+            dir,
         }))
     }
 }
