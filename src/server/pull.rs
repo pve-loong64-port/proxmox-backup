@@ -2,7 +2,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Seek};
+use std::io::Seek;
 use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -34,8 +34,7 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::{BackupManifest, FileInfo};
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{
-    check_backup_owner, check_namespace_depth_limit, DataBlobReader, DataStore, DatastoreBackend,
-    StoreProgress,
+    check_backup_owner, check_namespace_depth_limit, DataStore, DatastoreBackend, StoreProgress,
 };
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
@@ -43,7 +42,6 @@ use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::sha::sha256;
 use proxmox_human_byte::HumanByte;
 use proxmox_parallel_handler::ParallelHandler;
-use proxmox_sys::fs::{replace_file, CreateOptions};
 use tracing::{info, Level};
 
 pub(crate) struct PullTarget {
@@ -574,26 +572,15 @@ async fn pull_single_archive<'a>(
             })
             .with_context(|| archive_prefix.clone())?;
 
-            if crypt_config.is_some() {
-                let crypt_config = crypt_config.clone();
-
+            if let Some(crypt_config) = &crypt_config {
                 let tmp_dec_path = tmp_dec_path.clone();
 
-                let (csum, size) = tokio::task::spawn_blocking(move || {
-                    // must rewind again since after verifying cursor is at the end of the file
-                    tmpfile.rewind()?;
-                    let mut reader = DataBlobReader::new(tmpfile, crypt_config)?;
-                    let mut dec_raw_data = Vec::new();
-                    reader.read_to_end(&mut dec_raw_data)?;
-                    reader.finish()?;
-
-                    let blob = DataBlob::encode(&dec_raw_data, None, true)?;
-
-                    let (csum, size) = sha256(&mut blob.raw_data())?;
-                    replace_file(tmp_dec_path, blob.raw_data(), CreateOptions::new(), true)?;
-                    Ok((csum, size))
-                })
-                .await?
+                let (csum, size) = super::sync::decrypt_encrypted_data_blob(
+                    tmpfile,
+                    Arc::clone(crypt_config),
+                    tmp_dec_path,
+                )
+                .await
                 .map_err(|err: Error| format_err!("Failed when decrypting blob {path:?}: {err}"))
                 .with_context(|| archive_prefix.clone())?;
 
@@ -676,10 +663,10 @@ async fn pull_snapshot<'a>(
 
     let backend = &params.target.backend;
 
-    let fetch_log = async || {
+    let fetch_log = async |crypt_config: Option<Arc<CryptConfig>>| {
         if !client_log_name.exists() {
             reader
-                .try_fetch_client_log(&client_log_name, Arc::clone(&log_sender))
+                .try_fetch_client_log(&client_log_name, crypt_config, Arc::clone(&log_sender))
                 .await
                 .with_context(|| prefix.clone())?;
 
@@ -731,7 +718,8 @@ async fn pull_snapshot<'a>(
         })?;
 
         if manifest_blob.raw_data() == tmp_manifest_blob.raw_data() {
-            fetch_log().await?;
+            // requires no decryption since either none or both, source and target are encrypted
+            fetch_log(None).await?;
             cleanup().await?;
             return Ok(sync_stats); // nothing changed
         }
@@ -775,9 +763,9 @@ async fn pull_snapshot<'a>(
             let new_manifest = Arc::new(Mutex::new(BackupManifest::new(snapshot.into())));
             (Some(crypt_config), Some(new_manifest))
         }
-        (_, true) => {
+        (crypt_config, true) => {
             // nothing changed
-            fetch_log().await?;
+            fetch_log(crypt_config).await?;
             cleanup().await?;
             return Ok(sync_stats);
         }
@@ -908,7 +896,7 @@ async fn pull_snapshot<'a>(
             .with_context(|| prefix.clone())?;
     }
 
-    fetch_log().await?;
+    fetch_log(crypt_config).await?;
 
     snapshot
         .cleanup_unreferenced_files(&manifest)

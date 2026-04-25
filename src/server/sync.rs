@@ -1,7 +1,8 @@
 //! Sync datastore contents from source to target, either in push or pull direction
 
 use std::collections::HashMap;
-use std::io::{Seek, Write};
+use std::fs::File;
+use std::io::{Read, Seek, Write};
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -18,6 +19,7 @@ use tracing::{info, warn, Level};
 use proxmox_human_byte::HumanByte;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::HttpError;
+use proxmox_sys::fs::{replace_file, CreateOptions};
 
 use pbs_api_types::{
     Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
@@ -28,9 +30,12 @@ use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_config::CachedUserInfo;
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_datastore::{BackupManifest, DataStore, ListNamespacesRecursive, LocalChunkReader};
+use pbs_datastore::{
+    BackupManifest, DataBlobReader, DataStore, ListNamespacesRecursive, LocalChunkReader,
+};
 use pbs_tools::buffered_logger::LogLineSender;
 use pbs_tools::crypt_config::CryptConfig;
+use pbs_tools::sha::sha256;
 
 use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
@@ -107,6 +112,7 @@ pub(crate) trait SyncSourceReader: Send + Sync {
     async fn try_fetch_client_log(
         &self,
         to_path: &Path,
+        crypt_config: Option<Arc<CryptConfig>>,
         log_sender: Arc<LogLineSender>,
     ) -> Result<(), Error>;
 
@@ -174,6 +180,7 @@ impl SyncSourceReader for RemoteSourceReader {
     async fn try_fetch_client_log(
         &self,
         to_path: &Path,
+        crypt_config: Option<Arc<CryptConfig>>,
         log_sender: Arc<LogLineSender>,
     ) -> Result<(), Error> {
         let mut tmp_path = to_path.to_owned();
@@ -190,10 +197,17 @@ impl SyncSourceReader for RemoteSourceReader {
         let client_log_name = &CLIENT_LOG_BLOB_NAME;
         if let Ok(()) = self
             .backup_reader
-            .download(client_log_name.as_ref(), tmpfile)
+            .download(client_log_name.as_ref(), &tmpfile)
             .await
         {
-            if let Err(err) = std::fs::rename(&tmp_path, to_path) {
+            if let Some(crypt_config) = &crypt_config {
+                let (_csum, _size) = decrypt_encrypted_data_blob(
+                    tmpfile,
+                    Arc::clone(crypt_config),
+                    to_path.to_path_buf(),
+                )
+                .await?;
+            } else if let Err(err) = std::fs::rename(&tmp_path, to_path) {
                 bail!("Atomic rename file {to_path:?} failed - {err}");
             }
             log_sender
@@ -245,10 +259,24 @@ impl SyncSourceReader for LocalSourceReader {
     async fn try_fetch_client_log(
         &self,
         to_path: &Path,
+        crypt_config: Option<Arc<CryptConfig>>,
         log_sender: Arc<LogLineSender>,
     ) -> Result<(), Error> {
-        self.load_file_into(CLIENT_LOG_BLOB_NAME.as_ref(), to_path)
+        if let Some(crypt_config) = &crypt_config {
+            let mut from_path = self.dir.full_path();
+            from_path.push(CLIENT_LOG_BLOB_NAME.as_ref());
+            let blob_file = tokio::fs::File::open(from_path).await?;
+            let blob_file = blob_file.into_std().await;
+            let (_csum, _size) = decrypt_encrypted_data_blob(
+                blob_file,
+                Arc::clone(crypt_config),
+                to_path.to_path_buf(),
+            )
             .await?;
+        } else {
+            self.load_file_into(CLIENT_LOG_BLOB_NAME.as_ref(), to_path)
+                .await?;
+        }
         log_sender
             .log(
                 Level::INFO,
@@ -832,6 +860,33 @@ pub(super) fn exclude_not_verified_or_encrypted(
     }
 
     false
+}
+
+/// Decrypt data blob stored in given file and store it to target path.
+///
+/// Returns the checksum and size of the resulting decrypted blob file.
+pub(super) async fn decrypt_encrypted_data_blob<P: AsRef<Path> + Send + 'static>(
+    mut blob_file: File,
+    crypt_config: Arc<CryptConfig>,
+    target_path: P,
+) -> Result<([u8; 32], u64), Error> {
+    let (csum, size) = tokio::task::spawn_blocking(move || {
+        // assure to start at the beginning of the file
+        blob_file.rewind()?;
+        let mut reader = DataBlobReader::new(blob_file, Some(crypt_config))?;
+        let mut dec_raw_data = Vec::new();
+        reader.read_to_end(&mut dec_raw_data)?;
+        reader.finish()?;
+
+        let blob = DataBlob::encode(&dec_raw_data, None, true)?;
+
+        let (csum, size) = sha256(&mut blob.raw_data())?;
+        replace_file(target_path, blob.raw_data(), CreateOptions::new(), true)?;
+        Ok::<([u8; 32], u64), Error>((csum, size))
+    })
+    .await??;
+
+    Ok((csum, size))
 }
 
 /// Helper to check if user has access to given encryption key and load it from config.
