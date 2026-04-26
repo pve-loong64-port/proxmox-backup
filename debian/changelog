@@ -1,23 +1,23 @@
 rust-proxmox-backup (4.1.11-1) trixie; urgency=medium
 
+  * pull sync: avoid double-decoding blob files on the decrypt-on-pull path,
+    which broke any pull sync job that should have decrypted snapshot
+    manifests, catalogs or other blob files using a configured decryption key.
+    The decrypt-on-pull feature was introduced in 4.1.9.
+
+  * pull sync: also fetch the client log for local sync jobs, where the
+    implementation had been a no-op stub since the trait was first introduced.
+    Skip silently if the source snapshot has no client log, matching the
+    existing behavior of remote sync jobs.
+
+  * pull sync: decrypt the client log on the fly when a matching decryption
+    key is configured, mirroring the existing decrypt-on-pull behavior for the
+    rest of a snapshot's data.
+
   * ui: encryption keys: always enable the tape key restore button and rename
-    it to 'Restore Tape Key'.
-
-  * sync: implement client log fetching for local sync jobs, which was
-    previously not supported.
-
-  * sync: decrypt encrypted client logs on the fly when a matching decryption
-    key is configured, instead of storing them as opaque encrypted blobs on
-    the target.
-
-  * sync: pull: fix double blob decoding that broke on-the-fly decryption of
-    pulled blob files.
-
-  * sync: pull: skip client log fetch silently if the source snapshot has
-    none, instead of failing the snapshot pull.
-
-  * sync: pull: clean up temporary encrypted client log file after successful
-    decryption.
+    it to 'Restore Tape Key'. Restoring loads a new key, so an existing tape
+    key does not need to be selected first; this matches the existing behavior
+    in the tape backup view.
 
  -- Proxmox Support Team <support@proxmox.com>  Sun, 26 Apr 2026 01:52:39 +0200
 
