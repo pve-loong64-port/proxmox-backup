@@ -413,11 +413,13 @@ pub async fn list_snapshot_files(
             &backup_dir.group,
         )?;
 
-        let snapshot = datastore.backup_dir(ns, backup_dir)?;
+        let snapshot = datastore.backup_dir(ns, backup_dir.clone())?;
 
         let info = BackupInfo::new(snapshot)?;
 
-        let (_manifest, files) = get_all_snapshot_files(&info)?;
+        let Some((_manifest, files)) = get_all_snapshot_files(&info)? else {
+            bail!("manifest not found for snapshot '{backup_dir}'");
+        };
 
         Ok(files)
     })
@@ -1500,7 +1502,9 @@ pub fn download_file_decoded(
             required_string_param(&param, "file-name")?.try_into()?;
         let backup_dir = datastore.backup_dir(backup_ns.clone(), backup_dir_api.clone())?;
 
-        let (manifest, files) = read_backup_index(&backup_dir)?;
+        let Some((manifest, files)) = read_backup_index(&backup_dir)? else {
+            bail!("manifest not found for snapshot '{}'", backup_dir.dir());
+        };
         for file in files {
             if file.filename == file_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
                 bail!("cannot decode '{}' - is encrypted", file_name);
@@ -1725,7 +1729,9 @@ pub async fn catalog(
 
     let backup_dir = datastore.backup_dir(ns, backup_dir)?;
 
-    let (manifest, files) = read_backup_index(&backup_dir)?;
+    let Some((manifest, files)) = read_backup_index(&backup_dir)? else {
+        bail!("manifest not found for snapshot '{}'", backup_dir.dir());
+    };
     for file in files {
         if file.filename == file_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
             bail!("cannot decode '{file_name}' - is encrypted");
@@ -1866,7 +1872,9 @@ pub fn pxar_file_download(
             (pxar_name.to_owned(), file_path.to_owned())
         };
         let pxar_name: BackupArchiveName = std::str::from_utf8(&pxar_name)?.try_into()?;
-        let (manifest, files) = read_backup_index(&backup_dir)?;
+        let Some((manifest, files)) = read_backup_index(&backup_dir)? else {
+            bail!("manifest not found for snapshot '{}'", backup_dir.dir());
+        };
         for file in files {
             if file.filename == pxar_name.as_ref() && file.crypt_mode == Some(CryptMode::Encrypt) {
                 bail!("cannot decode '{}' - is encrypted", pxar_name);

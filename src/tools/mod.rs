@@ -46,8 +46,19 @@ pub fn setup_safe_path_env() {
 
 pub(crate) fn read_backup_index(
     backup_dir: &BackupDir,
-) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
-    let (manifest, index_size) = backup_dir.load_manifest()?;
+) -> Result<Option<(BackupManifest, Vec<BackupContent>)>, Error> {
+    let (manifest, index_size) = match backup_dir.load_manifest() {
+        Ok((manifest, index_size)) => (manifest, index_size),
+        Err(err) => {
+            let mut manifest_path = backup_dir.full_path();
+            manifest_path.push(MANIFEST_BLOB_NAME.as_ref());
+            if !manifest_path.exists() {
+                return Ok(None);
+            } else {
+                return Err(err);
+            }
+        }
+    };
 
     let mut result = Vec::new();
     for item in manifest.files() {
@@ -67,13 +78,15 @@ pub(crate) fn read_backup_index(
         size: Some(index_size),
     });
 
-    Ok((manifest, result))
+    Ok(Some((manifest, result)))
 }
 
 pub(crate) fn get_all_snapshot_files(
     info: &BackupInfo,
-) -> Result<(BackupManifest, Vec<BackupContent>), Error> {
-    let (manifest, mut files) = read_backup_index(&info.backup_dir)?;
+) -> Result<Option<(BackupManifest, Vec<BackupContent>)>, Error> {
+    let Some((manifest, mut files)) = read_backup_index(&info.backup_dir)? else {
+        return Ok(None);
+    };
 
     let file_set = files.iter().fold(HashSet::new(), |mut acc, item| {
         acc.insert(item.filename.clone());
@@ -91,7 +104,7 @@ pub(crate) fn get_all_snapshot_files(
         });
     }
 
-    Ok((manifest, files))
+    Ok(Some((manifest, files)))
 }
 
 /// Helper to transform `BackupInfo` to `SnapshotListItem` with given owner.
@@ -104,7 +117,7 @@ pub(crate) fn backup_info_to_snapshot_list_item(
     let owner = Some(owner.to_owned());
 
     match get_all_snapshot_files(info) {
-        Ok((manifest, files)) => {
+        Ok(Some((manifest, files))) => {
             // extract the first line from notes
             let comment: Option<String> = manifest.unprotected["notes"]
                 .as_str()
@@ -129,7 +142,7 @@ pub(crate) fn backup_info_to_snapshot_list_item(
 
             let size = Some(files.iter().map(|x| x.size.unwrap_or(0)).sum());
 
-            SnapshotListItem {
+            return SnapshotListItem {
                 backup,
                 comment,
                 verification,
@@ -138,31 +151,33 @@ pub(crate) fn backup_info_to_snapshot_list_item(
                 size,
                 owner,
                 protected,
-            }
+            };
         }
-        Err(err) => {
-            eprintln!("error during snapshot file listing: '{err}'");
-            let files = info
-                .files
-                .iter()
-                .map(|filename| BackupContent {
-                    filename: filename.to_owned(),
-                    size: None,
-                    crypt_mode: None,
-                })
-                .collect();
+        Ok(None) => (),
+        Err(err) => eprintln!("error during snapshot file listing: '{err}'"),
+    }
 
-            SnapshotListItem {
-                backup,
-                comment: None,
-                verification: None,
-                fingerprint: None,
-                files,
-                size: None,
-                owner,
-                protected,
-            }
-        }
+    // no manifest (possibly ongoing backup) or manifest read error,
+    // fallback to listing without any additional metadata.
+    let files = info
+        .files
+        .iter()
+        .map(|filename| BackupContent {
+            filename: filename.to_owned(),
+            size: None,
+            crypt_mode: None,
+        })
+        .collect();
+
+    SnapshotListItem {
+        backup,
+        comment: None,
+        verification: None,
+        fingerprint: None,
+        files,
+        size: None,
+        owner,
+        protected,
     }
 }
 
