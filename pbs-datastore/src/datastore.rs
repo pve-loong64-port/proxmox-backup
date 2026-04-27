@@ -1262,7 +1262,7 @@ impl DataStore {
         let backend = self.backend()?;
 
         log::info!(
-            "moving namespace '{source_ns}' -> '{target_ns}': {} namespaces",
+            "moving namespace '{source_ns}' -> '{target_ns}': {} namespace(s)",
             attempted_ns.len(),
         );
 
@@ -1392,7 +1392,7 @@ impl DataStore {
                     .any(|failed| failed == ns || ns.contains(failed).is_some())
                 {
                     log::warn!(
-                        "skipping source namespace '{ns}' cleanup: contains groups that failed to move",
+                        "skipping source namespace '{ns}' cleanup: contains group(s) that failed to move",
                     );
                     continue;
                 }
@@ -1423,7 +1423,7 @@ impl DataStore {
                 }
                 if depth_limited_child {
                     log::debug!(
-                        "keeping source namespace '{ns}': contains namespaces excluded by max-depth",
+                        "keeping source namespace '{ns}': contains namespace(s) excluded by max-depth",
                     );
                     continue;
                 }
