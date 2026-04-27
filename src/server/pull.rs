@@ -453,6 +453,7 @@ async fn pull_single_archive<'a>(
         .with_context(|| archive_prefix.clone())?
         .is_none()
     {
+        let _ = std::fs::remove_file(&tmp_path);
         bail!("{archive_prefix}: archive missing on source");
     };
 
@@ -629,7 +630,7 @@ async fn pull_snapshot<'a>(
     corrupt: bool,
     is_new: bool,
     log_sender: Arc<LogLineSender>,
-) -> Result<SyncStats, Error> {
+) -> Result<Option<SyncStats>, Error> {
     let prefix = snapshot.backup_time_string().to_owned();
     if is_new {
         log_sender
@@ -662,13 +663,14 @@ async fn pull_snapshot<'a>(
         .await
         .with_context(|| prefix.clone())?
     else {
+        let _ = std::fs::remove_file(&tmp_manifest_name);
         log_sender
             .log(
                 Level::INFO,
-                format!("{prefix}: skipped because vanished since start of sync",),
+                format!("{prefix}: skipped because vanished since start of sync"),
             )
             .await?;
-        return Ok(sync_stats);
+        return Ok(None);
     };
 
     let tmp_manifest_blob =
@@ -734,7 +736,7 @@ async fn pull_snapshot<'a>(
             // requires no decryption since either none or both, source and target are encrypted
             fetch_log(None).await?;
             cleanup().await?;
-            return Ok(sync_stats); // nothing changed
+            return Ok(Some(sync_stats)); // nothing changed
         }
 
         Some(BackupManifest::try_from(manifest_blob).with_context(|| prefix.clone())?)
@@ -758,7 +760,7 @@ async fn pull_snapshot<'a>(
                 format_err!("removing temporary backup snapshot {path:?} failed - {err}")
             })?;
         }
-        return Ok(sync_stats);
+        return Ok(Some(sync_stats));
     }
 
     let (crypt_config, new_manifest) = match optionally_use_decryption_key(
@@ -780,7 +782,7 @@ async fn pull_snapshot<'a>(
             // nothing changed
             fetch_log(crypt_config).await?;
             cleanup().await?;
-            return Ok(sync_stats);
+            return Ok(Some(sync_stats));
         }
     };
 
@@ -915,7 +917,7 @@ async fn pull_snapshot<'a>(
         .cleanup_unreferenced_files(&manifest)
         .map_err(|err| format_err!("{prefix}: failed to cleanup unreferenced files - {err}"))?;
 
-    Ok(sync_stats)
+    Ok(Some(sync_stats))
 }
 
 /// Check if the decryption key should be used to decrypt the snapshot during
@@ -1064,33 +1066,30 @@ async fn pull_snapshot_from<'a>(
     )
     .await;
 
+    // For freshly created snapshots, drop the still-empty target dir on either an error or a
+    // vanished source. Only after a successful sync the dir gets to keep its content.
     if is_new {
-        // Cleanup directory on error if snapshot was not present before
-        match result {
-            Err(err) => {
-                if let Err(cleanup_err) = snapshot.datastore().remove_backup_dir(
-                    snapshot.backup_ns(),
-                    snapshot.as_ref(),
-                    true,
-                ) {
-                    log_sender
-                        .log(
-                            Level::INFO,
-                            format!("{prefix}: cleanup error - {cleanup_err}"),
-                        )
-                        .await?;
-                }
-                return Err(err);
-            }
-            Ok(_) => {
+        if matches!(&result, Ok(None) | Err(_)) {
+            if let Err(cleanup_err) = snapshot.datastore().remove_backup_dir(
+                snapshot.backup_ns(),
+                snapshot.as_ref(),
+                true,
+            ) {
                 log_sender
-                    .log(Level::INFO, format!("{prefix}: sync done"))
-                    .await?
+                    .log(
+                        Level::INFO,
+                        format!("{prefix}: cleanup error - {cleanup_err}"),
+                    )
+                    .await?;
             }
+        } else {
+            log_sender
+                .log(Level::INFO, format!("{prefix}: sync done"))
+                .await?;
         }
     }
 
-    result
+    Ok(result?.unwrap_or_default())
 }
 
 /// Pulls a group according to `params`.
