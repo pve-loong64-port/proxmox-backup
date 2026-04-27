@@ -106,7 +106,7 @@ pub(crate) trait SyncSourceReader: Send + Sync {
     /// Asynchronously loads a file from the source into a local file.
     /// `filename` is the name of the file to load from the source.
     /// `into` is the path of the local file to load the source file into.
-    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error>;
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<File>, Error>;
 
     /// Tries to fetch the client log from the source and save it into a local file.
     async fn try_fetch_client_log(
@@ -146,7 +146,7 @@ impl SyncSourceReader for RemoteSourceReader {
         Ok(Arc::new(chunk_reader))
     }
 
-    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error> {
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<File>, Error> {
         let mut tmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -174,7 +174,7 @@ impl SyncSourceReader for RemoteSourceReader {
             };
         };
         tmp_file.rewind()?;
-        Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
+        Ok(Some(tmp_file))
     }
 
     async fn try_fetch_client_log(
@@ -245,7 +245,7 @@ impl SyncSourceReader for LocalSourceReader {
         Ok(Arc::new(chunk_reader))
     }
 
-    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<DataBlob>, Error> {
+    async fn load_file_into(&self, filename: &str, into: &Path) -> Result<Option<File>, Error> {
         let mut tmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -256,7 +256,7 @@ impl SyncSourceReader for LocalSourceReader {
         from_path.push(filename);
         tmp_file.write_all(std::fs::read(from_path)?.as_slice())?;
         tmp_file.rewind()?;
-        Ok(DataBlob::load_from_reader(&mut tmp_file).ok())
+        Ok(Some(tmp_file))
     }
 
     async fn try_fetch_client_log(

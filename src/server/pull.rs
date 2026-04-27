@@ -653,13 +653,16 @@ async fn pull_snapshot<'a>(
 
     let mut tmp_manifest_name = manifest_name.clone();
     tmp_manifest_name.set_extension("tmp");
-    let Some(tmp_manifest_blob) = reader
+    let Some(mut tmp_manifest_file) = reader
         .load_file_into(MANIFEST_BLOB_NAME.as_ref(), &tmp_manifest_name)
         .await
         .with_context(|| prefix.clone())?
     else {
         return Ok(sync_stats);
     };
+
+    let tmp_manifest_blob =
+        DataBlob::load_from_reader(&mut tmp_manifest_file).with_context(|| prefix.clone())?;
 
     let backend = &params.target.backend;
 
