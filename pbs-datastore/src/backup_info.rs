@@ -291,24 +291,35 @@ impl BackupGroup {
             );
         }
 
-        let src_oldest = self
-            .iter_snapshots()?
-            .filter_map(Result::ok)
-            .map(|s| s.backup_time())
-            .min();
+        let (src_oldest, src_oldest_str) = self.iter_snapshots()?.filter_map(Result::ok).fold(
+            (i64::MAX, String::new()),
+            |(min, min_str), s| {
+                let curr = s.backup_time();
+                if curr < min {
+                    (curr, s.backup_time_string.clone())
+                } else {
+                    (min, min_str)
+                }
+            },
+        );
 
-        if let Some(src_oldest) = src_oldest {
+        if src_oldest != i64::MAX {
             // Any target snapshot with time >= src_oldest violates the
             // "source strictly newer than target" merge invariant. Short-circuit on the first hit.
             if let Some(overlap) = target
                 .iter_snapshots()?
                 .filter_map(Result::ok)
-                .map(|s| s.backup_time())
-                .find(|t| *t >= src_oldest)
+                .find_map(|s| {
+                    if s.backup_time() >= src_oldest {
+                        Some(s.backup_time_string().to_owned())
+                    } else {
+                        None
+                    }
+                })
             {
                 bail!(
                     "cannot merge group '{}/{}' from '{}' into '{}': snapshot time overlap \
-                    (oldest source: {src_oldest}, conflicting target: {overlap})",
+                    (oldest source: {src_oldest_str}, conflicting target: {overlap})",
                     self.group.ty,
                     self.group.id,
                     self.ns,
