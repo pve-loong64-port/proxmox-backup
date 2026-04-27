@@ -135,8 +135,11 @@ Ext.define('PBS.config.SyncJobView', {
                 return;
             }
 
+            let endtime = selection[0].data['last-run-endtime'];
+
             Ext.create('Proxmox.window.TaskViewer', {
                 upid,
+                endtime,
             }).show();
         },
 
