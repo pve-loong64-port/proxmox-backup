@@ -1604,6 +1604,14 @@ impl DataStore {
                 group.group(),
             )));
         }
+        log::info!(
+            "{} group '{}/{}' from '{}' to '{target_group_ns}'",
+            if merge { "merging" } else { "moving" },
+            group.group().ty,
+            group.group().id,
+            group.backup_ns(),
+        );
+
         if merge {
             group
                 .check_merge_invariants(&target_group)
@@ -1619,14 +1627,6 @@ impl DataStore {
         // time-ordered split: all moved snapshots are older than all remaining ones. This keeps
         // the merge invariant (source oldest > target newest) valid on retry.
         snapshots.sort_by_key(|s| s.backup_time());
-
-        log::info!(
-            "{} group '{}/{}' from '{}' to '{target_group_ns}'",
-            if merge { "merging" } else { "moving" },
-            group.group().ty,
-            group.group().id,
-            group.backup_ns(),
-        );
 
         // Each batch is locked, moved, and released before the next to exclude concurrent readers.
         // `move_to` writes to the per-datastore move journal before each rename so a concurrent
