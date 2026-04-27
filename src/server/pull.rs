@@ -662,6 +662,12 @@ async fn pull_snapshot<'a>(
         .await
         .with_context(|| prefix.clone())?
     else {
+        log_sender
+            .log(
+                Level::INFO,
+                format!("{prefix}: skipped because vanished since start of sync",),
+            )
+            .await?;
         return Ok(sync_stats);
     };
 

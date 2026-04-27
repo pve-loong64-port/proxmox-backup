@@ -158,10 +158,6 @@ impl SyncSourceReader for RemoteSourceReader {
             match err.downcast_ref::<HttpError>() {
                 Some(HttpError { code, message }) => match *code {
                     StatusCode::NOT_FOUND => {
-                        info!(
-                            "Snapshot {}: skipped because vanished since start of sync",
-                            &self.dir
-                        );
                         return Ok(None);
                     }
                     _ => {
