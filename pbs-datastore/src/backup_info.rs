@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use anyhow::{bail, format_err, Context, Error};
 use const_format::concatcp;
+use tracing::info;
 
 use proxmox_s3_client::{S3ObjectKey, S3PathPrefix};
 use proxmox_sys::fs::{lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions};
@@ -317,9 +318,10 @@ impl BackupGroup {
                     }
                 })
             {
+                info!("oldest source snapshot: {src_oldest_str}");
+                info!("conflicting target snapshot: {overlap}");
                 bail!(
-                    "cannot merge group '{}/{}' from '{}' into '{}': snapshot time overlap \
-                    (oldest source: {src_oldest_str}, conflicting target: {overlap})",
+                    "cannot merge group '{}/{}' from '{}' into '{}': snapshot time overlap",
                     self.group.ty,
                     self.group.id,
                     self.ns,
