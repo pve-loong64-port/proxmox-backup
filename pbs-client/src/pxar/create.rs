@@ -822,6 +822,14 @@ impl Archiver {
                     debug!("Cache range has hole, new range: {payload_range:?}");
                     self.flush_cached_reusing_if_below_threshold(encoder, true)
                         .await?;
+                    // Inject any held-back chunk now: the new range is non-contiguous, so it
+                    // cannot legitimately merge with the next range's first chunk. Without this,
+                    // a digest collision via dedup would let the next flush skip the injection,
+                    // leaving the encoder's payload position behind the recorded offset and
+                    // writing a backwards PXAR_PAYLOAD_REF.
+                    if let Some(held) = self.cache.take_last_chunk() {
+                        self.inject_chunks_at_current_payload_position(encoder, vec![held])?;
+                    }
                     // range has to be set after flushing of cached entries, which resets the range
                     self.cache.update_range(payload_range.clone());
                 }
@@ -2033,5 +2041,34 @@ mod tests {
 
             Ok::<(), Error>(())
         })
+    }
+
+    /// Pins the contract the cache-hole path in [`Archiver`] depends on: `update_range` must not
+    /// clear `last_chunk`. The hole-path must take and inject the held chunk before
+    /// `update_range`, otherwise it would carry across the discontinuity and the next flush's
+    /// digest-match fast-path could collapse two physically separate but content-identical
+    /// (via dedup) chunks, leaving the encoder's payload position behind the recorded offset.
+    #[test]
+    fn cache_update_range_preserves_held_chunk() {
+        let mut cache = super::PxarLookaheadCache::new(None);
+        let chunk = super::ReusableDynamicEntry {
+            size: 1024,
+            padding: 0,
+            digest: [0u8; 32],
+        };
+
+        cache.update_last_chunk(Some(chunk));
+        cache.update_range(100..200);
+        cache.update_range(500..600);
+
+        assert!(
+            cache.take_last_chunk().is_some(),
+            "update_range alone must preserve last_chunk -- if this fails, the explicit \
+             take_last_chunk in the cache-hole path of add_entry_to_archive_impl can be removed"
+        );
+        assert!(
+            cache.take_last_chunk().is_none(),
+            "take_last_chunk must consume the value"
+        );
     }
 }
