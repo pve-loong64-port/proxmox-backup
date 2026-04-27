@@ -250,7 +250,15 @@ impl SyncSourceReader for LocalSourceReader {
             .open(into)?;
         let mut from_path = self.dir.full_path();
         from_path.push(filename);
-        tmp_file.write_all(std::fs::read(from_path)?.as_slice())?;
+        let data = match std::fs::read(&from_path) {
+            Ok(data) => data,
+            // mirror the RemoteSourceReader's HTTP 404 path: a file vanishing between
+            // snapshot listing and load is not fatal for the group, the caller logs
+            // and skips the snapshot
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(err) => return Err(err.into()),
+        };
+        tmp_file.write_all(&data)?;
         tmp_file.rewind()?;
         Ok(Some(tmp_file))
     }
