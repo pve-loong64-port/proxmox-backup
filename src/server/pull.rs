@@ -447,10 +447,14 @@ async fn pull_single_archive<'a>(
         .log(Level::INFO, format!("{archive_prefix}: sync archive"))
         .await?;
 
-    reader
+    if reader
         .load_file_into(archive_name, &tmp_path)
         .await
-        .with_context(|| archive_prefix.clone())?;
+        .with_context(|| archive_prefix.clone())?
+        .is_none()
+    {
+        bail!("{archive_prefix}: archive missing on source");
+    };
 
     let mut tmpfile = std::fs::OpenOptions::new()
         .read(true)
