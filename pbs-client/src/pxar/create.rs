@@ -188,6 +188,11 @@ struct Archiver {
     suggested_boundaries: Option<mpsc::Sender<u64>>,
     previous_payload_index: Option<DynamicIndexReader>,
     cache: PxarLookaheadCache,
+    // Highest payload offset accepted as reusable so far. Mirrors the encoder's accumulated
+    // strict-monotonic-offset invariant on the read side, so that a previous archive written by
+    // an older client without the encode-time check is detected here and the affected file is
+    // re-encoded instead of reused.
+    last_reusable_offset: Option<u64>,
     reuse_stats: ReuseStats,
     split_archive: bool,
 }
@@ -298,6 +303,7 @@ where
         suggested_boundaries,
         previous_payload_index,
         cache: PxarLookaheadCache::new(options.max_cache_size),
+        last_reusable_offset: None,
         reuse_stats: ReuseStats::default(),
         split_archive,
     };
@@ -418,6 +424,16 @@ impl Archiver {
         .boxed()
     }
 
+    /// Record an accepted reusable payload offset from the previous metadata archive.
+    ///
+    /// Returns `false` if `offset` is not strictly greater than the last accepted offset, which
+    /// signals a duplicate or non-monotonic previous archive. The caller must then treat the file
+    /// as non-reusable so the encoder's strict offset check cannot reject the eventual
+    /// `add_payload_ref`. Tracking is global to catch inversions that span cache ranges.
+    fn try_record_reusable_offset(&mut self, offset: u64) -> bool {
+        try_record_strictly_greater(&mut self.last_reusable_offset, offset)
+    }
+
     async fn is_reusable_entry(
         &mut self,
         previous_metadata_accessor: &Option<Directory<MetadataArchiveReader>>,
@@ -435,6 +451,19 @@ impl Archiver {
                     } = file_entry.entry().kind()
                     {
                         if file_size != *size {
+                            return Ok(None);
+                        }
+                        // a previous archive written by an older client version may contain
+                        // duplicate or non-monotonic PXAR_PAYLOAD_REF offsets for distinct files.
+                        // Re-encoding the affected file lets the chain self-heal and avoids the
+                        // pxar strict offset check rejecting the whole backup.
+                        if !self.try_record_reusable_offset(*offset) {
+                            let last = self.last_reusable_offset.unwrap_or(0);
+                            warn!(
+                                "re-encode: {file_name:?} previous archive payload offset \
+                                 {offset} not strictly greater than last seen {last}, \
+                                 treating as non-reusable"
+                            );
                             return Ok(None);
                         }
                         let range =
@@ -1378,6 +1407,19 @@ impl ReusableDynamicEntry {
     }
 }
 
+/// Updates `last` to `offset` and returns `true` if `offset` is strictly greater than the current
+/// value (or `last` is `None`). Returns `false` without modifying `last` for duplicate or
+/// backwards offsets.
+fn try_record_strictly_greater(last: &mut Option<u64>, offset: u64) -> bool {
+    if let Some(prev) = *last {
+        if offset <= prev {
+            return false;
+        }
+    }
+    *last = Some(offset);
+    true
+}
+
 /// List of dynamic entries containing the data given by an offset range
 fn lookup_dynamic_entries(
     index: &DynamicIndexReader,
@@ -2009,6 +2051,7 @@ mod tests {
                 previous_payload_index,
                 suggested_boundaries: Some(suggested_boundaries),
                 cache: PxarLookaheadCache::new(None),
+                last_reusable_offset: None,
                 reuse_stats: ReuseStats::default(),
                 split_archive: true,
             };
@@ -2070,5 +2113,48 @@ mod tests {
             cache.take_last_chunk().is_none(),
             "take_last_chunk must consume the value"
         );
+    }
+
+    /// Strictly-greater bookkeeping for [`Archiver::try_record_reusable_offset`]; mirrors the
+    /// encoder's accumulated strict-monotonic-offset invariant on the read side.
+    #[test]
+    fn try_record_strictly_greater_accepts_increasing() {
+        let mut last = None;
+        assert!(super::try_record_strictly_greater(&mut last, 100));
+        assert_eq!(last, Some(100));
+        assert!(super::try_record_strictly_greater(&mut last, 200));
+        assert_eq!(last, Some(200));
+    }
+
+    #[test]
+    fn try_record_strictly_greater_rejects_equal_and_backwards() {
+        let mut last = Some(200);
+        // duplicate offset: previous archive recorded two distinct files at the same offset
+        assert!(!super::try_record_strictly_greater(&mut last, 200));
+        assert_eq!(last, Some(200), "rejected offset must not update state");
+        // backwards offset: previous archive recorded the next file at a lower offset
+        assert!(!super::try_record_strictly_greater(&mut last, 150));
+        assert_eq!(last, Some(200));
+    }
+
+    #[test]
+    fn try_record_strictly_greater_first_call_accepts_any_value() {
+        let mut last = None;
+        assert!(super::try_record_strictly_greater(&mut last, 0));
+        assert_eq!(last, Some(0));
+    }
+
+    /// Inversions that span cache ranges must be caught by the global tracking; a per-range
+    /// implementation would have reset on flush and accepted the second offset, after which
+    /// the encoder strict check would still abort the backup.
+    #[test]
+    fn try_record_strictly_greater_persists_across_resets() {
+        let mut last = None;
+        assert!(super::try_record_strictly_greater(&mut last, 1000));
+        // a per-range implementation would have cleared `last` here on cache flush
+        assert!(!super::try_record_strictly_greater(&mut last, 500));
+        assert_eq!(last, Some(1000));
+        assert!(super::try_record_strictly_greater(&mut last, 1500));
+        assert_eq!(last, Some(1500));
     }
 }
