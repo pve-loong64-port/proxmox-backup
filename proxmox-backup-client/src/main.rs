@@ -322,10 +322,10 @@ async fn backup_directory<P: AsRef<Path>>(
 
         match futures::join!(stats, payload_stats) {
             (Ok(stats), Ok(payload_stats)) => Ok((stats, Some(payload_stats))),
-            (Err(err), Ok(_)) => Err(format_err!("upload failed: {err}")),
-            (Ok(_), Err(err)) => Err(format_err!("upload failed: {err}")),
+            (Err(err), Ok(_)) => Err(format_err!("upload failed: {err:#}")),
+            (Ok(_), Err(err)) => Err(format_err!("upload failed: {err:#}")),
             (Err(err), Err(payload_err)) => {
-                Err(format_err!("upload failed: {err} - {payload_err}"))
+                Err(format_err!("upload failed: {err:#} - {payload_err:#}"))
             }
         }
     } else {
