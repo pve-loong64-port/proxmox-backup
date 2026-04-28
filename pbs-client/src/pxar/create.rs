@@ -2138,6 +2138,52 @@ mod tests {
         assert_eq!(last, Some(0));
     }
 
+    /// Pins `lookup_dynamic_entries`'s `end_offset` population to `dynamic_entry.end()`;
+    /// any range-relative substitute would alias dedup-collided entries and resurrect
+    /// the backwards-`PXAR_PAYLOAD_REF` bug class.
+    #[test]
+    fn lookup_dynamic_entries_pins_chunk_identity() {
+        use pbs_datastore::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
+
+        // Use ./target/ instead of tempfile / std::env::temp_dir to keep the test
+        // runnable in build environments where /tmp may not be writable.
+        let mut testdir = PathBuf::from("./target/testout");
+        testdir.push(std::module_path!());
+        let _ = std::fs::create_dir_all(&testdir);
+        let path = testdir.join("lookup_dynamic_entries.didx");
+        let _ = std::fs::remove_file(&path);
+
+        let mut writer = DynamicIndexWriter::create(&path).unwrap();
+        let digest_a = [0xAAu8; 32];
+        let digest_b = [0xBBu8; 32];
+        // chunk 0: ends at 1024, digest A
+        writer.add_chunk(1024, &digest_a).unwrap();
+        // chunk 1: ends at 2048, digest B
+        writer.add_chunk(2048, &digest_b).unwrap();
+        // chunk 2: ends at 3072, digest A again - dedup collision (same content,
+        // distinct position). This is the configuration the bug class lives on.
+        writer.add_chunk(3072, &digest_a).unwrap();
+        let _csum = writer.close().unwrap();
+
+        let reader = DynamicIndexReader::open(&path).unwrap();
+        let (indices, _start_padding, _end_padding) =
+            super::lookup_dynamic_entries(&reader, &(0..3072)).unwrap();
+
+        assert_eq!(indices.len(), 3);
+        assert_eq!(indices[0].end_offset, 1024);
+        assert_eq!(indices[1].end_offset, 2048);
+        assert_eq!(indices[2].end_offset, 3072);
+
+        // The dedup collision must NOT compare equal under same_indexed_chunk_as; this
+        // is the predicate flush_cached_reusing_if_below_threshold relies on for the
+        // absorb-vs-inject decision.
+        assert_eq!(indices[0].digest, indices[2].digest);
+        assert!(!indices[0].same_indexed_chunk_as(&indices[2]));
+        assert!(indices[0].same_indexed_chunk_as(&indices[0]));
+
+        let _ = std::fs::remove_file(&path);
+    }
+
     /// Inversions that span cache ranges must be caught by the global tracking; a per-range
     /// implementation would have reset on flush and accepted the second offset, after which
     /// the encoder strict check would still abort the backup.
