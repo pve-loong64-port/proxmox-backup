@@ -242,7 +242,11 @@ impl BackupManifest {
         Ok(Some(serde_json::from_value::<SnapshotVerifyState>(verify)?))
     }
 
-    /// Set the fingerprint used to detect changes for encrypted -> decrypted syncs
+    /// Set the fingerprint used to detect snapshot changes across encrypted/decrypted sync flows.
+    ///
+    /// Always an HMAC-SHA256 like [`Self::signature`]; the input is the source's plain manifest for
+    /// encrypt-push, or the source's `signature` field (HMAC over its encrypted manifest) for
+    /// decrypt-pull from a regular encrypted backup. Not interchangeable across flows.
     pub fn set_change_detection_fingerprint(
         &mut self,
         fingerprint: &[u8; 32],
@@ -252,7 +256,10 @@ impl BackupManifest {
         Ok(())
     }
 
-    /// Get the fingerprint used to detect changes for encrypted -> decrypted syncs
+    /// Get the fingerprint used to detect snapshot changes across encrypted/decrypted sync flows.
+    ///
+    /// See [`Self::set_change_detection_fingerprint`] for the two distinct flows that set this
+    /// field with different interpretations.
     pub fn get_change_detection_fingerprint(&self) -> Result<Option<Fingerprint>, Error> {
         match &self.unprotected["change-detection-fingerprint"] {
             Value::Null => Ok(None),

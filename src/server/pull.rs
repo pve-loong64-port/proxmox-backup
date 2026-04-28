@@ -1026,16 +1026,19 @@ async fn optionally_use_decryption_key(
             } else {
                 bail!("Change detection fingerprint mismatch, refuse to continue!");
             }
-        } else if let Some(source_signature) = existing_manifest
+        } else if let Some(stored_source_fp) = existing_manifest
             .get_change_detection_fingerprint()
             .context("failed to parse change detection fingerprint of existing target manifest")
             .with_context(|| prefix.clone())?
         {
-            let Some(expected) = &manifest.signature else {
+            // Stored CDF is the source's prior signature on decrypt-pull (the flow this fallback
+            // handles); CDFs set by encrypt-push hold a different HMAC input and fall through to
+            // the mismatch bail.
+            let Some(current) = &manifest.signature else {
                 bail!("No signature on source manifest.");
             };
-            let expected: Fingerprint = expected.parse().with_context(|| prefix.clone())?;
-            if expected == source_signature {
+            let current: Fingerprint = current.parse().with_context(|| prefix.clone())?;
+            if current == stored_source_fp {
                 skip_resync = true;
             } else {
                 bail!("Change detection fingerprint mismatch, refuse to continue!");
