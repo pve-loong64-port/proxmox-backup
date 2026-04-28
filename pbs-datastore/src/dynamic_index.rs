@@ -119,8 +119,6 @@ impl DynamicIndexReader {
             bail!("got unknown magic number");
         }
 
-        let ctime = proxmox_time::epoch_i64();
-
         let index_size = stat.st_size as usize - header_size;
         let index_count = index_size / 40;
         if index_count * 40 != index_size {
@@ -141,7 +139,7 @@ impl DynamicIndexReader {
             _file: file,
             size,
             index,
-            ctime,
+            ctime: header.ctime,
             uuid: header.uuid,
             index_csum: header.index_csum,
         })
