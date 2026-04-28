@@ -1,3 +1,12 @@
+rust-proxmox-backup (4.2.0-1) trixie; urgency=medium
+
+  * bump version for 4.2 release.
+
+  * ui: datastore list summary: guard against missing history field, which
+    can happen on fresh installations.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 28 Apr 2026 23:51:16 +0200
+
 rust-proxmox-backup (4.1.13-1) trixie; urgency=medium
 
   * fix #5247: client: sanitize relative paths in pxar exclude patterns.
