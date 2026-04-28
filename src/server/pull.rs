@@ -753,14 +753,14 @@ async fn pull_snapshot<'a>(
         params.verified_only,
         params.encrypted_only,
     ) {
-        if is_new {
-            let path = snapshot.full_path();
-            // safe to remove as locked by caller
-            std::fs::remove_dir_all(&path).map_err(|err| {
-                format_err!("removing temporary backup snapshot {path:?} failed - {err}")
-            })?;
-        }
-        return Ok(Some(sync_stats));
+        let _ = std::fs::remove_file(&tmp_manifest_name);
+        log_sender
+            .log(
+                Level::INFO,
+                format!("{prefix}: skipped, did not match verified-only/encrypted-only filter"),
+            )
+            .await?;
+        return Ok(None);
     }
 
     let (crypt_config, new_manifest) = match optionally_use_decryption_key(
