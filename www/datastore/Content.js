@@ -102,8 +102,11 @@ Ext.define('PBS.DataStoreContent', {
             this.reload();
         },
 
-        reload: function () {
+        reload: function (nsLoadCallback) {
             let view = this.getView();
+            view.down('pbsNamespaceSelector').store?.load({
+                callback: Ext.isFunction(nsLoadCallback) ? nsLoadCallback : undefined,
+            });
 
             if (!view.store || !this.store) {
                 console.warn('cannot reload, no store(s)');
@@ -560,7 +563,6 @@ Ext.define('PBS.DataStoreContent', {
                 namespace: view.namespace ?? '',
                 apiCallDone: (success) => {
                     if (success) {
-                        view.down('pbsNamespaceSelector').store?.load();
                         me.reload();
                     }
                 },
@@ -685,11 +687,8 @@ Ext.define('PBS.DataStoreContent', {
                         // selector's tree store does not know about the just-created target
                         // namespace yet.
                         view.namespace = newNs;
-                        me.reload();
                         let selector = view.down('pbsNamespaceSelector');
-                        selector?.store?.load({
-                            callback: () => selector.setValue(newNs),
-                        });
+                        me.reload(() => selector.setValue(newNs));
                     }
                 },
             });
