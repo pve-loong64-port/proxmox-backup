@@ -277,7 +277,7 @@ impl BackupGroup {
     }
 
     /// Check merge invariants for moving this group's snapshots into `target`.
-    /// Returns an error if ownership differs or snapshot times overlap.
+    /// Returns an error if ownership differs or snapshot times mismatch.
     pub(crate) fn check_merge_invariants(&self, target: &BackupGroup) -> Result<(), Error> {
         let src_owner = self.get_owner()?;
         let tgt_owner = target.get_owner()?;
@@ -321,7 +321,7 @@ impl BackupGroup {
                 info!("oldest source snapshot: {src_oldest_str}");
                 info!("conflicting target snapshot: {overlap}");
                 bail!(
-                    "cannot merge group '{}/{}' from '{}' into '{}': snapshot time overlap",
+                    "cannot merge group '{}/{}' from '{}' into '{}': snapshot time mismatch",
                     self.group.ty,
                     self.group.id,
                     self.ns,
