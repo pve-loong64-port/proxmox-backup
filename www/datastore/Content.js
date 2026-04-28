@@ -689,6 +689,10 @@ Ext.define('PBS.DataStoreContent', {
                         view.namespace = newNs;
                         let selector = view.down('pbsNamespaceSelector');
                         me.reload(() => selector.setValue(newNs));
+                    } else {
+                        // if we ran into an error, keep the current view, but
+                        // reload it and the namespace selector in case a new namespace was created
+                        me.reload();
                     }
                 },
             });
