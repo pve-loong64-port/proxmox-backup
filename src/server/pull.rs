@@ -1011,26 +1011,29 @@ async fn optionally_use_decryption_key(
 
     // avoid overwriting pre-existing target manifest
     if let Some(existing_manifest) = existing_target_manifest {
-        if let Some(source_fp) = manifest
+        let source_fp = manifest
             .get_change_detection_fingerprint()
             .context("failed to parse change detection fingerprint of source manifest")
-            .with_context(|| prefix.clone())?
-        {
+            .with_context(|| prefix.clone())?;
+        let stored_source_fp = existing_manifest
+            .get_change_detection_fingerprint()
+            .context("failed to parse change detection fingerprint of existing target manifest")
+            .with_context(|| prefix.clone())?;
+
+        if source_fp.is_none() && stored_source_fp.is_none() {
+            bail!("No change detection fingerprint found, refuse to continue!");
+        }
+
+        if let Some(source_fp) = source_fp {
             // Stored fp is HMAC over the unencrypted source's protected fields; recompute
             // over the locally decrypted manifest, not the fresh encrypted remote one.
             let target_fp = existing_manifest
                 .signature(config)
                 .with_context(|| prefix.clone())?;
-            if target_fp == *source_fp.bytes() {
-                skip_resync = true;
-            } else {
-                bail!("Change detection fingerprint mismatch, refuse to continue!");
-            }
-        } else if let Some(stored_source_fp) = existing_manifest
-            .get_change_detection_fingerprint()
-            .context("failed to parse change detection fingerprint of existing target manifest")
-            .with_context(|| prefix.clone())?
-        {
+            skip_resync = skip_resync || target_fp == *source_fp.bytes();
+        }
+
+        if let Some(stored_source_fp) = stored_source_fp {
             // Stored CDF is the source's prior signature on decrypt-pull (the flow this fallback
             // handles); CDFs set by encrypt-push hold a different HMAC input and fall through to
             // the mismatch bail.
@@ -1038,13 +1041,11 @@ async fn optionally_use_decryption_key(
                 bail!("No signature on source manifest.");
             };
             let current: Fingerprint = current.parse().with_context(|| prefix.clone())?;
-            if current == stored_source_fp {
-                skip_resync = true;
-            } else {
-                bail!("Change detection fingerprint mismatch, refuse to continue!");
-            }
-        } else {
-            bail!("No change detection fingerprint found, refuse to continue!");
+            skip_resync = skip_resync || current == stored_source_fp;
+        }
+
+        if !skip_resync {
+            bail!("Change detection fingerprint mismatch, refuse to continue!");
         }
     }
 
