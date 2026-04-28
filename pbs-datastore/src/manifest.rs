@@ -242,29 +242,37 @@ impl BackupManifest {
         Ok(Some(serde_json::from_value::<SnapshotVerifyState>(verify)?))
     }
 
-    /// Set the fingerprint used to detect snapshot changes across encrypted/decrypted sync flows.
+    /// Set the sync-source-signature used to detect snapshot changes across encrypted/decrypted
+    /// sync flows.
     ///
     /// Always an HMAC-SHA256 like [`Self::signature`]; the input is the source's plain manifest for
     /// encrypt-push, or the source's `signature` field (HMAC over its encrypted manifest) for
     /// decrypt-pull from a regular encrypted backup. Not interchangeable across flows.
-    pub fn set_change_detection_fingerprint(
+    pub fn set_sync_source_signature(
         &mut self,
-        fingerprint: &[u8; 32],
+        signature: &[u8; 32],
     ) -> Result<(), Error> {
-        let fp_str = Fingerprint::new(*fingerprint);
-        self.unprotected["change-detection-fingerprint"] = serde_json::to_value(fp_str)?;
+        let fingerprint = Fingerprint::new(*signature);
+        self.unprotected["sync-source-signature"] = serde_json::to_value(fingerprint)?;
         Ok(())
     }
 
-    /// Get the fingerprint used to detect snapshot changes across encrypted/decrypted sync flows.
+    /// Get the sync-source-signature used to detect snapshot changes across encrypted/decrypted
+    /// sync flows.
     ///
-    /// See [`Self::set_change_detection_fingerprint`] for the two distinct flows that set this
-    /// field with different interpretations.
-    pub fn get_change_detection_fingerprint(&self) -> Result<Option<Fingerprint>, Error> {
-        match &self.unprotected["change-detection-fingerprint"] {
-            Value::Null => Ok(None),
-            value => Ok(Some(Deserialize::deserialize(value)?)),
-        }
+    /// See [`Self::set_sync_source_signature`] for the two distinct flows that set this field
+    /// with different interpretations.
+    pub fn get_sync_source_signature(&self) -> Result<Option<Fingerprint>, Error> {
+        let value = if !self.unprotected["sync-source-signature"].is_null() {
+            &self.unprotected["sync-source-signature"]
+        } else if !self.unprotected["change-detection-fingerprint"].is_null() {
+            // fallback to legacy field for sync-source-signature
+            &self.unprotected["change-detection-fingerprint"]
+        } else {
+            return Ok(None);
+        };
+
+        Ok(Some(Deserialize::deserialize(value)?))
     }
 }
 

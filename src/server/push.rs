@@ -1365,8 +1365,8 @@ pub(crate) async fn push_snapshot(
     // needs to update all relevant info for new manifest.
     target_manifest.unprotected = source_manifest.unprotected.clone();
     let manifest_string = if let Some((_id, crypt_config)) = &encrypt_using_key {
-        let fp = source_manifest.signature(crypt_config)?;
-        target_manifest.set_change_detection_fingerprint(&fp)?;
+        let sync_source_signature = source_manifest.signature(crypt_config)?;
+        target_manifest.set_sync_source_signature(&sync_source_signature)?;
         target_manifest.to_string(Some(crypt_config))?
     } else {
         target_manifest.signature = source_manifest.signature.clone();

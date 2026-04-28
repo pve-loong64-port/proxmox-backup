@@ -871,7 +871,9 @@ async fn pull_snapshot<'a>(
         // reverified independent from the sync.
         new_manifest.unprotected = manifest.unprotected.clone();
         if let Some(unprotected) = new_manifest.unprotected.as_object_mut() {
+            // legacy field replaced by sync-source-signature
             unprotected.remove("change-detection-fingerprint");
+            unprotected.remove("sync-source-signature");
             unprotected.remove("key-fingerprint");
             unprotected.remove("verify_state");
         } else {
@@ -880,7 +882,7 @@ async fn pull_snapshot<'a>(
 
         if let Some(expected) = &manifest.signature {
             let expected: Fingerprint = expected.parse().with_context(|| prefix.clone())?;
-            new_manifest.set_change_detection_fingerprint(expected.bytes())?;
+            new_manifest.set_sync_source_signature(expected.bytes())?;
         }
 
         let manifest_string = new_manifest.to_string(None)?;
@@ -1012,16 +1014,16 @@ async fn optionally_use_decryption_key(
     // avoid overwriting pre-existing target manifest
     if let Some(existing_manifest) = existing_target_manifest {
         let source_fp = manifest
-            .get_change_detection_fingerprint()
-            .context("failed to parse change detection fingerprint of source manifest")
+            .get_sync_source_signature()
+            .context("failed to parse sync-source-signature of source manifest")
             .with_context(|| prefix.clone())?;
         let stored_source_fp = existing_manifest
-            .get_change_detection_fingerprint()
-            .context("failed to parse change detection fingerprint of existing target manifest")
+            .get_sync_source_signature()
+            .context("failed to parse sync-source-signature of existing target manifest")
             .with_context(|| prefix.clone())?;
 
         if source_fp.is_none() && stored_source_fp.is_none() {
-            bail!("No change detection fingerprint found, refuse to continue!");
+            bail!("No sync-source-signature found, refuse to continue!");
         }
 
         if let Some(source_fp) = source_fp {
@@ -1034,9 +1036,9 @@ async fn optionally_use_decryption_key(
         }
 
         if let Some(stored_source_fp) = stored_source_fp {
-            // Stored CDF is the source's prior signature on decrypt-pull (the flow this fallback
-            // handles); CDFs set by encrypt-push hold a different HMAC input and fall through to
-            // the mismatch bail.
+            // Stored sync-source-signature is the source's prior signature on decrypt-pull
+            // (the flow this fallback handles); values set by encrypt-push hold a different
+            // HMAC input and fall through to the mismatch bail.
             let Some(current) = &manifest.signature else {
                 bail!("No signature on source manifest.");
             };
@@ -1045,7 +1047,7 @@ async fn optionally_use_decryption_key(
         }
 
         if !skip_resync {
-            bail!("Change detection fingerprint mismatch, refuse to continue!");
+            bail!("sync-source-signature mismatch, refuse to continue!");
         }
     }
 
