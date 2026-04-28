@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -294,7 +294,7 @@ fn inspect_file(
                 ctime_str = s;
             }
 
-            let mut chunk_digests = HashSet::new();
+            let mut chunk_digests = BTreeSet::new();
 
             for pos in 0..index.index_count() {
                 let digest = index.index_digest(pos).unwrap();
