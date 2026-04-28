@@ -101,7 +101,7 @@ Ext.define('PBS.datastore.DataStoreListSummary', {
         let last = 0;
         let time = statusData['history-start'];
         let delta = statusData['history-delta'];
-        let data = statusData.history.map((val) => {
+        let data = (statusData.history ?? []).map((val) => {
             if (val === null) {
                 val = last;
             } else {
