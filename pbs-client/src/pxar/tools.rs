@@ -76,6 +76,35 @@ fn assert_single_path_component_do(path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn normalize_lexically<S: AsRef<OsStr> + ?Sized>(path: &S) -> PathBuf {
+    // FIXME: Once std::path::normalize_lexically is stabilized we can
+    // switch to that
+    use std::path::Component;
+
+    let path = Path::new(path);
+    let has_trailing_slash = path
+        .as_os_str()
+        .as_encoded_bytes()
+        .ends_with(std::path::MAIN_SEPARATOR_STR.as_bytes());
+    let mut new = PathBuf::new();
+    let iter = path.components();
+    for component in iter {
+        match component {
+            Component::RootDir => new.push(Component::RootDir),
+            Component::Prefix(p) => new.push(Component::Prefix(p)),
+            Component::CurDir => continue,
+            Component::ParentDir => {
+                new.pop();
+            }
+            Component::Normal(n) => new.push(n),
+        };
+    }
+    if has_trailing_slash {
+        new.push("");
+    }
+    new
+}
+
 #[rustfmt::skip]
 fn symbolic_mode(c: u64, special: bool, special_x: u8, special_no_x: u8) -> [u8; 3] {
     [

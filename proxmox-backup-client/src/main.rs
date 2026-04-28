@@ -842,9 +842,21 @@ async fn create_backup(
         let entry = entry
             .as_str()
             .ok_or_else(|| format_err!("Invalid pattern string slice"))?;
+        let entry_normalized = pbs_client::pxar::tools::normalize_lexically(entry);
+        if entry_normalized.as_os_str() != entry {
+            log::warn!(
+                "Sanitized exclude pattern. Exclude patterns are relative to backup root, \
+                not the current working directory and should not contain '.' or '..' as path \
+                segments"
+            );
+        }
         pattern_list.push(
-            MatchEntry::parse_pattern(entry, PatternFlag::PATH_NAME, MatchType::Exclude)
-                .map_err(|err| format_err!("invalid exclude pattern entry: {}", err))?,
+            MatchEntry::parse_pattern(
+                entry_normalized.as_os_str().as_encoded_bytes(),
+                PatternFlag::PATH_NAME,
+                MatchType::Exclude,
+            )
+            .map_err(|err| format_err!("invalid exclude pattern entry: {}", err))?,
         );
     }
 

@@ -589,7 +589,19 @@ impl Archiver {
                 (line, MatchType::Exclude, false)
             };
 
-            match MatchEntry::parse_pattern(line, PatternFlag::PATH_NAME, mode) {
+            let line = OsStr::from_bytes(line);
+            let line_normalized = crate::pxar::tools::normalize_lexically(line);
+            if line_normalized.as_os_str() != line {
+                warn!(
+                    "Sanitized exclude pattern. Exclude patterns are relative to the current backup root, \
+                    not the current working directory and should not contain '.' or '..' as path segments"
+                );
+            }
+            match MatchEntry::parse_pattern(
+                line_normalized.as_path().as_os_str().as_bytes(),
+                PatternFlag::PATH_NAME,
+                mode,
+            ) {
                 Ok(pattern) => {
                     if anchored {
                         self.patterns.push(pattern.add_flags(MatchFlag::ANCHORED));
