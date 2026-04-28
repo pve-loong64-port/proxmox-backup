@@ -1825,10 +1825,10 @@ impl DataStore {
             if created {
                 let _ = std::fs::remove_dir(&full_path);
             }
-            BackupGroupOpError::Soft(err.context(format!(
-                "while {} locked backup group {full_path:?}",
+            BackupGroupOpError::Soft(format_err!(
+                "{err} while {} locked backup group {full_path:?}",
                 if created { "creating new" } else { "creating" },
-            )))
+            ))
         })?;
 
         if created {
