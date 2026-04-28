@@ -598,10 +598,8 @@ pub fn list_tasks(
         match (&info.state, &statusfilter) {
             (Some(_), _) if running => continue,
             (Some(TaskState::OK { .. }), _) if errors => continue,
-            (Some(state), Some(filters)) => {
-                if !filters.contains(&tasktype(state)) {
-                    continue;
-                }
+            (Some(state), Some(filters)) if !filters.contains(&tasktype(state)) => {
+                continue;
             }
             (None, Some(_)) => continue,
             _ => {}
