@@ -139,7 +139,7 @@ impl DynamicIndexReader {
             _file: file,
             size,
             index,
-            ctime: header.ctime,
+            ctime: i64::from_le(header.ctime),
             uuid: header.uuid,
             index_csum: header.index_csum,
         })
