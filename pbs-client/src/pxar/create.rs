@@ -593,8 +593,9 @@ impl Archiver {
             let line_normalized = crate::pxar::tools::normalize_lexically(line);
             if line_normalized.as_os_str() != line {
                 warn!(
-                    "Sanitized exclude pattern. Exclude patterns are relative to the current backup root, \
-                    not the current working directory and should not contain '.' or '..' as path segments"
+                    "Sanitized exclude pattern. Exclude patterns are relative to the current \
+                    backup root, not the current working directory and should not contain '.' or \
+                    '..' as path segments."
                 );
             }
             match MatchEntry::parse_pattern(

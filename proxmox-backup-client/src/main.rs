@@ -847,7 +847,7 @@ async fn create_backup(
             log::warn!(
                 "Sanitized exclude pattern. Exclude patterns are relative to backup root, \
                 not the current working directory and should not contain '.' or '..' as path \
-                segments"
+                segments."
             );
         }
         pattern_list.push(
