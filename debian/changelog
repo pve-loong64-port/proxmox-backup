@@ -1,3 +1,44 @@
+rust-proxmox-backup (4.1.12-1) trixie; urgency=medium
+
+  * pull sync: surface CRC errors on the source manifest as actual errors
+    instead of silently treating them as a vanished snapshot.
+
+  * pull sync: bail with a snapshot-prefixed 'archive missing on source' error
+    when fetching a referenced archive returns no data, instead of silently
+    continuing and failing later in the index parser with a confusing message.
+
+  * pull sync: handle vanished snapshots uniformly between local and remote
+    sources, so a concurrent prune during a local-source sync no longer aborts
+    the whole group with 'No such file or directory' but skips the affected
+    snapshot like the remote path already did.
+
+  * pull sync: clean up leftover .tmp files and the otherwise empty
+    freshly-created snapshot directory when a source snapshot vanishes
+    mid-sync or a referenced archive is missing, and drop the misleading 'sync
+    done' log line for snapshots that never actually synced.
+
+  * pull sync: emit an explicit 'skipped' log line for snapshots that fail the
+    verified-only or encrypted-only post-filter check, so the encrypted-only
+    rejection case is no longer silent.
+
+  * fix client metadata-mode incremental backups breaking with strict
+    payload-offset rejections introduced in pxar 1.0.1: hold-back chunks could
+    survive across cache-range discontinuities and produce non-monotonic
+    PXAR_PAYLOAD_REF offsets on disk. Inject any held chunk explicitly when a
+    discontinuity is detected, and re-encode files with non-monotonic previous
+    offsets on the next backup so already affected archives self-heal without
+    needing a --change-detection-mode=data run.
+
+  * client: show the full error context on upload failures in single-line
+    form, restoring information that was lost when the metadata and payload
+    upload streams were split.
+
+  * ui: sync/verify view: show the correct duration of finished tasks in the
+    task log window, instead of computing the duration against the current
+    time.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 28 Apr 2026 03:47:18 +0200
+
 rust-proxmox-backup (4.1.11-1) trixie; urgency=medium
 
   * pull sync: avoid double-decoding blob files on the decrypt-on-pull path,
