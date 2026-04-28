@@ -21,8 +21,8 @@ use tokio::io::AsyncWriteExt;
 
 use pbs_api_types::{
     print_store_and_ns, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
-    BackupNamespace, CryptMode, GroupFilter, Operation, RateLimitConfig, Remote, SnapshotListItem,
-    VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
+    BackupNamespace, CryptMode, Fingerprint, GroupFilter, Operation, RateLimitConfig, Remote,
+    SnapshotListItem, VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
     PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
 };
 use pbs_client::BackupRepository;
@@ -878,6 +878,11 @@ async fn pull_snapshot<'a>(
             bail!("Encountered unexpected manifest without 'unprotected' section.");
         }
 
+        if let Some(expected) = &manifest.signature {
+            let expected: Fingerprint = expected.parse().with_context(|| prefix.clone())?;
+            new_manifest.set_change_detection_fingerprint(expected.bytes())?;
+        }
+
         let manifest_string = new_manifest.to_string(None)?;
         let manifest_blob = DataBlob::encode(manifest_string.as_bytes(), None, true)?;
         // update contents to be uploaded to backend
@@ -1017,6 +1022,20 @@ async fn optionally_use_decryption_key(
                 .signature(config)
                 .with_context(|| prefix.clone())?;
             if target_fp == *source_fp.bytes() {
+                skip_resync = true;
+            } else {
+                bail!("Change detection fingerprint mismatch, refuse to continue!");
+            }
+        } else if let Some(source_signature) = existing_manifest
+            .get_change_detection_fingerprint()
+            .context("failed to parse change detection fingerprint of existing target manifest")
+            .with_context(|| prefix.clone())?
+        {
+            let Some(expected) = &manifest.signature else {
+                bail!("No signature on source manifest.");
+            };
+            let expected: Fingerprint = expected.parse().with_context(|| prefix.clone())?;
+            if expected == source_signature {
                 skip_resync = true;
             } else {
                 bail!("Change detection fingerprint mismatch, refuse to continue!");
