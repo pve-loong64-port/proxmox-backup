@@ -196,7 +196,7 @@ impl IndexFile for DynamicIndexReader {
         if pos >= self.index.len() {
             None
         } else {
-            Some(unsafe { &*(self.chunk_digest(pos).as_ptr() as *const [u8; 32]) })
+            Some(self.chunk_digest(pos))
         }
     }
 
