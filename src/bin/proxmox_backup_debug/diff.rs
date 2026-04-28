@@ -366,8 +366,7 @@ fn visit_directory<'f, 'c>(
 
                         entries.extend(
                             visit_directory(&new_dir, index, &dir_path, chunk_list, chunk_diff)
-                                .await?
-                                .into_iter(),
+                                .await?,
                         );
                         break;
                     }
