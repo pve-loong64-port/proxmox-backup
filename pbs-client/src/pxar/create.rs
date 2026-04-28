@@ -1063,9 +1063,10 @@ impl Archiver {
             let mut padding = start_padding + end_padding;
             let total_size = (range.end - range.start) + padding;
 
-            // take into account used bytes of kept back chunk for padding
+            // must use the same identity predicate as the absorb branch below; otherwise
+            // a dedup collision subtracts an unrelated chunk's bytes from padding.
             if let (Some(first), Some(last)) = (indices.first(), prev_last_chunk.as_ref()) {
-                if last.digest() == first.digest() {
+                if last.same_indexed_chunk_as(first) {
                     // Update padding used for threshold calculation only
                     let used = last.size() - last.padding;
                     padding -= used;
@@ -1093,10 +1094,13 @@ impl Archiver {
                     indices.len(),
                 );
 
-                // check for cases where kept back last is not equal first chunk because the range
-                // end aligned with a chunk boundary, and the chunks therefore needs to be injected
+                // inject the kept back chunk unless it refers to the same index entry
+                // as the new range's first: digests differ when the previous range ended
+                // on a chunk boundary, and matching digests at different `end_offset`s
+                // are a dedup collision in the previous archive (same content at distinct
+                // index positions). Both cases need an explicit injection.
                 if let (Some(first), Some(last)) = (indices.first_mut(), prev_last_chunk) {
-                    if last.digest() != first.digest() {
+                    if !last.same_indexed_chunk_as(first) {
                         // make sure to inject previous last chunk before encoding entries
                         self.inject_chunks_at_current_payload_position(encoder, vec![last])?;
                     } else {
@@ -1398,6 +1402,10 @@ pub struct ReusableDynamicEntry {
     size: u64,
     padding: u64,
     digest: [u8; 32],
+    /// Absolute end position of this entry in the previous archive's payload index;
+    /// together with `digest` the canonical identity tuple for an index entry -
+    /// `digest` alone aliases dedup-collided entries at distinct index positions.
+    end_offset: u64,
 }
 
 impl ReusableDynamicEntry {
@@ -1409,6 +1417,15 @@ impl ReusableDynamicEntry {
     #[inline]
     pub fn digest(&self) -> [u8; 32] {
         self.digest
+    }
+
+    /// Returns whether `self` and `other` reference the same entry in the previous
+    /// archive's payload index. Two distinct entries can share a digest (same chunk
+    /// content via deduplication), so digest equality alone aliases dedup collisions;
+    /// `end_offset` is the per-index-entry identity component that disambiguates them.
+    #[inline]
+    pub fn same_indexed_chunk_as(&self, other: &Self) -> bool {
+        self.digest == other.digest && self.end_offset == other.end_offset
     }
 }
 
@@ -1450,6 +1467,7 @@ fn lookup_dynamic_entries(
             size: (end - prev_end),
             padding: 0,
             digest: dynamic_entry.digest(),
+            end_offset: end,
         };
         indices.push(reusable_dynamic_entry);
 
