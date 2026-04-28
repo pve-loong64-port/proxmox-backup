@@ -599,7 +599,7 @@ impl Archiver {
                 );
             }
             match MatchEntry::parse_pattern(
-                line_normalized.as_path().as_os_str().as_bytes(),
+                line_normalized.as_os_str().as_bytes(),
                 PatternFlag::PATH_NAME,
                 mode,
             ) {
