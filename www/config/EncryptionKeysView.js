@@ -168,7 +168,7 @@ Ext.define('PBS.config.EncryptionKeysView', {
                     });
                 }
             } catch (error) {
-                Ext.Msg.alert(gettext('Error'), error);
+                Ext.Msg.alert(gettext('Error'), error.htmlStatus || gettext('Unknown error'));
             }
 
             try {
@@ -181,7 +181,7 @@ Ext.define('PBS.config.EncryptionKeysView', {
                     });
                 }
             } catch (error) {
-                Ext.Msg.alert(gettext('Error'), error);
+                Ext.Msg.alert(gettext('Error'), error.htmlStatus || gettext('Unknown error'));
             }
 
             let store = view.getStore().rstore;
