@@ -1,5 +1,5 @@
 [Unit]
-Description=Try to mount the removable device of a datastore with uuid '%i'.
+Description=Conditionally mounting device with uuid '%i' if it belongs to a removable datastore
 After=proxmox-backup-proxy.service
 Requires=proxmox-backup-proxy.service
 
