@@ -248,10 +248,7 @@ impl BackupManifest {
     /// Always an HMAC-SHA256 like [`Self::signature`]; the input is the source's plain manifest for
     /// encrypt-push, or the source's `signature` field (HMAC over its encrypted manifest) for
     /// decrypt-pull from a regular encrypted backup. Not interchangeable across flows.
-    pub fn set_sync_source_signature(
-        &mut self,
-        signature: &[u8; 32],
-    ) -> Result<(), Error> {
+    pub fn set_sync_source_signature(&mut self, signature: &[u8; 32]) -> Result<(), Error> {
         let fingerprint = Fingerprint::new(*signature);
         self.unprotected["sync-source-signature"] = serde_json::to_value(fingerprint)?;
         Ok(())
