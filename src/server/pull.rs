@@ -942,6 +942,21 @@ async fn optionally_use_decryption_key(
     log_sender: Arc<LogLineSender>,
 ) -> Result<(Option<Arc<CryptConfig>>, bool), Error> {
     let Some(key_fp) = manifest.fingerprint().with_context(|| prefix.clone())? else {
+        if let Some(existing_manifest) = existing_target_manifest {
+            if existing_manifest.fingerprint()?.is_some() {
+                bail!("refusing to overwrite local encrypted snapshot from unencrypted source");
+            } else {
+                // Use a zero key to produce a deterministic content hash over the canonical,
+                // signature- and unprotected-stripped manifest. Equal output means equal
+                // protected content (files, csums, backup-time, ...).
+                let dummy = CryptConfig::new([0u8; 32])?;
+                if existing_manifest.signature(&dummy)? != manifest.signature(&dummy)? {
+                    // neither source nor target encrypted, but manifests differ
+                    bail!("refusing to overwrite local snapshot: content differs from source");
+                }
+            }
+        }
+
         return Ok((None, false)); // no fingerprint on source, regular pull
     };
 
