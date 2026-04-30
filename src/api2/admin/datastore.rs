@@ -470,7 +470,7 @@ pub async fn delete_snapshot(
         let snapshot = datastore.backup_dir(ns, backup_dir)?;
         datastore
             .delete_snapshot(&snapshot)
-            .map_err(|err| format_err!("failed to delete snapshot - {err:#?}"))?;
+            .map_err(|err| format_err!("failed to delete snapshot - {err:#}"))?;
         Ok(Value::Null)
     })
     .await?
@@ -1096,7 +1096,7 @@ pub fn prune(
             if !keep {
                 if let Err(err) = datastore.delete_snapshot(backup_dir) {
                     warn!(
-                        "failed to remove dir {:?}: {err:#?}",
+                        "failed to remove dir {:?}: {err:#}",
                         backup_dir.relative_path()
                     );
                 }
@@ -1653,7 +1653,7 @@ pub fn upload_backup_log(
             datastore.add_blob(file_name.as_ref(), backup_dir, blob, &backend)
         })
         .await
-        .map_err(|err| format_err!("{err:#?}"))??;
+        .map_err(|err| format_err!("{err:#}"))??;
 
         // fixme: use correct formatter
         Ok(formatter::JSON_FORMATTER.format_data(Value::Null, &*rpcenv))
@@ -2118,7 +2118,7 @@ pub fn set_group_notes(
     let backup_group = datastore.backup_group(ns, backup_group);
     datastore
         .set_group_notes(notes, backup_group)
-        .map_err(|err| format_err!("failed to set group notes - {err:#?}"))?;
+        .map_err(|err| format_err!("failed to set group notes - {err:#}"))?;
     Ok(())
 }
 

@@ -1322,7 +1322,7 @@ async fn pull_group(
             log_sender
                 .log(
                     Level::WARN,
-                    format!("Failed to collect reusable chunk from last backup: {err:#?}"),
+                    format!("Failed to collect reusable chunk from last backup: {err:#}"),
                 )
                 .await?;
         }
