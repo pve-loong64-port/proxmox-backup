@@ -288,11 +288,11 @@ fn upgrade_to_backup_protocol(
                 if benchmark {
                     env.log("benchmark finished successfully");
                     proxmox_async::runtime::block_in_place(|| {
-                        env.datastore.remove_backup_dir(
-                            env.backup_dir.backup_ns(),
-                            env.backup_dir.as_ref(),
-                            true,
-                        )
+                        let datastore = env.datastore.clone();
+                        let namespace = env.backup_dir.backup_ns().clone();
+                        let snapshot = env.backup_dir.dir().clone();
+                        drop(env); // drops all locks to allow clean-up
+                        datastore.remove_backup_dir(&namespace, &snapshot, true)
                     })?;
                     return Ok(());
                 }
