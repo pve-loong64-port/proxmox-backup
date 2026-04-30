@@ -886,9 +886,9 @@ impl BackupDir {
     pub(crate) fn destroy(&self, force: bool, backend: &DatastoreBackend) -> Result<(), Error> {
         let (_guard, _manifest_guard);
         if !force {
-            _guard = self
-                .lock()
-                .with_context(|| format!("while destroying snapshot '{self:?}'"))?;
+            _guard = self.lock().map_err(|err| {
+                format_err!("while destroying snapshot {:?}: {err}", self.full_path())
+            })?;
             _manifest_guard = self.lock_manifest()?;
         }
 
