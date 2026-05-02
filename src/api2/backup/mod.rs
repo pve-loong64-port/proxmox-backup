@@ -292,7 +292,7 @@ fn upgrade_to_backup_protocol(
                         let namespace = env.backup_dir.backup_ns().clone();
                         let snapshot = env.backup_dir.dir().clone();
                         drop(env); // drops all locks to allow clean-up
-                        datastore.remove_backup_dir(&namespace, &snapshot, true)
+                        datastore.remove_backup_dir(&namespace, &snapshot, false)
                     })?;
                     return Ok(());
                 }
