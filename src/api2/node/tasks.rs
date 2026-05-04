@@ -255,6 +255,11 @@ fn into_task_list_item(info: proxmox_rest_server::TaskListInfo) -> pbs_api_types
                 optional: true,
                 description: "'OK', 'Error: <msg>', or 'unknown'.",
             },
+            endtime: {
+                type: i64,
+                description: "The task end time (Epoch)",
+                optional: true,
+            },
         },
     },
     access: {
@@ -292,6 +297,10 @@ async fn get_task_status(param: Value, rpcenv: &mut dyn RpcEnvironment) -> Resul
         let exitstatus = upid_read_status(&upid).unwrap_or(TaskState::Unknown { endtime: 0 });
         result["status"] = Value::from("stopped");
         result["exitstatus"] = Value::from(exitstatus.to_string());
+        let endtime = exitstatus.endtime();
+        if endtime > 0 {
+            result["endtime"] = Value::from(endtime);
+        }
     };
 
     Ok(result)
