@@ -882,7 +882,9 @@ impl BackupDir {
 
     /// Destroy the whole snapshot, bails if it's protected
     ///
-    /// Setting `force` to true skips locking and thus ignores if the backup is currently in use.
+    /// Setting `force` to true requires the caller to already hold both the snapshot and the
+    /// group lock so that destruction is race-free and the empty-group cleanup further below
+    /// can run safely.
     pub(crate) fn destroy(&self, force: bool, backend: &DatastoreBackend) -> Result<(), Error> {
         let (_guard, _manifest_guard);
         if !force {
@@ -922,23 +924,30 @@ impl BackupDir {
         let _ = std::fs::remove_file(self.lock_path()); // ignore errors
 
         let group = BackupGroup::from(self);
-        let guard = group.lock().with_context(|| {
-            format!("while checking if group '{group:?}' is empty during snapshot destruction")
-        });
+        // With force the caller asserts to already hold the group lock, otherwise acquire it now
+        // for the empty-group cleanup further below.
+        let _guard = if !force {
+            match group.lock() {
+                Ok(guard) => Some(guard),
+                Err(err) => {
+                    // If we can't lock the group, it is still in use (either by another backup
+                    // process or by a parent caller, which needs to take care of removing empty
+                    // groups itself). Do not error out, the snapshot was already removed and
+                    // there is nothing a user could do to rectify the situation.
+                    log::debug!(
+                        "could not lock group '{group:?}' for empty cleanup check: {err:#}"
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            None
+        };
 
-        // Only remove the group if all of the following is true:
-        //
-        // - we can lock it: if we can't lock the group, it is still in use (either by another
-        //   backup process or a parent caller (who needs to take care that empty groups are
-        //   removed themselves).
-        // - it is now empty: if the group isn't empty, removing it will fail (to avoid removing
-        //   backups that might still be used).
-        // - the new locking mechanism is used: if the old mechanism is used, a group removal here
-        //   could lead to a race condition.
-        //
-        // Do not error out, as we have already removed the snapshot, there is nothing a user could
-        // do to rectify the situation.
-        if guard.is_ok() && group.list_backups()?.is_empty() && !*OLD_LOCKING {
+        // Only remove the group if it is empty (otherwise removing would fail anyway, to avoid
+        // removing backups that might still be used) and the new locking mechanism is used (the
+        // old one would race here).
+        if group.list_backups()?.is_empty() && !*OLD_LOCKING {
             group.remove_group_dir()?;
             if let DatastoreBackend::S3(s3_client) = backend {
                 let object_key =
@@ -946,8 +955,6 @@ impl BackupDir {
                         .context("invalid owner file object key")?;
                 proxmox_async::runtime::block_on(s3_client.delete_object(object_key))?;
             }
-        } else if let Err(err) = guard {
-            log::debug!("{err:#}");
         }
 
         Ok(())
