@@ -1,3 +1,13 @@
+use std::os::unix::prelude::AsRawFd;
+
+use anyhow::{bail, format_err, Error};
+use hex::FromHex;
+use nix::unistd::{Gid, Group, Uid, User};
+
+use proxmox_sys::fs::DirLockGuard;
+
+pub use pbs_buildcfg::{BACKUP_GROUP_NAME, BACKUP_USER_NAME};
+
 pub mod acl;
 mod cached_user_info;
 pub use cached_user_info::CachedUserInfo;
@@ -22,14 +32,6 @@ pub mod verify;
 
 mod config_version_cache;
 pub use config_version_cache::ConfigVersionCache;
-
-use anyhow::{bail, format_err, Error};
-use hex::FromHex;
-use nix::unistd::{Gid, Group, Uid, User};
-use proxmox_sys::fs::DirLockGuard;
-use std::os::unix::prelude::AsRawFd;
-
-pub use pbs_buildcfg::{BACKUP_GROUP_NAME, BACKUP_USER_NAME};
 
 /// Return User info for the 'backup' user (``getpwnam_r(3)``)
 pub fn backup_user() -> Result<nix::unistd::User, Error> {
