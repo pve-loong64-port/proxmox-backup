@@ -845,7 +845,7 @@ async fn clean_drive(mut param: Value) -> Result<(), Error> {
                 optional: true,
                 type: Userid,
             },
-            groups: {
+            "group-filter": {
                 schema: GROUP_FILTER_LIST_SCHEMA,
                 optional: true,
             },
