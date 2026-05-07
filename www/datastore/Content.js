@@ -950,6 +950,9 @@ Ext.define('PBS.DataStoreContent', {
                 store.clearFilter();
                 // only collapse the children below our toplevel namespace "root"
                 store.getRoot().lastChild.collapseChildren(true);
+                // expand just the namespace "root", otherwise the navigation breaks,
+                // as the children are not accessible anymore
+                store.getRoot().lastChild.expand();
                 tf.triggers.clear.setVisible(false);
                 return;
             }
