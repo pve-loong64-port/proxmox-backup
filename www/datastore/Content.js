@@ -1242,13 +1242,14 @@ Ext.define('PBS.DataStoreContent', {
                         }
                         return 'pmx-hidden';
                     },
-                    isActionDisabled: (v, r, c, i, { data }) =>
-                        !(
+                    isActionDisabled: (v, r, c, i, { data }) => {
+                        const enableFile =
                             data.ty === 'file' &&
                             (data.filename.endsWith('.pxar.didx') ||
                                 data.filename.endsWith('.mpxar.didx')) &&
-                            data['crypt-mode'] < 3
-                        ) && data.ty !== 'ns',
+                            data['crypt-mode'] < 3;
+                        return !enableFile && (data.ty !== 'ns' || data.root);
+                    },
                 },
             ],
         },
