@@ -1150,14 +1150,18 @@ Ext.define('PBS.DataStoreContent', {
                         return Ext.String.format(gettext("Move namespace '{0}'"), v);
                     },
                     getClass: (v, m, { data }) => {
-                        if (data.ty === 'group') { return 'fa fa-arrows'; }
+                        if (data.ty === 'group') {
+                            return 'fa fa-arrows';
+                        }
                         if (data.ty === 'ns' && !data.isRootNS && data.ns === undefined) {
                             return 'fa fa-arrows';
                         }
                         return 'pmx-hidden';
                     },
                     isActionDisabled: (v, r, c, i, { data }) => {
-                        if (data.ty === 'group') { return false; }
+                        if (data.ty === 'group') {
+                            return false;
+                        }
                         if (data.ty === 'ns' && !data.isRootNS && data.ns === undefined) {
                             return false;
                         }
