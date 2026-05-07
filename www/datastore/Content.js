@@ -1212,7 +1212,13 @@ Ext.define('PBS.DataStoreContent', {
                         data.ty === 'dir'
                             ? 'fa critical fa-trash-o'
                             : 'pmx-hidden',
-                    isActionDisabled: (v, r, c, i, { data }) => false,
+                    isActionDisabled: (v, r, c, i, { data }) => {
+                        const enabled =
+                            (data.ty === 'ns' && !data.isRootNS && data.ns === undefined) ||
+                            data.ty === 'group' ||
+                            data.ty === 'dir';
+                        return !enabled;
+                    },
                 },
                 {
                     handler: 'downloadFile',
