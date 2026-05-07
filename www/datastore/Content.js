@@ -933,22 +933,13 @@ Ext.define('PBS.DataStoreContent', {
         },
 
         filter: function (item, value) {
-            if (item.data.text.indexOf(value) !== -1) {
-                return true;
-            }
+            const needle = value.toLowerCase();
 
-            if (item.data.owner && item.data.owner.indexOf(value) !== -1) {
-                return true;
-            }
-
-            if (
-                item.data.comment &&
-                item.data.comment.toLowerCase().includes(value.toLowerCase())
-            ) {
-                return true;
-            }
-
-            return false;
+            return (
+                item.data.text.toLowerCase().includes(needle) ||
+                (item.data.owner && item.data.owner.toLowerCase().includes(needle)) ||
+                (item.data.comment && item.data.comment.toLowerCase().includes(needle))
+            );
         },
 
         search: function (tf, value) {
