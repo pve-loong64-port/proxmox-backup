@@ -941,6 +941,13 @@ Ext.define('PBS.DataStoreContent', {
                 return true;
             }
 
+            if (
+                item.data.comment &&
+                item.data.comment.toLowerCase().includes(value.toLowerCase())
+            ) {
+                return true;
+            }
+
             return false;
         },
 
@@ -1490,7 +1497,7 @@ Ext.define('PBS.DataStoreContent', {
         {
             xtype: 'textfield',
             reference: 'searchbox',
-            emptyText: gettext('group, date or owner'),
+            emptyText: gettext('group, date, owner or comment'),
             triggers: {
                 clear: {
                     cls: 'pmx-clear-trigger',
