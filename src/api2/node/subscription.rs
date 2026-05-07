@@ -102,7 +102,15 @@ pub fn check_subscription(force: bool) -> Result<(), Error> {
         Ok(None) => return Ok(()),
     };
 
-    let server_id = proxmox_subscription::get_hardware_address()?;
+    let server_id = if let Some(existing) = info.serverid.as_ref() {
+        existing.to_owned()
+    } else {
+        proxmox_subscription::get_hardware_address_candidates()?
+            .first()
+            .ok_or_else(|| format_err!("Failed to generate serverid"))?
+            .to_string()
+    };
+
     let key = if let Some(key) = info.key.as_ref() {
         // always update apt auth if we have a key to ensure user can access enterprise repo
         proxmox_subscription::files::update_apt_auth(
@@ -110,7 +118,7 @@ pub fn check_subscription(force: bool) -> Result<(), Error> {
             apt_auth_file_opts(),
             APT_AUTH_URL,
             Some(key.to_owned()),
-            Some(server_id.to_owned()),
+            Some(server_id.clone()),
         )?;
         key.to_owned()
     } else {
@@ -124,6 +132,7 @@ pub fn check_subscription(force: bool) -> Result<(), Error> {
     if !force && info.status == SubscriptionStatus::Active {
         // will set to INVALID if last check too long ago
         info.check_age(true);
+
         if info.status == SubscriptionStatus::Active {
             return Ok(());
         }
@@ -156,13 +165,19 @@ pub fn get_subscription(
     ) {
         Err(err) => bail!("could not read subscription status: {}", err),
         Ok(Some(info)) => info,
-        Ok(None) => SubscriptionInfo {
-            status: SubscriptionStatus::NotFound,
-            message: Some("There is no subscription key".into()),
-            serverid: Some(proxmox_subscription::get_hardware_address()?),
-            url: Some(PRODUCT_URL.into()),
-            ..Default::default()
-        },
+        Ok(None) => {
+            let candidates = proxmox_subscription::get_hardware_address_candidates()?;
+            let serverid = candidates
+                .first()
+                .ok_or_else(|| format_err!("Failed to generate serverid"))?;
+            SubscriptionInfo {
+                status: SubscriptionStatus::NotFound,
+                message: Some("There is no subscription key".into()),
+                serverid: Some(serverid.to_string()),
+                url: Some(PRODUCT_URL.into()),
+                ..Default::default()
+            }
+        }
     };
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
@@ -200,7 +215,10 @@ pub fn get_subscription(
 )]
 /// Set a subscription key and check it.
 pub fn set_subscription(key: String) -> Result<(), Error> {
-    let server_id = proxmox_subscription::get_hardware_address()?;
+    let server_id = proxmox_subscription::get_hardware_address_candidates()?
+        .first()
+        .ok_or_else(|| format_err!("Failed to generate serverid"))?
+        .to_string();
 
     check_and_write_subscription(key, server_id)
 }
