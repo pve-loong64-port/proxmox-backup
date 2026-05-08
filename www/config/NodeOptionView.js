@@ -35,6 +35,17 @@ Ext.define('PBS.NodeOptionView', {
         },
     ],
 
+    rows: {
+        location: {
+            required: true,
+            header: gettext('Location'),
+            renderer: Proxmox.Utils.renderLocation,
+            editor: {
+                xtype: 'pmxLocationEditWindow',
+            },
+        },
+    },
+
     gridRows: [
         {
             xtype: 'text',
