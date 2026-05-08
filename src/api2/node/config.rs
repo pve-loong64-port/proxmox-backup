@@ -67,6 +67,8 @@ pub enum DeletableProperty {
     TaskLogMaxDays,
     /// Delete the consent-text property
     ConsentText,
+    /// Delete the location property
+    Location,
 }
 
 #[api(
@@ -157,6 +159,9 @@ pub fn update_node_config(
                 DeletableProperty::ConsentText => {
                     config.consent_text = None;
                 }
+                DeletableProperty::Location => {
+                    config.location = None;
+                }
             }
         }
     }
@@ -202,6 +207,9 @@ pub fn update_node_config(
     }
     if update.consent_text.is_some() {
         config.consent_text = update.consent_text;
+    }
+    if update.location.is_some() {
+        config.location = update.location;
     }
 
     pbs_config::node::save_config(&config)?;
