@@ -269,6 +269,10 @@ pub fn unload(
                 optional: true,
                 default: true,
             },
+            "load-barcode": {
+                schema: MEDIA_LABEL_SCHEMA,
+                optional: true,
+            },
             "label-text": {
                 schema: MEDIA_LABEL_SCHEMA,
                 optional: true,
@@ -286,6 +290,7 @@ pub fn unload(
 pub fn format_media(
     drive: String,
     fast: Option<bool>,
+    load_barcode: Option<String>,
     label_text: Option<String>,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Value, Error> {
@@ -295,10 +300,10 @@ pub fn format_media(
         "format-media",
         Some(drive.clone()),
         move |_worker, config| {
-            if let Some(ref label) = label_text {
-                info!("try to load media '{label}'");
+            if let Some(barcode) = load_barcode {
+                info!("try to load media '{barcode}'");
                 if let Some((mut changer, _)) = media_changer(&config, &drive)? {
-                    changer.load_media(label)?;
+                    changer.load_media(&barcode)?;
                 }
             }
 

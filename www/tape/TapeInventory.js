@@ -44,14 +44,15 @@ Ext.define('PBS.TapeManagement.TapeInventory', {
             if (!selection || selection.length < 1) {
                 return;
             }
-            let label = selection[0].data['label-text'];
+            let barcode = selection[0].data['label-text'];
             let inChanger = selection[0].data.location.startsWith('online-');
             let changer;
             if (inChanger) {
                 changer = selection[0].data.location.slice('online-'.length);
             }
             Ext.create('PBS.TapeManagement.EraseWindow', {
-                label,
+                barcode,
+                isLabeled: true,
                 changer,
                 listeners: {
                     destroy: function () {

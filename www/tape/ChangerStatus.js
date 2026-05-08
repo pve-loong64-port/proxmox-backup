@@ -164,10 +164,17 @@ Ext.define('PBS.TapeManagement.ChangerStatus', {
         'format-inserted': function (button, event, record) {
             let me = this;
 
+            let params = {};
+            if (record.data['is-labeled']) {
+                params = {
+                    'label-text': record.data['label-text'],
+                };
+            }
             let view = me.getView();
             PBS.Utils.driveCommand(record.data.name, 'format-media', {
                 waitMsgTarget: view,
                 method: 'POST',
+                params,
                 success: function (response) {
                     Ext.create('Proxmox.window.TaskProgress', {
                         upid: response.result.data,
@@ -182,12 +189,13 @@ Ext.define('PBS.TapeManagement.ChangerStatus', {
         format: function (v, rI, cI, button, el, record) {
             let me = this;
             let view = me.getView();
-            let label = record.data['label-text'];
+            let barcode = record.data['label-text'];
 
             let changer = encodeURIComponent(view.changer);
             let singleDrive = me.drives.length === 1 ? me.drives[0] : undefined;
             Ext.create('PBS.TapeManagement.EraseWindow', {
-                label,
+                barcode,
+                isLabeled: record.data['is-labeled'],
                 changer,
                 singleDrive,
                 listeners: {

@@ -3,16 +3,18 @@ Ext.define('PBS.TapeManagement.EraseWindow', {
     mixins: ['Proxmox.Mixin.CBind'],
 
     changer: undefined,
-    label: undefined,
+    barcode: undefined,
+    isLabeled: false,
 
     cbindData: function (config) {
         let me = this;
         return {
+            label: me.isLabeled ? me.barcode : undefined,
             singleDrive: me.singleDrive,
             hasSingleDrive: !!me.singleDrive,
             warning: Ext.String.format(
                 gettext("Are you sure you want to format tape '{0}' ?"),
-                me.label,
+                me.barcode,
             ),
         };
     },
@@ -68,8 +70,16 @@ Ext.define('PBS.TapeManagement.EraseWindow', {
                         },
                         {
                             xtype: 'hidden',
+                            name: 'load-barcode',
+                            cbind: {
+                                value: '{barcode}',
+                            },
+                        },
+                        {
+                            xtype: 'hidden',
                             name: 'label-text',
                             cbind: {
+                                submitValue: '{isLabeled}',
                                 value: '{label}',
                             },
                         },
