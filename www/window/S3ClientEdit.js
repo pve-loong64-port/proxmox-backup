@@ -142,6 +142,19 @@ Ext.define('PBS.window.S3ClientEdit', {
                 emptyText: gettext('Unlimited'),
                 minValue: 1,
             },
+            {
+                xtype: 'proxmoxcheckbox',
+                fieldLabel: gettext('Use node proxy'),
+                name: 'use-node-proxy',
+                autoEl: {
+                    tag: 'div',
+                    'data-qtip': gettext(
+                        "Use the node's http proxy configuration for S3 client API connections.",
+                    ),
+                },
+                uncheckedValue: false,
+                value: false,
+            },
         ],
         advancedColumn2: [
             {
