@@ -63,6 +63,12 @@ pub async fn check(
         base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
     };
 
+    let http_proxy = if config.config.use_node_proxy.unwrap_or(false) {
+        pbs_config::node::node_http_proxy_config()?
+    } else {
+        None
+    };
+
     let store_prefix = store_prefix.unwrap_or_default();
     let options = S3ClientOptions::from_config(
         config.config,
@@ -70,7 +76,7 @@ pub async fn check(
         Some(bucket),
         store_prefix,
         None,
-        pbs_config::node::node_http_proxy_config()?,
+        http_proxy,
         Some(request_counter_config),
     );
 

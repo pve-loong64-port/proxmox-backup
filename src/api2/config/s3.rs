@@ -153,6 +153,8 @@ pub enum DeletableProperty {
     LimitPassiveRequests,
     /// Delete the provider quirks property.
     ProviderQuirks,
+    /// Delete the use-node-proxy property.
+    UseNodeProxy,
 }
 
 #[api(
@@ -243,6 +245,9 @@ pub fn update_s3_client_config(
                 DeletableProperty::ProviderQuirks => {
                     data.config.provider_quirks = None;
                 }
+                DeletableProperty::UseNodeProxy => {
+                    data.config.use_node_proxy = None;
+                }
             }
         }
     }
@@ -285,6 +290,9 @@ pub fn update_s3_client_config(
     }
     if let Some(provider_quirks) = update.provider_quirks {
         data.config.provider_quirks = Some(provider_quirks);
+    }
+    if let Some(use_node_proxy) = update.use_node_proxy {
+        data.config.use_node_proxy = Some(use_node_proxy);
     }
 
     if let Some(secret_key) = secret_key {
@@ -365,13 +373,19 @@ pub async fn list_buckets(
         user: proxmox_product_config::get_api_user().clone(),
         base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
     };
+    let http_proxy = if config.config.use_node_proxy.unwrap_or(false) {
+        pbs_config::node::node_http_proxy_config()?
+    } else {
+        None
+    };
+
     let options = S3ClientOptions::from_config(
         config.config,
         config.secret_key,
         None,
         empty_prefix,
         None,
-        pbs_config::node::node_http_proxy_config()?,
+        http_proxy,
         Some(request_counter_config),
     );
     let client = S3Client::new(options).context("client creation failed")?;

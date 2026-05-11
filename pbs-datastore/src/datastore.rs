@@ -499,6 +499,11 @@ impl DataStore {
                     user: backup_user.clone(),
                     base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
                 };
+                let http_proxy = if config.config.use_node_proxy.unwrap_or(false) {
+                    pbs_config::node::node_http_proxy_config()?
+                } else {
+                    None
+                };
 
                 let mut options = S3ClientOptions::from_config(
                     config.config,
@@ -506,7 +511,7 @@ impl DataStore {
                     Some(bucket),
                     self.name().to_owned(),
                     Some(rate_limiter_options),
-                    pbs_config::node::node_http_proxy_config()?,
+                    http_proxy,
                     Some(request_counter_config),
                 );
                 if let Some(notify) = self.inner.thresholds_exceeded_callback {
@@ -3330,6 +3335,11 @@ impl DataStore {
             user: backup_user.clone(),
             base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
         };
+        let http_proxy = if client_config.config.use_node_proxy.unwrap_or(false) {
+            pbs_config::node::node_http_proxy_config()?
+        } else {
+            None
+        };
 
         let options = S3ClientOptions::from_config(
             client_config.config,
@@ -3337,7 +3347,7 @@ impl DataStore {
             Some(bucket),
             datastore_config.name.to_owned(),
             Some(rate_limiter_options),
-            pbs_config::node::node_http_proxy_config()?,
+            http_proxy,
             Some(request_counter_config),
         );
         let s3_client = S3Client::new(options)
