@@ -36,6 +36,12 @@ use pbs_api_types::{
     GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode,
     MaintenanceType, Operation, S3Statistics, UPID,
 };
+use pbs_api_types::{
+    ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
+    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, GarbageCollectionCacheStats,
+    GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode, MaintenanceType, Operation,
+    S3Statistics, UPID,
+};
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
 use proxmox_section_config::SectionConfigData;
@@ -204,7 +210,6 @@ pub struct DataStoreImpl {
     last_gc_status: Mutex<GarbageCollectionStatus>,
     verify_new: bool,
     chunk_order: ChunkOrder,
-    sync_level: DatastoreFSyncLevel,
     backend_config: DatastoreBackendConfig,
     lru_store_caching: Option<LocalDatastoreLruCache>,
     thread_settings: DatastoreThreadSettings,
@@ -225,7 +230,6 @@ impl DataStoreImpl {
             last_gc_status: Mutex::new(GarbageCollectionStatus::default()),
             verify_new: false,
             chunk_order: Default::default(),
-            sync_level: Default::default(),
             backend_config: Default::default(),
             lru_store_caching: None,
             thread_settings: Default::default(),
@@ -781,7 +785,6 @@ impl DataStore {
             last_gc_status: Mutex::new(gc_status),
             verify_new: config.verify_new.unwrap_or(false),
             chunk_order: tuning.chunk_order.unwrap_or_default(),
-            sync_level: tuning.sync_level.unwrap_or_default(),
             backend_config,
             lru_store_caching,
             thread_settings,
@@ -3005,19 +3008,10 @@ impl DataStore {
     }
     */
 
-    /// Syncs the filesystem of the datastore if 'sync_level' is set to
+    /// Syncs the filesystem of the chunk store base path if 'sync_level' is set to
     /// [`DatastoreFSyncLevel::Filesystem`]. Uses syncfs(2).
     pub fn try_ensure_sync_level(&self) -> Result<(), Error> {
-        if self.inner.sync_level != DatastoreFSyncLevel::Filesystem {
-            return Ok(());
-        }
-        let file = std::fs::File::open(self.base_path())?;
-        let fd = file.as_raw_fd();
-        log::info!("syncing filesystem");
-        if unsafe { libc::syncfs(fd) } < 0 {
-            bail!("error during syncfs: {}", std::io::Error::last_os_error());
-        }
-        Ok(())
+        self.inner.chunk_store.try_ensure_sync_level()
     }
 
     /// Destroy a datastore. This requires that there are no active operations on the datastore.

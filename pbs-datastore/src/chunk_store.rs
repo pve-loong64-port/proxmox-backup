@@ -974,6 +974,19 @@ impl ChunkStore {
         }
         (chunk_path, counter)
     }
+
+    pub(super) fn try_ensure_sync_level(&self) -> Result<(), Error> {
+        if self.sync_level != DatastoreFSyncLevel::Filesystem {
+            return Ok(());
+        }
+        let file = std::fs::File::open(self.base_path())?;
+        let fd = file.as_raw_fd();
+        info!("syncing filesystem");
+        if unsafe { libc::syncfs(fd) } < 0 {
+            bail!("error during syncfs: {}", std::io::Error::last_os_error());
+        }
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
