@@ -14,9 +14,9 @@ use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
     Authid, DATASTORE_SCHEMA, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType,
-    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType,
-    PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY,
-    PROXMOX_CONFIG_DIGEST_SCHEMA, PruneJobConfig, PruneJobOptions, UPID_SCHEMA,
+    DatastoreNotify, KeepOptions, MaintenanceMode, MaintenanceType, PRIV_DATASTORE_ALLOCATE,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    PruneJobConfig, PruneJobOptions, UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
@@ -121,11 +121,7 @@ pub(crate) fn do_create_datastore(
         param_bail!("path", err);
     }
 
-    let tuning: DatastoreTuning = serde_json::from_value(
-        DatastoreTuning::API_SCHEMA
-            .parse_property_string(datastore.tuning.as_deref().unwrap_or(""))?,
-    )?;
-
+    let tuning = pbs_config::datastore::parse_datastore_tuning_options(&datastore)?;
     let (backend_type, backend_s3_client) =
         match DataStore::s3_client_and_backend_from_datastore_config(&datastore)? {
             (backend_type, Some(s3_client)) => {

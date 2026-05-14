@@ -6,7 +6,7 @@ use anyhow::Error;
 use proxmox_schema::{AllOfSchema, ApiType};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use pbs_api_types::{DATASTORE_SCHEMA, DataStoreConfig, DatastoreBackendConfig};
+use pbs_api_types::{DATASTORE_SCHEMA, DataStoreConfig, DatastoreBackendConfig, DatastoreTuning};
 
 use crate::{BackupLockGuard, ConfigVersionCache, open_backup_lockfile, replace_backup_config};
 
@@ -117,6 +117,11 @@ pub fn complete_calendar_event(_arg: &str, _param: &HashMap<String, String>) -> 
 /// Parse the backend configuration from a datastore config.
 pub fn parse_backend_config(config: &DataStoreConfig) -> Result<DatastoreBackendConfig, Error> {
     config.backend.as_deref().unwrap_or("").parse()
+}
+
+/// Parse the datastore tuning options from a datastore config.
+pub fn parse_datastore_tuning_options(config: &DataStoreConfig) -> Result<DatastoreTuning, Error> {
+    config.tuning.as_deref().unwrap_or("").parse()
 }
 
 /// Returns the datastore backend type from its name.

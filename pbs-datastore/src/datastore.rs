@@ -33,8 +33,8 @@ use proxmox_worker_task::WorkerTaskContext;
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
-    DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH,
-    MaintenanceMode, MaintenanceType, Operation, S3Statistics, UPID,
+    GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode,
+    MaintenanceType, Operation, S3Statistics, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
@@ -605,10 +605,7 @@ impl DataStore {
             }
             Arc::clone(&datastore.chunk_store)
         } else {
-            let tuning: DatastoreTuning = serde_json::from_value(
-                DatastoreTuning::API_SCHEMA
-                    .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
-            )?;
+            let tuning = pbs_config::datastore::parse_datastore_tuning_options(&config)?;
             Arc::new(ChunkStore::open(
                 lookup.name,
                 config.absolute_path(),
@@ -697,10 +694,7 @@ impl DataStore {
 
         ensure_datastore_is_mounted(&config)?;
 
-        let tuning: DatastoreTuning = serde_json::from_value(
-            DatastoreTuning::API_SCHEMA
-                .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
-        )?;
+        let tuning = pbs_config::datastore::parse_datastore_tuning_options(&config)?;
         let chunk_store = ChunkStore::open(
             &name,
             config.absolute_path(),
@@ -741,11 +735,7 @@ impl DataStore {
             GarbageCollectionStatus::default()
         };
 
-        let tuning: DatastoreTuning = serde_json::from_value(
-            DatastoreTuning::API_SCHEMA
-                .parse_property_string(config.tuning.as_deref().unwrap_or(""))?,
-        )?;
-
+        let tuning = pbs_config::datastore::parse_datastore_tuning_options(&config)?;
         let backend_config = pbs_config::datastore::parse_backend_config(&config)?;
 
         let (lru_store_caching, request_counters) =
@@ -2403,10 +2393,7 @@ impl DataStore {
             cache_stats: Some(GarbageCollectionCacheStats::default()),
             ..Default::default()
         };
-        let tuning: DatastoreTuning = serde_json::from_value(
-            DatastoreTuning::API_SCHEMA
-                .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
-        )?;
+        let tuning = pbs_config::datastore::parse_datastore_tuning_options(&gc_store_config)?;
 
         let s3_client = match self.backend()? {
             DatastoreBackend::Filesystem => None,
