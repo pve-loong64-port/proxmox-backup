@@ -1003,9 +1003,10 @@ impl ChunkStore {
             return Ok(());
         }
 
-        let file = std::fs::File::open(self.base_path())?;
+        let base_path = self.base_path();
+        let file = std::fs::File::open(&base_path)?;
         let fd = file.as_raw_fd();
-        info!("syncing filesystem");
+        info!("syncing filesystem for backing path '{base_path:?}'");
         if unsafe { libc::syncfs(fd) } < 0 {
             bail!("error during syncfs: {}", std::io::Error::last_os_error());
         }
