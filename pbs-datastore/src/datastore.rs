@@ -594,7 +594,7 @@ impl DataStore {
         let entry = datastore_cache.get(lookup.name);
 
         // reuse chunk store so that we keep using the same process locker instance!
-        let chunk_store = if let Some(datastore) = &entry {
+        let chunk_store = if let Some(datastore) = entry {
             // Re-use DataStoreImpl
             if datastore.config_generation == gen_num && gen_num.is_some() {
                 update_active_operations(lookup.name, lookup.operation, 1)?;
