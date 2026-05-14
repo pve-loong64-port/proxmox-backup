@@ -106,7 +106,9 @@ Ext.define('PBS.window.NamespaceMove', {
                 },
                 autoEl: {
                     tag: 'div',
-                    'data-qtip': gettext('Limit how many levels of child namespaces to include. Leave empty to move the entire subtree.'),
+                    'data-qtip': gettext(
+                        'Limit how many levels of child namespaces to include. Leave empty to move the entire subtree.',
+                    ),
                 },
             },
             {
@@ -117,7 +119,9 @@ Ext.define('PBS.window.NamespaceMove', {
                 uncheckedValue: false,
                 autoEl: {
                     tag: 'div',
-                    'data-qtip': gettext('Merge snapshots into existing groups with the same name in the target namespace. Requires matching ownership and non-overlapping snapshot times.'),
+                    'data-qtip': gettext(
+                        'Merge snapshots into existing groups with the same name in the target namespace. Requires matching ownership and non-overlapping snapshot times.',
+                    ),
                 },
             },
             {
@@ -128,7 +132,9 @@ Ext.define('PBS.window.NamespaceMove', {
                 uncheckedValue: false,
                 autoEl: {
                     tag: 'div',
-                    'data-qtip': gettext('Remove the empty source namespace directories after moving all groups. Uncheck to keep the namespace structure.'),
+                    'data-qtip': gettext(
+                        'Remove the empty source namespace directories after moving all groups. Uncheck to keep the namespace structure.',
+                    ),
                 },
             },
         ],

@@ -125,7 +125,6 @@ Ext.define('PBS.Datastore.Options', {
                 activeTasks.read = data?.[0]?.data.value ?? 0;
                 activeTasks.write = data?.[1]?.data.value ?? 0;
             });
-
         },
 
         edit: function () {

@@ -63,7 +63,9 @@ Ext.define('PBS.window.GroupMove', {
                 uncheckedValue: false,
                 autoEl: {
                     tag: 'div',
-                    'data-qtip': gettext('If a group with the same name already exists in the target namespace, merge snapshots into it. Requires matching ownership and non-overlapping snapshot times.'),
+                    'data-qtip': gettext(
+                        'If a group with the same name already exists in the target namespace, merge snapshots into it. Requires matching ownership and non-overlapping snapshot times.',
+                    ),
                 },
             },
         ],
