@@ -34,12 +34,11 @@ impl LocalDatastoreLruCache {
     ///
     /// Fails if the chunk cannot be inserted successfully.
     pub fn insert(&self, digest: &[u8; 32], chunk: &DataBlob) -> Result<(), Error> {
-        let _lock = self.store.mutex().lock().unwrap();
+        let lock = self.store.mutex().lock().unwrap();
 
-        // Safety: lock acquire above
-        unsafe {
-            self.store.insert_chunk_nolock(chunk, digest, false)?;
-        }
+        self.store
+            .insert_chunk_nolock(chunk, digest, false, &lock)?;
+
         self.cache.insert(*digest, (), |digest| {
             // Safety: lock acquired above, this is executed inline!
             unsafe {

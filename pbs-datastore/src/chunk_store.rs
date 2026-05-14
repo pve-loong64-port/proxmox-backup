@@ -1,7 +1,7 @@
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use anyhow::{Context, Error, bail, format_err};
@@ -27,14 +27,20 @@ use crate::{DataBlob, LocalDatastoreLruCache};
 
 const USING_MARKER_FILENAME_EXT: &str = "using";
 
+#[derive(Default)]
+/// Configurable runtime properties of a chunk store
+pub(crate) struct ChunkStoreProperties {
+    pub(crate) sync_level: DatastoreFSyncLevel,
+}
+
 /// File system based chunk store
 pub struct ChunkStore {
     name: String, // used for error reporting
     pub(crate) base: PathBuf,
     chunk_dir: PathBuf,
-    mutex: Mutex<()>,
+    // Mutex to sync chunk store access, including property updates
+    mutex: Mutex<ChunkStoreProperties>,
     locker: Option<Arc<Mutex<ProcessLocker>>>,
-    sync_level: DatastoreFSyncLevel,
 }
 
 // TODO: what about sysctl setting vm.vfs_cache_pressure (0 - 100) ?
@@ -79,9 +85,8 @@ impl ChunkStore {
             name: String::new(),
             base: PathBuf::new(),
             chunk_dir: PathBuf::new(),
-            mutex: Mutex::new(()),
+            mutex: Mutex::new(Default::default()),
             locker: None,
-            sync_level: Default::default(),
         }
     }
 
@@ -204,16 +209,19 @@ impl ChunkStore {
             base,
             chunk_dir,
             locker: Some(locker),
-            mutex: Mutex::new(()),
-            sync_level,
+            mutex: Mutex::new(ChunkStoreProperties { sync_level }),
         })
     }
 
-    fn touch_chunk_no_lock(&self, digest: &[u8; 32]) -> Result<(), Error> {
+    fn touch_chunk_no_lock(
+        &self,
+        digest: &[u8; 32],
+        mutex_guard: &MutexGuard<ChunkStoreProperties>,
+    ) -> Result<(), Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
 
-        self.cond_touch_chunk_no_lock(digest, true)?;
+        self.cond_touch_chunk_no_lock(digest, true, mutex_guard)?;
         Ok(())
     }
 
@@ -226,14 +234,15 @@ impl ChunkStore {
         digest: &[u8; 32],
         assert_exists: bool,
     ) -> Result<bool, Error> {
-        let _lock = self.mutex.lock();
-        self.cond_touch_chunk_no_lock(digest, assert_exists)
+        let lock = self.mutex.lock().unwrap();
+        self.cond_touch_chunk_no_lock(digest, assert_exists, &lock)
     }
 
     fn cond_touch_chunk_no_lock(
         &self,
         digest: &[u8; 32],
         assert_exists: bool,
+        _mutex_guard: &MutexGuard<ChunkStoreProperties>,
     ) -> Result<bool, Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
@@ -423,7 +432,11 @@ impl ChunkStore {
         ProcessLocker::oldest_shared_lock(self.locker.clone().unwrap())
     }
 
-    pub(crate) fn mutex(&self) -> &std::sync::Mutex<()> {
+    /// Mutex to lock chunk store for exclusive access.
+    ///
+    /// Must be held when modifying chunk store contents and allows to update
+    /// chunk store runtime properties.
+    pub(crate) fn mutex(&self) -> &Mutex<ChunkStoreProperties> {
         &self.mutex
     }
 
@@ -665,18 +678,17 @@ impl ChunkStore {
 
         //println!("DIGEST {}", hex::encode(digest));
 
-        let _lock = self.mutex.lock();
+        let lock = self.mutex.lock().unwrap();
 
-        // Safety: lock acquired above
-        unsafe { self.insert_chunk_nolock(chunk, digest, true) }
+        self.insert_chunk_nolock(chunk, digest, true, &lock)
     }
 
-    /// Safety: requires holding the chunk store mutex!
-    pub(crate) unsafe fn insert_chunk_nolock(
+    pub(crate) fn insert_chunk_nolock(
         &self,
         chunk: &DataBlob,
         digest: &[u8; 32],
         warn_on_overwrite_empty: bool,
+        mutex_guard: &MutexGuard<ChunkStoreProperties>,
     ) -> Result<(bool, u64), Error> {
         // unwrap: only `None` in unit tests
         assert!(self.locker.is_some());
@@ -694,7 +706,7 @@ impl ChunkStore {
             }
             let old_size = metadata.len();
             if encoded_size == old_size {
-                self.touch_chunk_no_lock(digest)?;
+                self.touch_chunk_no_lock(digest, mutex_guard)?;
                 return Ok((true, old_size));
             } else if old_size == 0 {
                 if warn_on_overwrite_empty {
@@ -725,13 +737,13 @@ impl ChunkStore {
                 // compressed, the size mismatch could be caused by different zstd versions
                 // so let's keep the one that was uploaded first, bit-rot is hopefully detected by
                 // verification at some point..
-                self.touch_chunk_no_lock(digest)?;
+                self.touch_chunk_no_lock(digest, mutex_guard)?;
                 return Ok((true, old_size));
             } else if old_size < encoded_size {
                 log::debug!(
                     "Got another copy of chunk with digest '{digest_str}', existing chunk is smaller, discarding uploaded one."
                 );
-                self.touch_chunk_no_lock(digest)?;
+                self.touch_chunk_no_lock(digest, mutex_guard)?;
                 return Ok((true, old_size));
             } else {
                 log::debug!(
@@ -754,13 +766,13 @@ impl ChunkStore {
             &chunk_path,
             raw_data,
             create_options,
-            self.sync_level == DatastoreFSyncLevel::File,
+            mutex_guard.sync_level == DatastoreFSyncLevel::File,
         )
         .map_err(|err| {
             format_err!("inserting chunk on store '{name}' failed for {digest_str} - {err}")
         })?;
 
-        if self.sync_level == DatastoreFSyncLevel::File {
+        if mutex_guard.sync_level == DatastoreFSyncLevel::File {
             // fsync dir handle to persist the tmp rename
             let dir = std::fs::File::open(chunk_dir_path)?;
             nix::unistd::fsync(dir.as_raw_fd())
@@ -975,10 +987,22 @@ impl ChunkStore {
         (chunk_path, counter)
     }
 
-    pub(super) fn try_ensure_sync_level(&self) -> Result<(), Error> {
-        if self.sync_level != DatastoreFSyncLevel::Filesystem {
+    pub(super) fn try_ensure_sync_level_with_update(
+        &self,
+        mut mutex_guard: MutexGuard<ChunkStoreProperties>,
+        update_sync_level: Option<DatastoreFSyncLevel>,
+    ) -> Result<(), Error> {
+        let assure_sync_level = mutex_guard.sync_level;
+        if let Some(sync_level) = update_sync_level {
+            mutex_guard.sync_level = sync_level;
+        }
+
+        drop(mutex_guard); // never hold during syncfs
+
+        if assure_sync_level != DatastoreFSyncLevel::Filesystem {
             return Ok(());
         }
+
         let file = std::fs::File::open(self.base_path())?;
         let fd = file.as_raw_fd();
         info!("syncing filesystem");

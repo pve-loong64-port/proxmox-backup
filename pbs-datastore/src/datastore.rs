@@ -607,6 +607,19 @@ impl DataStore {
                     operation: Some(lookup.operation),
                 }));
             }
+
+            let tuning = pbs_config::datastore::parse_datastore_tuning_options(&config)?;
+            let sync_level = tuning.sync_level.unwrap_or_default();
+
+            let mutex_guard = datastore.chunk_store.mutex().lock().unwrap();
+            if mutex_guard.sync_level != sync_level {
+                datastore
+                    .chunk_store
+                    .try_ensure_sync_level_with_update(mutex_guard, Some(sync_level))?;
+            } else {
+                drop(mutex_guard);
+            }
+
             Arc::clone(&datastore.chunk_store)
         } else {
             let tuning = pbs_config::datastore::parse_datastore_tuning_options(&config)?;
@@ -3011,7 +3024,10 @@ impl DataStore {
     /// Syncs the filesystem of the chunk store base path if 'sync_level' is set to
     /// [`DatastoreFSyncLevel::Filesystem`]. Uses syncfs(2).
     pub fn try_ensure_sync_level(&self) -> Result<(), Error> {
-        self.inner.chunk_store.try_ensure_sync_level()
+        let mutex_guard = self.inner.chunk_store.mutex().lock().unwrap();
+        self.inner
+            .chunk_store
+            .try_ensure_sync_level_with_update(mutex_guard, None)
     }
 
     /// Destroy a datastore. This requires that there are no active operations on the datastore.
