@@ -2448,10 +2448,6 @@ impl DataStore {
             );
         }
 
-        let tuning: DatastoreTuning = serde_json::from_value(
-            DatastoreTuning::API_SCHEMA
-                .parse_property_string(gc_store_config.tuning.as_deref().unwrap_or(""))?,
-        )?;
         let gc_cache_capacity = if let Some(capacity) = tuning.gc_cache_capacity {
             info!("Using chunk digest cache capacity of {capacity}.");
             capacity
