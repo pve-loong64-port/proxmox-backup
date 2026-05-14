@@ -5,12 +5,12 @@ use proxmox_http::client::Client;
 use proxmox_http::HttpOptions;
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
-use proxmox_subscription::{SubscriptionInfo, SubscriptionStatus};
+use proxmox_subscription::{
+    SetSubscription, SubscriptionInfo, SubscriptionStatus, UpdateSubscription,
+};
 use proxmox_sys::fs::CreateOptions;
 
-use pbs_api_types::{
-    Authid, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, SUBSCRIPTION_KEY_SCHEMA,
-};
+use pbs_api_types::{Authid, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY};
 
 use crate::tools::{DEFAULT_USER_AGENT_STRING, PROXMOX_BACKUP_TCP_KEEPALIVE_TIME};
 
@@ -78,11 +78,9 @@ fn check_and_write_subscription(key: String, server_id: String) -> Result<(), Er
             node: {
                 schema: NODE_SCHEMA,
             },
-            force: {
-                description: "Always connect to server, even if information in cache is up to date.",
-                type: bool,
-                optional: true,
-                default: false,
+            params: {
+                type: UpdateSubscription,
+                flatten: true,
             },
         },
     },
@@ -92,7 +90,8 @@ fn check_and_write_subscription(key: String, server_id: String) -> Result<(), Er
     },
 )]
 /// Check and update subscription status.
-pub fn check_subscription(force: bool) -> Result<(), Error> {
+pub fn check_subscription(params: UpdateSubscription) -> Result<(), Error> {
+    let force = params.force.unwrap_or(false);
     let mut info = match proxmox_subscription::files::read_subscription(
         PROXMOX_BACKUP_SUBSCRIPTION_FN,
         &[proxmox_subscription::files::DEFAULT_SIGNING_KEY],
@@ -203,8 +202,9 @@ pub fn get_subscription(
             node: {
                 schema: NODE_SCHEMA,
             },
-            key: {
-                schema: SUBSCRIPTION_KEY_SCHEMA,
+            params: {
+                type: SetSubscription,
+                flatten: true,
             },
         },
     },
@@ -214,13 +214,17 @@ pub fn get_subscription(
     },
 )]
 /// Set a subscription key and check it.
-pub fn set_subscription(key: String) -> Result<(), Error> {
+pub fn set_subscription(params: SetSubscription) -> Result<(), Error> {
+    // SetSubscription stays product-neutral; enforce the PBS key pattern locally so bad keys fail fast.
+    pbs_api_types::SUBSCRIPTION_KEY_SCHEMA
+        .parse_simple_value(&params.key)
+        .map_err(|err| format_err!("invalid subscription key: {err}"))?;
     let server_id = proxmox_subscription::get_hardware_address_candidates()?
         .first()
         .ok_or_else(|| format_err!("Failed to generate serverid"))?
         .to_string();
 
-    check_and_write_subscription(key, server_id)
+    check_and_write_subscription(params.key, server_id)
 }
 
 #[api(
