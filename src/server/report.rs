@@ -2,6 +2,8 @@ use std::fmt::Write;
 use std::path::Path;
 use std::process::Command;
 
+use proxmox_network_api::NetworkInterfaceType;
+
 fn get_top_processes() -> String {
     let (exe, args) = ("top", vec!["-b", "-c", "-w512", "-n", "1", "-o", "TIME"]);
     let output = Command::new(exe).args(&args).output();
@@ -91,6 +93,25 @@ fn commands() -> Vec<(&'static str, Vec<&'static str>)> {
         ("lspci", vec!["-nnk"]),
         ("ip", vec!["-details", "-statistics", "a"]),
     ]
+}
+
+fn dynamic_commands() -> Vec<(&'static str, Vec<String>)> {
+    let mut commands = Vec::new();
+
+    match proxmox_network_api::config() {
+        Ok((config, _)) => {
+            for (name, iface) in config.interfaces {
+                if iface.interface_type == NetworkInterfaceType::Eth {
+                    commands.push(("ethtool", vec![name]));
+                }
+            }
+        }
+        Err(err) => {
+            eprintln!("failed to query network interfaces: {err}");
+        }
+    }
+
+    commands
 }
 
 // (description, function())
@@ -206,9 +227,17 @@ pub fn generate_report() -> String {
         .collect::<Vec<String>>()
         .join("\n\n");
 
-    let command_outputs = commands()
-        .iter()
-        .map(|(command, args)| get_command_output(command, args))
+    let static_command_outputs = commands()
+        .into_iter()
+        .map(|(command, args)| get_command_output(command, &args));
+
+    let dynamic_command_outputs = dynamic_commands().into_iter().map(|(command, args)| {
+        let args = args.iter().map(String::as_str).collect();
+        get_command_output(command, &args)
+    });
+
+    let command_outputs = static_command_outputs
+        .chain(dynamic_command_outputs)
         .collect::<Vec<String>>()
         .join("\n\n");
 
