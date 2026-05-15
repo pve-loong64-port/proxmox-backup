@@ -91,7 +91,7 @@ proxmox-serde = "1"
 proxmox-shared-cache = "1"
 proxmox-shared-memory = "1"
 proxmox-sortable-macro = "1"
-proxmox-subscription = { version = "1", features = [ "api-types" ] }
+proxmox-subscription = { version = "1.0.2", features = [ "api-types" ] }
 proxmox-sys = "1"
 proxmox-systemd = "1.0.1"
 proxmox-tfa = { version = "6.0.3", features = [ "api", "api-types" ] }
