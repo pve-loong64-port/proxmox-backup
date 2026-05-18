@@ -8,9 +8,10 @@ update_initramfs() {
     case "$ARCH" in
         amd64) HOST_MULTIARCH="x86_64-linux-gnu" ;;
         arm64) HOST_MULTIARCH="aarch64-linux-gnu" ;;
+        loong64) HOST_MULTIARCH="loongarch64-linux-gnu" ;;
         riscv64) HOST_MULTIARCH="riscv64-linux-gnu" ;;
         *)
-            echo "Error: Unsupported architecture '$ARCH', amd64, arm64, and riscv64 are supported." >&2
+            echo "Error: Unsupported architecture '$ARCH', amd64, arm64, loong64, and riscv64 are supported." >&2
             exit 1
             ;;
     esac
