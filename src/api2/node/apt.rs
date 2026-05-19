@@ -2,7 +2,7 @@ use anyhow::{bail, Error};
 
 use proxmox_apt_api_types::{
     APTChangeRepositoryOptions, APTGetChangelogOptions, APTRepositoriesResult, APTRepositoryHandle,
-    APTUpdateInfo, APTUpdateOptions,
+    APTUpdateInfo, APTUpdateOptions, HostProduct,
 };
 use proxmox_config_digest::ConfigDigest;
 use proxmox_http::ProxyConfig;
@@ -202,7 +202,7 @@ pub fn get_versions() -> Result<Vec<APTUpdateInfo>, Error> {
 )]
 /// Get APT repository information.
 pub fn get_repositories() -> Result<APTRepositoriesResult, Error> {
-    proxmox_apt::list_repositories("pbs")
+    proxmox_apt::list_repositories(&HostProduct::Pbs)
 }
 
 #[api(
@@ -233,7 +233,7 @@ pub fn add_repository(
     handle: APTRepositoryHandle,
     digest: Option<ConfigDigest>,
 ) -> Result<(), Error> {
-    proxmox_apt::add_repository_handle("pbs", handle, digest)
+    proxmox_apt::add_repository_handle(&HostProduct::Pbs, handle, digest)
 }
 
 #[api(

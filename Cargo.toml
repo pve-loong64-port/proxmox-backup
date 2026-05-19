@@ -53,8 +53,8 @@ path = "src/lib.rs"
 
 [workspace.dependencies]
 # proxmox workspace
-proxmox-apt = { version = "0.99.7", features = [ "cache" ] }
-proxmox-apt-api-types = "2.0.5"
+proxmox-apt = { version = "1.0", features = [ "cache" ] }
+proxmox-apt-api-types = "3.0"
 proxmox-async = "0.5"
 proxmox-auth-api = "1.0.5"
 proxmox-base64 = "1"
