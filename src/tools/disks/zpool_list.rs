@@ -1,6 +1,6 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
-use pbs_tools::nom::{multispace0, multispace1, notspace1, IResult};
+use pbs_tools::nom::{IResult, multispace0, multispace1, notspace1};
 
 use nom::{
     bytes::complete::{take_till, take_till1, take_while1},

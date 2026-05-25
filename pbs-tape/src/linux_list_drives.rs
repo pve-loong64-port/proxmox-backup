@@ -5,8 +5,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use anyhow::{bail, format_err, Error};
-use nix::fcntl::{fcntl, FcntlArg, OFlag};
+use anyhow::{Error, bail, format_err};
+use nix::fcntl::{FcntlArg, OFlag, fcntl};
 
 use proxmox_sys::error::SysResult;
 use proxmox_sys::fs::scan_subdir;

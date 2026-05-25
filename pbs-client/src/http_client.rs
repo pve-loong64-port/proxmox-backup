@@ -2,44 +2,44 @@ use std::io::{IsTerminal, Write};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use bytes::Bytes;
 use futures::*;
 use http_body_util::{BodyDataStream, BodyExt};
 use hyper::body::Incoming;
 use hyper::header::SET_COOKIE;
-use hyper::http::header::HeaderValue;
 use hyper::http::Uri;
+use hyper::http::header::HeaderValue;
 use hyper::http::{Request, Response};
 #[cfg(not(target_feature = "crt-static"))]
 use hyper_util::client::legacy::connect::dns::GaiResolver;
-use hyper_util::client::legacy::{connect::HttpConnector, Client};
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use openssl::{
     ssl::{SslConnector, SslMethod},
     x509::X509StoreContextRef,
 };
 use percent_encoding::percent_encode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use xdg::BaseDirectories;
 
 use proxmox_router::HttpError;
-use proxmox_sys::fs::{file_get_json, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_json, replace_file};
 use proxmox_sys::linux::tty;
 
 use proxmox_async::broadcast_future::BroadcastFuture;
-use proxmox_http::client::HttpsConnector;
-use proxmox_http::uri::{build_authority, json_object_to_query};
 use proxmox_http::Body;
 use proxmox_http::ProxyConfig;
+use proxmox_http::client::HttpsConnector;
+use proxmox_http::uri::{build_authority, json_object_to_query};
 use proxmox_log::{error, info, warn};
 use proxmox_rate_limiter::RateLimiter;
 
 use pbs_api_types::percent_encoding::DEFAULT_ENCODE_SET;
 use pbs_api_types::{Authid, RateLimitConfig, Userid};
 
-use super::pipe_to_stream::PipeToSendStream;
 use super::PROXMOX_BACKUP_TCP_KEEPALIVE_TIME;
+use super::pipe_to_stream::PipeToSendStream;
 
 #[cfg(not(target_feature = "crt-static"))]
 type DnsResolver = GaiResolver;
@@ -55,9 +55,9 @@ mod resolver {
     use std::task::{Context, Poll};
 
     use futures::Future;
+    use hickory_resolver::TokioAsyncResolver;
     use hickory_resolver::error::ResolveError;
     use hickory_resolver::lookup_ip::LookupIpIntoIter;
-    use hickory_resolver::TokioAsyncResolver;
     use hyper_util::client::legacy::connect::dns::Name;
     use tower_service::Service;
 

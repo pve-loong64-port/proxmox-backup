@@ -47,10 +47,10 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use nix::sys::stat::Mode;
 
-use proxmox_sys::fs::{open_file_locked, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, open_file_locked};
 
 use pbs_config::backup_user;
 

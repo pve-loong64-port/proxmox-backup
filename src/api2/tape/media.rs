@@ -1,22 +1,21 @@
 use std::collections::HashSet;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
-use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
+use proxmox_router::{Permission, Router, RpcEnvironment, SubdirMap, list_subdirs_api_method};
 use proxmox_schema::{api, param_bail};
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, MediaContentEntry, MediaContentListFilter, MediaListEntry, MediaPoolConfig,
-    MediaSetListEntry, MediaStatus, CHANGER_NAME_SCHEMA, MEDIA_LABEL_SCHEMA,
-    MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY, PRIV_TAPE_WRITE,
-    VAULT_NAME_SCHEMA,
+    Authid, CHANGER_NAME_SCHEMA, MEDIA_LABEL_SCHEMA, MEDIA_POOL_NAME_SCHEMA, MEDIA_UUID_SCHEMA,
+    MediaContentEntry, MediaContentListFilter, MediaListEntry, MediaPoolConfig, MediaSetListEntry,
+    MediaStatus, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY, PRIV_TAPE_WRITE, VAULT_NAME_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
 
 use crate::tape::{
-    changer::update_online_status, media_catalog_snapshot_list, Inventory, MediaCatalog, MediaPool,
-    TAPE_STATUS_DIR,
+    Inventory, MediaCatalog, MediaPool, TAPE_STATUS_DIR, changer::update_online_status,
+    media_catalog_snapshot_list,
 };
 
 #[api(

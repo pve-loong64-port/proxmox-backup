@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use hyper::http::HeaderMap;
 use hyper::{Method, Response, StatusCode};
 

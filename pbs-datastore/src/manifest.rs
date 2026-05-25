@@ -1,7 +1,7 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use pbs_api_types::{BackupArchiveName, BackupType, CryptMode, Fingerprint, SnapshotVerifyState};
 use pbs_tools::crypt_config::CryptConfig;

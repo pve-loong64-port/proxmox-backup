@@ -1,9 +1,9 @@
 //! Magnetic tape backup
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use proxmox_auth_api::types::Userid;
 
-use proxmox_sys::fs::{create_path, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path};
 
 use pbs_buildcfg::{PROXMOX_BACKUP_RUN_DIR_M, PROXMOX_BACKUP_STATE_DIR_M};
 

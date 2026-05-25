@@ -1,18 +1,18 @@
 use std::io::IsTerminal;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::{api, param_bail};
 use proxmox_sys::linux::tty;
 
 use pbs_api_types::{
-    Fingerprint, Kdf, DRIVE_NAME_SCHEMA, PASSWORD_HINT_SCHEMA,
+    DRIVE_NAME_SCHEMA, Fingerprint, Kdf, PASSWORD_HINT_SCHEMA,
     TAPE_ENCRYPTION_KEY_FINGERPRINT_SCHEMA,
 };
 
-use pbs_datastore::paperkey::{generate_paper_key, PaperkeyFormat};
+use pbs_datastore::paperkey::{PaperkeyFormat, generate_paper_key};
 use pbs_key_config::KeyConfig;
 
 use proxmox_backup::api2;

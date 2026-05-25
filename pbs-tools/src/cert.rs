@@ -3,7 +3,7 @@
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use foreign_types::ForeignTypeRef;
 use openssl::pkey::{PKey, Public};
 use openssl::stack::Stack;

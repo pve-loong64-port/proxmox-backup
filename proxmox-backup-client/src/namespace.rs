@@ -1,12 +1,12 @@
-use anyhow::{bail, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, bail};
+use serde_json::{Value, json};
 
 use pbs_api_types::{BackupNamespace, NS_MAX_DEPTH_SCHEMA};
-use pbs_client::{view_task_result, BackupTargetArgs};
+use pbs_client::{BackupTargetArgs, view_task_result};
 
 use proxmox_router::cli::{
-    extract_output_format, format_and_print_result, get_output_format, CliCommand, CliCommandMap,
-    OUTPUT_FORMAT,
+    CliCommand, CliCommandMap, OUTPUT_FORMAT, extract_output_format, format_and_print_result,
+    get_output_format,
 };
 use proxmox_schema::api;
 

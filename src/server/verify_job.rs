@@ -1,4 +1,4 @@
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use tracing::{error, info};
 
 use pbs_api_types::{Authid, Operation, VerificationJobConfig};

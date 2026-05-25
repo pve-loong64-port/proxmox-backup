@@ -15,7 +15,7 @@ use pbs_api_types::{
 };
 
 use pbs_config::CachedUserInfo;
-use pbs_datastore::{get_datastore_mount_status, DataStore};
+use pbs_datastore::{DataStore, get_datastore_mount_status};
 
 use crate::server::metric_collection::rrd::extract_rrd_data;
 use crate::tools::statistics::linear_regression;

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use pbs_api_types::{
-    privs_to_priv_names, Authid, BackupNamespace, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_READ,
+    Authid, BackupNamespace, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY,
+    PRIV_DATASTORE_READ, privs_to_priv_names,
 };
 use pbs_config::CachedUserInfo;
-use pbs_datastore::{backup_info::BackupGroup, DataStore, ListGroups, ListNamespacesRecursive};
+use pbs_datastore::{DataStore, ListGroups, ListNamespacesRecursive, backup_info::BackupGroup};
 
 /// Asserts that `privs` are fulfilled on datastore + (optional) namespace.
 pub fn check_ns_privs(

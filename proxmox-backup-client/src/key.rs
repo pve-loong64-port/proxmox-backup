@@ -1,16 +1,16 @@
 use std::io::IsTerminal;
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use proxmox_router::cli::{
-    complete_file_name, format_and_print_result_full, get_output_format, CliCommand, CliCommandMap,
-    ColumnConfig, OUTPUT_FORMAT,
+    CliCommand, CliCommandMap, ColumnConfig, OUTPUT_FORMAT, complete_file_name,
+    format_and_print_result_full, get_output_format,
 };
-use proxmox_schema::{api, ApiType, ReturnType};
-use proxmox_sys::fs::{file_get_contents, replace_file, CreateOptions};
+use proxmox_schema::{ApiType, ReturnType, api};
+use proxmox_sys::fs::{CreateOptions, file_get_contents, replace_file};
 use proxmox_sys::linux::tty;
 
 use pbs_api_types::{Kdf, KeyInfo, PASSWORD_HINT_SCHEMA};
@@ -18,8 +18,8 @@ use pbs_client::tools::key_source::{
     find_default_encryption_key, find_default_master_pubkey, get_encryption_key_password,
     place_default_encryption_key, place_default_master_pubkey,
 };
-use pbs_datastore::paperkey::{generate_paper_key, PaperkeyFormat};
-use pbs_key_config::{rsa_decrypt_key_config, KeyConfig};
+use pbs_datastore::paperkey::{PaperkeyFormat, generate_paper_key};
+use pbs_key_config::{KeyConfig, rsa_decrypt_key_config};
 
 #[api]
 #[derive(Deserialize, Serialize)]
@@ -155,7 +155,10 @@ async fn import_with_master_key(
         None => {
             let path = place_default_encryption_key()?;
             if path.exists() {
-                bail!("Please remove default encryption key at {:?} before importing to default location (or choose a non-default one).", path);
+                bail!(
+                    "Please remove default encryption key at {:?} before importing to default location (or choose a non-default one).",
+                    path
+                );
             }
             log::info!("Importing key to default location at: {:?}", path);
             path

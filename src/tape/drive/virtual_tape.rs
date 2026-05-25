@@ -3,10 +3,10 @@
 use std::fs::File;
 use std::io;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
 
-use proxmox_sys::fs::{replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, replace_file};
 
 use pbs_key_config::KeyConfig;
 use pbs_tape::{

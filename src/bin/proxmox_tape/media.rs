@@ -2,12 +2,12 @@ use anyhow::Error;
 use serde::Deserialize;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    MediaContentListFilter, MediaListEntry, MediaStatus, CHANGER_NAME_SCHEMA,
-    MEDIA_POOL_NAME_SCHEMA,
+    CHANGER_NAME_SCHEMA, MEDIA_POOL_NAME_SCHEMA, MediaContentListFilter, MediaListEntry,
+    MediaStatus,
 };
 use pbs_config::drive::complete_changer_name;
 use pbs_config::media_pool::complete_pool_name;

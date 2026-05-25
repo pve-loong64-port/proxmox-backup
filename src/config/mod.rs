@@ -3,7 +3,7 @@
 //! This library contains helper to read, parse and write the
 //! configuration files.
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use nix::sys::stat::Mode;
 use openssl::pkey::PKey;
 use openssl::rsa::Rsa;

@@ -5,7 +5,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use nix::sys::stat::Mode;
 
 use proxmox_sys::error::SysError;
@@ -19,7 +19,7 @@ pub use proxmox_tfa::api::{
 
 use pbs_api_types::{User, Userid};
 use pbs_buildcfg::configdir;
-use pbs_config::{open_backup_lockfile, BackupLockGuard};
+use pbs_config::{BackupLockGuard, open_backup_lockfile};
 
 const CONF_FILE: &str = configdir!("/tfa.json");
 const LOCK_FILE: &str = configdir!("/tfa.json.lock");

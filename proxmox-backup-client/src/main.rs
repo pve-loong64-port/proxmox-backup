@@ -5,10 +5,10 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Context;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::stream::{StreamExt, TryStreamExt};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use xdg::BaseDirectories;
@@ -16,39 +16,40 @@ use xdg::BaseDirectories;
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
 use proxmox_async::blocking::TokioWriterAdapter;
 use proxmox_io::StdChannelWriter;
-use proxmox_router::{cli::*, ApiMethod, RpcEnvironment};
+use proxmox_router::{ApiMethod, RpcEnvironment, cli::*};
 use proxmox_schema::api;
-use proxmox_sys::fs::{file_get_json, image_size, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_json, image_size, replace_file};
 use proxmox_time::{epoch_i64, strftime_local};
 use pxar::accessor::aio::Accessor;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart,
-    BackupType, ClientRateLimitConfig, CryptMode, Fingerprint, GroupListItem, PathPattern,
-    PruneJobOptions, PruneListItem, RateLimitConfig, ServerIdentity, SnapshotListItem,
-    StorageStatus, BACKUP_ID_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME,
-    ENCRYPTED_KEY_BLOB_NAME, MANIFEST_BLOB_NAME,
+    ArchiveType, Authid, BACKUP_ID_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA,
+    BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, BackupPart, BackupType,
+    CATALOG_NAME, ClientRateLimitConfig, CryptMode, ENCRYPTED_KEY_BLOB_NAME, Fingerprint,
+    GroupListItem, MANIFEST_BLOB_NAME, PathPattern, PruneJobOptions, PruneListItem,
+    RateLimitConfig, ServerIdentity, SnapshotListItem, StorageStatus,
 };
 use pbs_client::catalog_shell::Shell;
 use pbs_client::pxar::{ErrorHandler as PxarErrorHandler, MetadataArchiveReader, PxarPrevRef};
 use pbs_client::tools::{
-    complete_archive_name, complete_auth_id, complete_backup_group, complete_backup_snapshot,
-    complete_backup_source, complete_chunk_size, complete_group_or_snapshot,
-    complete_img_archive_name, complete_namespace, complete_pxar_archive_name, complete_repository,
-    connect, connect_rate_limited, extract_repository_from_value,
+    CHUNK_SIZE_SCHEMA, complete_archive_name, complete_auth_id, complete_backup_group,
+    complete_backup_snapshot, complete_backup_source, complete_chunk_size,
+    complete_group_or_snapshot, complete_img_archive_name, complete_namespace,
+    complete_pxar_archive_name, complete_repository, connect, connect_rate_limited,
+    extract_repository_from_value,
     key_source::{
-        crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
-        KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
+        KEYFD_SCHEMA, KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
+        crypto_parameters, format_key_source, get_encryption_key_password,
     },
-    raise_nofile_limit, remove_repository_from_value, CHUNK_SIZE_SCHEMA,
+    raise_nofile_limit, remove_repository_from_value,
 };
 use pbs_client::{
-    delete_ticket_info, parse_backup_specification, view_task_result, BackupDetectionMode,
-    BackupReader, BackupRepository, BackupRepositoryArgs, BackupSpecificationType, BackupStats,
-    BackupTargetArgs, BackupWriter, BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient,
-    IndexType, InjectionData, PxarBackupStream, RemoteChunkReader, UploadOptions,
-    BACKUP_SOURCE_SCHEMA,
+    BACKUP_SOURCE_SCHEMA, BackupDetectionMode, BackupReader, BackupRepository,
+    BackupRepositoryArgs, BackupSpecificationType, BackupStats, BackupTargetArgs, BackupWriter,
+    BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, IndexType, InjectionData,
+    PxarBackupStream, RemoteChunkReader, UploadOptions, delete_ticket_info,
+    parse_backup_specification, view_task_result,
 };
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogReader, CatalogWriter};
 use pbs_datastore::chunk_store::verify_chunk_size;
@@ -57,7 +58,7 @@ use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::read_chunk::AsyncReadChunk;
-use pbs_key_config::{decrypt_key, rsa_encrypt_key_config, KeyConfig};
+use pbs_key_config::{KeyConfig, decrypt_key, rsa_encrypt_key_config};
 use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json;
 
@@ -937,7 +938,9 @@ async fn create_backup(
                             "Character devices (including pseudo terminals) are not supported."
                         );
                     }
-                    bail!("got unexpected file type (expected file, block device, or fifo): {filename}");
+                    bail!(
+                        "got unexpected file type (expected file, block device, or fifo): {filename}"
+                    );
                 };
 
                 upload_list.push((

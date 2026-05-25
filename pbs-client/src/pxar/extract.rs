@@ -9,7 +9,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use bitflags::bitflags;
 use nix::dir::Dir;
 use nix::fcntl::OFlag;
@@ -17,21 +17,21 @@ use nix::sys::stat::Mode;
 
 use pathpatterns::{MatchEntry, MatchList, MatchType};
 use pxar::accessor::aio::{Accessor, FileContents, FileEntry};
-use pxar::decoder::{aio::Decoder, Contents};
+use pxar::decoder::{Contents, aio::Decoder};
 use pxar::format::Device;
 use pxar::{Entry, EntryKind, Metadata};
 
 use proxmox_io::{sparse_copy, sparse_copy_async};
 use proxmox_log::{debug, error, info};
 use proxmox_sys::c_result;
-use proxmox_sys::fs::{create_path, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path};
 
 use proxmox_compression::zip::{FileType, ZipEncoder, ZipEntry};
 
+use crate::pxar::Flags;
 use crate::pxar::dir_stack::PxarDirStack;
 use crate::pxar::metadata;
 use crate::pxar::tools::handle_root_with_optional_format_version_prelude;
-use crate::pxar::Flags;
 
 pub struct PxarExtractOptions<'a> {
     pub match_list: &'a [MatchEntry],

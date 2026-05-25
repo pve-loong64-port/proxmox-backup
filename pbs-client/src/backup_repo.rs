@@ -1,13 +1,13 @@
 use std::fmt;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
 
 use proxmox_schema::*;
 
 use pbs_api_types::{
-    Authid, BackupNamespace, Userid, BACKUP_REPO_URL, BACKUP_REPO_URL_REGEX, DATASTORE_SCHEMA,
-    IP_V6_REGEX,
+    Authid, BACKUP_REPO_URL, BACKUP_REPO_URL_REGEX, BackupNamespace, DATASTORE_SCHEMA, IP_V6_REGEX,
+    Userid,
 };
 
 pub const REPO_URL_SCHEMA: Schema =

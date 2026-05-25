@@ -1,11 +1,11 @@
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Context, Error};
+use anyhow::{Context, Error, bail};
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_s3_client::{
-    S3BucketListItem, S3Client, S3ClientConf, S3ClientConfig, S3ClientConfigUpdater,
-    S3ClientConfigWithoutSecret, S3ClientOptions, S3RequestCounterConfig, S3_CLIENT_ID_SCHEMA,
+    S3_CLIENT_ID_SCHEMA, S3BucketListItem, S3Client, S3ClientConf, S3ClientConfig,
+    S3ClientConfigUpdater, S3ClientConfigWithoutSecret, S3ClientOptions, S3RequestCounterConfig,
 };
 use proxmox_schema::{api, param_bail};
 
@@ -13,8 +13,8 @@ use pbs_api_types::{
     Authid, DataStoreConfig, DatastoreBackendType, JOB_ID_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,
     PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
-use pbs_config::s3::{self, S3_CFG_TYPE_ID};
 use pbs_config::CachedUserInfo;
+use pbs_config::s3::{self, S3_CFG_TYPE_ID};
 use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 
 #[api(
@@ -382,7 +382,7 @@ fn s3_client_in_use(id: &str) -> Result<Option<String>, Error> {
         let backend_config = pbs_config::datastore::parse_backend_config(&datastore)?;
         match (backend_config.ty, backend_config.client) {
             (Some(DatastoreBackendType::S3), Some(client)) if client == id => {
-                return Ok(Some(datastore.name.to_owned()))
+                return Ok(Some(datastore.name.to_owned()));
             }
             _ => (),
         }

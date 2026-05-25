@@ -6,11 +6,11 @@ use proxmox_sys::error::SysError;
 use proxmox_uuid::Uuid;
 
 use pbs_datastore::SnapshotReader;
-use pbs_tape::{MediaContentHeader, TapeWrite, PROXMOX_TAPE_BLOCK_SIZE};
+use pbs_tape::{MediaContentHeader, PROXMOX_TAPE_BLOCK_SIZE, TapeWrite};
 
 use crate::tape::file_formats::{
-    SnapshotArchiveHeader, PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1,
-    PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
+    PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1, PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
+    SnapshotArchiveHeader,
 };
 
 /// Write a set of files as `pxar` archive to the tape

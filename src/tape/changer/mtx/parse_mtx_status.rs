@@ -5,7 +5,7 @@ use nom::bytes::complete::{tag, take_while};
 use pbs_tape::{DriveStatus, ElementStatus, MtxStatus, StorageElementStatus};
 
 use pbs_tools::nom::{
-    multispace0, multispace1, parse_complete, parse_error, parse_failure, parse_u64, IResult,
+    IResult, multispace0, multispace1, parse_complete, parse_error, parse_failure, parse_u64,
 };
 
 // Recognizes one line

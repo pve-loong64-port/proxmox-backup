@@ -3,26 +3,26 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use hex::FromHex;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use walkdir::WalkDir;
 
 use proxmox_router::cli::{
-    format_and_print_result, get_output_format, CliCommand, CliCommandMap, CommandLineInterface,
-    OUTPUT_FORMAT,
+    CliCommand, CliCommandMap, CommandLineInterface, OUTPUT_FORMAT, format_and_print_result,
+    get_output_format,
 };
 use proxmox_schema::api;
 
 use pbs_client::tools::key_source::get_encryption_key_password;
+use pbs_datastore::DataBlob;
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::file_formats::{
-    COMPRESSED_BLOB_MAGIC_1_0, DYNAMIC_SIZED_CHUNK_INDEX_1_0, ENCRYPTED_BLOB_MAGIC_1_0,
-    ENCR_COMPR_BLOB_MAGIC_1_0, FIXED_SIZED_CHUNK_INDEX_1_0, UNCOMPRESSED_BLOB_MAGIC_1_0,
+    COMPRESSED_BLOB_MAGIC_1_0, DYNAMIC_SIZED_CHUNK_INDEX_1_0, ENCR_COMPR_BLOB_MAGIC_1_0,
+    ENCRYPTED_BLOB_MAGIC_1_0, FIXED_SIZED_CHUNK_INDEX_1_0, UNCOMPRESSED_BLOB_MAGIC_1_0,
 };
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::DataBlob;
 use pbs_key_config::load_and_decrypt_key;
 use pbs_tools::crypt_config::CryptConfig;
 

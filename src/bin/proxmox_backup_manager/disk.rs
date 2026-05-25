@@ -1,16 +1,16 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use std::io::IsTerminal;
 
 use pbs_api_types::{
-    ZfsCompressionType, ZfsRaidLevel, BLOCKDEVICE_DISK_AND_PARTITION_NAME_SCHEMA,
-    BLOCKDEVICE_NAME_SCHEMA, DATASTORE_SCHEMA, DISK_LIST_SCHEMA, ZFS_ASHIFT_SCHEMA,
+    BLOCKDEVICE_DISK_AND_PARTITION_NAME_SCHEMA, BLOCKDEVICE_NAME_SCHEMA, DATASTORE_SCHEMA,
+    DISK_LIST_SCHEMA, ZFS_ASHIFT_SCHEMA, ZfsCompressionType, ZfsRaidLevel,
 };
 use proxmox_backup::tools::disks::{
-    complete_disk_name, complete_partition_name, FileSystemType, SmartAttribute,
+    FileSystemType, SmartAttribute, complete_disk_name, complete_partition_name,
 };
 
 use proxmox_backup::api2;

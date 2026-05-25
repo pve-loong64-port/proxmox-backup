@@ -14,14 +14,14 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
-use pbs_api_types::{LtoTapeDrive, ScsiTapeChanger, VirtualTapeDrive, DRIVE_NAME_SCHEMA};
+use pbs_api_types::{DRIVE_NAME_SCHEMA, LtoTapeDrive, ScsiTapeChanger, VirtualTapeDrive};
 
 /// Static [`SectionConfig`] to access parser/writer functions.
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);

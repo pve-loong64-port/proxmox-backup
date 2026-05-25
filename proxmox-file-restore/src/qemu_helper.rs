@@ -5,21 +5,21 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::json;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
     time,
 };
 
-use nix::sys::signal::{kill, Signal};
+use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 
 use proxmox_sys::fd::fd_change_cloexec;
-use proxmox_sys::fs::{create_path, file_read_string, make_tmp_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path, file_read_string, make_tmp_file};
 use proxmox_sys::logrotate::LogRotate;
 
-use pbs_client::{VsockClient, DEFAULT_VSOCK_PORT};
+use pbs_client::{DEFAULT_VSOCK_PORT, VsockClient};
 
 use super::SnapRestoreDetails;
 use crate::{backup_user, cpio};
@@ -59,7 +59,9 @@ fn validate_img_existence(debug: bool) -> Result<(), Error> {
         pbs_buildcfg::PROXMOX_BACKUP_INITRAMFS_FN
     });
     if !kernel.exists() || !initramfs.exists() {
-        bail!("cannot run file-restore VM: package 'proxmox-backup-restore-image' is not (correctly) installed");
+        bail!(
+            "cannot run file-restore VM: package 'proxmox-backup-restore-image' is not (correctly) installed"
+        );
     }
     Ok(())
 }

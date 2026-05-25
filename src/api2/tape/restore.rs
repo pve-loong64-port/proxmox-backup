@@ -4,7 +4,7 @@ use std::io::{Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -13,18 +13,18 @@ use proxmox_io::ReadExt;
 use proxmox_parallel_handler::ParallelHandler;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
-use proxmox_schema::{api, ApiType};
+use proxmox_schema::{ApiType, api};
 use proxmox_section_config::SectionConfigData;
-use proxmox_sys::fs::{replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, replace_file};
 use proxmox_uuid::Uuid;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    parse_ns_and_snapshot, print_ns_and_snapshot, ArchiveType, Authid, BackupDir, BackupNamespace,
-    CryptMode, NotificationMode, Operation, TapeRestoreNamespace, Userid,
-    DATASTORE_MAP_ARRAY_SCHEMA, DATASTORE_MAP_LIST_SCHEMA, DRIVE_NAME_SCHEMA, MANIFEST_BLOB_NAME,
-    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ,
-    TAPE_RESTORE_NAMESPACE_SCHEMA, TAPE_RESTORE_SNAPSHOT_SCHEMA, UPID_SCHEMA,
+    ArchiveType, Authid, BackupDir, BackupNamespace, CryptMode, DATASTORE_MAP_ARRAY_SCHEMA,
+    DATASTORE_MAP_LIST_SCHEMA, DRIVE_NAME_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
+    NotificationMode, Operation, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ,
+    TAPE_RESTORE_NAMESPACE_SCHEMA, TAPE_RESTORE_SNAPSHOT_SCHEMA, TapeRestoreNamespace, UPID_SCHEMA,
+    Userid, parse_ns_and_snapshot, print_ns_and_snapshot,
 };
 use pbs_client::pxar::tools::handle_root_with_optional_format_version_prelude;
 use pbs_config::CachedUserInfo;
@@ -34,23 +34,24 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::{DataBlob, DataStore};
 use pbs_tape::{
-    BlockReadError, MediaContentHeader, TapeRead, PROXMOX_BACKUP_CONTENT_HEADER_MAGIC_1_0,
+    BlockReadError, MediaContentHeader, PROXMOX_BACKUP_CONTENT_HEADER_MAGIC_1_0, TapeRead,
 };
 
 use crate::backup::check_ns_modification_privs;
-use crate::tape::{assert_datastore_type, TapeNotificationMode};
 use crate::tape::{
-    drive::{lock_tape_device, request_and_load_media, set_tape_device_state, TapeDriver},
+    Inventory, MediaCatalog, MediaId, MediaSet, MediaSetCatalog, TAPE_STATUS_DIR,
+    drive::{TapeDriver, lock_tape_device, request_and_load_media, set_tape_device_state},
     file_formats::{
-        CatalogArchiveHeader, ChunkArchiveDecoder, ChunkArchiveHeader, SnapshotArchiveHeader,
+        CatalogArchiveHeader, ChunkArchiveDecoder, ChunkArchiveHeader,
         PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CATALOG_ARCHIVE_MAGIC_1_1,
         PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_CHUNK_ARCHIVE_MAGIC_1_1,
         PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0, PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0,
         PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_0, PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_1,
-        PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2,
+        PROXMOX_BACKUP_SNAPSHOT_ARCHIVE_MAGIC_1_2, SnapshotArchiveHeader,
     },
-    lock_media_set, Inventory, MediaCatalog, MediaId, MediaSet, MediaSetCatalog, TAPE_STATUS_DIR,
+    lock_media_set,
 };
+use crate::tape::{TapeNotificationMode, assert_datastore_type};
 
 struct NamespaceMap {
     map: HashMap<String, HashMap<BackupNamespace, (BackupNamespace, usize)>>,

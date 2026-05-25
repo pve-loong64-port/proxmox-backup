@@ -1,7 +1,7 @@
 use std::io::{BufReader, Read};
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use proxmox_io::ReadExt;
 

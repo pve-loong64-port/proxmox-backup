@@ -6,23 +6,23 @@ use serde::Serialize;
 use serde_json::Value;
 
 use proxmox_router::{
-    cli::{
-        default_table_format_options, format_and_print_result_full, get_output_format,
-        ColumnConfig, OUTPUT_FORMAT,
-    },
     ApiMethod, RpcEnvironment,
+    cli::{
+        ColumnConfig, OUTPUT_FORMAT, default_table_format_options, format_and_print_result_full,
+        get_output_format,
+    },
 };
-use proxmox_schema::{api, ApiType, ReturnType};
+use proxmox_schema::{ApiType, ReturnType, api};
 
 use pbs_api_types::{BackupNamespace, BackupType};
 use pbs_client::tools::key_source::get_encryption_key_password;
 use pbs_client::{BackupRepository, BackupWriter, BackupWriterOptions};
 use pbs_datastore::data_blob::{DataBlob, DataChunkBuilder};
-use pbs_key_config::{load_and_decrypt_key, KeyDerivationConfig};
+use pbs_key_config::{KeyDerivationConfig, load_and_decrypt_key};
 use pbs_tools::crypt_config::CryptConfig;
 
 use crate::{
-    connect, extract_repository_from_value, record_repository, BackupRepositoryArgs, KEYFILE_SCHEMA,
+    BackupRepositoryArgs, KEYFILE_SCHEMA, connect, extract_repository_from_value, record_repository,
 };
 
 #[api()]

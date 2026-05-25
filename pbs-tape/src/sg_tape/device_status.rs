@@ -1,6 +1,6 @@
 use std::os::fd::AsRawFd;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use pbs_api_types::DeviceActivity;
 use proxmox_io::ReadExt;

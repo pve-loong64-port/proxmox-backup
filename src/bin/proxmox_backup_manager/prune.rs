@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
-use pbs_api_types::{PruneJobConfig, JOB_ID_SCHEMA};
+use pbs_api_types::{JOB_ID_SCHEMA, PruneJobConfig};
 use pbs_config::prune;
 
 use proxmox_backup::api2;

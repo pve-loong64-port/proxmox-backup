@@ -2,15 +2,15 @@ use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
 use anyhow::Error;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 
 use pbs_api_types::Authid;
 use pbs_datastore::backup_info::BackupDir;
 use pbs_datastore::{DataStore, DatastoreBackend};
-use proxmox_rest_server::formatter::*;
 use proxmox_rest_server::WorkerTask;
+use proxmox_rest_server::formatter::*;
 use tracing::info;
 
 /// `RpcEnvironment` implementation for backup reader service

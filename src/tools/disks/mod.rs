@@ -8,7 +8,7 @@ use std::os::unix::fs::{FileExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
-use anyhow::{bail, format_err, Context as _, Error};
+use anyhow::{Context as _, Error, bail, format_err};
 use libc::dev_t;
 use once_cell::sync::OnceCell;
 
@@ -17,7 +17,7 @@ use ::serde::{Deserialize, Serialize};
 use proxmox_lang::{io_bail, io_format_err};
 use proxmox_log::info;
 use proxmox_schema::api;
-use proxmox_sys::linux::procfs::{mountinfo::Device, MountInfo};
+use proxmox_sys::linux::procfs::{MountInfo, mountinfo::Device};
 
 use pbs_api_types::{BLOCKDEVICE_DISK_AND_PARTITION_NAME_REGEX, BLOCKDEVICE_NAME_REGEX};
 

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use nix::{sys::stat::Mode, unistd::Uid};
 use serde::Deserialize;
 
-use pbs_api_types::{CryptKey, KeyInfo, CRYPT_KEY_ID_SCHEMA};
+use pbs_api_types::{CRYPT_KEY_ID_SCHEMA, CryptKey, KeyInfo};
 use proxmox_schema::ApiType;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 use proxmox_sys::fs::CreateOptions;
@@ -13,7 +13,7 @@ use proxmox_sys::fs::CreateOptions;
 use pbs_buildcfg::configdir;
 use pbs_key_config::KeyConfig;
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

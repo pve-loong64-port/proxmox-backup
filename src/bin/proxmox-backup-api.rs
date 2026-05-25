@@ -1,9 +1,9 @@
 use std::future::Future;
-use std::pin::{pin, Pin};
+use std::pin::{Pin, pin};
 
-use anyhow::{bail, Error};
-use hyper::http::Response;
+use anyhow::{Error, bail};
 use hyper::StatusCode;
+use hyper::http::Response;
 use hyper_util::server::graceful::GracefulShutdown;
 use tokio::net::TcpListener;
 use tracing::level_filters::LevelFilter;
@@ -160,9 +160,11 @@ async fn run() -> Result<(), Error> {
     // acquire the IO driver, if blocked, before going to sleep, which allows progress again
     // TODO: remove once tokio solves this at their level (see proposals in linked comments)
     let rt_handle = tokio::runtime::Handle::current();
-    std::thread::spawn(move || loop {
-        rt_handle.spawn(std::future::ready(()));
-        std::thread::sleep(std::time::Duration::from_secs(3));
+    std::thread::spawn(move || {
+        loop {
+            rt_handle.spawn(std::future::ready(()));
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
     });
 
     start_notification_worker();

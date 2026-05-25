@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_io::ReadExt;
 

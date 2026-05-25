@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use anyhow::{bail, Error};
-use openssl::symm::{decrypt_aead, Mode};
+use anyhow::{Error, bail};
+use openssl::symm::{Mode, decrypt_aead};
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 use proxmox_io::{ReadExt, WriteExt};
@@ -579,7 +579,7 @@ fn zstd_error_is_target_too_small(err: usize) -> bool {
 mod test {
     use pbs_tools::crypt_config::CryptConfig;
 
-    use super::{zstd_error_is_target_too_small, DataChunkBuilder};
+    use super::{DataChunkBuilder, zstd_error_is_target_too_small};
 
     const TEST_DATA_LEN: usize = 50;
 

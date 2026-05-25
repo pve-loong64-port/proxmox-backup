@@ -3,26 +3,26 @@ use std::ffi::OsStr;
 use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::future::FutureExt;
 use futures::select;
 use serde_json::Value;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
 
 use pbs_api_types::PathPattern;
 use pbs_client::pxar::tools::format_single_line_entry;
 use pbs_client::pxar::{
-    Flags, OverwriteFlags, PxarExtractOptions, PxarWriters, ENCODER_MAX_ENTRIES,
+    ENCODER_MAX_ENTRIES, Flags, OverwriteFlags, PxarExtractOptions, PxarWriters,
 };
 use pxar::EntryKind;
 
 use proxmox_human_byte::HumanByte;
-use proxmox_log::{debug, enabled, error, Level};
+use proxmox_log::{Level, debug, enabled, error};
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 

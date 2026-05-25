@@ -14,7 +14,7 @@
 use std::fs::File;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use proxmox_sys::command::run_command;
 use proxmox_uuid::Uuid;
@@ -25,7 +25,7 @@ use pbs_api_types::{
 use pbs_buildcfg::PROXMOX_BACKUP_MULTIARCH_LIB_DIR;
 use pbs_key_config::KeyConfig;
 
-use pbs_tape::sg_tape::{drive_get_encryption, SgTape, TapeAlertFlags};
+use pbs_tape::sg_tape::{SgTape, TapeAlertFlags, drive_get_encryption};
 use pbs_tape::{BlockReadError, MediaContentHeader, TapeRead, TapeWrite};
 
 use crate::tape::{
@@ -269,7 +269,9 @@ impl TapeDriver for LtoTapeHandle {
         }
         let encryption_set = drive_get_encryption(self.sg_tape.file_mut())?;
         if encryption_wanted != encryption_set {
-            bail!("Set encryption mode not what was desired (set: {encryption_set}, wanted: {encryption_wanted})");
+            bail!(
+                "Set encryption mode not what was desired (set: {encryption_set}, wanted: {encryption_wanted})"
+            );
         }
         Ok(())
     }

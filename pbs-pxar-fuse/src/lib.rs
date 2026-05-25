@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use futures::channel::mpsc::UnboundedSender;
 use futures::select;
 use futures::sink::SinkExt;
@@ -22,7 +22,7 @@ use proxmox_io::vec;
 use pxar::accessor::{self, ContentRange, EntryRangeInfo, ReadAt};
 
 use proxmox_fuse::requests::{self, FuseRequest};
-use proxmox_fuse::{EntryParam, Fuse, ReplyBufState, Request, ROOT_ID};
+use proxmox_fuse::{EntryParam, Fuse, ROOT_ID, ReplyBufState, Request};
 use proxmox_lang::io_format_err;
 use proxmox_sys::fs::xattr;
 

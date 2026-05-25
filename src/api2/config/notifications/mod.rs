@@ -3,7 +3,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::cmp::Ordering;
 
-use proxmox_router::{list_subdirs_api_method, ApiMethod, Permission, RpcEnvironment};
+use proxmox_router::{ApiMethod, Permission, RpcEnvironment, list_subdirs_api_method};
 use proxmox_router::{Router, SubdirMap};
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
@@ -12,7 +12,7 @@ use crate::api2::admin::datastore::get_datastore_list;
 use pbs_api_types::PRIV_SYS_AUDIT;
 
 use crate::api2::admin::prune::list_prune_jobs;
-use crate::api2::admin::sync::{list_config_sync_jobs, ListSyncDirection};
+use crate::api2::admin::sync::{ListSyncDirection, list_config_sync_jobs};
 use crate::api2::admin::verify::list_verification_jobs;
 use crate::api2::config::media_pool::list_pools;
 use crate::api2::tape::backup::list_tape_backup_jobs;

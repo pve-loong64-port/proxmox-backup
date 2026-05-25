@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use http_body_util::BodyExt;
 
 use pbs_tools::async_lru_cache::AsyncLruCache;

@@ -5,17 +5,17 @@
 use std::fs::File;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use pbs_tape::sg_tape::SgTape;
 use proxmox_backup::tape::encryption_keys::load_key;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, RpcEnvironment};
+use proxmox_router::{RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Fingerprint, LtoTapeDrive, DRIVE_NAME_SCHEMA, LTO_DRIVE_PATH_SCHEMA, MEDIA_SET_UUID_SCHEMA,
+    DRIVE_NAME_SCHEMA, Fingerprint, LTO_DRIVE_PATH_SCHEMA, LtoTapeDrive, MEDIA_SET_UUID_SCHEMA,
     TAPE_ENCRYPTION_KEY_FINGERPRINT_SCHEMA,
 };
 

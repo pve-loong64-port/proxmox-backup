@@ -5,18 +5,18 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::stream::{self, StreamExt, TryStreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tracing::{info, warn, Level};
+use tracing::{Level, info, warn};
 
 use pbs_api_types::{
-    print_store_and_ns, ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupArchiveName,
-    BackupDir, BackupGroup, BackupGroupDeleteStats, BackupNamespace, CryptMode, GroupFilter,
-    GroupListItem, NamespaceListItem, Operation, RateLimitConfig, Remote, SnapshotListItem,
-    CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
-    PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_MODIFY, PRIV_REMOTE_DATASTORE_PRUNE,
+    ApiVersion, ApiVersionInfo, ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup,
+    BackupGroupDeleteStats, BackupNamespace, CLIENT_LOG_BLOB_NAME, CryptMode, GroupFilter,
+    GroupListItem, MANIFEST_BLOB_NAME, NamespaceListItem, Operation, PRIV_DATASTORE_BACKUP,
+    PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_MODIFY,
+    PRIV_REMOTE_DATASTORE_PRUNE, RateLimitConfig, Remote, SnapshotListItem, print_store_and_ns,
 };
 use pbs_client::{
     BackupRepository, BackupStats, BackupWriter, BackupWriterOptions, HttpClient, IndexType,
@@ -29,7 +29,7 @@ use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::read_chunk::AsyncReadChunk;
 use pbs_datastore::{
-    check_namespace_depth_limit, BackupManifest, DataBlob, DataStore, StoreProgress,
+    BackupManifest, DataBlob, DataStore, StoreProgress, check_namespace_depth_limit,
 };
 use pbs_tools::bounded_join_set::BoundedJoinSet;
 use pbs_tools::buffered_logger::{BufferedLogger, LogLineSender};
@@ -38,8 +38,8 @@ use pbs_tools::crypt_config::CryptConfig;
 use proxmox_human_byte::HumanByte;
 
 use super::sync::{
-    exclude_not_verified_or_encrypted, filter_out_in_progress, ignore_not_verified_or_encrypted,
     LocalSource, RemovedVanishedStats, SkipInfo, SkipReason, SyncSource, SyncStats,
+    exclude_not_verified_or_encrypted, filter_out_in_progress, ignore_not_verified_or_encrypted,
 };
 use crate::api2::config::remote;
 use crate::server::sync::SharedGroupProgress;

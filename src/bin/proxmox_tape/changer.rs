@@ -1,7 +1,7 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
 

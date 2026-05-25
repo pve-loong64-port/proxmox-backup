@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Error;
 
-use pbs_api_types::{PruneJobOptions, MANIFEST_BLOB_NAME};
+use pbs_api_types::{MANIFEST_BLOB_NAME, PruneJobOptions};
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{BackupDir, BackupInfo};
 

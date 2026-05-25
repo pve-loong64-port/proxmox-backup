@@ -5,9 +5,9 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{bail, Context as _, Error};
-use futures::future::BoxFuture;
+use anyhow::{Context as _, Error, bail};
 use futures::FutureExt;
+use futures::future::BoxFuture;
 
 use proxmox_human_byte::HumanByte;
 use proxmox_router::cli::{CliCommand, CliCommandMap, CommandLineInterface};
@@ -15,7 +15,7 @@ use proxmox_schema::api;
 
 use pbs_api_types::{BackupArchiveName, BackupNamespace, BackupPart};
 use pbs_client::tools::key_source::{
-    crypto_parameters, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
+    KEYFD_SCHEMA, crypto_parameters, format_key_source, get_encryption_key_password,
 };
 use pbs_client::tools::{
     complete_archive_name, complete_group_or_snapshot, connect, extract_repository_from_value,
@@ -26,8 +26,8 @@ use pbs_datastore::dynamic_index::{BufferedDynamicReader, DynamicIndexReader, Lo
 use pbs_datastore::index::IndexFile;
 use pbs_key_config::decrypt_key;
 use pbs_tools::crypt_config::CryptConfig;
-use pxar::accessor::ReadAt;
 use pxar::EntryKind;
+use pxar::accessor::ReadAt;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -612,11 +612,7 @@ impl FileEntryPrinter {
     }
 
     fn change_indicator(&self, changed: bool) -> &'static str {
-        if changed {
-            "*"
-        } else {
-            " "
-        }
+        if changed { "*" } else { " " }
     }
 
     fn set_color_if_changed(&mut self, changed: bool) -> Result<(), Error> {

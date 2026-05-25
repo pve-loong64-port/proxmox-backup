@@ -1,7 +1,7 @@
 use std::io::{Seek, SeekFrom};
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
 use proxmox_router::cli::*;
@@ -17,11 +17,11 @@ use pxar::accessor::aio::Accessor;
 
 use crate::helper;
 use crate::{
-    complete_backup_snapshot, complete_group_or_snapshot, complete_namespace,
-    complete_pxar_archive_name, complete_repository, connect, crypto_parameters, decrypt_key,
-    dir_or_last_from_group, extract_repository_from_value, format_key_source, optional_ns_param,
-    record_repository, BackupDir, BackupTargetArgs, BufferedDynamicReader, CatalogReader,
-    DynamicIndexReader, IndexFile, Shell, KEYFD_SCHEMA,
+    BackupDir, BackupTargetArgs, BufferedDynamicReader, CatalogReader, DynamicIndexReader,
+    IndexFile, KEYFD_SCHEMA, Shell, complete_backup_snapshot, complete_group_or_snapshot,
+    complete_namespace, complete_pxar_archive_name, complete_repository, connect,
+    crypto_parameters, decrypt_key, dir_or_last_from_group, extract_repository_from_value,
+    format_key_source, optional_ns_param, record_repository,
 };
 
 #[api(

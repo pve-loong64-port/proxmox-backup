@@ -1,9 +1,9 @@
-use anyhow::{bail, format_err, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, bail, format_err};
+use serde_json::{Value, json};
 
 use proxmox_router::{Permission, Router};
 use proxmox_schema::api;
-use proxmox_sys::fs::{file_read_firstline, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_read_firstline, replace_file};
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_MODIFY, TIME_ZONE_SCHEMA};
 

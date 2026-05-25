@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 fn run_command(mut command: Command) -> Result<(), Error> {
     let output = command

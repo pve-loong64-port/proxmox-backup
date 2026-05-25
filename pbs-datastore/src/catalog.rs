@@ -3,14 +3,14 @@ use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::ffi::OsStrExt;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
 
 use pathpatterns::{MatchList, MatchType};
-use pxar::accessor::aio::FileEntry;
 use pxar::accessor::ReadAt;
+use pxar::accessor::aio::FileEntry;
 use pxar::format::SignedDuration;
-use pxar::{mode, EntryKind};
+use pxar::{EntryKind, mode};
 
 use proxmox_io::ReadExt;
 use proxmox_schema::api;

@@ -1,12 +1,12 @@
 //! Low-level disk (image) access functions for file restore VMs.
 use std::collections::HashMap;
-use std::fs::{create_dir_all, File};
+use std::fs::{File, create_dir_all};
 use std::io::{BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::LazyLock;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use log::{info, warn};
 
 use proxmox_schema::const_regex;

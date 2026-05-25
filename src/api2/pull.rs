@@ -1,5 +1,5 @@
 //! Sync datastore from remote server
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::{future::FutureExt, select};
 use tracing::info;
 
@@ -7,16 +7,16 @@ use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, BackupNamespace, GroupFilter, RateLimitConfig, SyncJobConfig, CRYPT_KEY_ID_SCHEMA,
-    DATASTORE_SCHEMA, GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_PRUNE, PRIV_REMOTE_READ, REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA,
-    RESYNC_CORRUPT_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA,
-    SYNC_WORKER_THREADS_SCHEMA, TRANSFER_LAST_SCHEMA,
+    Authid, BackupNamespace, CRYPT_KEY_ID_SCHEMA, DATASTORE_SCHEMA, GROUP_FILTER_LIST_SCHEMA,
+    GroupFilter, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_PRUNE,
+    PRIV_REMOTE_READ, REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA,
+    RateLimitConfig, SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA,
+    SYNC_WORKER_THREADS_SCHEMA, SyncJobConfig, TRANSFER_LAST_SCHEMA,
 };
 use pbs_config::CachedUserInfo;
 use proxmox_rest_server::WorkerTask;
 
-use crate::server::pull::{pull_store, PullParameters};
+use crate::server::pull::{PullParameters, pull_store};
 
 pub fn check_pull_privs(
     auth_id: &Authid,

@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use pbs_config::BackupLockGuard;
 use proxmox_sys::process_locker::ProcessLockSharedGuard;
 
@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use tracing::info;
 
 use ::serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_http::Body;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
@@ -17,7 +17,7 @@ use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::dynamic_index::DynamicIndexWriter;
 use pbs_datastore::fixed_index::FixedIndexWriter;
 use pbs_datastore::{DataBlob, DataStore, DatastoreBackend};
-use proxmox_rest_server::{formatter::*, WorkerTask};
+use proxmox_rest_server::{WorkerTask, formatter::*};
 
 use crate::backup::VerifyWorker;
 

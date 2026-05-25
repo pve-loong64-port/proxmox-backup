@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use bitflags::bitflags;
 use endian_trait::Endian;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use proxmox_uuid::Uuid;
 
-use pbs_api_types::{ScsiTapeChanger, SLOT_ARRAY_SCHEMA};
+use pbs_api_types::{SLOT_ARRAY_SCHEMA, ScsiTapeChanger};
 
 pub mod linux_list_drives;
 
@@ -157,7 +157,7 @@ impl BlockHeader {
 
     /// Allocates a new instance on the heap
     pub fn new() -> Box<Self> {
-        use std::alloc::{alloc_zeroed, Layout};
+        use std::alloc::{Layout, alloc_zeroed};
 
         // align to PAGESIZE, so that we can use it with SG_IO
         let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;

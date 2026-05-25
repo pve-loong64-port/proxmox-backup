@@ -4,7 +4,7 @@ use proxmox_notify::Config;
 
 use pbs_buildcfg::configdir;
 
-use crate::{open_backup_lockfile, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 /// Configuration file location for notification targets/matchers.
 pub const NOTIFICATION_CONFIG_PATH: &str = configdir!("/notifications.cfg");

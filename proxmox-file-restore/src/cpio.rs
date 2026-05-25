@@ -5,8 +5,8 @@
 //! initramfs intended for a linux kernel.
 use std::ffi::{CStr, CString};
 
-use anyhow::{bail, Error};
-use tokio::io::{copy, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use anyhow::{Error, bail};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, copy};
 
 #[derive(Default)]
 pub struct Entry {

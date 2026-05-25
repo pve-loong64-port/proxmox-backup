@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
 pub fn required_string_param<'a>(param: &'a Value, name: &str) -> Result<&'a str, Error> {

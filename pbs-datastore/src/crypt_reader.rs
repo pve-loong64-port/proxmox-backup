@@ -1,7 +1,7 @@
 use std::io::{BufRead, Read};
 use std::sync::Arc;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use pbs_tools::crypt_config::CryptConfig;
 

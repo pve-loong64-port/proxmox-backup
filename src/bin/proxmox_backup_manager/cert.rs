@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_router::cli::*;
 use proxmox_schema::api;

@@ -1,21 +1,21 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use pbs_config::CachedUserInfo;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{
-    http_bail, ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType,
+    ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType, http_bail,
 };
 use proxmox_schema::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use pbs_api_types::{
-    Authid, BackupGroupDeleteStats, BackupNamespace, NamespaceListItem, Operation,
-    DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA, PROXMOX_SAFE_ID_FORMAT, UPID_SCHEMA,
+    Authid, BackupGroupDeleteStats, BackupNamespace, DATASTORE_SCHEMA, NS_MAX_DEPTH_SCHEMA,
+    NamespaceListItem, Operation, PROXMOX_SAFE_ID_FORMAT, UPID_SCHEMA,
 };
 
 use pbs_datastore::DataStore;
 
-use crate::backup::{check_ns_modification_privs, check_ns_privs, NS_PRIVS_OK};
+use crate::backup::{NS_PRIVS_OK, check_ns_modification_privs, check_ns_privs};
 
 #[api(
     input: {

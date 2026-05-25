@@ -1,6 +1,6 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
-use serde_json::{to_value, Value};
+use serde_json::{Value, to_value};
 
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
@@ -10,10 +10,11 @@ use pbs_api_types::{
 };
 
 use proxmox_network_api::{
-    self as network, parse_vlan_id_from_name, parse_vlan_raw_device_from_name, BondXmitHashPolicy,
-    Interface, LinuxBondMode, NetworkConfig, NetworkConfigMethod, NetworkInterfaceType,
-    CIDR_V4_SCHEMA, CIDR_V6_SCHEMA, IP_V4_SCHEMA, IP_V6_SCHEMA, NETWORK_INTERFACE_ARRAY_SCHEMA,
-    NETWORK_INTERFACE_LIST_SCHEMA, NETWORK_INTERFACE_NAME_SCHEMA,
+    self as network, BondXmitHashPolicy, CIDR_V4_SCHEMA, CIDR_V6_SCHEMA, IP_V4_SCHEMA,
+    IP_V6_SCHEMA, Interface, LinuxBondMode, NETWORK_INTERFACE_ARRAY_SCHEMA,
+    NETWORK_INTERFACE_LIST_SCHEMA, NETWORK_INTERFACE_NAME_SCHEMA, NetworkConfig,
+    NetworkConfigMethod, NetworkInterfaceType, parse_vlan_id_from_name,
+    parse_vlan_raw_device_from_name,
 };
 
 use proxmox_rest_server::WorkerTask;
@@ -376,7 +377,9 @@ pub fn create_interface(
                 }
                 if bond_xmit_hash_policy.is_some() {
                     if mode != LinuxBondMode::Ieee802_3ad && mode != LinuxBondMode::BalanceXor {
-                        bail!("bond_xmit_hash_policy is only valid with LACP(802.3ad) or balance-xor mode");
+                        bail!(
+                            "bond_xmit_hash_policy is only valid with LACP(802.3ad) or balance-xor mode"
+                        );
                     }
                     interface.bond_xmit_hash_policy = bond_xmit_hash_policy;
                 }

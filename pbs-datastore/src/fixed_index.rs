@@ -4,7 +4,7 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;

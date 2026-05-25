@@ -5,8 +5,8 @@ use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    PamRealmConfig, PamRealmConfigUpdater, PRIV_REALM_ALLOCATE, PRIV_SYS_AUDIT,
-    PROXMOX_CONFIG_DIGEST_SCHEMA,
+    PRIV_REALM_ALLOCATE, PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, PamRealmConfig,
+    PamRealmConfigUpdater,
 };
 
 use pbs_config::domains;

@@ -3,13 +3,13 @@ use std::sync::LazyLock;
 
 use anyhow::Error;
 
-use proxmox_s3_client::{S3ClientConf, S3_CLIENT_ID_SCHEMA};
+use proxmox_s3_client::{S3_CLIENT_ID_SCHEMA, S3ClientConf};
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use pbs_buildcfg::configdir;
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

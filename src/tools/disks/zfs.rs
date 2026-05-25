@@ -3,7 +3,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_schema::const_regex;
 

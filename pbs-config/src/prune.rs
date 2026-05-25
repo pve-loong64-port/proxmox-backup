@@ -6,9 +6,9 @@ use std::sync::LazyLock;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use pbs_api_types::{PruneJobConfig, JOB_ID_SCHEMA};
+use pbs_api_types::{JOB_ID_SCHEMA, PruneJobConfig};
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

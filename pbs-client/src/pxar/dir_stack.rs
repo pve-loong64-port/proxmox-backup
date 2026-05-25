@@ -2,10 +2,10 @@ use std::ffi::OsString;
 use std::os::unix::io::{AsRawFd, BorrowedFd, RawFd};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Error};
+use anyhow::{Context, Error, bail};
 use nix::dir::Dir;
 use nix::fcntl::OFlag;
-use nix::sys::stat::{mkdirat, Mode};
+use nix::sys::stat::{Mode, mkdirat};
 
 use proxmox_sys::error::SysError;
 use pxar::Metadata;

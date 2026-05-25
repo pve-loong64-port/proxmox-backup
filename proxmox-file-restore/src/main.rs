@@ -3,33 +3,32 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::StreamExt;
 use pbs_api_types::{BackupArchiveName, CATALOG_NAME};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::AsyncWriteExt;
 
 use proxmox_compression::zstd::ZstdEncoder;
 use proxmox_router::cli::{
-    complete_file_name, default_table_format_options, format_and_print_result_full,
-    get_output_format, run_cli_command, CliCommand, CliCommandMap, CliEnvironment, ColumnConfig,
-    OUTPUT_FORMAT,
+    CliCommand, CliCommandMap, CliEnvironment, ColumnConfig, OUTPUT_FORMAT, complete_file_name,
+    default_table_format_options, format_and_print_result_full, get_output_format, run_cli_command,
 };
-use proxmox_router::{http_err, HttpError};
+use proxmox_router::{HttpError, http_err};
 use proxmox_schema::api;
-use proxmox_sys::fs::{create_path, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path};
 use pxar::accessor::aio::Accessor;
 use pxar::decoder::aio::Decoder;
 
-use pbs_api_types::{file_restore::FileRestoreFormat, BackupDir, BackupNamespace, CryptMode};
+use pbs_api_types::{BackupDir, BackupNamespace, CryptMode, file_restore::FileRestoreFormat};
 use pbs_client::pxar::tools::get_remote_pxar_reader;
 use pbs_client::pxar::{create_tar, create_zip, extract_sub_dir, extract_sub_dir_seq};
 use pbs_client::tools::{
     complete_group_or_snapshot, complete_repository, connect, extract_repository_from_value,
     has_pxar_filename_extension,
     key_source::{
-        crypto_parameters_keep_fd, format_key_source, get_encryption_key_password, KEYFD_SCHEMA,
-        KEYFILE_SCHEMA,
+        KEYFD_SCHEMA, KEYFILE_SCHEMA, crypto_parameters_keep_fd, format_key_source,
+        get_encryption_key_password,
     },
     optional_ns_param,
 };

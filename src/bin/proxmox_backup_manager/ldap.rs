@@ -3,10 +3,10 @@ use pbs_client::view_task_result;
 use pbs_tools::json::required_string_param;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, Permission, RpcEnvironment};
+use proxmox_router::{ApiHandler, Permission, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
-use pbs_api_types::{Realm, PRIV_PERMISSIONS_MODIFY, REALM_ID_SCHEMA, REMOVE_VANISHED_SCHEMA};
+use pbs_api_types::{PRIV_PERMISSIONS_MODIFY, REALM_ID_SCHEMA, REMOVE_VANISHED_SCHEMA, Realm};
 
 use proxmox_backup::{api2, client_helpers::connect_to_localhost};
 

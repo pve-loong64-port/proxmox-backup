@@ -2,17 +2,17 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use http_body_util::BodyExt;
 
 use pbs_api_types::CryptMode;
 use pbs_tools::crypt_config::CryptConfig;
 use proxmox_s3_client::S3Client;
 
+use crate::DataStore;
 use crate::data_blob::DataBlob;
 use crate::datastore::DatastoreBackend;
 use crate::read_chunk::{AsyncReadChunk, ReadChunk};
-use crate::DataStore;
 
 #[derive(Clone)]
 pub struct LocalChunkReader {

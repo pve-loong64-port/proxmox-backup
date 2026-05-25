@@ -3,7 +3,7 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{

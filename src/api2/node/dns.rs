@@ -6,13 +6,13 @@ use const_format::concatcp;
 use hex::FromHex;
 use openssl::sha;
 use regex::Regex;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use pbs_api_types::IPRE_STR;
 
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
-use proxmox_sys::fs::{file_get_contents, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_contents, replace_file};
 
 use pbs_api_types::{
     FIRST_DNS_SERVER_SCHEMA, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,

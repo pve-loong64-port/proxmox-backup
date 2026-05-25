@@ -1,10 +1,10 @@
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use std::fs::File;
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::Arc;
 
 use futures::future::AbortHandle;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use pbs_api_types::{BackupArchiveName, BackupDir, BackupNamespace, MANIFEST_BLOB_NAME};
 use pbs_datastore::data_blob::DataBlob;

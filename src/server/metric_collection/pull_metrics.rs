@@ -1,6 +1,6 @@
 use std::{path::Path, sync::OnceLock, time::Duration};
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 
 use nix::sys::stat::Mode;
 use pbs_api_types::{
@@ -13,7 +13,7 @@ use proxmox_shared_cache::SharedCache;
 use proxmox_sys::fs::CreateOptions;
 use serde::{Deserialize, Serialize};
 
-use super::{DatastoreStats, DiskStat, HostStats, NetdevType, METRIC_COLLECTION_INTERVAL};
+use super::{DatastoreStats, DiskStat, HostStats, METRIC_COLLECTION_INTERVAL, NetdevType};
 
 const METRIC_CACHE_TIME: Duration = Duration::from_secs(30 * 60);
 const STORED_METRIC_GENERATIONS: u64 =

@@ -58,11 +58,11 @@ mod flags;
 pub use flags::Flags;
 
 pub use create::{
-    create_archive, MetadataArchiveReader, PxarCreateOptions, PxarPrevRef, PxarWriters,
+    MetadataArchiveReader, PxarCreateOptions, PxarPrevRef, PxarWriters, create_archive,
 };
 pub use extract::{
-    create_tar, create_zip, extract_archive, extract_sub_dir, extract_sub_dir_seq, ErrorHandler,
-    OverwriteFlags, PxarExtractContext, PxarExtractOptions,
+    ErrorHandler, OverwriteFlags, PxarExtractContext, PxarExtractOptions, create_tar, create_zip,
+    extract_archive, extract_sub_dir, extract_sub_dir_seq,
 };
 
 /// The format requires to build sorted directory lookup tables in

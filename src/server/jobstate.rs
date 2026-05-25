@@ -39,18 +39,18 @@
 //! ```
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
 
-use proxmox_sys::fs::{create_path, file_read_optional_string, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path, file_read_optional_string, replace_file};
 
 use proxmox_time::CalendarEvent;
 
 use pbs_api_types::{JobScheduleStatus, UPID};
 use pbs_buildcfg::PROXMOX_BACKUP_STATE_DIR_M;
-use pbs_config::{open_backup_lockfile, BackupLockGuard};
+use pbs_config::{BackupLockGuard, open_backup_lockfile};
 
-use proxmox_rest_server::{upid_read_status, worker_is_active_local, TaskState};
+use proxmox_rest_server::{TaskState, upid_read_status, worker_is_active_local};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

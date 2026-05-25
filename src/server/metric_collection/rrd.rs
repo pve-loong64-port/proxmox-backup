@@ -6,11 +6,11 @@
 
 use std::path::Path;
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use once_cell::sync::OnceCell;
 
-use proxmox_rrd::rrd::{AggregationFn, Archive, DataSourceType, Database};
 use proxmox_rrd::Cache;
+use proxmox_rrd::rrd::{AggregationFn, Archive, DataSourceType, Database};
 use proxmox_sys::fs::CreateOptions;
 
 use pbs_api_types::S3Statistics;

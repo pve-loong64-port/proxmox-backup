@@ -4,22 +4,22 @@ use anyhow::Error;
 use serde_json::Value;
 
 use proxmox_router::{
-    list_subdirs_api_method, ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType,
-    SubdirMap,
+    ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    list_subdirs_api_method,
 };
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, VerificationJobConfig, VerificationJobStatus, DATASTORE_SCHEMA, JOB_ID_SCHEMA,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_VERIFY,
+    Authid, DATASTORE_SCHEMA, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_VERIFY,
+    VerificationJobConfig, VerificationJobStatus,
 };
-use pbs_config::verify;
 use pbs_config::CachedUserInfo;
+use pbs_config::verify;
 
 use crate::server::{
     do_verification_job,
-    jobstate::{compute_schedule_status, Job},
+    jobstate::{Job, compute_schedule_status},
 };
 
 #[api(

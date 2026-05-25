@@ -2,7 +2,7 @@ use std::io::{IsTerminal, Read};
 use std::os::unix::io::{FromRawFd, RawFd};
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
 use proxmox_log::info;
@@ -183,7 +183,11 @@ fn do_crypto_parameters(param: &Value, keep_keyfd_open: bool) -> Result<CryptoPa
         None => match (key, master_pubkey) {
             // only default keys if available
             (None, None) => match read_optional_default_encryption_key()? {
-                None => CryptoParams { mode: CryptMode::None, enc_key: None, master_pubkey: None },
+                None => CryptoParams {
+                    mode: CryptMode::None,
+                    enc_key: None,
+                    master_pubkey: None,
+                },
                 enc_key => {
                     let master_pubkey = read_optional_default_master_pubkey()?;
                     CryptoParams {
@@ -191,38 +195,52 @@ fn do_crypto_parameters(param: &Value, keep_keyfd_open: bool) -> Result<CryptoPa
                         enc_key,
                         master_pubkey,
                     }
-                },
+                }
             },
 
             // explicit master key, default enc key needed
             (None, master_pubkey) => match read_optional_default_encryption_key()? {
-                None => bail!("--master-pubkey-file/--master-pubkey-fd specified, but no key available"),
-                enc_key => {
-                    CryptoParams {
-                        mode: CryptMode::Encrypt,
-                        enc_key,
-                        master_pubkey,
-                    }
+                None => {
+                    bail!("--master-pubkey-file/--master-pubkey-fd specified, but no key available")
+                }
+                enc_key => CryptoParams {
+                    mode: CryptMode::Encrypt,
+                    enc_key,
+                    master_pubkey,
                 },
             },
 
             // explicit keyfile, maybe default master key
-            (enc_key, None) => CryptoParams { mode: CryptMode::Encrypt, enc_key, master_pubkey: read_optional_default_master_pubkey()? },
+            (enc_key, None) => CryptoParams {
+                mode: CryptMode::Encrypt,
+                enc_key,
+                master_pubkey: read_optional_default_master_pubkey()?,
+            },
 
             // explicit keyfile and master key
-            (enc_key, master_pubkey) => CryptoParams { mode: CryptMode::Encrypt, enc_key, master_pubkey },
+            (enc_key, master_pubkey) => CryptoParams {
+                mode: CryptMode::Encrypt,
+                enc_key,
+                master_pubkey,
+            },
         },
 
         // explicitly disabled encryption
         Some(CryptMode::None) => match (key, master_pubkey) {
             // no keys => OK, no encryption
-            (None, None) => CryptoParams { mode: CryptMode::None, enc_key: None, master_pubkey: None },
+            (None, None) => CryptoParams {
+                mode: CryptMode::None,
+                enc_key: None,
+                master_pubkey: None,
+            },
 
             // --keyfile and --crypt-mode=none
             (Some(_), _) => bail!("--keyfile/--keyfd and --crypt-mode=none are mutually exclusive"),
 
             // --master-pubkey-file and --crypt-mode=none
-            (_, Some(_)) => bail!("--master-pubkey-file/--master-pubkey-fd and --crypt-mode=none are mutually exclusive"),
+            (_, Some(_)) => bail!(
+                "--master-pubkey-file/--master-pubkey-fd and --crypt-mode=none are mutually exclusive"
+            ),
         },
 
         // explicitly enabled encryption
@@ -242,7 +260,7 @@ fn do_crypto_parameters(param: &Value, keep_keyfd_open: bool) -> Result<CryptoPa
                         enc_key,
                         master_pubkey,
                     }
-                },
+                }
             },
 
             // --keyfile and --crypt-mode other than none
@@ -252,8 +270,12 @@ fn do_crypto_parameters(param: &Value, keep_keyfd_open: bool) -> Result<CryptoPa
                     master_pubkey => master_pubkey,
                 };
 
-                CryptoParams { mode, enc_key, master_pubkey }
-            },
+                CryptoParams {
+                    mode,
+                    enc_key,
+                    master_pubkey,
+                }
+            }
         },
     };
 
@@ -375,7 +397,7 @@ fn create_testdir(name: &str) -> Result<String, Error> {
 // WARNING: there must only be one test for crypto_parameters as the default key handling is not
 // safe w.r.t. concurrency
 fn test_crypto_parameters_handling() -> Result<(), Error> {
-    use proxmox_sys::fs::{replace_file, CreateOptions};
+    use proxmox_sys::fs::{CreateOptions, replace_file};
     use serde_json::json;
 
     let some_key = vec![1; 1];
@@ -593,26 +615,28 @@ fn test_crypto_parameters_handling() -> Result<(), Error> {
     assert_eq!(res.unwrap(), some_key_default_master_res);
 
     // crypt mode none == error
-    assert!(crypto_parameters(
-        &json!({"crypt-mode": "none", "master-pubkey-file": master_keypath})
-    )
-    .is_err());
+    assert!(
+        crypto_parameters(&json!({"crypt-mode": "none", "master-pubkey-file": master_keypath}))
+            .is_err()
+    );
     // with just default master key == no key
     let res = crypto_parameters(&json!({"crypt-mode": "none"}));
     assert_eq!(res.unwrap(), no_key_res);
 
     // crypt mode encrypt without enc key == error
-    assert!(crypto_parameters(
-        &json!({"crypt-mode": "encrypt", "master-pubkey-file": master_keypath})
-    )
-    .is_err());
+    assert!(
+        crypto_parameters(&json!({"crypt-mode": "encrypt", "master-pubkey-file": master_keypath}))
+            .is_err()
+    );
     assert!(crypto_parameters(&json!({"crypt-mode": "encrypt"})).is_err());
 
     // crypt mode none with explicit key == Error
-    assert!(crypto_parameters(
-        &json!({"crypt-mode": "none", "keyfile": keypath, "master-pubkey-file": master_keypath})
-    )
-    .is_err());
+    assert!(
+        crypto_parameters(
+            &json!({"crypt-mode": "none", "keyfile": keypath, "master-pubkey-file": master_keypath})
+        )
+        .is_err()
+    );
     assert!(crypto_parameters(&json!({"crypt-mode": "none", "keyfile": keypath})).is_err());
 
     // crypt mode encrypt with keyfile == key from keyfile with correct mode
@@ -629,10 +653,12 @@ fn test_crypto_parameters_handling() -> Result<(), Error> {
         crypto_parameters(&json!({"keyfile": keypath, "master-pubkey-file": invalid_keypath}))
             .is_err()
     );
-    assert!(crypto_parameters(
-        &json!({"keyfile": keypath, "master-pubkey-file": invalid_keypath,"crypt-mode": "none"})
-    )
-    .is_err());
+    assert!(
+        crypto_parameters(
+            &json!({"keyfile": keypath, "master-pubkey-file": invalid_keypath,"crypt-mode": "none"})
+        )
+        .is_err()
+    );
     assert!(crypto_parameters(&json!({"keyfile": keypath, "master-pubkey-file": invalid_keypath,"crypt-mode": "sign-only"})).is_err());
     assert!(crypto_parameters(
         &json!({"keyfile": keypath, "master-pubkey-file": invalid_keypath,"crypt-mode": "encrypt"})

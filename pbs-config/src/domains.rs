@@ -7,7 +7,7 @@ use pbs_buildcfg::configdir;
 use proxmox_schema::{ApiType, ObjectSchema};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 use pbs_api_types::{
     AdRealmConfig, LdapRealmConfig, OpenIdRealmConfig, PamRealmConfig, PbsRealmConfig,
     REALM_ID_SCHEMA,

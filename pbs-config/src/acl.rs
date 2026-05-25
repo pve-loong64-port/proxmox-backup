@@ -4,13 +4,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_schema::{ApiStringFormat, ApiType, Schema, StringSchema};
 
-use pbs_api_types::{Authid, Role, Userid, ROLE_NAME_NO_ACCESS};
+use pbs_api_types::{Authid, ROLE_NAME_NO_ACCESS, Role, Userid};
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 /// Map of pre-defined [Roles](Role) to their associated
 /// [privileges](pbs_api_types::PRIVILEGES) combination and description.
@@ -940,9 +940,10 @@ acl:1:/storage/store1:user1@pbs:DatastoreBackup
         );
 
         // user2 has no privileges under "/store/store2/store3" --> return empty
-        assert!(tree
-            .get_child_paths(&user2, &["store", "store2", "store3"],)?
-            .is_empty());
+        assert!(
+            tree.get_child_paths(&user2, &["store", "store2", "store3"],)?
+                .is_empty()
+        );
 
         // user2 has DatastoreReader privileges under "/store/store2/store31" --> return paths
         let paths = tree.get_child_paths(&user2, &["store/store2/store31"])?;
@@ -951,15 +952,17 @@ acl:1:/storage/store1:user1@pbs:DatastoreBackup
         );
 
         // user2 has no privileges under "/store/store2/foo/bar/baz"
-        assert!(tree
-            .get_child_paths(&user2, &["store", "store2", "foo/bar/baz"])?
-            .is_empty());
+        assert!(
+            tree.get_child_paths(&user2, &["store", "store2", "foo/bar/baz"])?
+                .is_empty()
+        );
 
         // user2 has DatastoreReader privileges on "/store/store2/store31/store4/store6", but not
         // on any child paths --> return empty
-        assert!(tree
-            .get_child_paths(&user2, &["store/store2/store31/store4/store6"],)?
-            .is_empty());
+        assert!(
+            tree.get_child_paths(&user2, &["store/store2/store31/store4/store6"],)?
+                .is_empty()
+        );
 
         Ok(())
     }

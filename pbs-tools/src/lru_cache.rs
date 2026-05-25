@@ -4,7 +4,7 @@
 //! A HashMap is used for fast access by a given key and a doubly linked list
 //! is used to keep track of the cache access order.
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 use std::marker::PhantomData;
 
 /// Interface for getting values on cache misses.

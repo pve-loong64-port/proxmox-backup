@@ -2,22 +2,22 @@ use std::os::fd::{AsRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::*;
 use http_body_util::{BodyDataStream, BodyExt};
 use hyper::body::Incoming;
 use hyper::http::Uri;
 use hyper::http::{Request, Response};
-use hyper_util::client::legacy::connect::{Connected, Connection};
 use hyper_util::client::legacy::Client;
+use hyper_util::client::legacy::connect::{Connected, Connection};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use pin_project_lite::pin_project;
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::UnixStream;
 
-use proxmox_http::uri::json_object_to_query;
 use proxmox_http::Body;
+use proxmox_http::uri::json_object_to_query;
 use proxmox_router::HttpError;
 
 pub const DEFAULT_VSOCK_PORT: u16 = 807;

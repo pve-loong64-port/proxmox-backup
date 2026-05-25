@@ -5,21 +5,21 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use nix::sys::stat::Mode;
 
 use pathpatterns::MatchType;
-use pxar::accessor::aio::{Accessor, Directory, FileEntry};
 use pxar::accessor::ReadAt;
+use pxar::accessor::aio::{Accessor, Directory, FileEntry};
 use pxar::format::StatxTimestamp;
-use pxar::{mode, Entry, EntryKind, Metadata};
+use pxar::{Entry, EntryKind, Metadata, mode};
 
 use pbs_api_types::BackupArchiveName;
 use pbs_datastore::catalog::{ArchiveEntry, CatalogEntryType, DirEntryAttribute};
 
+use pbs_datastore::BackupManifest;
 use pbs_datastore::dynamic_index::{BufferedDynamicReader, LocalDynamicReadAt};
 use pbs_datastore::index::IndexFile;
-use pbs_datastore::BackupManifest;
 use pbs_tools::crypt_config::CryptConfig;
 use proxmox_log::{debug, info};
 

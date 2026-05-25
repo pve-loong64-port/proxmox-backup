@@ -8,7 +8,7 @@ use nix::unistd::Uid;
 
 use proxmox_notify::context::pbs::PBS_CONTEXT;
 use proxmox_schema::ApiType;
-use proxmox_sys::fs::{create_path, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path};
 
 use crate::tape::TapeNotificationMode;
 use pbs_api_types::{

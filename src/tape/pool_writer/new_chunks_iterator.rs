@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 
 use proxmox_parallel_handler::ParallelHandler;
 

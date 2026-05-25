@@ -3,23 +3,23 @@ use std::collections::HashMap;
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
+use proxmox_router::{Permission, Router, RpcEnvironment, SubdirMap, list_subdirs_api_method};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, ChangerListEntry, LtoTapeDrive, MtxEntryKind, MtxStatusEntry, ScsiTapeChanger,
-    CHANGER_NAME_SCHEMA, PRIV_TAPE_AUDIT, PRIV_TAPE_READ,
+    Authid, CHANGER_NAME_SCHEMA, ChangerListEntry, LtoTapeDrive, MtxEntryKind, MtxStatusEntry,
+    PRIV_TAPE_AUDIT, PRIV_TAPE_READ, ScsiTapeChanger,
 };
 use pbs_config::CachedUserInfo;
 use pbs_tape::{
-    linux_list_drives::{linux_tape_changer_list, lookup_device_identification},
     ElementStatus,
+    linux_list_drives::{linux_tape_changer_list, lookup_device_identification},
 };
 
 use crate::tape::{
-    changer::{mtx_status_to_online_set, OnlineStatusMap, ScsiMediaChange},
-    drive::get_tape_device_state,
     Inventory, TAPE_STATUS_DIR,
+    changer::{OnlineStatusMap, ScsiMediaChange, mtx_status_to_online_set},
+    drive::get_tape_device_state,
 };
 
 #[api(

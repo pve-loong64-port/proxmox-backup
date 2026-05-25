@@ -1,11 +1,11 @@
 use std::io::Write;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
 use proxmox_acme::async_client::AcmeClient;
 use proxmox_acme_api::{AcmeAccountName, DnsPluginCore, KNOWN_ACME_DIRECTORIES};
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_sys::fs::file_get_contents;
 

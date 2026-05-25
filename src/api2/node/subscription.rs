@@ -1,8 +1,8 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
-use proxmox_http::client::Client;
 use proxmox_http::HttpOptions;
+use proxmox_http::client::Client;
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 use proxmox_subscription::{
@@ -15,8 +15,8 @@ use pbs_api_types::{Authid, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY};
 use crate::tools::{DEFAULT_USER_AGENT_STRING, PROXMOX_BACKUP_TCP_KEEPALIVE_TIME};
 
 use pbs_buildcfg::PROXMOX_BACKUP_SUBSCRIPTION_FN;
-use pbs_config::node;
 use pbs_config::CachedUserInfo;
+use pbs_config::node;
 
 const PRODUCT_URL: &str = "https://www.proxmox.com/en/proxmox-backup-server/pricing";
 const APT_AUTH_FN: &str = "/etc/apt/auth.conf.d/pbs.conf";
@@ -125,7 +125,9 @@ pub fn check_subscription(params: UpdateSubscription) -> Result<(), Error> {
     };
 
     if info.is_signed() {
-        bail!("Updating offline key not possible - please remove and re-add subscription key to switch to online key.");
+        bail!(
+            "Updating offline key not possible - please remove and re-add subscription key to switch to online key."
+        );
     }
 
     if !force && info.status == SubscriptionStatus::Active {

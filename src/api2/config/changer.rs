@@ -2,12 +2,12 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, LtoTapeDrive, ScsiTapeChanger, ScsiTapeChangerUpdater, CHANGER_NAME_SCHEMA,
-    PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, SLOT_ARRAY_SCHEMA,
+    Authid, CHANGER_NAME_SCHEMA, LtoTapeDrive, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY,
+    PROXMOX_CONFIG_DIGEST_SCHEMA, SLOT_ARRAY_SCHEMA, ScsiTapeChanger, ScsiTapeChangerUpdater,
 };
 use pbs_config::CachedUserInfo;
 use pbs_tape::linux_list_drives::{check_drive_path, linux_tape_changer_list};

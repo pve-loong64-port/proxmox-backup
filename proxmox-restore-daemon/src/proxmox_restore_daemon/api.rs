@@ -4,11 +4,11 @@ use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use futures::FutureExt;
 use hyper::body::Incoming;
 use hyper::http::request::Parts;
-use hyper::{header, Response, StatusCode};
+use hyper::{Response, StatusCode, header};
 use log::error;
 use serde_json::Value;
 use tokio::sync::Semaphore;
@@ -17,8 +17,8 @@ use pathpatterns::{MatchEntry, MatchPattern, MatchType, Pattern};
 use proxmox_compression::{tar::tar_directory, zip::zip_directory, zstd::ZstdEncoder};
 use proxmox_http::Body;
 use proxmox_router::{
-    list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router,
-    RpcEnvironment, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
+    list_subdirs_api_method,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
@@ -26,7 +26,7 @@ use proxmox_sys::fs::read_subdir;
 
 use pbs_api_types::file_restore::{FileRestoreFormat, RestoreDaemonStatus};
 use pbs_client::pxar::{
-    create_archive, Flags, PxarCreateOptions, PxarWriters, ENCODER_MAX_ENTRIES,
+    ENCODER_MAX_ENTRIES, Flags, PxarCreateOptions, PxarWriters, create_archive,
 };
 use pbs_datastore::catalog::{ArchiveEntry, DirEntryAttribute};
 use pbs_tools::json::required_string_param;
@@ -175,7 +175,7 @@ fn list(
                             // ignore '.' and '..'
                             match path.components().next().unwrap() {
                                 std::path::Component::CurDir | std::path::Component::ParentDir => {
-                                    continue
+                                    continue;
                                 }
                                 _ => {}
                             }

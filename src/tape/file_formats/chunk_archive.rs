@@ -1,13 +1,13 @@
 use std::io::Read;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use endian_trait::Endian;
 
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
 
 use pbs_datastore::DataBlob;
-use pbs_tape::{MediaContentHeader, TapeWrite, PROXMOX_TAPE_BLOCK_SIZE};
+use pbs_tape::{MediaContentHeader, PROXMOX_TAPE_BLOCK_SIZE, TapeWrite};
 
 use crate::tape::file_formats::{
     ChunkArchiveEntryHeader, ChunkArchiveHeader, PROXMOX_BACKUP_CHUNK_ARCHIVE_ENTRY_MAGIC_1_0,

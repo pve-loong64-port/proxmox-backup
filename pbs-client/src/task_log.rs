@@ -1,12 +1,12 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use futures::*;
-use serde_json::{json, Value};
-use tokio::signal::unix::{signal, SignalKind};
+use serde_json::{Value, json};
+use tokio::signal::unix::{SignalKind, signal};
 
 use proxmox_log::info;
 use proxmox_router::cli::format_and_print_result;

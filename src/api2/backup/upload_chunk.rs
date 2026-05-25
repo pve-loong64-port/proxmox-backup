@@ -1,21 +1,21 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::*;
 use hex::FromHex;
 use http_body_util::{BodyDataStream, BodyExt};
 use hyper::body::Incoming;
 use hyper::http::request::Parts;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::{ApiHandler, ApiMethod, ApiResponseFuture, RpcEnvironment};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{BACKUP_ARCHIVE_NAME_SCHEMA, CHUNK_DIGEST_SCHEMA};
-use pbs_datastore::file_formats::{DataBlobHeader, EncryptedDataBlobHeader};
 use pbs_datastore::DataBlob;
+use pbs_datastore::file_formats::{DataBlobHeader, EncryptedDataBlobHeader};
 use pbs_tools::json::{required_integer_param, required_string_param};
 
 use super::environment::*;

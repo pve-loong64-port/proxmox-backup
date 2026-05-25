@@ -4,11 +4,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::future::{self, AbortHandle, Either, FutureExt, TryFutureExt};
 use futures::stream::{Stream, StreamExt, TryStreamExt};
 use openssl::sha::Sha256;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
@@ -16,16 +16,16 @@ use tokio_stream::wrappers::ReceiverStream;
 use pbs_api_types::{
     ArchiveType, BackupArchiveName, BackupDir, BackupNamespace, CATALOG_NAME, MANIFEST_BLOB_NAME,
 };
+use pbs_datastore::PROXMOX_BACKUP_PROTOCOL_ID_V1;
 use pbs_datastore::data_blob::{ChunkInfo, DataBlob, DataChunkBuilder};
 use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::fixed_index::FixedIndexReader;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
-use pbs_datastore::PROXMOX_BACKUP_PROTOCOL_ID_V1;
 use pbs_tools::crypt_config::CryptConfig;
 
 use proxmox_human_byte::HumanByte;
-use proxmox_log::{debug, enabled, info, trace, warn, Level};
+use proxmox_log::{Level, debug, enabled, info, trace, warn};
 use proxmox_time::TimeSpan;
 
 use super::backup_stats::{BackupStats, UploadCounters, UploadStats};
@@ -422,7 +422,9 @@ impl BackupWriter {
                 .iter()
                 .any(|file| file.filename == archive_name.as_ref())
             {
-                info!("Previous manifest does not contain an archive called '{archive_name}', skipping download..");
+                info!(
+                    "Previous manifest does not contain an archive called '{archive_name}', skipping download.."
+                );
             } else {
                 // try, but ignore errors
                 match archive_name.archive_type() {
@@ -905,9 +907,7 @@ impl BackupWriter {
 
                     trace!(
                         "upload new chunk {} ({} bytes, offset {})",
-                        digest_str,
-                        chunk_info.chunk_len,
-                        offset
+                        digest_str, chunk_info.chunk_len, offset
                     );
 
                     let chunk_data = chunk_info.chunk.into_inner();

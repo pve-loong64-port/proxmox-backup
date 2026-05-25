@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Error;
 use futures::stream::TryStreamExt;
-use hyper::{header, Response, StatusCode};
+use hyper::{Response, StatusCode, header};
 
 use proxmox_http::Body;
 use proxmox_router::http_bail;

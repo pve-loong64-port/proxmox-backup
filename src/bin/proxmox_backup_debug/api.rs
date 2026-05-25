@@ -1,13 +1,13 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use hyper::Method;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use std::collections::HashMap;
 
-use proxmox_router::{cli::*, ApiHandler, ApiMethod, RpcEnvironment, SubRoute};
+use proxmox_router::{ApiHandler, ApiMethod, RpcEnvironment, SubRoute, cli::*};
 use proxmox_schema::format::DocumentationFormat;
-use proxmox_schema::{api, ApiType, ParameterSchema, Schema};
+use proxmox_schema::{ApiType, ParameterSchema, Schema, api};
 
 use pbs_api_types::PROXMOX_UPID_REGEX;
 use pbs_client::view_task_result;

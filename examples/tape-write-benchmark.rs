@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use pbs_tape::TapeWrite;
 use proxmox_backup::tape::drive::{LtoTapeHandle, TapeDriver};
 

@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use openssl::pkey::PKey;
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
@@ -7,8 +7,8 @@ use tracing::info;
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_MODIFY};
 use proxmox_acme_api::AcmeDomain;
 use proxmox_rest_server::WorkerTask;
-use proxmox_router::list_subdirs_api_method;
 use proxmox_router::SubdirMap;
+use proxmox_router::list_subdirs_api_method;
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 

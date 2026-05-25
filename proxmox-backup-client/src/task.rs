@@ -1,5 +1,5 @@
 use anyhow::Error;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::cli::*;
 use proxmox_schema::api;
@@ -10,7 +10,7 @@ use pbs_tools::json::required_string_param;
 
 use pbs_api_types::UPID;
 
-use crate::{complete_repository, connect, extract_repository_from_value, BackupRepositoryArgs};
+use crate::{BackupRepositoryArgs, complete_repository, connect, extract_repository_from_value};
 
 #[api(
     input: {

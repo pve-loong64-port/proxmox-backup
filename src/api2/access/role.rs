@@ -2,12 +2,12 @@
 
 use anyhow::Error;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::{Permission, Router};
 use proxmox_schema::api;
 
-use pbs_api_types::{Role, PRIVILEGES, SINGLE_LINE_COMMENT_SCHEMA};
+use pbs_api_types::{PRIVILEGES, Role, SINGLE_LINE_COMMENT_SCHEMA};
 use pbs_config::acl::ROLE_NAMES;
 
 #[api(

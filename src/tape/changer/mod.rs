@@ -7,13 +7,13 @@ pub use online_status_map::*;
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
-use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_read_optional_string, replace_file};
 
 use pbs_api_types::{LtoTapeDrive, ScsiTapeChanger};
 
-use pbs_tape::{linux_list_drives::open_lto_tape_device, sg_pt_changer, ElementStatus, MtxStatus};
+use pbs_tape::{ElementStatus, MtxStatus, linux_list_drives::open_lto_tape_device, sg_pt_changer};
 
 use crate::tape::drive::{LtoTapeHandle, TapeDriver};
 

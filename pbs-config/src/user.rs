@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
@@ -10,7 +10,7 @@ use pbs_api_types::{ApiToken, Authid, User, Userid};
 
 use crate::ConfigVersionCache;
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

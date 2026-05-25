@@ -1,16 +1,16 @@
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use pbs_api_types::SyncDirection;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, SyncJobConfig, SyncJobConfigUpdater, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ,
-    PRIV_REMOTE_AUDIT, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE, PRIV_REMOTE_READ,
-    PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY,
+    PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ, PRIV_REMOTE_AUDIT, PRIV_REMOTE_DATASTORE_BACKUP,
+    PRIV_REMOTE_DATASTORE_PRUNE, PRIV_REMOTE_READ, PROXMOX_CONFIG_DIGEST_SCHEMA, SyncJobConfig,
+    SyncJobConfigUpdater,
 };
 use pbs_config::sync;
 

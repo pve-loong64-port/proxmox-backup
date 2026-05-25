@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use proxmox_sys::fs::CreateOptions;
 

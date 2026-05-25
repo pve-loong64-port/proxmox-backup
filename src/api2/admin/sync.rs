@@ -1,25 +1,25 @@
 //! Datastore Synchronization Job Management
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use proxmox_router::{
-    list_subdirs_api_method, ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType,
-    SubdirMap,
+    ApiMethod, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    list_subdirs_api_method,
 };
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, SyncDirection, SyncJobConfig, SyncJobStatus, DATASTORE_SCHEMA, JOB_ID_SCHEMA,
+    Authid, DATASTORE_SCHEMA, JOB_ID_SCHEMA, SyncDirection, SyncJobConfig, SyncJobStatus,
 };
-use pbs_config::sync;
 use pbs_config::CachedUserInfo;
+use pbs_config::sync;
 
 use crate::{
     api2::config::sync::{check_sync_job_modify_access, check_sync_job_read_access},
-    server::jobstate::{compute_schedule_status, Job},
+    server::jobstate::{Job, compute_schedule_status},
     server::sync::do_sync_job,
 };
 

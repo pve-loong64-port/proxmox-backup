@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
 use proxmox_router::{ApiMethod, Permission, Router, SubRoute, SubdirMap};
 use proxmox_schema::*;

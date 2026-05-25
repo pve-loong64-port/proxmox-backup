@@ -9,22 +9,23 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::{future::FutureExt, select};
 use hyper::http::StatusCode;
 use pbs_config::BackupLockGuard;
 use serde_json::json;
-use tracing::{info, warn, Level};
+use tracing::{Level, info, warn};
 
 use proxmox_human_byte::HumanByte;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::HttpError;
-use proxmox_sys::fs::{replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, replace_file};
 
 use pbs_api_types::{
-    Authid, BackupDir, BackupGroup, BackupNamespace, CryptMode, GroupListItem, SnapshotListItem,
-    SyncDirection, SyncJobConfig, VerifyState, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
-    MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_SYS_MODIFY,
+    Authid, BackupDir, BackupGroup, BackupNamespace, CLIENT_LOG_BLOB_NAME, CryptMode,
+    GroupListItem, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP,
+    PRIV_DATASTORE_READ, PRIV_SYS_MODIFY, SnapshotListItem, SyncDirection, SyncJobConfig,
+    VerifyState,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_config::CachedUserInfo;
@@ -39,8 +40,8 @@ use pbs_tools::sha::sha256;
 
 use crate::backup::ListAccessibleBackupGroups;
 use crate::server::jobstate::Job;
-use crate::server::pull::{pull_store, PullParameters};
-use crate::server::push::{push_store, PushParameters};
+use crate::server::pull::{PullParameters, pull_store};
+use crate::server::push::{PushParameters, push_store};
 use crate::tools::backup_info_to_snapshot_list_item;
 
 #[derive(Default)]
@@ -384,11 +385,17 @@ impl SyncSource for RemoteSource {
                 Some(HttpError { code, message }) => match code {
                     &StatusCode::NOT_FOUND => {
                         if self.ns.is_root() && max_depth.is_none() {
-                            warn!("Could not query remote for namespaces (404) -> temporarily switching to backwards-compat mode");
-                            warn!("Either make backwards-compat mode explicit (max-depth == 0) or upgrade remote system.");
+                            warn!(
+                                "Could not query remote for namespaces (404) -> temporarily switching to backwards-compat mode"
+                            );
+                            warn!(
+                                "Either make backwards-compat mode explicit (max-depth == 0) or upgrade remote system."
+                            );
                             max_depth.replace(0);
                         } else {
-                            bail!("Remote namespace set/recursive sync requested, but remote does not support namespaces.")
+                            bail!(
+                                "Remote namespace set/recursive sync requested, but remote does not support namespaces."
+                            )
                         }
 
                         return Ok(vec![self.ns.clone()]);

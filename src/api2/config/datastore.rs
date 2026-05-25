@@ -2,28 +2,28 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use tracing::{info, warn};
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment, RpcEnvironmentType};
-use proxmox_schema::{api, param_bail, ApiType};
+use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType, http_bail};
+use proxmox_schema::{ApiType, api, param_bail};
 use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType, DatastoreNotify,
-    DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType, PruneJobConfig,
-    PruneJobOptions, DATASTORE_SCHEMA, PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, UPID_SCHEMA,
+    Authid, DATASTORE_SCHEMA, DataStoreConfig, DataStoreConfigUpdater, DatastoreBackendType,
+    DatastoreNotify, DatastoreTuning, KeepOptions, MaintenanceMode, MaintenanceType,
+    PRIV_DATASTORE_ALLOCATE, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY, PRIV_SYS_MODIFY,
+    PROXMOX_CONFIG_DIGEST_SCHEMA, PruneJobConfig, PruneJobOptions, UPID_SCHEMA,
 };
 use pbs_config::BackupLockGuard;
 use pbs_datastore::chunk_store::ChunkStore;
 
 use crate::api2::admin::datastore::do_mount_device;
 use crate::api2::admin::prune::list_prune_jobs;
-use crate::api2::admin::sync::{list_config_sync_jobs, ListSyncDirection};
+use crate::api2::admin::sync::{ListSyncDirection, list_config_sync_jobs};
 use crate::api2::admin::verify::list_verification_jobs;
 use crate::api2::config::prune::{delete_prune_job, do_create_prune_job, has_prune_job};
 use crate::api2::config::sync::delete_sync_job;
@@ -31,9 +31,9 @@ use crate::api2::config::tape_backup_job::{delete_tape_backup_job, list_tape_bac
 use crate::api2::config::verify::delete_verification_job;
 use pbs_config::CachedUserInfo;
 
-use pbs_datastore::{get_datastore_mount_status, DataStore, S3_DATASTORE_IN_USE_MARKER};
+use pbs_datastore::{DataStore, S3_DATASTORE_IN_USE_MARKER, get_datastore_mount_status};
 use proxmox_rest_server::WorkerTask;
-use proxmox_s3_client::{S3ObjectKey, S3_HTTP_REQUEST_TIMEOUT};
+use proxmox_s3_client::{S3_HTTP_REQUEST_TIMEOUT, S3ObjectKey};
 
 use crate::server::jobstate;
 use crate::tools::disks::unmount_by_mountpoint;

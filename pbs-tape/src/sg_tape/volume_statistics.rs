@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::os::unix::io::AsRawFd;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 
 use proxmox_io::ReadExt;

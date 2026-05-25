@@ -6,14 +6,14 @@ use anyhow::Error;
 use std::collections::HashSet;
 
 use pbs_api_types::{
-    Authid, BackupContent, CryptMode, Operation, SnapshotListItem, SnapshotVerifyState,
-    MANIFEST_BLOB_NAME,
+    Authid, BackupContent, CryptMode, MANIFEST_BLOB_NAME, Operation, SnapshotListItem,
+    SnapshotVerifyState,
 };
-use proxmox_http::{client::Client, HttpOptions, ProxyConfig};
+use proxmox_http::{HttpOptions, ProxyConfig, client::Client};
 
+use pbs_datastore::DataStoreLookup;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::manifest::BackupManifest;
-use pbs_datastore::DataStoreLookup;
 
 pub mod disks;
 pub mod fs;

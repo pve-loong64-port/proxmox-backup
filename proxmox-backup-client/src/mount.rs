@@ -5,15 +5,15 @@ use std::os::unix::io::{AsRawFd, OwnedFd};
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{StreamExt, TryStreamExt};
-use nix::unistd::{fork, ForkResult};
+use nix::unistd::{ForkResult, fork};
 use serde_json::Value;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 
-use proxmox_router::{cli::*, ApiHandler, ApiMethod, RpcEnvironment};
+use proxmox_router::{ApiHandler, ApiMethod, RpcEnvironment, cli::*};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 

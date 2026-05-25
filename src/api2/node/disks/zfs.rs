@@ -1,18 +1,18 @@
-use anyhow::{bail, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, bail};
+use serde_json::{Value, json};
 use tracing::{error, info};
 
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    DataStoreConfig, ZfsCompressionType, ZfsRaidLevel, ZpoolListItem, DATASTORE_SCHEMA,
-    DISK_ARRAY_SCHEMA, DISK_LIST_SCHEMA, NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA,
-    ZFS_ASHIFT_SCHEMA, ZPOOL_NAME_SCHEMA,
+    DATASTORE_SCHEMA, DISK_ARRAY_SCHEMA, DISK_LIST_SCHEMA, DataStoreConfig, NODE_SCHEMA,
+    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA, ZFS_ASHIFT_SCHEMA, ZPOOL_NAME_SCHEMA,
+    ZfsCompressionType, ZfsRaidLevel, ZpoolListItem,
 };
 
 use crate::tools::disks::{
-    parse_zpool_status_config_tree, vdev_list_to_tree, zpool_list, zpool_status, DiskUsageType,
+    DiskUsageType, parse_zpool_status_config_tree, vdev_list_to_tree, zpool_list, zpool_status,
 };
 
 use proxmox_rest_server::WorkerTask;

@@ -2,12 +2,12 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, VerificationJobConfig, VerificationJobConfigUpdater, JOB_ID_SCHEMA,
-    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_VERIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_VERIFY,
+    PROXMOX_CONFIG_DIGEST_SCHEMA, VerificationJobConfig, VerificationJobConfigUpdater,
 };
 use pbs_config::verify;
 

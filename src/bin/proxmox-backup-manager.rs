@@ -2,20 +2,20 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::str::FromStr;
 
-use anyhow::{format_err, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, format_err};
+use serde_json::{Value, json};
 
 use pbs_api_types::percent_encoding::percent_encode_component;
 use pbs_api_types::{
-    BackupNamespace, GroupFilter, RateLimitConfig, SyncDirection, SyncJobConfig, DATASTORE_SCHEMA,
-    GROUP_FILTER_LIST_SCHEMA, IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA,
-    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA,
-    SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA, TRANSFER_LAST_SCHEMA, UPID_SCHEMA,
-    VERIFICATION_OUTDATED_AFTER_SCHEMA, VERIFY_JOB_READ_THREADS_SCHEMA,
-    VERIFY_JOB_VERIFY_THREADS_SCHEMA,
+    BackupNamespace, DATASTORE_SCHEMA, GROUP_FILTER_LIST_SCHEMA, GroupFilter,
+    IGNORE_VERIFIED_BACKUPS_SCHEMA, NS_MAX_DEPTH_SCHEMA, REMOTE_ID_SCHEMA,
+    REMOVE_VANISHED_BACKUPS_SCHEMA, RESYNC_CORRUPT_SCHEMA, RateLimitConfig,
+    SYNC_ENCRYPTED_ONLY_SCHEMA, SYNC_VERIFIED_ONLY_SCHEMA, SyncDirection, SyncJobConfig,
+    TRANSFER_LAST_SCHEMA, UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
+    VERIFY_JOB_READ_THREADS_SCHEMA, VERIFY_JOB_VERIFY_THREADS_SCHEMA,
 };
 use proxmox_rest_server::wait_for_local_worker;
-use proxmox_router::{cli::*, RpcEnvironment};
+use proxmox_router::{RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_sys::fs::CreateOptions;
 

@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use proxmox_notify::api::Target;
 use proxmox_notify::schema::ENTITY_NAME_SCHEMA;
-use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
+use proxmox_router::{Permission, Router, RpcEnvironment, SubdirMap, list_subdirs_api_method};
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 

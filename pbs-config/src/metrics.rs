@@ -8,7 +8,7 @@ use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlug
 
 use pbs_api_types::{InfluxDbHttp, InfluxDbUdp, METRIC_SERVER_ID_SCHEMA};
 
-use crate::{open_backup_lockfile, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

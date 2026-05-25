@@ -19,7 +19,7 @@ pub mod tape;
 pub mod types;
 pub mod version;
 
-use proxmox_router::{list_subdirs_api_method, Router, SubdirMap};
+use proxmox_router::{Router, SubdirMap, list_subdirs_api_method};
 
 #[sortable]
 const SUBDIRS: SubdirMap = &sorted!([

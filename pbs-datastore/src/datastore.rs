@@ -7,11 +7,11 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use http_body_util::BodyExt;
-use hyper::body::Bytes;
 use hyper::Method;
-use nix::unistd::{unlinkat, UnlinkatFlags};
+use hyper::body::Bytes;
+use nix::unistd::{UnlinkatFlags, unlinkat};
 use pbs_tools::lru_cache::LruCache;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
@@ -24,17 +24,17 @@ use proxmox_s3_client::{
 use proxmox_schema::ApiType;
 
 use proxmox_sys::error::SysError;
-use proxmox_sys::fs::{file_read_optional_string, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_read_optional_string, replace_file};
 use proxmox_sys::linux::procfs::MountInfo;
 use proxmox_sys::process_locker::{ProcessLockExclusiveGuard, ProcessLockSharedGuard};
-use proxmox_time::{epoch_i64, TimeSpan};
+use proxmox_time::{TimeSpan, epoch_i64};
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
-    DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MaintenanceMode,
-    MaintenanceType, Operation, S3Statistics, MAX_NAMESPACE_DEPTH, UPID,
+    DatastoreTuning, GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH,
+    MaintenanceMode, MaintenanceType, Operation, S3Statistics, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
@@ -310,13 +310,19 @@ impl Drop for DataStore {
                             .is_some_and(|m| m.clear_from_cache()),
                         Err(err) => {
                             // datastore removed from config; evict cached entry if available (without checking maintenance mode)
-                            log::warn!("DataStore::drop: datastore '{}' missing from datastore.cfg; evicting cached instance: {err}", self.name());
+                            log::warn!(
+                                "DataStore::drop: datastore '{}' missing from datastore.cfg; evicting cached instance: {err}",
+                                self.name()
+                            );
                             true
                         }
                     }
                 }
                 Err(err) => {
-                    log::warn!("DataStore::drop: failed to load datastore.cfg for '{}'; skipping cache-eviction: {err}", self.name());
+                    log::warn!(
+                        "DataStore::drop: failed to load datastore.cfg for '{}'; skipping cache-eviction: {err}",
+                        self.name()
+                    );
                     false
                 }
             };
@@ -1817,7 +1823,7 @@ impl DataStore {
             Err(err) => {
                 return Err(BackupGroupOpError::Hard(format_err!(
                     "unable to create backup group {full_path:?} - {err}"
-                )))
+                )));
             }
         };
 
@@ -2075,7 +2081,7 @@ impl DataStore {
             // ignore vanished files
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(err) => {
-                return Err(Error::from(err).context(format!("can't open file '{absolute_path:?}'")))
+                return Err(Error::from(err).context(format!("can't open file '{absolute_path:?}'")));
             }
         };
 
@@ -2257,7 +2263,9 @@ impl DataStore {
                             )?;
 
                             if !unprocessed_index_list.remove(&path) {
-                                info!("Encountered new index file '{path:?}', increment total index file count");
+                                info!(
+                                    "Encountered new index file '{path:?}', increment total index file count"
+                                );
                                 index_count += 1;
                             }
 

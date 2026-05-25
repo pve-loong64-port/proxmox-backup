@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
 use std::sync::LazyLock;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 
 use proxmox_io::ReadExt;
 
 use pbs_api_types::MamAttribute;
 
-use crate::sgutils2::{alloc_page_aligned_buffer, SgRaw};
+use crate::sgutils2::{SgRaw, alloc_page_aligned_buffer};
 
 use super::TapeAlertFlags;
 

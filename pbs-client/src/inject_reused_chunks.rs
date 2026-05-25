@@ -3,8 +3,8 @@ use std::pin::Pin;
 use std::sync::mpsc;
 use std::task::{Context, Poll};
 
-use anyhow::{anyhow, Error};
-use futures::{ready, Stream};
+use anyhow::{Error, anyhow};
+use futures::{Stream, ready};
 use pin_project_lite::pin_project;
 
 use crate::backup_stats::UploadCounters;
@@ -97,7 +97,7 @@ where
                     cmp::Ordering::Greater => *this.next_injection = Some(inject),
                     // incoming new chunks and injections didn't line up?
                     cmp::Ordering::Less => {
-                        return Poll::Ready(Some(Err(anyhow!("invalid injection boundary"))))
+                        return Poll::Ready(Some(Err(anyhow!("invalid injection boundary"))));
                     }
                 }
             }

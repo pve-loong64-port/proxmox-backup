@@ -2,16 +2,16 @@
 
 use std::sync::{Arc, LazyLock, RwLock};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_router::UserInformation;
 use proxmox_section_config::SectionConfigData;
 use proxmox_time::epoch_i64;
 
-use pbs_api_types::{privs_to_priv_names, ApiToken, Authid, User, Userid, ROLE_ADMIN};
+use pbs_api_types::{ApiToken, Authid, ROLE_ADMIN, User, Userid, privs_to_priv_names};
 
-use crate::acl::{AclTree, ROLE_NAMES};
 use crate::ConfigVersionCache;
+use crate::acl::{AclTree, ROLE_NAMES};
 
 /// Cache User/Group/Token/Acl configuration data for fast permission tests
 pub struct CachedUserInfo {

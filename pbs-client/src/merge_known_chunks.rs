@@ -2,7 +2,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use anyhow::Error;
-use futures::{ready, Stream};
+use futures::{Stream, ready};
 use pin_project_lite::pin_project;
 
 use pbs_datastore::data_blob::ChunkInfo;

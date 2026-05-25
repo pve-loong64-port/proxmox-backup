@@ -4,11 +4,11 @@ use anyhow::Error;
 use tracing::{info, warn};
 
 use pbs_api_types::{
-    print_store_and_ns, Authid, KeepOptions, Operation, PruneJobOptions, MAX_NAMESPACE_DEPTH,
-    PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE,
+    Authid, KeepOptions, MAX_NAMESPACE_DEPTH, Operation, PRIV_DATASTORE_MODIFY,
+    PRIV_DATASTORE_PRUNE, PruneJobOptions, print_store_and_ns,
 };
-use pbs_datastore::prune::{compute_prune_info, PruneMark};
 use pbs_datastore::DataStore;
+use pbs_datastore::prune::{PruneMark, compute_prune_info};
 use proxmox_rest_server::WorkerTask;
 
 use crate::backup::ListAccessibleBackupGroups;

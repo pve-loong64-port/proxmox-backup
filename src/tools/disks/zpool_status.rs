@@ -1,12 +1,12 @@
 use std::mem::{replace, take};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use pbs_tools::nom::{
-    multispace0, multispace1, notspace1, parse_complete, parse_error, parse_failure, parse_u64,
-    IResult,
+    IResult, multispace0, multispace1, notspace1, parse_complete, parse_error, parse_failure,
+    parse_u64,
 };
 
 use nom::{

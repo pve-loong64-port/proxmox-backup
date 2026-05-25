@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::path::PathBuf;
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use tokio::task::spawn_blocking;
 
 /// `proxmox_sys::fs::fs_into` wrapped in a `spawn_blocking` call.

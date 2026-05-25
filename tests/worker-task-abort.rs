@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use tracing::info;
 
 use proxmox_lang::try_block;

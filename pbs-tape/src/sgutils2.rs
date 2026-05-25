@@ -10,7 +10,7 @@ use std::ffi::CStr;
 use std::os::unix::io::AsRawFd;
 use std::ptr::NonNull;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 use libc::{c_char, c_int};
 use serde::{Deserialize, Serialize};
@@ -507,7 +507,7 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
         match res {
             SCSI_PT_DO_START_OK => { /* Ok */ }
             SCSI_PT_DO_BAD_PARAMS => {
-                return Err(format_err!("do_scsi_pt failed - bad pass through setup").into())
+                return Err(format_err!("do_scsi_pt failed - bad pass through setup").into());
             }
             SCSI_PT_DO_TIMEOUT => return Err(format_err!("do_scsi_pt failed - timeout").into()),
             code if code < 0 => {
@@ -516,7 +516,7 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
                 return Err(format_err!("do_scsi_pt failed with err {}", err).into());
             }
             unknown => {
-                return Err(format_err!("do_scsi_pt failed: unknown error {}", unknown).into())
+                return Err(format_err!("do_scsi_pt failed: unknown error {}", unknown).into());
             }
         }
 

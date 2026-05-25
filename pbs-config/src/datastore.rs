@@ -6,9 +6,9 @@ use anyhow::Error;
 use proxmox_schema::{AllOfSchema, ApiType};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use pbs_api_types::{DataStoreConfig, DatastoreBackendConfig, DATASTORE_SCHEMA};
+use pbs_api_types::{DATASTORE_SCHEMA, DataStoreConfig, DatastoreBackendConfig};
 
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard, ConfigVersionCache};
+use crate::{BackupLockGuard, ConfigVersionCache, open_backup_lockfile, replace_backup_config};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 

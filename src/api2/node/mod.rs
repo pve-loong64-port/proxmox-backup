@@ -3,14 +3,14 @@
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::future::{FutureExt, TryFutureExt};
+use hyper::Request;
 use hyper::body::Incoming;
 use hyper::http::request::Parts;
 use hyper::upgrade::Upgraded;
-use hyper::Request;
 use hyper_util::rt::TokioIo;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use proxmox_auth_api::ticket::{Empty, Ticket};
@@ -25,7 +25,7 @@ use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fd::fd_change_cloexec;
 
-use pbs_api_types::{NodeShellTicket, ServerIdentity, NODE_SCHEMA, PRIV_SYS_CONSOLE};
+use pbs_api_types::{NODE_SCHEMA, NodeShellTicket, PRIV_SYS_CONSOLE, ServerIdentity};
 use tracing::{info, warn};
 
 use crate::auth::{private_auth_keyring, public_auth_keyring};

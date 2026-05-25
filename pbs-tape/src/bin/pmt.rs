@@ -12,14 +12,14 @@
 /// - support tape alert flags
 /// - support volume statistics
 /// - read cartridge memory
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
-use proxmox_router::cli::*;
 use proxmox_router::RpcEnvironment;
-use proxmox_schema::{api, ArraySchema, IntegerSchema, Schema, StringSchema};
+use proxmox_router::cli::*;
+use proxmox_schema::{ArraySchema, IntegerSchema, Schema, StringSchema, api};
 
-use pbs_api_types::{LtoTapeDrive, DRIVE_NAME_SCHEMA, LTO_DRIVE_PATH_SCHEMA};
+use pbs_api_types::{DRIVE_NAME_SCHEMA, LTO_DRIVE_PATH_SCHEMA, LtoTapeDrive};
 use pbs_config::drive::complete_drive_name;
 use pbs_tape::{
     linux_list_drives::{complete_drive_path, lto_tape_device_list, open_lto_tape_device},

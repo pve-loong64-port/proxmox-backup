@@ -6,14 +6,14 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::*;
 use http_body_util::BodyExt;
 use hyper::http::request::Parts;
-use hyper::{body::Incoming, header, Response, StatusCode};
+use hyper::{Response, StatusCode, body::Incoming, header};
 use proxmox_http::Body;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::{info, warn};
 
@@ -22,31 +22,31 @@ use proxmox_async::{io::AsyncChannelWriter, stream::AsyncReaderStream};
 use proxmox_compression::zstd::ZstdEncoder;
 use proxmox_log::LogContext;
 use proxmox_router::{
-    http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
-    Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment,
+    RpcEnvironmentType, SubdirMap, http_err, list_subdirs_api_method,
 };
 use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
-use proxmox_sys::fs::{file_read_firstline, file_read_optional_string, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_read_firstline, file_read_optional_string};
 use proxmox_time::CalendarEvent;
 use proxmox_worker_task::WorkerTaskContext;
 
-use pxar::accessor::aio::Accessor;
 use pxar::EntryKind;
+use pxar::accessor::aio::Accessor;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupArchiveName,
-    BackupContent, BackupGroupDeleteStats, BackupNamespace, BackupType, Counts, CryptMode,
-    DataStoreConfig, DataStoreListItem, DataStoreMountStatus, DataStoreStatus,
-    DatastoreBackendType, GarbageCollectionJobStatus, GroupListItem, JobScheduleStatus,
-    KeepOptions, MaintenanceMode, MaintenanceType, Operation, PruneJobOptions, SnapshotListItem,
-    SyncJobConfig, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CATALOG_NAME, CLIENT_LOG_BLOB_NAME, DATASTORE_SCHEMA,
-    IGNORE_VERIFIED_BACKUPS_SCHEMA, MAX_NAMESPACE_DEPTH, NS_MAX_DEPTH_SCHEMA, PRIV_DATASTORE_AUDIT,
+    ArchiveType, Authid, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, BackupArchiveName, BackupContent,
+    BackupGroupDeleteStats, BackupNamespace, BackupType, CATALOG_NAME, CLIENT_LOG_BLOB_NAME,
+    Counts, CryptMode, DATASTORE_SCHEMA, DataStoreConfig, DataStoreListItem, DataStoreMountStatus,
+    DataStoreStatus, DatastoreBackendType, GarbageCollectionJobStatus, GroupListItem,
+    IGNORE_VERIFIED_BACKUPS_SCHEMA, JobScheduleStatus, KeepOptions, MAX_NAMESPACE_DEPTH,
+    MaintenanceMode, MaintenanceType, NS_MAX_DEPTH_SCHEMA, Operation, PRIV_DATASTORE_AUDIT,
     PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_PRUNE, PRIV_DATASTORE_READ,
-    PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, UPID, UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA,
-    VERIFY_JOB_READ_THREADS_SCHEMA, VERIFY_JOB_VERIFY_THREADS_SCHEMA,
+    PRIV_DATASTORE_VERIFY, PRIV_SYS_MODIFY, PruneJobOptions, SnapshotListItem, SyncJobConfig, UPID,
+    UPID_SCHEMA, VERIFICATION_OUTDATED_AFTER_SCHEMA, VERIFY_JOB_READ_THREADS_SCHEMA,
+    VERIFY_JOB_VERIFY_THREADS_SCHEMA, print_ns_and_snapshot, print_store_and_ns,
 };
 use pbs_client::pxar::{create_tar, create_zip};
 use pbs_config::CachedUserInfo;
@@ -61,16 +61,16 @@ use pbs_datastore::index::IndexFile;
 use pbs_datastore::manifest::BackupManifest;
 use pbs_datastore::prune::compute_prune_info;
 use pbs_datastore::{
-    check_backup_owner, ensure_datastore_is_mounted, task_tracking, BackupDir, DataStore,
-    LocalChunkReader, StoreProgress,
+    BackupDir, DataStore, LocalChunkReader, StoreProgress, check_backup_owner,
+    ensure_datastore_is_mounted, task_tracking,
 };
 use pbs_tools::json::required_string_param;
-use proxmox_rest_server::{formatter, worker_is_active, WorkerTask};
+use proxmox_rest_server::{WorkerTask, formatter, worker_is_active};
 
 use crate::api2::backup::optional_ns_param;
 use crate::api2::node::rrd::create_value_from_rrd;
-use crate::backup::{check_ns_privs_full, ListAccessibleBackupGroups, VerifyWorker, NS_PRIVS_OK};
-use crate::server::jobstate::{compute_schedule_status, Job, JobState};
+use crate::backup::{ListAccessibleBackupGroups, NS_PRIVS_OK, VerifyWorker, check_ns_privs_full};
+use crate::server::jobstate::{Job, JobState, compute_schedule_status};
 use crate::tools::{
     backup_info_to_snapshot_list_item, get_all_snapshot_files, lookup_with, read_backup_index,
 };

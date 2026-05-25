@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -11,25 +11,25 @@ use proxmox_schema::api;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, Authid, MediaPoolConfig, Operation,
-    TapeBackupJobConfig, TapeBackupJobSetup, TapeBackupJobStatus, JOB_ID_SCHEMA,
-    PRIV_DATASTORE_READ, PRIV_TAPE_AUDIT, PRIV_TAPE_WRITE, UPID_SCHEMA,
+    Authid, JOB_ID_SCHEMA, MediaPoolConfig, Operation, PRIV_DATASTORE_READ, PRIV_TAPE_AUDIT,
+    PRIV_TAPE_WRITE, TapeBackupJobConfig, TapeBackupJobSetup, TapeBackupJobStatus, UPID_SCHEMA,
+    print_ns_and_snapshot, print_store_and_ns,
 };
 
 use pbs_config::CachedUserInfo;
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::{DataStore, StoreProgress};
 
-use crate::tape::{assert_datastore_type, TapeNotificationMode};
+use crate::tape::{TapeNotificationMode, assert_datastore_type};
 use crate::{
     server::{
-        jobstate::{compute_schedule_status, Job},
         TapeBackupJobSummary,
+        jobstate::{Job, compute_schedule_status},
     },
     tape::{
-        changer::update_changer_online_status,
-        drive::{lock_tape_device, media_changer, set_tape_device_state, TapeLockError},
         Inventory, MediaPool, PoolWriter, TAPE_STATUS_DIR,
+        changer::update_changer_online_status,
+        drive::{TapeLockError, lock_tape_device, media_changer, set_tape_device_state},
     },
 };
 

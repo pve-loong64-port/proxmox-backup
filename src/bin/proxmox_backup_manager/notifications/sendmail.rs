@@ -2,7 +2,7 @@ use anyhow::Error;
 use proxmox_notify::schema::ENTITY_NAME_SCHEMA;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
 use proxmox_backup::api2;

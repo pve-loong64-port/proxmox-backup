@@ -1,12 +1,12 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::pin::pin;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use hyper::Method;
 use tokio::join;
 
@@ -14,12 +14,12 @@ use pbs_api_types::{
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, Operation, S3Statistics,
 };
 use proxmox_lang::try_block;
-use proxmox_network_api::{get_network_interfaces, IpLink};
+use proxmox_network_api::{IpLink, get_network_interfaces};
 use proxmox_s3_client::SharedRequestCounters;
 use proxmox_sys::fs::FileSystemInformation;
 use proxmox_sys::linux::procfs::{Loadavg, ProcFsMemInfo, ProcFsNetDev, ProcFsStat};
 
-use crate::tools::disks::{zfs_dataset_stats, BlockDevStat, DiskManage};
+use crate::tools::disks::{BlockDevStat, DiskManage, zfs_dataset_stats};
 use pbs_datastore::S3_CLIENT_REQUEST_COUNTER_BASE_PATH;
 
 mod metric_server;

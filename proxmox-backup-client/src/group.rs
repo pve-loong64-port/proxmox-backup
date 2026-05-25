@@ -1,14 +1,14 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
 use proxmox_router::cli::{
-    extract_output_format, CliCommand, CliCommandMap, Confirmation, OUTPUT_FORMAT,
+    CliCommand, CliCommandMap, Confirmation, OUTPUT_FORMAT, extract_output_format,
 };
 use proxmox_schema::api;
 
 use crate::{
-    complete_backup_group, complete_namespace, complete_repository, merge_group_into,
-    optional_ns_param, record_repository, BackupTargetArgs,
+    BackupTargetArgs, complete_backup_group, complete_namespace, complete_repository,
+    merge_group_into, optional_ns_param, record_repository,
 };
 use pbs_api_types::{BackupGroup, BackupNamespace};
 use pbs_client::tools::{connect, remove_repository_from_value};

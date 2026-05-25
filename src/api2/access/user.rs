@@ -1,8 +1,8 @@
 //! User Management
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, SubdirMap};
@@ -11,12 +11,11 @@ use proxmox_section_config::SectionConfigData;
 use proxmox_tfa::api::TfaConfig;
 
 use pbs_api_types::{
-    ApiToken, Authid, Tokenname, User, UserUpdater, UserWithTokens, Userid, ENABLE_USER_SCHEMA,
-    EXPIRE_USER_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY,
-    PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, REGENERATE_TOKEN_SCHEMA,
-    SINGLE_LINE_COMMENT_SCHEMA,
+    ApiToken, Authid, ENABLE_USER_SCHEMA, EXPIRE_USER_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA,
+    PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT, PROXMOX_CONFIG_DIGEST_SCHEMA, REGENERATE_TOKEN_SCHEMA,
+    SINGLE_LINE_COMMENT_SCHEMA, Tokenname, User, UserUpdater, UserWithTokens, Userid,
 };
-use pbs_config::{acl::AclTree, token_shadow, CachedUserInfo};
+use pbs_config::{CachedUserInfo, acl::AclTree, token_shadow};
 
 fn new_user_with_tokens(user: User, tfa: &TfaConfig) -> UserWithTokens {
     UserWithTokens {

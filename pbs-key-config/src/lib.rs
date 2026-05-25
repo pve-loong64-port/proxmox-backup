@@ -2,13 +2,13 @@ use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::path::Path;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use nix::sys::stat::Mode;
 use nix::unistd::{Gid, Uid};
 use serde::{Deserialize, Serialize};
 
 use proxmox_lang::try_block;
-use proxmox_sys::fs::{file_get_contents, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_contents, replace_file};
 
 use pbs_api_types::{Fingerprint, Kdf, KeyInfo};
 

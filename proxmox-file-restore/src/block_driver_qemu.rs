@@ -2,19 +2,19 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{prelude::*, BufReader, BufWriter, SeekFrom};
+use std::io::{BufReader, BufWriter, SeekFrom, prelude::*};
 use std::os::unix::prelude::OsStrExt;
 use std::path::Path;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use proxmox_sys::fs::lock_file;
 
-use pbs_api_types::{file_restore::FileRestoreFormat, BackupDir, BackupNamespace};
-use pbs_client::{BackupRepository, VsockClient, DEFAULT_VSOCK_PORT};
+use pbs_api_types::{BackupDir, BackupNamespace, file_restore::FileRestoreFormat};
+use pbs_client::{BackupRepository, DEFAULT_VSOCK_PORT, VsockClient};
 use pbs_datastore::catalog::ArchiveEntry;
 
 use super::block_driver::*;

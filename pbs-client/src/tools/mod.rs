@@ -8,8 +8,8 @@ use std::os::unix::io::FromRawFd;
 use std::process::Command;
 use std::sync::OnceLock;
 
-use anyhow::{bail, format_err, Context, Error};
-use serde_json::{json, Value};
+use anyhow::{Context, Error, bail, format_err};
+use serde_json::{Value, json};
 use xdg::BaseDirectories;
 
 use proxmox_http::uri::json_object_to_query;

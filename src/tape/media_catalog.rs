@@ -4,18 +4,18 @@ use std::io::{BufReader, Read, Seek, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 
 use proxmox_sys::fs::read_subdir;
 
 use proxmox_io::{ReadExt, WriteExt};
-use proxmox_sys::fs::{create_path, fchown, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_path, fchown};
 use proxmox_uuid::Uuid;
 
-use pbs_api_types::{parse_ns_and_snapshot, print_ns_and_snapshot, BackupDir, BackupNamespace};
+use pbs_api_types::{BackupDir, BackupNamespace, parse_ns_and_snapshot, print_ns_and_snapshot};
 
-use crate::tape::{file_formats::MediaSetLabel, MediaId};
+use crate::tape::{MediaId, file_formats::MediaSetLabel};
 
 #[derive(Default)]
 pub struct DatastoreContent {

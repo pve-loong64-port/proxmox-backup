@@ -7,7 +7,7 @@ use super::types::*;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use proxmox_sys::{fs::replace_file, fs::CreateOptions};
+use proxmox_sys::{fs::CreateOptions, fs::replace_file};
 
 pub static SERVICE_CONFIG: LazyLock<SectionConfig> = LazyLock::new(init_service);
 pub static TIMER_CONFIG: LazyLock<SectionConfig> = LazyLock::new(init_timer);

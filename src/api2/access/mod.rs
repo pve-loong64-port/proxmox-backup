@@ -1,11 +1,11 @@
 //! Access control (Users, Permissions and Authentication)
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
+use hyper::Response;
 use hyper::header::CONTENT_TYPE;
 use hyper::http::request::Parts;
-use hyper::Response;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -13,20 +13,20 @@ use std::collections::HashSet;
 use proxmox_auth_api::api::{API_METHOD_CREATE_TICKET_HTTP_ONLY, API_METHOD_VERIFY_VNC_TICKET};
 use proxmox_auth_api::types::{CreateTicket, CreateTicketResponse};
 use proxmox_router::{
-    http_bail, http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture,
-    Permission, Router, RpcEnvironment, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
+    http_bail, http_err, list_subdirs_api_method,
 };
 use proxmox_schema::{
-    api, AllOfSchema, ApiType, BooleanSchema, ObjectSchema, ParameterSchema, ReturnType,
+    AllOfSchema, ApiType, BooleanSchema, ObjectSchema, ParameterSchema, ReturnType, api,
 };
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, User, Userid, ACL_PATH_SCHEMA, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIVILEGES,
-    PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT,
+    ACL_PATH_SCHEMA, Authid, PASSWORD_FORMAT, PBS_PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY,
+    PRIV_SYS_AUDIT, PRIVILEGES, User, Userid,
 };
-use pbs_config::acl::AclTreeNode;
 use pbs_config::CachedUserInfo;
+use pbs_config::acl::AclTreeNode;
 
 pub mod acl;
 pub mod domain;

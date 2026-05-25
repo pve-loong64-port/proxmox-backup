@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Error;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::cli::*;
 use proxmox_schema::api;
@@ -15,10 +15,10 @@ use pbs_tools::crypt_config::CryptConfig;
 use pbs_tools::json::required_string_param;
 
 use crate::{
-    api_datastore_list_snapshots, complete_backup_group, complete_backup_snapshot,
-    complete_namespace, complete_repository, connect, crypto_parameters,
-    extract_repository_from_value, optional_ns_param, record_repository, BackupDir,
-    BackupTargetArgs, KEYFD_SCHEMA, KEYFILE_SCHEMA,
+    BackupDir, BackupTargetArgs, KEYFD_SCHEMA, KEYFILE_SCHEMA, api_datastore_list_snapshots,
+    complete_backup_group, complete_backup_snapshot, complete_namespace, complete_repository,
+    connect, crypto_parameters, extract_repository_from_value, optional_ns_param,
+    record_repository,
 };
 
 fn snapshot_args(ns: &BackupNamespace, snapshot: &BackupDir) -> Result<Value, Error> {

@@ -1,29 +1,29 @@
 //! Backup protocol (HTTP2 upgrade)
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::*;
 use hex::FromHex;
-use hyper::header::{HeaderValue, CONNECTION, UPGRADE};
+use hyper::header::{CONNECTION, HeaderValue, UPGRADE};
 use hyper::http::request::Parts;
-use hyper::{body::Incoming, Request, Response, StatusCode};
+use hyper::{Request, Response, StatusCode, body::Incoming};
 use hyper_util::service::TowerToHyperService;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::warn;
 
 use proxmox_http::Body;
 use proxmox_rest_server::{H2Service, WorkerTask};
-use proxmox_router::{http_err, list_subdirs_api_method};
 use proxmox_router::{
     ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
 };
+use proxmox_router::{http_err, list_subdirs_api_method};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupNamespace, BackupType, Operation, VerifyState,
-    BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA,
-    BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA, PRIV_DATASTORE_BACKUP,
+    ArchiveType, Authid, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, BackupNamespace, BackupType, CHUNK_DIGEST_SCHEMA,
+    DATASTORE_SCHEMA, Operation, PRIV_DATASTORE_BACKUP, VerifyState,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;

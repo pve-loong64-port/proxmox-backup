@@ -7,11 +7,11 @@ use std::ops::Range;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
-use anyhow::{bail, Context, Error};
-use futures::future::BoxFuture;
+use anyhow::{Context, Error, bail};
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use nix::dir::Dir;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
@@ -20,8 +20,8 @@ use serde::{Deserialize, Serialize};
 
 use pathpatterns::{MatchEntry, MatchFlag, MatchList, MatchType, PatternFlag};
 use proxmox_sys::error::SysError;
-use pxar::accessor::aio::{Accessor, Directory};
 use pxar::accessor::ReadAt;
+use pxar::accessor::aio::{Accessor, Directory};
 use pxar::encoder::{LinkOffset, PayloadOffset, SeqWrite};
 use pxar::{EntryKind, Metadata, PxarVariant};
 
@@ -35,10 +35,10 @@ use pbs_datastore::dynamic_index::DynamicIndexReader;
 use pbs_datastore::index::IndexFile;
 
 use crate::inject_reused_chunks::InjectChunks;
+use crate::pxar::Flags;
 use crate::pxar::look_ahead_cache::{CacheEntry, CacheEntryData, PxarLookaheadCache};
 use crate::pxar::metadata::errno_is_unsupported;
 use crate::pxar::tools::assert_single_path_component;
-use crate::pxar::Flags;
 
 const CHUNK_PADDING_THRESHOLD: f64 = 0.1;
 
@@ -707,7 +707,7 @@ impl Archiver {
                     continue;
                 }
                 Err(err) => {
-                    return Err(err).with_context(|| format!("stat failed on {full_path:?}"))
+                    return Err(err).with_context(|| format!("stat failed on {full_path:?}"));
                 }
             }
 
@@ -722,7 +722,7 @@ impl Archiver {
                     Err(err) => {
                         return Err(
                             Error::from(err).context(format!("stat failed on {full_path:?}"))
-                        )
+                        );
                     }
                 },
             };
@@ -1611,7 +1611,7 @@ fn get_xattr_fcaps_acl(
                 };
             }
             Err(err) => {
-                return Err(err).context(format!("error reading extended attribute {attr:?}"))
+                return Err(err).context(format!("error reading extended attribute {attr:?}"));
             }
         }
     }
@@ -1876,8 +1876,8 @@ mod tests {
     use pxar::accessor::sync::FileReader;
     use pxar::encoder::SeqWrite;
 
-    use crate::pxar::extract::Extractor;
     use crate::pxar::OverwriteFlags;
+    use crate::pxar::extract::Extractor;
 
     use super::*;
 

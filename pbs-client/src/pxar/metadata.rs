@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{Context, Error, anyhow};
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
@@ -14,8 +14,8 @@ use proxmox_sys::c_result;
 use proxmox_sys::error::SysError;
 use proxmox_sys::fs::{self, acl, xattr};
 
-use crate::pxar::tools::perms_from_metadata;
 use crate::pxar::Flags;
+use crate::pxar::tools::perms_from_metadata;
 
 //
 // utility functions

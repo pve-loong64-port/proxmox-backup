@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use pbs_datastore::DataStore;
 

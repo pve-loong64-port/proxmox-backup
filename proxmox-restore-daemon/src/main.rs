@@ -6,7 +6,7 @@ use std::os::unix::net;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use futures::StreamExt;
 use hyper_util::rt::TokioIo;
 use hyper_util::service::TowerToHyperService;

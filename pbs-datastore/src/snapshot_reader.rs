@@ -4,23 +4,23 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use anyhow::{bail, Context, Error};
+use anyhow::{Context, Error, bail};
 use nix::dir::Dir;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 use pbs_config::BackupLockGuard;
 
 use pbs_api_types::{
-    print_store_and_ns, ArchiveType, BackupNamespace, Operation, CLIENT_LOG_BLOB_NAME,
-    MANIFEST_BLOB_NAME,
+    ArchiveType, BackupNamespace, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME, Operation,
+    print_store_and_ns,
 };
 
+use crate::DataStore;
 use crate::backup_info::BackupDir;
 use crate::datastore::DataStoreLookup;
 use crate::dynamic_index::DynamicIndexReader;
 use crate::fixed_index::FixedIndexReader;
 use crate::index::IndexFile;
-use crate::DataStore;
 
 /// Helper to access the contents of a datastore backup snapshot
 ///

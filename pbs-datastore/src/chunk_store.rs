@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use hex::FromHex;
 use tracing::{info, warn};
 
@@ -12,7 +12,7 @@ use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
 use pbs_config::BackupLockGuard;
 use proxmox_io::ReadExt;
 use proxmox_s3_client::S3Client;
-use proxmox_sys::fs::{create_dir, create_path, file_type_from_file_stat, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, create_dir, create_path, file_type_from_file_stat};
 use proxmox_sys::process_locker::{
     ProcessLockExclusiveGuard, ProcessLockSharedGuard, ProcessLocker,
 };
@@ -439,7 +439,7 @@ impl ChunkStore {
         assert!(self.locker.is_some());
 
         use nix::sys::stat::fstatat;
-        use nix::unistd::{unlinkat, UnlinkatFlags};
+        use nix::unistd::{UnlinkatFlags, unlinkat};
 
         let mut last_percentage = 0;
         let mut chunk_count = 0;
@@ -708,13 +708,17 @@ impl ChunkStore {
                 // going from unencrypted to encrypted can never be right, since the digest
                 // includes data derived from the encryption key
                 if magic == UNCOMPRESSED_BLOB_MAGIC_1_0 || magic == COMPRESSED_BLOB_MAGIC_1_0 {
-                    bail!("Overwriting unencrypted chunk '{digest_str}' on store '{name}' with encrypted chunk with same digest not allowed!");
+                    bail!(
+                        "Overwriting unencrypted chunk '{digest_str}' on store '{name}' with encrypted chunk with same digest not allowed!"
+                    );
                 }
 
                 // if both chunks are uncompressed and encrypted and have the same digest, but
                 // their sizes are different, one of them *must* be invalid
                 if magic == ENCRYPTED_BLOB_MAGIC_1_0 && !chunk.is_compressed() {
-                    bail!("Overwriting existing (encrypted) chunk '{digest_str}' on store '{name}' is not allowed!")
+                    bail!(
+                        "Overwriting existing (encrypted) chunk '{digest_str}' on store '{name}' is not allowed!"
+                    )
                 }
 
                 // we can't tell if either chunk is invalid if either or both of them are
@@ -724,11 +728,15 @@ impl ChunkStore {
                 self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else if old_size < encoded_size {
-                log::debug!("Got another copy of chunk with digest '{digest_str}', existing chunk is smaller, discarding uploaded one.");
+                log::debug!(
+                    "Got another copy of chunk with digest '{digest_str}', existing chunk is smaller, discarding uploaded one."
+                );
                 self.touch_chunk_no_lock(digest)?;
                 return Ok((true, old_size));
             } else {
-                log::debug!("Got another copy of chunk with digest '{digest_str}', existing chunk is bigger, replacing with uploaded one.");
+                log::debug!(
+                    "Got another copy of chunk with digest '{digest_str}', existing chunk is bigger, replacing with uploaded one."
+                );
             }
         }
 
@@ -889,9 +897,9 @@ impl ChunkStore {
                     || stat.st_mode & 0o777 != file_mode
                 {
                     bail!(
-                            "unable to open existing chunk store path {:?} - permissions or owner not correct",
-                            path.as_ref(),
-                        );
+                        "unable to open existing chunk store path {:?} - permissions or owner not correct",
+                        path.as_ref(),
+                    );
                 }
             }
             Err(err) => {

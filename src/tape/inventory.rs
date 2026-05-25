@@ -26,11 +26,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use proxmox_sys::fs::{file_get_json, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_json, replace_file};
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{Fingerprint, MediaLocation, MediaSetPolicy, MediaStatus, RetentionPolicy};
@@ -49,9 +49,9 @@ fn open_backup_lockfile<P: AsRef<std::path::Path>>(
 }
 
 use crate::tape::{
+    MediaCatalog, MediaSet, TAPE_STATUS_DIR,
     changer::OnlineStatusMap,
     file_formats::{MediaLabel, MediaSetLabel},
-    MediaCatalog, MediaSet, TAPE_STATUS_DIR,
 };
 
 /// Unique Media Identifier
@@ -345,7 +345,9 @@ impl Inventory {
                     if let Some((pool, _)) = self.lookup_media_pool(&entry.id.label.uuid) {
                         if let Some(last_pool) = last_pool {
                             if last_pool != pool {
-                                bail!("detected media set with inconsistent pool assignment - internal error");
+                                bail!(
+                                    "detected media set with inconsistent pool assignment - internal error"
+                                );
                             }
                         } else {
                             last_pool = Some(pool);

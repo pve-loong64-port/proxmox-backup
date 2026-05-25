@@ -18,7 +18,7 @@ fn handle_expired() -> ! {
 }
 
 async fn watchdog_loop() {
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
     loop {
         let remaining = watchdog_remaining();
         if remaining <= 0 {

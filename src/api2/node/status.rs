@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
 use proxmox_sys::boot_mode;
@@ -10,8 +10,8 @@ use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    BootModeInformation, KernelVersionInformation, NodePowerCommand, StorageStatus, NODE_SCHEMA,
-    PRIV_SYS_AUDIT, PRIV_SYS_POWER_MANAGEMENT,
+    BootModeInformation, KernelVersionInformation, NODE_SCHEMA, NodePowerCommand, PRIV_SYS_AUDIT,
+    PRIV_SYS_POWER_MANAGEMENT, StorageStatus,
 };
 
 use pbs_api_types::{

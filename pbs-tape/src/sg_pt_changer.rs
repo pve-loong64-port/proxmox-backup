@@ -5,7 +5,7 @@ use std::io::Read;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 
 use proxmox_io::ReadExt;
@@ -13,8 +13,8 @@ use proxmox_io::ReadExt;
 use pbs_api_types::ScsiTapeChanger;
 
 use crate::{
-    sgutils2::{scsi_ascii_to_string, scsi_inquiry, ScsiError, SgRaw, SENSE_KEY_NOT_READY},
     DriveStatus, ElementStatus, MtxStatus, StorageElementStatus, TransportElementStatus,
+    sgutils2::{SENSE_KEY_NOT_READY, ScsiError, SgRaw, scsi_ascii_to_string, scsi_inquiry},
 };
 
 const SCSI_CHANGER_DEFAULT_TIMEOUT: usize = 60 * 5; // 5 minutes

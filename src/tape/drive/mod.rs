@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 use serde::Deserialize;
@@ -12,26 +12,26 @@ use tracing::info;
 use proxmox_io::ReadExt;
 use proxmox_section_config::SectionConfigData;
 use proxmox_sys::fs::{
-    atomic_open_or_create_file, file_read_optional_string, lock_file, replace_file, CreateOptions,
+    CreateOptions, atomic_open_or_create_file, file_read_optional_string, lock_file, replace_file,
 };
 use proxmox_uuid::Uuid;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{Fingerprint, LtoTapeDrive, VirtualTapeDrive};
 use pbs_key_config::KeyConfig;
-use pbs_tape::{sg_tape::TapeAlertFlags, BlockReadError, MediaContentHeader, TapeRead, TapeWrite};
+use pbs_tape::{BlockReadError, MediaContentHeader, TapeRead, TapeWrite, sg_tape::TapeAlertFlags};
 
 use crate::tape::TapeNotificationMode;
 use crate::{
     server::send_load_media_notification,
     tape::{
+        MediaId,
         changer::{MediaChange, MtxMediaChanger},
         drive::virtual_tape::open_virtual_tape_drive,
         file_formats::{
             MediaLabel, MediaSetLabel, PROXMOX_BACKUP_MEDIA_LABEL_MAGIC_1_0,
             PROXMOX_BACKUP_MEDIA_SET_LABEL_MAGIC_1_0,
         },
-        MediaId,
     },
 };
 
@@ -417,31 +417,32 @@ pub fn request_and_load_media(
 
                     let changer = &drive_config.changer;
 
-                    let update_and_log_request_error =
-                        |old: &mut TapeRequestError, new: TapeRequestError| -> Result<(), Error> {
-                            if new != *old {
-                                info!("{new}");
-                                let (device_type, device) = if let Some(changer) = changer {
-                                    ("changer", changer.as_str())
-                                } else {
-                                    ("drive", drive)
-                                };
+                    let update_and_log_request_error = |old: &mut TapeRequestError,
+                                                        new: TapeRequestError|
+                     -> Result<(), Error> {
+                        if new != *old {
+                            info!("{new}");
+                            let (device_type, device) = if let Some(changer) = changer {
+                                ("changer", changer.as_str())
+                            } else {
+                                ("drive", drive)
+                            };
 
-                                info!(
+                            info!(
                                 "Please insert media '{label_text}' into {device_type} '{device}'"
                             );
-                                send_load_media_notification(
-                                    notification_mode,
-                                    changer.is_some(),
-                                    device,
-                                    &label_text,
-                                    Some(new.to_string()),
-                                )?;
+                            send_load_media_notification(
+                                notification_mode,
+                                changer.is_some(),
+                                device,
+                                &label_text,
+                                Some(new.to_string()),
+                            )?;
 
-                                *old = new;
-                            }
-                            Ok(())
-                        };
+                            *old = new;
+                        }
+                        Ok(())
+                    };
 
                     loop {
                         worker.check_abort()?;

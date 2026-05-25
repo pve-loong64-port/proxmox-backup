@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{stdout, Write},
+    io::{Write, stdout},
     panic::{RefUnwindSafe, UnwindSafe},
     path::Path,
 };

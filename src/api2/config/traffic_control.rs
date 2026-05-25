@@ -2,12 +2,12 @@ use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, ApiMethod, Permission, Router, RpcEnvironment};
+use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    TrafficControlRule, TrafficControlRuleUpdater, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,
-    PROXMOX_CONFIG_DIGEST_SCHEMA, TRAFFIC_CONTROL_ID_SCHEMA,
+    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, TRAFFIC_CONTROL_ID_SCHEMA,
+    TrafficControlRule, TrafficControlRuleUpdater,
 };
 
 #[api(

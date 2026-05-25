@@ -1,8 +1,8 @@
-use anyhow::{bail, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, bail};
+use serde_json::{Value, json};
 
 use proxmox_router::{
-    list_subdirs_api_method, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap, list_subdirs_api_method,
 };
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
@@ -14,8 +14,8 @@ use pbs_api_types::{
 };
 
 use crate::tools::disks::{
-    get_smart_data, inititialize_gpt_disk, wipe_blockdev, DiskManage, DiskUsageInfo,
-    DiskUsageQuery, DiskUsageType, SmartData,
+    DiskManage, DiskUsageInfo, DiskUsageQuery, DiskUsageType, SmartData, get_smart_data,
+    inititialize_gpt_disk, wipe_blockdev,
 };
 use proxmox_rest_server::WorkerTask;
 

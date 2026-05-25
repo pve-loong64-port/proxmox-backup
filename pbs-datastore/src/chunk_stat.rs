@@ -35,7 +35,10 @@ impl std::fmt::Debug for ChunkStat {
 
         let write_speed = ((self.size as f64) / (1024.0 * 1024.0)) / elapsed;
 
-        write!(f, "Size: {}, average chunk size: {}, compression rate: {}%, disk_size: {} ({}%), speed: {:.2} MB/s",
-               self.size, avg, compression, self.disk_size, rate, write_speed)
+        write!(
+            f,
+            "Size: {}, average chunk size: {}, compression rate: {}%, disk_size: {} ({}%), speed: {:.2} MB/s",
+            self.size, avg, compression, self.disk_size, rate, write_speed
+        )
     }
 }

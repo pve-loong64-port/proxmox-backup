@@ -1,14 +1,14 @@
 //! List Authentication domains/realms
 
-use anyhow::{bail, format_err, Error};
-use serde_json::{json, Value};
+use anyhow::{Error, bail, format_err};
+use serde_json::{Value, json};
 
 use proxmox_router::{Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap};
 use proxmox_schema::api;
 
 use pbs_api_types::{
-    Authid, BasicRealmInfo, Realm, RealmRef, RealmType, PRIV_PERMISSIONS_MODIFY,
-    REMOVE_VANISHED_SCHEMA, UPID_SCHEMA,
+    Authid, BasicRealmInfo, PRIV_PERMISSIONS_MODIFY, REMOVE_VANISHED_SCHEMA, Realm, RealmRef,
+    RealmType, UPID_SCHEMA,
 };
 
 use crate::server::jobstate::Job;

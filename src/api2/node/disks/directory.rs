@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::json;
 use std::os::linux::fs::MetadataExt;
 use tracing::info;
@@ -11,13 +11,13 @@ use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
 
 use pbs_api_types::{
-    DataStoreConfig, BLOCKDEVICE_NAME_SCHEMA, DATASTORE_MOUNT_DIR, DATASTORE_SCHEMA, NODE_SCHEMA,
+    BLOCKDEVICE_NAME_SCHEMA, DATASTORE_MOUNT_DIR, DATASTORE_SCHEMA, DataStoreConfig, NODE_SCHEMA,
     PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA,
 };
 
 use crate::tools::disks::{
-    create_file_system, create_single_linux_partition, get_fs_uuid, DiskManage, DiskUsageQuery,
-    DiskUsageType, FileSystemType,
+    DiskManage, DiskUsageQuery, DiskUsageType, FileSystemType, create_file_system,
+    create_single_linux_partition, get_fs_uuid,
 };
 use crate::tools::systemd::{self, types::*};
 

@@ -1,5 +1,5 @@
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
-use proxmox_s3_client::{S3BucketListItem, S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
+use proxmox_s3_client::{S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3BucketListItem};
 use proxmox_schema::api;
 
 use proxmox_backup::api2;

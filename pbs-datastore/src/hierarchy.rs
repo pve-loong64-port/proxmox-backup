@@ -2,13 +2,13 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 
-use pbs_api_types::{BackupNamespace, BackupType, BACKUP_DATE_REGEX, BACKUP_ID_REGEX};
+use pbs_api_types::{BACKUP_DATE_REGEX, BACKUP_ID_REGEX, BackupNamespace, BackupType};
 use proxmox_sys::fs::get_file_type;
 
-use crate::backup_info::{BackupDir, BackupGroup};
 use crate::DataStore;
+use crate::backup_info::{BackupDir, BackupGroup};
 
 /// A iterator for all BackupDir's (Snapshots) in a BackupGroup
 pub struct ListSnapshots {

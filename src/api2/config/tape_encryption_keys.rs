@@ -1,7 +1,7 @@
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use serde_json::Value;
 
-use proxmox_router::{http_bail, ApiMethod, Permission, Router, RpcEnvironment};
+use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
@@ -15,7 +15,7 @@ use pbs_config::open_backup_lockfile;
 use pbs_key_config::KeyConfig;
 
 use crate::tape::encryption_keys::{
-    insert_key, load_key_configs, load_keys, save_key_configs, save_keys, TAPE_KEYS_LOCKFILE,
+    TAPE_KEYS_LOCKFILE, insert_key, load_key_configs, load_keys, save_key_configs, save_keys,
 };
 
 #[api(

@@ -4,7 +4,7 @@ use std::io::Read;
 use proxmox_sys::error::SysError;
 use proxmox_uuid::Uuid;
 
-use pbs_tape::{MediaContentHeader, TapeWrite, PROXMOX_TAPE_BLOCK_SIZE};
+use pbs_tape::{MediaContentHeader, PROXMOX_TAPE_BLOCK_SIZE, TapeWrite};
 
 use crate::tape::file_formats::CatalogArchiveHeader;
 

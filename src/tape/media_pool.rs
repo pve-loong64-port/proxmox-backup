@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
 
 use proxmox_uuid::Uuid;
@@ -20,9 +20,9 @@ use pbs_api_types::{
 use pbs_config::BackupLockGuard;
 
 use crate::tape::{
+    Inventory, MediaCatalog, MediaId, MediaSet,
     file_formats::{MediaLabel, MediaSetLabel},
-    lock_media_pool, lock_media_set, lock_unassigned_media_pool, Inventory, MediaCatalog, MediaId,
-    MediaSet,
+    lock_media_pool, lock_media_set, lock_unassigned_media_pool,
 };
 
 /// Media Pool

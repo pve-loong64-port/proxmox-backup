@@ -1,32 +1,32 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use futures::FutureExt;
 use hyper::body::Incoming;
 use hyper::http::request::Parts;
-use hyper::http::{header, Response, StatusCode};
+use hyper::http::{Response, StatusCode, header};
 use proxmox_http::Body;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_async::stream::AsyncReaderStream;
 use proxmox_router::{
-    list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router,
-    RpcEnvironment, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
+    list_subdirs_api_method,
 };
-use proxmox_schema::{api, BooleanSchema, IntegerSchema, ObjectSchema, Schema};
+use proxmox_schema::{BooleanSchema, IntegerSchema, ObjectSchema, Schema, api};
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    Authid, TaskListItem, TaskStateType, Tokenname, Userid, DATASTORE_SCHEMA, NODE_SCHEMA,
-    PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_VERIFY, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY,
-    SYNC_JOB_WORKER_ID_REGEX, UPID, UPID_SCHEMA, VERIFICATION_JOB_WORKER_ID_REGEX,
+    Authid, DATASTORE_SCHEMA, NODE_SCHEMA, PRIV_DATASTORE_MODIFY, PRIV_DATASTORE_VERIFY,
+    PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, SYNC_JOB_WORKER_ID_REGEX, TaskListItem, TaskStateType,
+    Tokenname, UPID, UPID_SCHEMA, Userid, VERIFICATION_JOB_WORKER_ID_REGEX,
 };
 
 use crate::api2::pull::check_pull_privs;
 
 use pbs_config::CachedUserInfo;
-use proxmox_rest_server::{upid_log_path, upid_read_status, TaskListInfoIterator, TaskState};
+use proxmox_rest_server::{TaskListInfoIterator, TaskState, upid_log_path, upid_read_status};
 
 pub const START_PARAM_SCHEMA: Schema =
     IntegerSchema::new("Start at this line when reading the tasklog")
@@ -97,7 +97,7 @@ fn check_job_privs(auth_id: &Authid, user_info: &CachedUserInfo, upid: &UPID) ->
                 &["datastore", workerid],
                 PRIV_DATASTORE_MODIFY,
                 true,
-            )
+            );
         }
         ("prune", Some(workerid)) | ("prunejob", Some(workerid)) => {
             let mut acl_path = vec!["datastore"];

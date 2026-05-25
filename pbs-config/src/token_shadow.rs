@@ -4,17 +4,17 @@ use std::io::ErrorKind;
 use std::sync::LazyLock;
 use std::time::SystemTime;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Value};
+use serde_json::{Value, from_value};
 
 use proxmox_sys::fs::CreateOptions;
 use proxmox_time::epoch_i64;
 
 use pbs_api_types::Authid;
 //use crate::auth;
-use crate::{open_backup_lockfile, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 const LOCK_FILE: &str = pbs_buildcfg::configdir!("/token.shadow.lock");
 const CONF_FILE: &str = pbs_buildcfg::configdir!("/token.shadow");

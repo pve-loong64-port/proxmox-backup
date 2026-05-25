@@ -3,7 +3,7 @@
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{list_subdirs_api_method, Router, SubdirMap};
+use proxmox_router::{Router, SubdirMap, list_subdirs_api_method};
 use proxmox_schema::api;
 
 use pbs_api_types::TapeDeviceInfo;

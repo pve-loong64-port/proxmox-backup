@@ -3,14 +3,14 @@
 use std::path::Path;
 use std::sync::atomic::Ordering;
 
-use anyhow::{bail, Context, Error};
+use anyhow::{Context, Error, bail};
 use serde_json::Value;
 
 use proxmox_http::Body;
-use proxmox_router::{list_subdirs_api_method, Permission, Router, RpcEnvironment, SubdirMap};
+use proxmox_router::{Permission, Router, RpcEnvironment, SubdirMap, list_subdirs_api_method};
 use proxmox_s3_client::{
-    S3Client, S3ClientConf, S3ClientOptions, S3ObjectKey, S3RequestCounterConfig,
-    SharedRequestCounters, S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT,
+    S3_BUCKET_NAME_SCHEMA, S3_CLIENT_ID_SCHEMA, S3_HTTP_REQUEST_TIMEOUT, S3Client, S3ClientConf,
+    S3ClientOptions, S3ObjectKey, S3RequestCounterConfig, SharedRequestCounters,
 };
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;

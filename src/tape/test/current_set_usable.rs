@@ -9,7 +9,7 @@ use proxmox_uuid::Uuid;
 
 use pbs_api_types::{MediaSetPolicy, RetentionPolicy};
 
-use crate::tape::{file_formats::MediaSetLabel, Inventory, MediaPool};
+use crate::tape::{Inventory, MediaPool, file_formats::MediaSetLabel};
 
 fn create_testdir(name: &str) -> Result<PathBuf, Error> {
     let mut testdir: PathBuf = String::from("./target/testout").into();

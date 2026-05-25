@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::Deserialize;
 
 use pbs_api_types::{
@@ -125,7 +125,9 @@ fn migrate_datastore_notification_mode_default() -> Result<(), Error> {
 
         if config.notification_mode.is_none() {
             config.notification_mode = Some(NotificationMode::LegacySendmail);
-            eprintln!("setting notification-mode of datastore '{store}' to 'legacy-sendmail' to presere previous default behavior.");
+            eprintln!(
+                "setting notification-mode of datastore '{store}' to 'legacy-sendmail' to presere previous default behavior."
+            );
         }
 
         entry.1 = serde_json::to_value(config)?;

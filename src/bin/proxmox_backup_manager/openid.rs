@@ -1,7 +1,7 @@
 use anyhow::Error;
 use serde_json::Value;
 
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
 use pbs_api_types::REALM_ID_SCHEMA;

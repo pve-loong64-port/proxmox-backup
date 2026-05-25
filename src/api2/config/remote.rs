@@ -1,19 +1,20 @@
 use ::serde::{Deserialize, Serialize};
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use pbs_api_types::BackupNamespace;
 use pbs_api_types::NamespaceListItem;
-use proxmox_router::list_subdirs_api_method;
 use proxmox_router::SubdirMap;
+use proxmox_router::list_subdirs_api_method;
 use proxmox_sortable_macro::sortable;
 use serde_json::Value;
 
-use proxmox_router::{http_bail, http_err, ApiMethod, Permission, Router, RpcEnvironment};
+use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment, http_bail, http_err};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, DataStoreListItem, GroupListItem, RateLimitConfig, Remote, RemoteConfig,
-    RemoteConfigUpdater, RemoteWithoutPassword, SyncJobConfig, DATASTORE_SCHEMA, PRIV_REMOTE_AUDIT,
+    Authid, DATASTORE_SCHEMA, DataStoreListItem, GroupListItem, PRIV_REMOTE_AUDIT,
     PRIV_REMOTE_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA, REMOTE_ID_SCHEMA, REMOTE_PASSWORD_SCHEMA,
+    RateLimitConfig, Remote, RemoteConfig, RemoteConfigUpdater, RemoteWithoutPassword,
+    SyncJobConfig,
 };
 use pbs_client::{HttpClient, HttpClientOptions};
 use pbs_config::sync;

@@ -1,6 +1,6 @@
 //! Helpers for common statistics tasks
-use num_traits::cast::ToPrimitive;
 use num_traits::NumAssignRef;
+use num_traits::cast::ToPrimitive;
 
 /// Calculates the sum of a list of numbers
 /// ```

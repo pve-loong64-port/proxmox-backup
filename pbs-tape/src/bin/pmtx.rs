@@ -13,20 +13,20 @@
 ///   to associate drive numbers with drives.
 use std::fs::File;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde_json::Value;
 
-use proxmox_router::cli::*;
 use proxmox_router::RpcEnvironment;
+use proxmox_router::cli::*;
 use proxmox_schema::api;
 
-use pbs_api_types::{LtoTapeDrive, ScsiTapeChanger, CHANGER_NAME_SCHEMA, SCSI_CHANGER_PATH_SCHEMA};
+use pbs_api_types::{CHANGER_NAME_SCHEMA, LtoTapeDrive, SCSI_CHANGER_PATH_SCHEMA, ScsiTapeChanger};
 use pbs_config::drive::complete_changer_name;
 use pbs_tape::{
+    ElementStatus,
     linux_list_drives::{complete_changer_path, linux_tape_changer_list},
     sg_pt_changer,
     sgutils2::scsi_inquiry,
-    ElementStatus,
 };
 
 fn get_changer_handle(param: &Value) -> Result<File, Error> {

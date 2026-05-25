@@ -6,19 +6,19 @@ use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use const_format::concatcp;
 use tracing::info;
 
 use proxmox_s3_client::{S3ObjectKey, S3PathPrefix};
-use proxmox_sys::fs::{lock_dir_noblock, lock_dir_noblock_shared, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, lock_dir_noblock, lock_dir_noblock_shared, replace_file};
 use proxmox_systemd::escape_unit;
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, GroupFilter,
-    VerifyState, BACKUP_DATE_REGEX, CLIENT_LOG_BLOB_NAME, MANIFEST_BLOB_NAME,
+    ArchiveType, Authid, BACKUP_DATE_REGEX, BackupGroupDeleteStats, BackupNamespace, BackupType,
+    CLIENT_LOG_BLOB_NAME, GroupFilter, MANIFEST_BLOB_NAME, VerifyState,
 };
-use pbs_config::{open_backup_lockfile, BackupLockGuard};
+use pbs_config::{BackupLockGuard, open_backup_lockfile};
 
 use crate::datastore::{GROUP_NOTES_FILE_NAME, GROUP_OWNER_FILE_NAME};
 use crate::manifest::{BackupManifest, MANIFEST_LOCK_NAME};
@@ -164,7 +164,7 @@ impl BackupGroup {
                 let mut manifest_path = PathBuf::from(backup_time);
                 manifest_path.push(MANIFEST_BLOB_NAME.as_ref());
 
-                use nix::fcntl::{openat, OFlag};
+                use nix::fcntl::{OFlag, openat};
                 match openat(
                     Some(l2_fd),
                     &manifest_path,
@@ -367,7 +367,9 @@ impl BackupGroup {
                 if dst_notes != src_notes {
                     log::warn!(
                         "group notes differ during merge of '{}' from '{}' into '{}' - keeping target's notes",
-                        self.group, self.ns, target.ns,
+                        self.group,
+                        self.ns,
+                        target.ns,
                     );
                 }
                 // Identical or intentionally kept: source copy will be removed by destroy().

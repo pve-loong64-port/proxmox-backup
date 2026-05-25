@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_section_config::SectionConfigData;
 use proxmox_uuid::Uuid;
@@ -9,8 +9,8 @@ use proxmox_uuid::Uuid;
 use pbs_api_types::{ScsiTapeChanger, VirtualTapeDrive};
 use pbs_tape::{ElementStatus, MtxStatus};
 
-use crate::tape::changer::{MediaChange, ScsiMediaChange};
 use crate::tape::Inventory;
+use crate::tape::changer::{MediaChange, ScsiMediaChange};
 
 /// Helper to update media online status
 ///

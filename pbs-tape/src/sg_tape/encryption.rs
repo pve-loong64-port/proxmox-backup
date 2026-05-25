@@ -1,12 +1,12 @@
 use std::io::Write;
 use std::os::unix::prelude::AsRawFd;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
 
 use proxmox_io::{ReadExt, WriteExt};
 
-use crate::sgutils2::{alloc_page_aligned_buffer, SgRaw};
+use crate::sgutils2::{SgRaw, alloc_page_aligned_buffer};
 
 /// Set or clear encryption key
 ///

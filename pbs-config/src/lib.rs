@@ -1,6 +1,6 @@
 use std::os::unix::prelude::AsRawFd;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use hex::FromHex;
 use nix::unistd::{Gid, Group, Uid, User};
 

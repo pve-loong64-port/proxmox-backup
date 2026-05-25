@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use http_body_util::BodyExt;
 use tracing::{error, info, warn};
 
@@ -12,9 +12,9 @@ use proxmox_parallel_handler::{ParallelHandler, SendHandle};
 use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
-    print_ns_and_snapshot, print_store_and_ns, ArchiveType, Authid, BackupNamespace, BackupType,
-    CryptMode, SnapshotVerifyState, VerifyState, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_VERIFY,
-    UPID,
+    ArchiveType, Authid, BackupNamespace, BackupType, CryptMode, PRIV_DATASTORE_BACKUP,
+    PRIV_DATASTORE_VERIFY, SnapshotVerifyState, UPID, VerifyState, print_ns_and_snapshot,
+    print_store_and_ns,
 };
 use pbs_datastore::backup_info::{BackupDir, BackupGroup, BackupInfo};
 use pbs_datastore::index::{ChunkReadInfo, IndexFile};
@@ -145,8 +145,8 @@ impl VerifyWorker {
 
                 if chunk_crypt_mode != crypt_mode {
                     info!(
-                    "chunk CryptMode {chunk_crypt_mode:?} does not match index CryptMode {crypt_mode:?}"
-                );
+                        "chunk CryptMode {chunk_crypt_mode:?} does not match index CryptMode {crypt_mode:?}"
+                    );
                     verify_state.errors.fetch_add(1, Ordering::SeqCst);
                 }
 

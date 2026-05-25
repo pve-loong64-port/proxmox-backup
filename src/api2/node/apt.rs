@@ -1,4 +1,4 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use proxmox_apt_api_types::{
     APTChangeRepositoryOptions, APTGetChangelogOptions, APTRepositoriesResult, APTRepositoryHandle,
@@ -8,10 +8,10 @@ use proxmox_config_digest::ConfigDigest;
 use proxmox_http::ProxyConfig;
 use proxmox_rest_server::WorkerTask;
 use proxmox_router::{
-    list_subdirs_api_method, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap, list_subdirs_api_method,
 };
 use proxmox_schema::api;
-use proxmox_sys::fs::{replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, replace_file};
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT, PRIV_SYS_MODIFY, UPID_SCHEMA};
 

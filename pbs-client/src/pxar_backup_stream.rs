@@ -2,7 +2,7 @@ use std::io::Write;
 //use std::os::unix::io::FromRawFd;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::task::{Context, Poll};
 
 use anyhow::Error;

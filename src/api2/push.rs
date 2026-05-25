@@ -1,11 +1,11 @@
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use futures::{future::FutureExt, select};
 
 use pbs_api_types::{
-    Authid, BackupNamespace, GroupFilter, RateLimitConfig, CRYPT_KEY_ID_SCHEMA, DATASTORE_SCHEMA,
-    GROUP_FILTER_LIST_SCHEMA, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_READ, PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE,
-    REMOTE_ID_SCHEMA, REMOVE_VANISHED_BACKUPS_SCHEMA, SYNC_ENCRYPTED_ONLY_SCHEMA,
+    Authid, BackupNamespace, CRYPT_KEY_ID_SCHEMA, DATASTORE_SCHEMA, GROUP_FILTER_LIST_SCHEMA,
+    GroupFilter, NS_MAX_DEPTH_REDUCED_SCHEMA, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    PRIV_REMOTE_DATASTORE_BACKUP, PRIV_REMOTE_DATASTORE_PRUNE, REMOTE_ID_SCHEMA,
+    REMOVE_VANISHED_BACKUPS_SCHEMA, RateLimitConfig, SYNC_ENCRYPTED_ONLY_SCHEMA,
     SYNC_VERIFIED_ONLY_SCHEMA, SYNC_WORKER_THREADS_SCHEMA, TRANSFER_LAST_SCHEMA,
 };
 use proxmox_rest_server::WorkerTask;
@@ -14,7 +14,7 @@ use proxmox_schema::api;
 
 use pbs_config::CachedUserInfo;
 
-use crate::server::push::{push_store, PushParameters};
+use crate::server::push::{PushParameters, push_store};
 
 /// Check if the provided user is allowed to read from the local source and act on the remote
 /// target for pushing content

@@ -1,7 +1,7 @@
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use tracing::{info, warn};
 
-use pbs_config::{acl::AclTree, token_shadow, BackupLockGuard};
+use pbs_config::{BackupLockGuard, acl::AclTree, token_shadow};
 use proxmox_lang::try_block;
 use proxmox_ldap::{Config, Connection, SearchParameters, SearchResult};
 use proxmox_rest_server::WorkerTask;
@@ -11,9 +11,9 @@ use proxmox_section_config::SectionConfigData;
 use std::collections::HashSet;
 
 use pbs_api_types::{
-    AdRealmConfig, ApiToken, Authid, LdapRealmConfig, Realm, RealmType, RemoveVanished,
-    SyncAttributes as LdapSyncAttributes, SyncDefaultsOptions, User, Userid, EMAIL_SCHEMA,
-    FIRST_NAME_SCHEMA, LAST_NAME_SCHEMA, REMOVE_VANISHED_ARRAY, USER_CLASSES_ARRAY,
+    AdRealmConfig, ApiToken, Authid, EMAIL_SCHEMA, FIRST_NAME_SCHEMA, LAST_NAME_SCHEMA,
+    LdapRealmConfig, REMOVE_VANISHED_ARRAY, Realm, RealmType, RemoveVanished,
+    SyncAttributes as LdapSyncAttributes, SyncDefaultsOptions, USER_CLASSES_ARRAY, User, Userid,
 };
 
 use crate::{auth, server::jobstate::Job};

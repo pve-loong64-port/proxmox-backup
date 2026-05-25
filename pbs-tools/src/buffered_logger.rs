@@ -1,14 +1,14 @@
 //! Log aggregator to collect and group messages sent from concurrent tasks via
 //! a tokio channel.
 
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::time::Duration;
 
 use anyhow::Error;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
-use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{Level, debug, error, info, trace, warn};
 
 use proxmox_log::LogContext;
 

@@ -1,15 +1,15 @@
 use pbs_api_types::{
-    DataStoreConfig, DataStoreConfigUpdater, DATASTORE_SCHEMA, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    DATASTORE_SCHEMA, DataStoreConfig, DataStoreConfigUpdater, PROXMOX_CONFIG_DIGEST_SCHEMA,
 };
 use pbs_client::view_task_result;
-use proxmox_router::{cli::*, ApiHandler, RpcEnvironment};
+use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 
 use proxmox_backup::api2;
 use proxmox_backup::api2::config::datastore::DeletableProperty;
 use proxmox_backup::client_helpers::connect_to_localhost;
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use serde_json::Value;
 
 #[api(

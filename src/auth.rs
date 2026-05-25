@@ -6,7 +6,7 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use futures::Future;
 use once_cell::sync::{Lazy, OnceCell};
 use pbs_config::open_backup_lockfile;

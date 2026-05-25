@@ -2,12 +2,12 @@ use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, PruneJobConfig, PruneJobConfigUpdater, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT,
-    PRIV_DATASTORE_MODIFY, PROXMOX_CONFIG_DIGEST_SCHEMA,
+    Authid, JOB_ID_SCHEMA, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_MODIFY,
+    PROXMOX_CONFIG_DIGEST_SCHEMA, PruneJobConfig, PruneJobConfigUpdater,
 };
 use pbs_config::prune;
 

@@ -4,9 +4,9 @@ use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::time::SystemTime;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use endian_trait::Endian;
-use nix::fcntl::{fcntl, FcntlArg, OFlag};
+use nix::fcntl::{FcntlArg, OFlag, fcntl};
 
 mod encryption;
 pub use encryption::{drive_get_encryption, drive_set_encryption};
@@ -37,12 +37,12 @@ use pbs_api_types::{
 
 use crate::linux_list_drives::open_lto_tape_device;
 use crate::{
-    sgutils2::{
-        alloc_page_aligned_buffer, scsi_cmd_mode_select10, scsi_cmd_mode_select6, scsi_inquiry,
-        scsi_mode_sense, scsi_request_sense, InquiryInfo, ModeBlockDescriptor, ModeParameterHeader,
-        ScsiError, SenseInfo, SgRaw,
-    },
     BlockRead, BlockReadError, BlockWrite, BlockedReader, BlockedWriter,
+    sgutils2::{
+        InquiryInfo, ModeBlockDescriptor, ModeParameterHeader, ScsiError, SenseInfo, SgRaw,
+        alloc_page_aligned_buffer, scsi_cmd_mode_select6, scsi_cmd_mode_select10, scsi_inquiry,
+        scsi_mode_sense, scsi_request_sense,
+    },
 };
 
 #[repr(C, packed)]
@@ -675,7 +675,9 @@ impl SgTape {
                             if let Ok(DeviceActivity::Calibrating) =
                                 read_device_activity(&mut self.file)
                             {
-                                log::info!("Detected drive calibration, increasing timeout to 2 hours 5 minutes");
+                                log::info!(
+                                    "Detected drive calibration, increasing timeout to 2 hours 5 minutes"
+                                );
                                 max_wait = std::time::Duration::new(2 * 60 * 60 + 5 * 60, 0);
                                 increased_timeout = true;
                                 continue;

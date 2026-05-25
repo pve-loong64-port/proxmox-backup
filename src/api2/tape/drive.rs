@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::panic::UnwindSafe;
 use std::sync::Arc;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use pbs_tape::sg_tape::SgTape;
 use serde_json::Value;
 use tracing::{info, warn};
 
 use proxmox_router::{
-    list_subdirs_api_method, Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap,
+    Permission, Router, RpcEnvironment, RpcEnvironmentType, SubdirMap, list_subdirs_api_method,
 };
 use proxmox_schema::api;
 use proxmox_section_config::SectionConfigData;
@@ -16,33 +16,33 @@ use proxmox_sortable_macro::sortable;
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{
-    Authid, DriveListEntry, LabelUuidMap, Lp17VolumeStatistics, LtoDriveAndMediaStatus,
-    LtoTapeDrive, MamAttribute, MediaIdFlat, TapeDensity, CHANGER_NAME_SCHEMA, DRIVE_NAME_SCHEMA,
-    MEDIA_LABEL_SCHEMA, MEDIA_POOL_NAME_SCHEMA, UPID_SCHEMA,
+    Authid, CHANGER_NAME_SCHEMA, DRIVE_NAME_SCHEMA, DriveListEntry, LabelUuidMap,
+    Lp17VolumeStatistics, LtoDriveAndMediaStatus, LtoTapeDrive, MEDIA_LABEL_SCHEMA,
+    MEDIA_POOL_NAME_SCHEMA, MamAttribute, MediaIdFlat, TapeDensity, UPID_SCHEMA,
 };
 
 use pbs_api_types::{PRIV_TAPE_AUDIT, PRIV_TAPE_READ, PRIV_TAPE_WRITE};
 
 use pbs_config::CachedUserInfo;
 use pbs_tape::{
+    BlockReadError,
     linux_list_drives::{lookup_device_identification, lto_tape_device_list, open_lto_tape_device},
     sg_tape::tape_alert_flags_critical,
-    BlockReadError,
 };
 use proxmox_rest_server::WorkerTask;
 
 use crate::{
     api2::tape::restore::{fast_catalog_restore, restore_media},
     tape::{
+        Inventory, MediaCatalog, MediaId, TAPE_STATUS_DIR,
         changer::update_changer_online_status,
         drive::{
-            get_tape_device_state, lock_tape_device, media_changer, open_drive,
-            required_media_changer, set_tape_device_state, LtoTapeHandle, TapeDriver,
+            LtoTapeHandle, TapeDriver, get_tape_device_state, lock_tape_device, media_changer,
+            open_drive, required_media_changer, set_tape_device_state,
         },
         encryption_keys::insert_key,
         file_formats::{MediaLabel, MediaSetLabel},
-        lock_media_pool, lock_media_set, lock_unassigned_media_pool, Inventory, MediaCatalog,
-        MediaId, TAPE_STATUS_DIR,
+        lock_media_pool, lock_media_set, lock_unassigned_media_pool,
     },
 };
 

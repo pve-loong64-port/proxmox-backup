@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use nix::sys::stat::FileStat;
 
-use pxar::encoder::PayloadOffset;
 use pxar::Metadata;
+use pxar::encoder::PayloadOffset;
 
 use super::create::*;
 

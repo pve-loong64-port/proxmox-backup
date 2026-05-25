@@ -1,11 +1,11 @@
 //! Backup reader/restore protocol (HTTP2 upgrade)
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::*;
 use hex::FromHex;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::header::{self, HeaderValue, CONNECTION, UPGRADE};
+use hyper::header::{self, CONNECTION, HeaderValue, UPGRADE};
 use hyper::http::request::Parts;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::service::TowerToHyperService;
@@ -15,16 +15,16 @@ use serde_json::Value;
 use proxmox_http::Body;
 use proxmox_rest_server::{H2Service, WorkerTask};
 use proxmox_router::{
-    http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
-    Router, RpcEnvironment, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
+    http_err, list_subdirs_api_method,
 };
 use proxmox_schema::{BooleanSchema, ObjectSchema};
 use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
-    ArchiveType, Authid, Operation, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA,
-    BACKUP_NAMESPACE_SCHEMA, BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA,
-    DATASTORE_SCHEMA, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
+    ArchiveType, Authid, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA, Operation,
+    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;
@@ -32,9 +32,9 @@ use pbs_datastore::{DataStore, DatastoreBackend, PROXMOX_BACKUP_READER_PROTOCOL_
 use pbs_tools::json::required_string_param;
 use proxmox_s3_client::S3Client;
 
+use crate::api2::ExecInheritLogContext;
 use crate::api2::backup::optional_ns_param;
 use crate::api2::helpers;
-use crate::api2::ExecInheritLogContext;
 
 mod environment;
 use environment::*;

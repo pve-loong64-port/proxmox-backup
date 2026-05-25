@@ -5,7 +5,7 @@ use anyhow::Error;
 
 use pbs_config::BackupLockGuard;
 use proxmox_auth_api::{HMACKey, PrivateKey, PublicKey};
-use proxmox_sys::fs::{file_get_contents, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_get_contents, replace_file};
 
 use pbs_buildcfg::configdir;
 use serde_json::json;

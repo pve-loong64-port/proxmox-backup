@@ -4,14 +4,14 @@ use std::future::Future;
 use std::hash::BuildHasher;
 use std::pin::Pin;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use proxmox_router::cli::*;
 use proxmox_schema::api;
 
-use pbs_api_types::{file_restore::FileRestoreFormat, BackupDir, BackupNamespace};
+use pbs_api_types::{BackupDir, BackupNamespace, file_restore::FileRestoreFormat};
 use pbs_client::BackupRepository;
 use pbs_datastore::catalog::ArchiveEntry;
 use pbs_datastore::manifest::BackupManifest;

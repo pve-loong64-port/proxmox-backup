@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use openssl::ssl::{SslAcceptor, SslMethod};
 
 use pbs_api_types::NodeConfig;
@@ -9,7 +9,7 @@ use proxmox_schema::ApiType;
 
 use pbs_buildcfg::configdir;
 
-use crate::{open_backup_lockfile, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 const CONF_FILE: &str = configdir!("/node.cfg");
 const LOCK_FILE: &str = configdir!("/.node.lck");

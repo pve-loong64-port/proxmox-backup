@@ -5,7 +5,7 @@ use std::iter::Sum;
 use std::path::PathBuf;
 
 use pbs_api_types::Operation;
-use proxmox_sys::fs::{file_read_optional_string, open_file_locked, replace_file, CreateOptions};
+use proxmox_sys::fs::{CreateOptions, file_read_optional_string, open_file_locked, replace_file};
 use proxmox_sys::linux::procfs;
 use serde::{Deserialize, Serialize};
 

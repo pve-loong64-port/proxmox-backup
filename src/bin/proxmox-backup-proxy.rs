@@ -3,15 +3,15 @@ use std::pin::pin;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, format_err, Context, Error};
+use anyhow::{Context, Error, bail, format_err};
 use futures::*;
-use hyper::header;
-use hyper::http::request::Parts;
-use hyper::http::Response;
 use hyper::StatusCode;
+use hyper::header;
+use hyper::http::Response;
+use hyper::http::request::Parts;
 use hyper_util::server::graceful::GracefulShutdown;
 use openssl::ssl::SslAcceptor;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::level_filters::LevelFilter;
 use tracing::{info, warn};
 use url::form_urlencoded;
@@ -21,8 +21,8 @@ use proxmox_http::RateLimiterTag;
 use proxmox_human_byte::HumanByte;
 use proxmox_lang::try_block;
 use proxmox_rest_server::{
-    cleanup_old_tasks, cookie_from_header, rotate_task_log_archive, ApiConfig, Redirector,
-    RestEnvironment, RestServer, WorkerTask,
+    ApiConfig, Redirector, RestEnvironment, RestServer, WorkerTask, cleanup_old_tasks,
+    cookie_from_header, rotate_task_log_archive,
 };
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 use proxmox_sys::fs::CreateOptions;
@@ -48,7 +48,7 @@ use pbs_api_types::{
 
 use proxmox_backup::auth_helpers::*;
 use proxmox_backup::server::{self, metric_collection};
-use proxmox_backup::tools::{lookup_with, PROXMOX_BACKUP_TCP_KEEPALIVE_TIME};
+use proxmox_backup::tools::{PROXMOX_BACKUP_TCP_KEEPALIVE_TIME, lookup_with};
 
 use proxmox_backup::api2::tape::backup::do_tape_backup_job;
 use proxmox_backup::server::do_prune_job;
@@ -224,7 +224,9 @@ async fn run() -> Result<(), Error> {
                 config = config.real_ip_allow_from(allowed_cidrs);
             }
             Err(err) => {
-                log::error!("ignoring environment variable 'PROXY_REAL_IP_ALLOW_FROM={real_ip_allow_from}', failed to parse as CIDR/IP-range list: {err}");
+                log::error!(
+                    "ignoring environment variable 'PROXY_REAL_IP_ALLOW_FROM={real_ip_allow_from}', failed to parse as CIDR/IP-range list: {err}"
+                );
             }
         }
     }
@@ -410,9 +412,11 @@ async fn run() -> Result<(), Error> {
     // acquire the IO driver, if blocked, before going to sleep, which allows progress again
     // TODO: remove once tokio solves this at their level (see proposals in linked comments)
     let rt_handle = tokio::runtime::Handle::current();
-    std::thread::spawn(move || loop {
-        rt_handle.spawn(std::future::ready(()));
-        std::thread::sleep(Duration::from_secs(3));
+    std::thread::spawn(move || {
+        loop {
+            rt_handle.spawn(std::future::ready(()));
+            std::thread::sleep(Duration::from_secs(3));
+        }
     });
 
     start_task_scheduler();
@@ -493,7 +497,9 @@ async fn run_task_scheduler() {
                 } else if let Some(msg) = panic.downcast_ref::<String>() {
                     tracing::error!("task scheduler panic: {msg}");
                 } else {
-                    tracing::error!("task scheduler panic - cannot show error message due to unknown error type")
+                    tracing::error!(
+                        "task scheduler panic - cannot show error message due to unknown error type"
+                    )
                 }
             }
             Ok(Err(err)) => tracing::error!("task scheduler failed - {err:?}"),

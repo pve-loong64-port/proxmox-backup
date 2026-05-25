@@ -6,12 +6,12 @@ use anyhow::Error;
 
 use proxmox_schema::{ApiType, Schema};
 
-use pbs_api_types::{TrafficControlRule, TRAFFIC_CONTROL_ID_SCHEMA};
+use pbs_api_types::{TRAFFIC_CONTROL_ID_SCHEMA, TrafficControlRule};
 
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use crate::ConfigVersionCache;
-use crate::{open_backup_lockfile, replace_backup_config, BackupLockGuard};
+use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
 
 /// Static [`SectionConfig`] to access parser/writer functions.
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);

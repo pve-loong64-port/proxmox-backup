@@ -2,11 +2,11 @@
 
 use anyhow::Error;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::api;
 use proxmox_tfa::api::methods;
 
-use pbs_api_types::{Authid, Userid, PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT};
+use pbs_api_types::{Authid, PASSWORD_SCHEMA, PRIV_PERMISSIONS_MODIFY, PRIV_SYS_AUDIT, Userid};
 use pbs_config::CachedUserInfo;
 
 use crate::config::tfa::UserAccess;

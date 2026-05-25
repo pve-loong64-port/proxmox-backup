@@ -1,28 +1,28 @@
 //! OpenID redirect/login API
-use anyhow::{bail, format_err, Error};
-use hyper::http::request::Parts;
+use anyhow::{Error, bail, format_err};
 use hyper::Response;
-use serde_json::{json, Value};
+use hyper::http::request::Parts;
+use serde_json::{Value, json};
 
 use proxmox_auth_api::api::ApiTicket;
 use proxmox_auth_api::ticket::Ticket;
 use proxmox_router::{
-    http_err, list_subdirs_api_method, ApiHandler, ApiMethod, ApiResponseFuture, Permission,
-    Router, RpcEnvironment, SubdirMap,
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment, SubdirMap,
+    http_err, list_subdirs_api_method,
 };
-use proxmox_schema::{api, BooleanSchema, ObjectSchema, ParameterSchema, StringSchema};
+use proxmox_schema::{BooleanSchema, ObjectSchema, ParameterSchema, StringSchema, api};
 use proxmox_sortable_macro::sortable;
 
 use proxmox_openid::{OpenIdAuthenticator, OpenIdConfig};
 
 use pbs_api_types::{
-    OpenIdRealmConfig, User, Userid, EMAIL_SCHEMA, FIRST_NAME_SCHEMA, LAST_NAME_SCHEMA,
-    OPENID_DEFAILT_SCOPE_LIST, REALM_ID_SCHEMA,
+    EMAIL_SCHEMA, FIRST_NAME_SCHEMA, LAST_NAME_SCHEMA, OPENID_DEFAILT_SCOPE_LIST,
+    OpenIdRealmConfig, REALM_ID_SCHEMA, User, Userid,
 };
 use pbs_buildcfg::PROXMOX_BACKUP_RUN_DIR_M;
 
-use pbs_config::open_backup_lockfile;
 use pbs_config::CachedUserInfo;
+use pbs_config::open_backup_lockfile;
 
 use crate::auth::private_auth_keyring;
 use crate::auth_helpers::*;

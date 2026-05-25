@@ -1,11 +1,11 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Error;
 
-use proxmox_router::{http_bail, Permission, Router, RpcEnvironment};
+use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
 
 use pbs_api_types::{
-    Authid, MediaPoolConfig, MediaPoolConfigUpdater, MEDIA_POOL_NAME_SCHEMA, PRIV_TAPE_AUDIT,
+    Authid, MEDIA_POOL_NAME_SCHEMA, MediaPoolConfig, MediaPoolConfigUpdater, PRIV_TAPE_AUDIT,
     PRIV_TAPE_MODIFY,
 };
 

@@ -2,14 +2,14 @@
 //
 // # cargo test --release tape::test::inventory
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use std::path::PathBuf;
 
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{MediaLocation, MediaStatus};
 
-use crate::tape::{file_formats::MediaSetLabel, Inventory};
+use crate::tape::{Inventory, file_formats::MediaSetLabel};
 
 fn create_testdir(name: &str) -> Result<PathBuf, Error> {
     let mut testdir: PathBuf = String::from("./target/testout").into();

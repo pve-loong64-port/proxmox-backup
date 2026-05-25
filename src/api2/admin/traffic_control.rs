@@ -3,7 +3,7 @@ use anyhow::Error;
 use proxmox_router::{Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
-use pbs_api_types::{TrafficControlCurrentRate, TrafficControlRule, PRIV_SYS_AUDIT};
+use pbs_api_types::{PRIV_SYS_AUDIT, TrafficControlCurrentRate, TrafficControlRule};
 
 use crate::traffic_control_cache::TRAFFIC_CONTROL_CACHE;
 

@@ -1,11 +1,11 @@
 //! Map a raw data reader as a loop device via FUSE
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{Error, bail, format_err};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs::{read_to_string, remove_file, File, OpenOptions};
-use std::io::prelude::*;
+use std::fs::{File, OpenOptions, read_to_string, remove_file};
 use std::io::SeekFrom;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
