@@ -2081,7 +2081,9 @@ impl DataStore {
             // ignore vanished files
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(err) => {
-                return Err(Error::from(err).context(format!("can't open file '{absolute_path:?}'")));
+                return Err(
+                    Error::from(err).context(format!("can't open file '{absolute_path:?}'"))
+                );
             }
         };
 
