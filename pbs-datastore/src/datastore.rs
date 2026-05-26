@@ -32,12 +32,6 @@ use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
-    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, DatastoreFSyncLevel,
-    GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode,
-    MaintenanceType, Operation, S3Statistics, UPID,
-};
-use pbs_api_types::{
-    ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
     DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, GarbageCollectionCacheStats,
     GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode, MaintenanceType, Operation,
     S3Statistics, UPID,
