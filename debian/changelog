@@ -1,3 +1,63 @@
+rust-proxmox-backup (4.2.1-1) trixie; urgency=medium
+
+  * fix #5076: api: support an 'audiences' property on OpenID realms, listing
+    additional trusted audience values besides the configured client-id.
+    Improves compatibility with providers that issue tokens with multiple
+    audiences.
+
+  * fix #7562: api/ui: tape: separate the format-media 'load-barcode'
+    parameter from the existing 'label-text' verification, so the web
+    interface can load and format empty or previously-unrelated tapes from a
+    changer slot in one step. The old shared parameter aborted formatting
+    after a successful load whenever the on-tape label did not match.
+
+  * sync: pull: refuse to overwrite a locally encrypted snapshot from an
+    unencrypted source or one using a different key, and detect content
+    differences between two unencrypted snapshots that share a backup time.
+    Previously such mismatches silently triggered a resync that overwrote the
+    local snapshot.
+
+  * datastore: fix tuning option changes not propagating the updated sync
+    level to the chunk store until the service was restarted.
+
+  * datastore: improve the error message when prune cannot acquire a snapshot
+    lock for deletion, by showing the snapshot directory and lock file paths
+    instead of an internal debug dump.
+
+  * api: backup: fix benchmark, finish-failed, and backup-failed cleanups
+    leaving an orphaned empty backup group behind on the datastore.
+
+  * api: node: tasks status: return the task end time as an optional field
+    once the task is finished, so the task viewer can render the correct
+    duration without an extra API call.
+
+  * api/ui: node: add a 'location' property to the node config, exposed
+    through the node options panel.
+
+  * subscription: reuse the server ID from an existing subscription info when
+    multiple candidates are detected, falling back to the first candidate only
+    when no prior info exists.
+
+  * chunk store: include the filesystem backing path in the syncfs log output
+    for easier identification of which directory is being synced.
+
+  * tree-wide: print error chains as a colon-separated single line and stop
+    quoting simple errors without context, making logs and CLI output easier
+    to read at a glance.
+
+  * ui: encryption keys: extract the error message from API2 responses before
+    displaying the alert, so permission and other endpoint errors no longer
+    surface as an empty popup.
+
+  * removable device attach service: clarify the systemd unit description so
+    it no longer suggests that mount is attempted for every device or that
+    every device is a datastore.
+
+  * docs: faq: correct the Debian Bookworm end-of-life date; the last point
+    release is planned for July 2026.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 26 May 2026 14:53:58 +0200
+
 rust-proxmox-backup (4.2.0-1) trixie; urgency=medium
 
   * bump version for 4.2 release.
