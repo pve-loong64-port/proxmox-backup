@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use anyhow::{Error, bail, format_err};
@@ -8,6 +9,7 @@ use http_body_util::{BodyDataStream, BodyExt};
 use hyper::body::Incoming;
 use hyper::http::request::Parts;
 use serde_json::{Value, json};
+use tokio::task::spawn_blocking;
 
 use proxmox_router::{ApiHandler, ApiMethod, ApiResponseFuture, RpcEnvironment};
 use proxmox_schema::*;
@@ -232,14 +234,18 @@ async fn upload_to_backend(
     let (digest, size, chunk) =
         UploadChunk::new(BodyDataStream::new(req_body), digest, size, encoded_size).await?;
 
+    let datastore = Arc::clone(&env.datastore);
+    let backend = env.backend.clone();
+
     if env.no_cache {
         let (is_duplicate, chunk_size) =
-            env.datastore
-                .insert_chunk_no_cache(&chunk, &digest, &env.backend)?;
+            spawn_blocking(move || datastore.insert_chunk_no_cache(&chunk, &digest, &backend))
+                .await??;
         return Ok((digest, size, chunk_size as u32, is_duplicate));
     }
 
-    let (is_duplicate, chunk_size) = env.datastore.insert_chunk(&chunk, &digest, &env.backend)?;
+    let (is_duplicate, chunk_size) =
+        spawn_blocking(move || datastore.insert_chunk(&chunk, &digest, &backend)).await??;
     Ok((digest, size, chunk_size as u32, is_duplicate))
 }
 
