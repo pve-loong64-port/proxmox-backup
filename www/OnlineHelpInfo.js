@@ -271,6 +271,10 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/notifications.html#notification-mode",
     "title": "Notification Mode"
   },
+  "s3-notification-thresholds": {
+    "link": "/docs/notifications.html#s3-notification-thresholds",
+    "title": "Notification Thresholds and Reset Schedule (S3 Datastores Only)"
+  },
   "pve-integration": {
     "link": "/docs/pve-integration.html#pve-integration",
     "title": "`Proxmox VE`_ Integration"
@@ -302,6 +306,10 @@ const proxmoxOnlineHelpInfo = {
   "storage-move-namespaces-groups": {
     "link": "/docs/storage.html#storage-move-namespaces-groups",
     "title": "Moving Namespaces and Groups"
+  },
+  "datastore-options": {
+    "link": "/docs/storage.html#datastore-options",
+    "title": "Options"
   },
   "datastore-tuning-options": {
     "link": "/docs/storage.html#datastore-tuning-options",
