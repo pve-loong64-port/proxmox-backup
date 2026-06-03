@@ -695,36 +695,28 @@ impl Archiver {
                     })
                 });
 
-            match match_result {
+            let stat_result = match match_result {
                 Ok(Some(MatchType::Exclude)) => {
                     debug!("matched by exclude pattern '{full_path:?}'");
                     continue;
                 }
-                Ok(_) => (),
-                Err(err) if err.not_found() => continue,
+                Ok(_) => stat_result.map_or_else(do_stat, Ok),
+                Err(e) => Err(e),
+            };
+
+            let stat = match stat_result {
+                Ok(stat) => stat,
+                Err(err) if err.not_found() => {
+                    warn!("warning: file vanished while reading directory: {full_path:?}");
+                    continue;
+                }
                 Err(Errno::ESTALE) => {
                     self.report_stale_file_handle(Some(&full_path));
                     continue;
                 }
                 Err(err) => {
-                    return Err(err).with_context(|| format!("stat failed on {full_path:?}"));
+                    return Err(err).context(format!("stat failed on {full_path:?}"));
                 }
-            }
-
-            let stat = match stat_result {
-                Some(stat) => stat,
-                None => match do_stat() {
-                    Ok(stat) => stat,
-                    Err(Errno::ESTALE) => {
-                        self.report_stale_file_handle(Some(&full_path));
-                        continue;
-                    }
-                    Err(err) => {
-                        return Err(
-                            Error::from(err).context(format!("stat failed on {full_path:?}"))
-                        );
-                    }
-                },
             };
 
             self.entry_counter += 1;
