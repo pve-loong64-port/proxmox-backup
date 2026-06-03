@@ -710,6 +710,11 @@ impl Archiver {
                     warn!("warning: file vanished while reading directory: {full_path:?}");
                     continue;
                 }
+                Err(Errno::EACCES) => {
+                    // may happen for fuse mountpoints without allow_other or allow_root
+                    warn!("warning: failed to stat file: {full_path:?}: access denied");
+                    continue;
+                }
                 Err(Errno::ESTALE) => {
                     self.report_stale_file_handle(Some(&full_path));
                     continue;
