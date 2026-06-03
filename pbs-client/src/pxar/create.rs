@@ -676,9 +676,9 @@ impl Archiver {
 
             let match_path = PathBuf::from("/").join(full_path.clone());
 
-            let mut stat_results: Option<FileStat> = None;
+            let mut stat_result: Option<FileStat> = None;
 
-            let get_file_mode = || {
+            let do_stat = || {
                 nix::sys::stat::fstatat(
                     Some(dir_fd),
                     file_name,
@@ -689,9 +689,9 @@ impl Archiver {
             let match_result = self
                 .patterns
                 .matches(match_path.as_os_str().as_bytes(), || {
-                    Ok::<_, Errno>(match &stat_results {
+                    Ok::<_, Errno>(match &stat_result {
                         Some(result) => result.st_mode,
-                        None => stat_results.insert(get_file_mode()?).st_mode,
+                        None => stat_result.insert(do_stat()?).st_mode,
                     })
                 });
 
@@ -711,10 +711,10 @@ impl Archiver {
                 }
             }
 
-            let stat = match stat_results {
-                Some(mode) => mode,
-                None => match get_file_mode() {
-                    Ok(mode) => mode,
+            let stat = match stat_result {
+                Some(stat) => stat,
+                None => match do_stat() {
+                    Ok(stat) => stat,
                     Err(Errno::ESTALE) => {
                         self.report_stale_file_handle(Some(&full_path));
                         continue;
