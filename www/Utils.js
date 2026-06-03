@@ -405,11 +405,11 @@ Ext.define('PBS.Utils', {
         me.VERIFICATION_JOB_ID_RE = new RegExp('^' + PROXMOX_SAFE_ID_REGEX + ':?');
         me.SYNC_JOB_ID_RE = new RegExp(
             '^' +
-                PROXMOX_SAFE_ID_REGEX +
+                '(?:' + PROXMOX_SAFE_ID_REGEX + '|-)' + // remote
                 ':' +
-                PROXMOX_SAFE_ID_REGEX +
+                PROXMOX_SAFE_ID_REGEX + // remote datastore
                 ':' +
-                PROXMOX_SAFE_ID_REGEX +
+                PROXMOX_SAFE_ID_REGEX + // local datastore
                 ':',
         );
         me.BACKUP_JOB_ID_RE = new RegExp('^' + PROXMOX_SAFE_ID_REGEX + ':');
