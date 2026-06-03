@@ -280,7 +280,10 @@ Ext.define('PBS.Utils', {
         } else if (type === 'garbage_collection') {
             return id;
         } else if (type === 'prune') {
-            return id;
+            res = PBS.Utils.PRUNE_JOB_ID_RE.exec(id);
+            if (res) {
+                result = res[1];
+            }
         }
 
         return result;
@@ -410,6 +413,9 @@ Ext.define('PBS.Utils', {
                 ':',
         );
         me.BACKUP_JOB_ID_RE = new RegExp('^' + PROXMOX_SAFE_ID_REGEX + ':');
+        // Only parse the datastore for now, ignore the optional namespace.
+        // Examples: "datastore1::host/devel", "datastore2:"
+        me.PRUNE_JOB_ID_RE = new RegExp('^' + PROXMOX_SAFE_ID_REGEX + '(?::|$)');
 
         // do whatever you want here
         Proxmox.Utils.override_task_descriptions({
