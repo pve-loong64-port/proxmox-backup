@@ -942,7 +942,7 @@ pub fn update_inventory(
                 let mut drive = open_drive(&config, &drive)?;
                 match drive.read_label() {
                     Err(err) => {
-                        warn!("unable to read label form media '{label_text}' - {err}");
+                        warn!("unable to read label from media '{label_text}' - {err}");
                     }
                     Ok((None, _)) => {
                         info!("media '{label_text}' is empty");
