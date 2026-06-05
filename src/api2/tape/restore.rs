@@ -1820,7 +1820,7 @@ pub fn fast_catalog_restore(
                 });
 
                 if !wanted {
-                    info!("skip catalog because media '{catalog_uuid}' not inventarized");
+                    info!("skip catalog because media '{catalog_uuid}' not inventoried");
                     reader.skip_data()?; // read all data
                     continue;
                 }
