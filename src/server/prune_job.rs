@@ -38,7 +38,7 @@ pub fn prune_datastore(
     let keep_all = !prune_options.keeps_something();
 
     if keep_all {
-        info!("No prune selection - keeping all files.");
+        warn!("No prune selection - keeping all files.");
     } else {
         let rendered_options = cli_prune_options_string(&prune_options);
         info!("retention options: {rendered_options}");
