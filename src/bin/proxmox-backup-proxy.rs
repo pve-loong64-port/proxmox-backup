@@ -642,10 +642,6 @@ async fn schedule_datastore_prune_jobs() {
             continue;
         }
 
-        if !job_config.options.keeps_something() {
-            continue; // no 'keep' values set, keep all
-        }
-
         let worker_type = "prunejob";
         let auth_id = Authid::root_auth_id().clone();
         if check_schedule(worker_type, &job_config.schedule, &job_id) {
