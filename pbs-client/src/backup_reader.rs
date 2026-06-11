@@ -6,6 +6,8 @@ use std::sync::Arc;
 use futures::future::AbortHandle;
 use serde_json::{Value, json};
 
+use proxmox_log::warn;
+
 use pbs_api_types::{BackupArchiveName, BackupDir, BackupNamespace, MANIFEST_BLOB_NAME};
 use pbs_datastore::data_blob::DataBlob;
 use pbs_datastore::data_blob_reader::DataBlobReader;
@@ -123,8 +125,12 @@ impl BackupReader {
 
     /// Download backup manifest (index.json)
     ///
-    /// The manifest signature is verified if we have a crypt_config.
-    pub async fn download_manifest(&self) -> Result<(BackupManifest, Vec<u8>), Error> {
+    /// The manifest signature is verified if we have a crypt_config. With a crypt_config set an
+    /// unsigned manifest is rejected unless `ignore_missing_signature` is set.
+    pub async fn download_manifest(
+        &self,
+        ignore_missing_signature: bool,
+    ) -> Result<(BackupManifest, Vec<u8>), Error> {
         let mut raw_data = Vec::with_capacity(64 * 1024);
         self.download(MANIFEST_BLOB_NAME.as_ref(), &mut raw_data)
             .await?;
@@ -132,8 +138,18 @@ impl BackupReader {
         // no expected digest available
         let data = blob.decode(None, None)?;
 
-        let manifest =
-            BackupManifest::from_data(&data[..], self.crypt_config.as_ref().map(Arc::as_ref))?;
+        let manifest = BackupManifest::from_data(
+            &data[..],
+            self.crypt_config.as_ref().map(Arc::as_ref),
+            ignore_missing_signature,
+        )?;
+
+        if ignore_missing_signature && self.crypt_config.is_some() && manifest.signature.is_none() {
+            warn!(
+                "backup manifest has no signature, but an encryption key is set - cannot verify \
+                 the backup's integrity"
+            );
+        }
 
         Ok((manifest, data))
     }

@@ -255,7 +255,7 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest().await?;
+    let (manifest, _) = client.download_manifest(false).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     let daemonize = || -> Result<(), Error> {

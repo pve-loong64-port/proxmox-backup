@@ -246,7 +246,7 @@ async fn open_dynamic_index(
 ) -> Result<(DynamicIndexReader, Accessor), Error> {
     let backup_reader = create_backup_reader(snapshot, params).await?;
 
-    let (manifest, _) = backup_reader.download_manifest().await?;
+    let (manifest, _) = backup_reader.download_manifest(false).await?;
     manifest.check_fingerprint(params.crypt_config.as_ref().map(Arc::as_ref))?;
 
     let index = backup_reader

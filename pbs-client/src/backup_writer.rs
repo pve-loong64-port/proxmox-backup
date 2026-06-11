@@ -739,8 +739,9 @@ impl BackupWriter {
 
     /// Download backup manifest (index.json) of last backup.
     ///
-    /// If `check_signature` is set and the writer stores a crypt config,
-    /// also checks the manifest's signature.
+    /// If `check_signature` is set and the writer stores a crypt config, verifies any present
+    /// signature. Unsigned manifests are accepted for known-chunk deduplication; callers reusing
+    /// payloads without rereading source data must authenticate the manifest separately.
     pub async fn download_previous_manifest(
         &self,
         check_signature: bool,
@@ -762,7 +763,10 @@ impl BackupWriter {
             None
         };
 
-        BackupManifest::from_data(&data[..], crypt_config)
+        // Known-chunk deduplication computes digests again from local contents, so an unsigned
+        // manifest can still avoid uploads when signing starts. Callers reusing payloads without
+        // rereading the source must authenticate the manifest separately.
+        BackupManifest::from_data(&data[..], crypt_config, true)
     }
 
     // We have no `self` here for `h2` and `verbose`, the only other arg "common" with 1 other

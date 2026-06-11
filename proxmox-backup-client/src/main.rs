@@ -1396,6 +1396,28 @@ fn check_previous_manifest(
     Ok(())
 }
 
+fn previous_reference_archives(
+    target: &BackupArchiveName,
+    manifest: &BackupManifest,
+    crypt_config: Option<&CryptConfig>,
+    crypt_mode: CryptMode,
+) -> Result<(BackupArchiveName, BackupArchiveName), Error> {
+    // Metadata-based reuse signs reference payload digests without rereading the local contents.
+    // Unlike known-chunk deduplication, it needs an authenticated reference when a key is in use.
+    if let Some(crypt_config) = crypt_config {
+        manifest.check_signature(crypt_config, false)?;
+    }
+
+    let (target, payload_target) = pbs_client::tools::get_pxar_archive_names(target, manifest)?;
+    let payload_target =
+        payload_target.ok_or_else(|| format_err!("previous backup has no split archive"))?;
+    if manifest.lookup_file_info(&payload_target)?.crypt_mode != crypt_mode {
+        bail!("previous payload archive uses a different crypt mode");
+    }
+
+    Ok((target, payload_target))
+}
+
 async fn prepare_reference(
     target: &BackupArchiveName,
     manifest: Arc<BackupManifest>,
@@ -1404,15 +1426,19 @@ async fn prepare_reference(
     crypt_config: Option<Arc<CryptConfig>>,
     crypt_mode: CryptMode,
 ) -> Result<Option<PxarPrevRef>, Error> {
-    let (target, payload_target) =
-        match pbs_client::tools::get_pxar_archive_names(target, &manifest) {
-            Ok((target, payload_target)) => (target, payload_target),
-            Err(_) => return Ok(None),
-        };
-    let payload_target = if let Some(payload_target) = payload_target {
-        payload_target
-    } else {
-        return Ok(None);
+    let (target, payload_target) = match previous_reference_archives(
+        target,
+        &manifest,
+        crypt_config.as_deref(),
+        crypt_mode,
+    ) {
+        Ok(archives) => archives,
+        Err(err) => {
+            log::info!(
+                "Not using previous metadata reference for '{target}': {err}; reading source data"
+            );
+            return Ok(None);
+        }
     };
 
     let metadata_ref_index = if let Ok(index) = backup_reader
@@ -1424,19 +1450,6 @@ async fn prepare_reference(
         log::info!("No previous metadata index, continue without reference");
         return Ok(None);
     };
-
-    let file_info = match manifest.lookup_file_info(&payload_target) {
-        Ok(file_info) => file_info,
-        Err(_) => {
-            log::info!("No previous payload index found in manifest, continue without reference");
-            return Ok(None);
-        }
-    };
-
-    if file_info.crypt_mode != crypt_mode {
-        log::info!("Crypt mode mismatch, continue without reference");
-        return Ok(None);
-    }
 
     let known_payload_chunks = Arc::new(Mutex::new(HashSet::new()));
     let payload_ref_index = backup_writer
@@ -1783,7 +1796,7 @@ async fn restore(
     )
     .await?;
 
-    let (manifest, backup_index_data) = client.download_manifest().await?;
+    let (manifest, backup_index_data) = client.download_manifest(false).await?;
 
     if archive_name == *ENCRYPTED_KEY_BLOB_NAME && crypt_config.is_none() {
         log::info!(

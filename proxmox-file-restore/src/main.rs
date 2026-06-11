@@ -117,7 +117,7 @@ async fn list_files(
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest().await?;
+    let (manifest, _) = client.download_manifest(false).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     match path {
@@ -459,7 +459,7 @@ async fn extract(
         true,
     )
     .await?;
-    let (manifest, _) = client.download_manifest().await?;
+    let (manifest, _) = client.download_manifest(false).await?;
 
     match path {
         ExtractPath::Pxar(archive_name, path) => {

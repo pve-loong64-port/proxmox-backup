@@ -81,7 +81,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest().await?;
+    let (manifest, _) = client.download_manifest(false).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     let file_info = match manifest.lookup_file_info(&CATALOG_NAME) {
@@ -217,7 +217,7 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest().await?;
+    let (manifest, _) = client.download_manifest(false).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     if let Err(_err) = manifest.lookup_file_info(&CATALOG_NAME) {

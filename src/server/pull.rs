@@ -1012,7 +1012,7 @@ async fn optionally_use_decryption_key(
     }
 
     manifest
-        .check_signature(config)
+        .check_signature(config, false)
         .context("failed to check source manifest signature")
         .with_context(|| prefix.clone())?;
 

@@ -197,22 +197,36 @@ impl BackupManifest {
     }
 
     /// Try to read the manifest. This verifies the signature if there is a crypt_config.
+    ///
+    /// With a crypt config set the manifest must carry a valid signature; see
+    /// [`Self::check_signature`] for the meaning of `ignore_missing_signature`.
     pub fn from_data(
         data: &[u8],
         crypt_config: Option<&CryptConfig>,
+        ignore_missing_signature: bool,
     ) -> Result<BackupManifest, Error> {
         let json: Value = serde_json::from_slice(data)?;
         let manifest: BackupManifest = serde_json::from_value(json)?;
 
         if let Some(crypt_config) = crypt_config {
-            manifest.check_signature(crypt_config)?;
+            manifest.check_signature(crypt_config, ignore_missing_signature)?;
         }
 
         Ok(manifest)
     }
 
     /// Verify the signature of the manifest by given crypt config.
-    pub fn check_signature(&self, crypt_config: &CryptConfig) -> Result<(), Error> {
+    ///
+    /// A manifest that carries no signature at all is rejected, since with a key set its integrity
+    /// cannot be verified and an attacker with write access to the backend could strip the
+    /// signature to tamper with the backup. Set `ignore_missing_signature` to accept an unsigned
+    /// manifest anyway, for example to read a genuinely unencrypted backup while an encryption key
+    /// is configured; callers that do so should warn the user, as the integrity is then unverified.
+    pub fn check_signature(
+        &self,
+        crypt_config: &CryptConfig,
+        ignore_missing_signature: bool,
+    ) -> Result<(), Error> {
         if let Some(signature) = &self.signature {
             let expected_signature = hex::encode(self.signature(crypt_config)?);
 
@@ -231,8 +245,11 @@ impl BackupManifest {
             if *signature != expected_signature {
                 bail!("wrong signature in manifest");
             }
-        } else {
-            // not signed: warn/fail?
+        } else if !ignore_missing_signature {
+            bail!(
+                "manifest has no signature, but an encryption key is set - refusing to trust a \
+                 potentially tampered, unsigned backup"
+            );
         }
         Ok(())
     }
@@ -409,4 +426,106 @@ fn test_invalid_manifest_archive_name_parsing() {
         let json: Value = serde_json::from_slice(invalid_manifest.as_bytes()).unwrap();
         assert!(serde_json::from_value::<BackupManifest>(json).is_err());
     }
+}
+
+#[test]
+fn test_manifest_missing_signature() -> Result<(), Error> {
+    let crypt_config = CryptConfig::new([7; 32])?;
+    let manifest = BackupManifest::new("host/elsa/2020-06-26T13:56:05Z".parse()?);
+    assert!(manifest.check_signature(&crypt_config, false).is_err());
+    manifest.check_signature(&crypt_config, true)?;
+
+    let signed: Value = serde_json::from_str(&manifest.to_string(Some(&crypt_config))?)?;
+    for remove_fingerprint in [false, true] {
+        for omit_signature in [false, true] {
+            let mut json = signed.clone();
+            if remove_fingerprint {
+                json["unprotected"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("key-fingerprint");
+            }
+            if omit_signature {
+                json.as_object_mut().unwrap().remove("signature");
+            } else {
+                json["signature"] = Value::Null;
+            }
+            let data = serde_json::to_vec(&json)?;
+            for ignore_missing_signature in [false, true] {
+                BackupManifest::from_data(&data, None, ignore_missing_signature)?;
+                assert_eq!(
+                    BackupManifest::from_data(&data, Some(&crypt_config), ignore_missing_signature)
+                        .is_ok(),
+                    ignore_missing_signature,
+                    "remove fingerprint: {remove_fingerprint}, omit signature: {omit_signature}",
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_manifest_present_signature() -> Result<(), Error> {
+    let crypt_config = CryptConfig::new([7; 32])?;
+    let other_config = CryptConfig::new([8; 32])?;
+    let mut manifest = BackupManifest::new("host/elsa/2020-06-26T13:56:05Z".parse()?);
+    manifest.add_file(
+        &"test1.img.fidx".try_into()?,
+        200,
+        [1; 32],
+        CryptMode::Encrypt,
+    )?;
+    let signed: Value = serde_json::from_str(&manifest.to_string(Some(&crypt_config))?)?;
+
+    for remove_fingerprint in [false, true] {
+        let mut json = signed.clone();
+        if remove_fingerprint {
+            json["unprotected"]
+                .as_object_mut()
+                .unwrap()
+                .remove("key-fingerprint");
+        }
+        for ignore_missing_signature in [false, true] {
+            let data = serde_json::to_vec(&json)?;
+            BackupManifest::from_data(&data, Some(&crypt_config), ignore_missing_signature)?;
+            assert!(
+                BackupManifest::from_data(&data, Some(&other_config), ignore_missing_signature)
+                    .is_err()
+            );
+
+            let mut tampered = json.clone();
+            tampered["files"][0]["size"] = 201.into();
+            assert!(
+                BackupManifest::from_data(
+                    &serde_json::to_vec(&tampered)?,
+                    Some(&crypt_config),
+                    ignore_missing_signature,
+                )
+                .is_err()
+            );
+
+            for signature in [
+                json!(""),
+                json!("invalid"),
+                json!(false),
+                json!(42),
+                json!({}),
+            ] {
+                let mut tampered = json.clone();
+                tampered["signature"] = signature;
+                assert!(
+                    BackupManifest::from_data(
+                        &serde_json::to_vec(&tampered)?,
+                        Some(&crypt_config),
+                        ignore_missing_signature,
+                    )
+                    .is_err()
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
