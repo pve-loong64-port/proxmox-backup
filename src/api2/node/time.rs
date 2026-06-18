@@ -1,16 +1,16 @@
+use std::process::Command;
+
 use anyhow::{Error, bail, format_err};
 use serde_json::{Value, json};
 
 use proxmox_router::{Permission, Router};
 use proxmox_schema::api;
-use proxmox_sys::fs::{CreateOptions, file_read_firstline, replace_file};
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_MODIFY, TIME_ZONE_SCHEMA};
 
 fn read_etc_localtime() -> Result<String, Error> {
-    // use /etc/timezone
-    if let Ok(line) = file_read_firstline("/etc/timezone") {
-        return Ok(line.trim().to_owned());
+    if let Ok(timezone) = timedatectl_get_timezone() {
+        return Ok(timezone);
     }
 
     // otherwise guess from the /etc/localtime symlink
@@ -22,6 +22,61 @@ fn read_etc_localtime() -> Result<String, Error> {
         Some(pos) => Ok(link[(pos + 10)..].to_string()),
         None => Ok(link.to_string()),
     }
+}
+
+fn timedatectl_get_timezone() -> Result<String, Error> {
+    let output = Command::new("timedatectl")
+        .args(["show", "--property=Timezone", "--value"])
+        .output()
+        .map_err(|err| format_err!("failed to execute timedatectl show - {err}"))?;
+
+    if !output.status.success() {
+        if let Some(code) = output.status.code() {
+            let msg = String::from_utf8(output.stderr)
+                .map(|s| {
+                    if s.is_empty() {
+                        String::from("no error message")
+                    } else {
+                        s
+                    }
+                })
+                .unwrap_or_else(|_| String::from("non utf8 error message (suppressed)"));
+            bail!("timedatectl show failed with status code {code} - {msg}",);
+        } else {
+            bail!("timedatectl terminated by signal",);
+        }
+    }
+
+    let timezone = String::from_utf8(output.stdout)
+        .map_err(|err| format_err!("non utf8 timezone from timedatectl - {err}"))?;
+
+    Ok(timezone)
+}
+
+fn timedatectl_set_timezone(timezone: &str) -> Result<(), Error> {
+    let output = Command::new("timedatectl")
+        .args(["set-timezone", timezone])
+        .output()
+        .map_err(|err| format_err!("failed to execute timedatectl set-timezone - {err}"))?;
+
+    if !output.status.success() {
+        if let Some(code) = output.status.code() {
+            let msg = String::from_utf8(output.stderr)
+                .map(|s| {
+                    if s.is_empty() {
+                        String::from("no error message")
+                    } else {
+                        s
+                    }
+                })
+                .unwrap_or_else(|_| String::from("non utf8 error message (suppressed)"));
+            bail!("timedatectl set-timezone failed with status code {code} - {msg}",);
+        } else {
+            bail!("timedatectl terminated by signal",);
+        }
+    }
+
+    Ok(())
 }
 
 #[api(
@@ -88,18 +143,15 @@ fn get_time(_param: Value) -> Result<Value, Error> {
 )]
 /// Set time zone
 fn set_timezone(timezone: String, _param: Value) -> Result<Value, Error> {
+    if timedatectl_set_timezone(&timezone).is_ok() {
+        return Ok(Value::Null);
+    }
+
     let path = std::path::PathBuf::from(format!("/usr/share/zoneinfo/{timezone}"));
 
     if !path.exists() {
         bail!("No such timezone.");
     }
-
-    replace_file(
-        "/etc/timezone",
-        timezone.as_bytes(),
-        CreateOptions::new(),
-        true,
-    )?;
 
     let _ = std::fs::remove_file("/etc/localtime");
 
