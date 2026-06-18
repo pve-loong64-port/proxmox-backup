@@ -8,7 +8,7 @@ use proxmox_schema::api;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_MODIFY, TIME_ZONE_SCHEMA};
 
-fn read_etc_localtime() -> Result<String, Error> {
+fn get_timezone() -> Result<String, Error> {
     if let Ok(timezone) = timedatectl_get_timezone() {
         return Ok(timezone);
     }
@@ -118,7 +118,7 @@ fn get_time(_param: Value) -> Result<Value, Error> {
     let localtime = time + offset;
 
     Ok(json!({
-        "timezone": read_etc_localtime()?,
+        "timezone": get_timezone()?,
         "time": time,
         "localtime": localtime,
     }))
