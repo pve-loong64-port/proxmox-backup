@@ -1,3 +1,35 @@
+rust-proxmox-backup (4.2.2-1) trixie; urgency=medium
+
+  * api: backup: run synchronous chunk-insert operations off the asynchronous
+    runtime's worker threads. Blocking those threads, most notably during S3
+    uploads that can wait up to three hours for a chunk lock, could stall the
+    I/O and timer drivers of the entire runtime and starve other backup
+    workers.
+
+  * client: backup: make the file-based backup more robust against files that
+    cannot be accessed or that vanish while the backup is running:
+    - fix #7658: skip a file and log a warning instead of aborting the whole
+      backup when querying its metadata fails with a permission error,
+      matching the existing handling of permission errors when opening files.
+      Such files can also still be excluded explicitly.
+    - consistently ignore files that disappear during the backup and warn
+      about them, instead of treating this as a fatal error in some cases.
+
+  * tape: backup: fix the command-line group filter, which was passed to the
+    API under the wrong parameter name and thus had no effect.
+
+  * api: do not log a spurious error when listing the files of a snapshot
+    whose manifest does not exist yet, which is expected while a backup to
+    that snapshot is still running.
+
+  * ui: datastore summary: fix the per-datastore sync and prune job counts,
+    which were derived from an incorrectly parsed datastore ID; the prune
+    count in particular was always shown as zero.
+
+  * tape: fix two typos in log and informational messages.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 18 Jun 2026 11:28:25 +0200
+
 rust-proxmox-backup (4.2.1-1) trixie; urgency=medium
 
   * fix #5076: api: support an 'audiences' property on OpenID realms, listing
