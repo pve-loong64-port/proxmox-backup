@@ -45,4 +45,7 @@ pub use chunk_stream::{ChunkStream, FixedChunkStream, InjectionData};
 mod backup_stats;
 pub use backup_stats::BackupStats;
 
+mod log_throttle;
+pub use log_throttle::LogThrottle;
+
 pub const PROXMOX_BACKUP_TCP_KEEPALIVE_TIME: u32 = 120;
