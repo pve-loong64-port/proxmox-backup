@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Context;
+use std::time::{Duration, Instant};
 
 use anyhow::{Error, bail, format_err};
 use futures::stream::{StreamExt, TryStreamExt};
@@ -15,11 +16,12 @@ use xdg::BaseDirectories;
 
 use pathpatterns::{MatchEntry, MatchType, PatternFlag};
 use proxmox_async::blocking::TokioWriterAdapter;
+use proxmox_human_byte::HumanByte;
 use proxmox_io::StdChannelWriter;
 use proxmox_router::{ApiMethod, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_sys::fs::{CreateOptions, file_get_json, image_size, replace_file};
-use proxmox_time::{epoch_i64, strftime_local};
+use proxmox_time::{TimeSpan, epoch_i64, strftime_local};
 use pxar::accessor::aio::Accessor;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
@@ -48,7 +50,7 @@ use pbs_client::{
     BACKUP_SOURCE_SCHEMA, BackupDetectionMode, BackupReader, BackupRepository,
     BackupRepositoryArgs, BackupSpecificationType, BackupStats, BackupTargetArgs, BackupWriter,
     BackupWriterOptions, ChunkStream, FixedChunkStream, HttpClient, IndexType, InjectionData,
-    PxarBackupStream, RemoteChunkReader, UploadOptions, delete_ticket_info,
+    LogThrottle, PxarBackupStream, RemoteChunkReader, UploadOptions, delete_ticket_info,
     parse_backup_specification, view_task_result,
 };
 use pbs_datastore::catalog::{BackupCatalogWriter, CatalogReader, CatalogWriter};
@@ -1421,6 +1423,112 @@ async fn prepare_reference(
     }))
 }
 
+/// Wraps a reader, feeding the bytes read from it into a shared [`RestoreProgress`].
+///
+/// Accounting on every read keeps progress advancing even while a single large file is being
+/// restored.
+struct CountingReader<R> {
+    inner: R,
+    progress: Arc<Mutex<RestoreProgress>>,
+}
+
+impl<R> CountingReader<R> {
+    fn new(inner: R, progress: Arc<Mutex<RestoreProgress>>) -> Self {
+        Self { inner, progress }
+    }
+}
+
+impl<R: Read> Read for CountingReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let count = self.inner.read(buf)?;
+        self.progress.lock().unwrap().add(count as u64);
+        Ok(count)
+    }
+}
+
+/// Tracks the amount of restored data and logs the progress periodically, plus a final summary.
+///
+/// Progress lines are throttled with a backoff (see [`LogThrottle`]) so that they appear quickly at
+/// first but do not spam the log during long-running restores.
+struct RestoreProgress {
+    total: u64,
+    bytes: u64,
+    start: Instant,
+    last_log: Instant,
+    last_log_bytes: u64,
+    throttle: LogThrottle,
+}
+
+impl RestoreProgress {
+    const INITIAL_INTERVAL: Duration = Duration::from_secs(5);
+    const MAX_INTERVAL: Duration = Duration::from_secs(60);
+
+    fn new(total: u64) -> Self {
+        let now = Instant::now();
+        Self {
+            total,
+            bytes: 0,
+            start: now,
+            last_log: now,
+            last_log_bytes: 0,
+            throttle: LogThrottle::new(Self::INITIAL_INTERVAL, Self::MAX_INTERVAL),
+        }
+    }
+
+    /// Account for `count` newly processed bytes, logging a throttled progress line.
+    fn add(&mut self, count: u64) {
+        self.bytes += count;
+
+        if !self.throttle.should_log() {
+            return;
+        }
+
+        // report the speed over the last interval rather than the overall average, so it reflects
+        // the current throughput, which can vary a lot with bandwidth, holes and compression
+        let now = Instant::now();
+        let speed = HumanByte::from(per_second(
+            self.bytes - self.last_log_bytes,
+            now.duration_since(self.last_log),
+        ));
+        self.last_log = now;
+        self.last_log_bytes = self.bytes;
+
+        let elapsed = TimeSpan::from(self.start.elapsed());
+        match (self.bytes * 100).checked_div(self.total) {
+            Some(percentage) => log::info!(
+                "progress {percentage}% ({} of {} in {elapsed}, {speed}/s)",
+                HumanByte::from(self.bytes),
+                HumanByte::from(self.total),
+            ),
+            None => log::info!(
+                "processed {} in {elapsed}, {speed}/s",
+                HumanByte::from(self.bytes)
+            ),
+        }
+    }
+
+    /// Log a final summary with the total amount of processed data and the average speed.
+    fn finish(&self) {
+        let elapsed = self.start.elapsed();
+        log::info!(
+            "restore complete ({} processed in {}, average {}/s)",
+            HumanByte::from(self.bytes),
+            TimeSpan::from(elapsed),
+            HumanByte::from(per_second(self.bytes, elapsed)),
+        );
+    }
+}
+
+/// Returns the average number of bytes per second, or `0` if no time elapsed yet.
+fn per_second(bytes: u64, elapsed: Duration) -> u64 {
+    let secs = elapsed.as_secs_f64();
+    if secs > 0.0 {
+        (bytes as f64 / secs) as u64
+    } else {
+        0
+    }
+}
+
 async fn dump_image<W: Write>(
     client: Arc<BackupReader>,
     crypt_config: Option<Arc<CryptConfig>>,
@@ -1434,35 +1542,16 @@ async fn dump_image<W: Write>(
 
     // Note: we avoid using BufferedFixedReader, because that add an additional buffer/copy
     // and thus slows down reading. Instead, directly use RemoteChunkReader
-    let mut per = 0;
-    let mut bytes = 0;
-    let start_time = std::time::Instant::now();
+    let mut progress = RestoreProgress::new(index.index_bytes());
 
     for pos in 0..index.index_count() {
         let digest = index.index_digest(pos).unwrap();
         let raw_data = chunk_reader.read_chunk(digest).await?;
         writer.write_all(&raw_data)?;
-        bytes += raw_data.len();
-        let next_per = ((pos + 1) * 100) / index.index_count();
-        if per != next_per {
-            log::debug!(
-                "progress {}% (read {} bytes, duration {} sec)",
-                next_per,
-                bytes,
-                start_time.elapsed().as_secs()
-            );
-            per = next_per;
-        }
+        progress.add(raw_data.len() as u64);
     }
 
-    let end_time = std::time::Instant::now();
-    let elapsed = end_time.duration_since(start_time);
-    log::info!(
-        "restore image complete (bytes={}, duration={:.2}s, speed={:.2}MB/s)",
-        bytes,
-        elapsed.as_secs_f64(),
-        bytes as f64 / (1024.0 * 1024.0 * elapsed.as_secs_f64())
-    );
+    progress.finish();
 
     Ok(())
 }
@@ -1770,6 +1859,7 @@ async fn restore(
         }
 
         if let Some(target) = target {
+            let progress;
             let reader = if let Some(payload_archive_name) = payload_archive_name {
                 let payload_reader = get_buffered_pxar_reader(
                     &payload_archive_name,
@@ -1778,9 +1868,15 @@ async fn restore(
                     crypt_config.clone(),
                 )
                 .await?;
-                pxar::PxarVariant::Split(reader, payload_reader)
+                let total = reader.archive_size() + payload_reader.archive_size();
+                progress = Arc::new(Mutex::new(RestoreProgress::new(total)));
+                pxar::PxarVariant::Split(
+                    CountingReader::new(reader, progress.clone()),
+                    CountingReader::new(payload_reader, progress.clone()),
+                )
             } else {
-                pxar::PxarVariant::Unified(reader)
+                progress = Arc::new(Mutex::new(RestoreProgress::new(reader.archive_size())));
+                pxar::PxarVariant::Unified(CountingReader::new(reader, progress.clone()))
             };
             let decoder = pxar::decoder::Decoder::from_std(reader)?;
 
@@ -1794,6 +1890,7 @@ async fn restore(
                 options,
             )
             .map_err(|err| format_err!("error extracting archive - {:#}", err))?;
+            progress.lock().unwrap().finish();
         } else {
             if archive_name.ends_with(".mpxar.didx") || archive_name.ends_with(".ppxar.didx") {
                 bail!("unable to pipe split archive");
