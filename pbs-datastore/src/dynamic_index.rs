@@ -22,6 +22,7 @@ use crate::read_chunk::ReadChunk;
 
 /// Header format definition for dynamic index files (`.dixd`)
 #[repr(C)]
+#[cfg(not(target_arch = "loongarch64"))]
 pub struct DynamicIndexHeader {
     pub magic: [u8; 8],
     pub uuid: [u8; 16],
@@ -30,7 +31,22 @@ pub struct DynamicIndexHeader {
     pub index_csum: [u8; 32],
     reserved: [u8; 4032], // overall size is one page (4096 bytes)
 }
+#[cfg(not(target_arch = "loongarch64"))]
 proxmox_lang::static_assert_size!(DynamicIndexHeader, 4096);
+
+/// Header format definition for dynamic index files (`.dixd`)
+#[repr(C)]
+#[cfg(target_arch = "loongarch64")]
+pub struct DynamicIndexHeader {
+    pub magic: [u8; 8],
+    pub uuid: [u8; 16],
+    pub ctime: i64,
+    /// Sha256 over the index ``SHA256(offset1||digest1||offset2||digest2||...)``
+    pub index_csum: [u8; 32],
+    reserved: [u8; 16320], // overall size is one page (16384 bytes)
+}
+#[cfg(target_arch = "loongarch64")]
+proxmox_lang::static_assert_size!(DynamicIndexHeader, 16384);
 // TODO: Once non-Copy unions are stabilized, use:
 // union DynamicIndexHeader {
 //     reserved: [u8; 4096],
