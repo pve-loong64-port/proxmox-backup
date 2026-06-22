@@ -14,6 +14,7 @@ use crate::index::{ChunkReadInfo, IndexFile};
 
 /// Header format definition for fixed index files (`.fidx`)
 #[repr(C)]
+#[cfg(not(target_arch = "loongarch64"))]
 pub struct FixedIndexHeader {
     pub magic: [u8; 8],
     pub uuid: [u8; 16],
@@ -24,7 +25,24 @@ pub struct FixedIndexHeader {
     pub chunk_size: u64,
     reserved: [u8; 4016], // overall size is one page (4096 bytes)
 }
+#[cfg(not(target_arch = "loongarch64"))]
 proxmox_lang::static_assert_size!(FixedIndexHeader, 4096);
+
+/// Header format definition for fixed index files (`.fidx`)
+#[repr(C)]
+#[cfg(target_arch = "loongarch64")]
+pub struct FixedIndexHeader {
+    pub magic: [u8; 8],
+    pub uuid: [u8; 16],
+    pub ctime: i64,
+    /// Sha256 over the index ``SHA256(digest1||digest2||...)``
+    pub index_csum: [u8; 32],
+    pub size: u64,
+    pub chunk_size: u64,
+    reserved: [u8; 16304], // overall size is one page (16384 bytes)
+}
+#[cfg(target_arch = "loongarch64")]
+proxmox_lang::static_assert_size!(FixedIndexHeader, 16384);
 
 // split image into fixed size chunks
 
@@ -286,7 +304,7 @@ impl FixedIndexWriter {
         let header_size = std::mem::size_of::<FixedIndexHeader>();
 
         // todo: use static assertion when available in rust
-        if header_size != 4096 {
+        if header_size != 4096 && header_size != 16384 {
             panic!("got unexpected header size");
         }
 
