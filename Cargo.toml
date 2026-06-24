@@ -92,6 +92,7 @@ proxmox-shared-cache = "1"
 proxmox-shared-memory = "1"
 proxmox-sortable-macro = "1"
 proxmox-subscription = { version = "1.0.2", features = [ "api-types" ] }
+proxmox-syslog-api = { version = "1.1", features = [ "impl" ] }
 proxmox-sys = "1"
 proxmox-systemd = "1.0.1"
 proxmox-tfa = { version = "6.0.3", features = [ "api", "api-types" ] }
@@ -249,6 +250,7 @@ proxmox-shared-cache.workspace = true
 proxmox-shared-memory.workspace = true
 proxmox-sortable-macro.workspace = true
 proxmox-subscription.workspace = true
+proxmox-syslog-api.workspace = true
 proxmox-sys = { workspace = true, features = [ "timer" ] }
 proxmox-systemd.workspace = true
 proxmox-tfa.workspace = true

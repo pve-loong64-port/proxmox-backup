@@ -1,130 +1,79 @@
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use anyhow::Error;
-use serde_json::{Value, json};
-use std::io::{BufRead, BufReader};
+use futures::FutureExt;
+use hyper::body::Incoming;
+use hyper::http::request::Parts;
+use hyper::http::{Response, StatusCode, header};
+use serde_json::Value;
+use tokio::process::Command;
 
-use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
-use proxmox_schema::api;
+use proxmox_async::stream::AsyncReaderStream;
+use proxmox_http::Body;
+use proxmox_router::{
+    ApiHandler, ApiMethod, ApiResponseFuture, Permission, Router, RpcEnvironment,
+};
+use proxmox_schema::{AllOfSchema, ApiType, ObjectSchema, ParameterSchema, Schema};
+
+use proxmox_syslog_api::JournalFilter;
 
 use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT};
 
-#[api(
-    protected: true,
-    input: {
-        properties: {
-            node: {
-                schema: NODE_SCHEMA,
-            },
-            since: {
-                type: Integer,
-                optional: true,
-                description: "Display all log since this UNIX epoch. Conflicts with 'startcursor'.",
-                minimum: 0,
-            },
-            until: {
-                type: Integer,
-                optional: true,
-                description: "Display all log until this UNIX epoch. Conflicts with 'endcursor'.",
-                minimum: 0,
-            },
-            lastentries: {
-                type: Integer,
-                optional: true,
-                description: "Limit to the last X lines. Conflicts with a range.",
-                minimum: 0,
-            },
-            startcursor: {
-                type: String,
-                description: "Start after the given Cursor. Conflicts with 'since'.",
-                optional: true,
-            },
-            endcursor: {
-                type: String,
-                description: "End before the given Cursor. Conflicts with 'until'",
-                optional: true,
-            },
-        },
-    },
-    returns: {
-        type: Array,
-        description: "Returns a list of journal entries.",
-        items: {
-            type: String,
-            description: "Line text.",
-        },
-    },
-    access: {
-        permission: &Permission::Privilege(&["system", "log"], PRIV_SYS_AUDIT, false),
-    },
-)]
+const NODE_OBJECT_SCHEMA: Schema =
+    ObjectSchema::new("Node parameter.", &[("node", false, &NODE_SCHEMA)]).schema();
+
+pub const API_METHOD_GET_JOURNAL: ApiMethod = ApiMethod::new_full(
+    &ApiHandler::AsyncHttp(&get_journal),
+    ParameterSchema::AllOf(&AllOfSchema::new(
+        "Read syslog entries.",
+        &[&NODE_OBJECT_SCHEMA, &<JournalFilter as ApiType>::API_SCHEMA],
+    )),
+)
+.protected(true)
+.access(
+    None,
+    &Permission::Privilege(&["system", "log"], PRIV_SYS_AUDIT, false),
+);
+
 /// Read syslog entries.
-#[allow(clippy::too_many_arguments)]
-fn get_journal(
-    since: Option<i64>,
-    until: Option<i64>,
-    lastentries: Option<u64>,
-    startcursor: Option<String>,
-    endcursor: Option<String>,
-    _param: Value,
+pub fn get_journal(
+    _parts: Parts,
+    _req_body: Incoming,
+    param: Value,
     _info: &ApiMethod,
-    _rpcenv: &mut dyn RpcEnvironment,
-) -> Result<Value, Error> {
-    let mut args = vec![];
+    _rpcenv: Box<dyn RpcEnvironment>,
+) -> ApiResponseFuture {
+    async move {
+        let filter: JournalFilter = serde_json::from_value(param)?;
+        let args = proxmox_syslog_api::journal_args(&filter);
 
-    if let Some(lastentries) = lastentries {
-        args.push(String::from("-n"));
-        args.push(format!("{lastentries}"));
-    }
+        let mut child = Command::new("mini-journalreader")
+            .args(&args)
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()?;
 
-    if let Some(since) = since {
-        args.push(String::from("-b"));
-        args.push(since.to_string());
-    }
+        let stdout = child.stdout.take().expect("piped stdout is available");
 
-    if let Some(until) = until {
-        args.push(String::from("-e"));
-        args.push(until.to_string());
-    }
-
-    if let Some(startcursor) = startcursor {
-        args.push(String::from("-f"));
-        args.push(startcursor);
-    }
-
-    if let Some(endcursor) = endcursor {
-        args.push(String::from("-t"));
-        args.push(endcursor);
-    }
-
-    let mut lines: Vec<String> = vec![];
-
-    let mut child = Command::new("mini-journalreader")
-        .args(&args)
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    if let Some(ref mut stdout) = child.stdout {
-        for line in BufReader::new(stdout).lines() {
-            match line {
-                Ok(line) => {
-                    lines.push(line);
+        // reap the short-lived child so it does not turn into a zombie
+        tokio::spawn(async move {
+            match child.wait().await {
+                Ok(status) if !status.success() => {
+                    log::error!("mini-journalreader exited with {status}")
                 }
-                Err(err) => {
-                    log::error!("reading journal failed: {}", err);
-                    let _ = child.kill();
-                    break;
-                }
+                Err(err) => log::error!("waiting for mini-journalreader failed: {err}"),
+                _ => {}
             }
-        }
-    }
+        });
 
-    let status = child.wait().unwrap();
-    if !status.success() {
-        log::error!("journalctl failed with {}", status);
-    }
+        let stream = AsyncReaderStream::new(stdout);
 
-    Ok(json!(lines))
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::wrap_stream(stream))
+            .unwrap())
+    }
+    .boxed()
 }
 
 pub const ROUTER: Router = Router::new().get(&API_METHOD_GET_JOURNAL);
