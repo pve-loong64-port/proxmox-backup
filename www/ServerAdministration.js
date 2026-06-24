@@ -29,6 +29,7 @@ Ext.define('PBS.ServerAdministration', {
             title: gettext('Services'),
             itemId: 'services',
             iconCls: 'fa fa-cogs',
+            useJournalLog: true,
             restartCommand: 'reload', // avoid disruptions
             startOnlyServices: {
                 syslog: true,
@@ -68,6 +69,7 @@ Ext.define('PBS.ServerAdministration', {
             iconCls: 'fa fa-list',
             title: gettext('Syslog'),
             url: '/api2/extjs/nodes/localhost/journal',
+            structured: true,
         },
         {
             xtype: 'proxmoxNodeTasks',
