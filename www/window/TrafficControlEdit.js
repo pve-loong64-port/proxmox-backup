@@ -216,9 +216,6 @@ Ext.define('PBS.window.TrafficControlEdit', {
                 PBS.Utils.delete_if_default(values, 'burst-in');
                 PBS.Utils.delete_if_default(values, 'burst-out');
                 PBS.Utils.delete_if_default(values, 'users');
-                if (typeof values.delete === 'string') {
-                    values.delete = values.delete.split(',');
-                }
             }
 
             return values;

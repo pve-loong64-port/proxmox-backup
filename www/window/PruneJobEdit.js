@@ -51,11 +51,6 @@ Ext.define('PBS.window.PruneJobEdit', {
             if (!values.id && me.up('pbsPruneJobEdit').isCreate) {
                 values.id = 's-' + Ext.data.identifier.Uuid.Global.generate().slice(0, 13);
             }
-            if (!me.isCreate) {
-                if (typeof values.delete === 'string') {
-                    values.delete = values.delete.split(',');
-                }
-            }
             values.disable = !values.enable;
             delete values.enable;
 

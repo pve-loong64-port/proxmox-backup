@@ -179,9 +179,6 @@ Ext.define('PBS.window.S3ClientEdit', {
         let me = this;
         let values = me.callParent(arguments);
 
-        if (values.delete && !Ext.isArray(values.delete)) {
-            values.delete = values.delete.split(',');
-        }
         PBS.Utils.delete_if_default(values, 'path-style', false, me.isCreate);
         PBS.Utils.delete_if_default(values, 'rate-in', undefined, me.isCreate);
         PBS.Utils.delete_if_default(values, 'burst-in', undefined, me.isCreate);

@@ -129,9 +129,6 @@ Ext.define('PBS.window.SyncJobEdit', {
                         PBS.Utils.delete_if_default(values, 'rate-in');
                         PBS.Utils.delete_if_default(values, 'rate-out');
                         PBS.Utils.delete_if_default(values, 'remote');
-                        if (typeof values.delete === 'string') {
-                            values.delete = values.delete.split(',');
-                        }
                     }
                     return values;
                 },

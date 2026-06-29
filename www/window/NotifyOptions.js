@@ -64,10 +64,6 @@ Ext.define('PBS.window.NotifyOptions', {
             }
             values.notify = PBS.Utils.printPropertyString(notify);
 
-            if (values.delete && !Ext.isArray(values.delete)) {
-                values.delete = values.delete.split(',');
-            }
-
             PBS.Utils.delete_if_default(values, 'notify', '');
             PBS.Utils.delete_if_default(values, 'notify-user', '');
 
