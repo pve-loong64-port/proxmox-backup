@@ -147,6 +147,10 @@ pub enum DeletableProperty {
     RateOut,
     /// Delete the burst-out property.
     BurstOut,
+    /// Delete the limit-active-requests property.
+    LimitActiveRequests,
+    /// Delete the limit-passive-requests property.
+    LimitPassiveRequests,
     /// Delete the provider quirks property.
     ProviderQuirks,
 }
@@ -230,6 +234,12 @@ pub fn update_s3_client_config(
                 DeletableProperty::BurstOut => {
                     data.config.burst_out = None;
                 }
+                DeletableProperty::LimitActiveRequests => {
+                    data.config.limit_active_requests = None;
+                }
+                DeletableProperty::LimitPassiveRequests => {
+                    data.config.limit_passive_requests = None;
+                }
                 DeletableProperty::ProviderQuirks => {
                     data.config.provider_quirks = None;
                 }
@@ -266,6 +276,12 @@ pub fn update_s3_client_config(
     }
     if let Some(burst_out) = update.burst_out {
         data.config.burst_out = Some(burst_out);
+    }
+    if let Some(limit_active_requests) = update.limit_active_requests {
+        data.config.limit_active_requests = Some(limit_active_requests);
+    }
+    if let Some(limit_passive_requests) = update.limit_passive_requests {
+        data.config.limit_passive_requests = Some(limit_passive_requests);
     }
     if let Some(provider_quirks) = update.provider_quirks {
         data.config.provider_quirks = Some(provider_quirks);
