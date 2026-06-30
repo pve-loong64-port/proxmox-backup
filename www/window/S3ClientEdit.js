@@ -135,6 +135,13 @@ Ext.define('PBS.window.S3ClientEdit', {
                 emptyText: gettext('Unlimited'),
                 submitAutoScaledSizeUnit: true,
             },
+            {
+                xtype: 'proxmoxintegerfield',
+                name: 'limit-active-requests',
+                fieldLabel: gettext('PUT/POST/DELETE request limit (#/s)'),
+                emptyText: gettext('Unlimited'),
+                minValue: 1,
+            },
         ],
         advancedColumn2: [
             {
@@ -150,6 +157,13 @@ Ext.define('PBS.window.S3ClientEdit', {
                 fieldLabel: gettext('Burst Out'),
                 emptyText: gettext('Same as Rate'),
                 submitAutoScaledSizeUnit: true,
+            },
+            {
+                xtype: 'proxmoxintegerfield',
+                name: 'limit-passive-requests',
+                fieldLabel: gettext('GET/HEAD request limit (#/s)'),
+                emptyText: gettext('Unlimited'),
+                minValue: 1,
             },
         ],
         advancedColumnB: [
