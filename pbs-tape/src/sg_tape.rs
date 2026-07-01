@@ -41,7 +41,8 @@ use crate::{
     sgutils2::{
         InquiryInfo, ModeBlockDescriptor, ModeParameterHeader, ScsiError, SenseInfo, SgRaw,
         alloc_page_aligned_buffer, scsi_cmd_mode_select6, scsi_cmd_mode_select10, scsi_inquiry,
-        scsi_mode_sense, scsi_request_sense,
+        scsi_mode_sense, scsi_request_sense, sense_err_is_becoming_ready,
+        sense_err_is_rewind_in_progress,
     },
 };
 
@@ -358,7 +359,60 @@ impl SgTape {
             .do_command(&cmd)
             .map_err(|err| format_err!("rewind failed - {err}"))?;
 
+        // Some drives return from the non-immediate REWIND before it has
+        // actually finished (as if IMMED had been set), so the next command
+        // fails with "rewind operation in progress". Wait for the drive to
+        // reach beginning-of-tape before returning.
+        self.wait_until_rewound()?;
+
         Ok(())
+    }
+
+    /// Wait until a rewind reached beginning-of-tape.
+    ///
+    /// Polls READ POSITION and busy-waits while the drive reports that the
+    /// rewind is still in progress (or that it is not ready yet). Returns as
+    /// soon as the drive reports beginning-of-tape, which happens on the first
+    /// iteration for a well-behaved drive.
+    fn wait_until_rewound(&mut self) -> Result<(), Error> {
+        log::debug!("waiting for drive to finish rewind");
+        let start = SystemTime::now();
+        let max_wait = std::time::Duration::new(Self::SCSI_TAPE_DEFAULT_TIMEOUT as u64, 0);
+
+        let mut last_msg: Option<String> = None;
+
+        loop {
+            match self.read_position_raw() {
+                Ok(data) => {
+                    let page = Self::decode_read_position(&data)?;
+                    let object_number = page.logical_object_number;
+                    if object_number == 0 {
+                        // beginning-of-tape reached, the rewind is done
+                        log::debug!("finished waiting for rewind");
+                        return Ok(());
+                    }
+                    // position readable, but not at beginning-of-tape yet
+                    log::debug!("rewind not done yet, at object position {object_number}");
+                }
+                Err(ScsiError::Sense(sense))
+                    if sense_err_is_rewind_in_progress(&sense)
+                        || sense_err_is_becoming_ready(&sense) =>
+                {
+                    let msg = sense.to_string();
+                    if last_msg.as_ref() != Some(&msg) {
+                        log::info!("waiting for rewind to complete - {msg}");
+                        last_msg = Some(msg);
+                    }
+                }
+                Err(err) => bail!("wait for rewind to complete failed - {err}"),
+            }
+
+            if start.elapsed()? > max_wait {
+                bail!("wait for rewind to complete failed - timeout");
+            }
+
+            std::thread::sleep(std::time::Duration::new(1, 0));
+        }
     }
 
     #[allow(clippy::unusual_byte_groupings)]
@@ -440,9 +494,11 @@ impl SgTape {
         Ok(())
     }
 
-    pub fn position(&mut self) -> Result<ReadPositionLongPage, Error> {
-        let expected_size = std::mem::size_of::<ReadPositionLongPage>();
-
+    /// Send READ POSITION LONG FORM and return the raw response.
+    ///
+    /// Returns the raw `ScsiError` so callers can inspect the sense data, for
+    /// example to busy-wait while a rewind is still in progress.
+    fn read_position_raw(&mut self) -> Result<Vec<u8>, ScsiError> {
         let mut sg_raw = SgRaw::new(&mut self.file, 32)?;
         sg_raw.set_timeout(30); // use short timeout
         let mut cmd = Vec::new();
@@ -451,9 +507,11 @@ impl SgTape {
         // reference manual.
         cmd.extend([0x34, 0x06, 0, 0, 0, 0, 0, 0, 0, 0]); // READ POSITION LONG FORM
 
-        let data = sg_raw
-            .do_command(&cmd)
-            .map_err(|err| format_err!("read position failed - {}", err))?;
+        Ok(sg_raw.do_command(&cmd)?.to_vec())
+    }
+
+    fn decode_read_position(data: &[u8]) -> Result<ReadPositionLongPage, Error> {
+        let expected_size = std::mem::size_of::<ReadPositionLongPage>();
 
         let page = proxmox_lang::try_block!({
             if data.len() != expected_size {
@@ -472,8 +530,18 @@ impl SgTape {
         })
         .map_err(|err: Error| format_err!("decode position page failed - {err}"))?;
 
+        Ok(page)
+    }
+
+    pub fn position(&mut self) -> Result<ReadPositionLongPage, Error> {
+        let data = self
+            .read_position_raw()
+            .map_err(|err| format_err!("read position failed - {err}"))?;
+
+        let page = Self::decode_read_position(&data)?;
+
         if page.partition_number != 0 {
-            bail!("detecthed partitioned tape - not supported");
+            bail!("detected partitioned tape - not supported");
         }
 
         Ok(page)
