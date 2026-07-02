@@ -1192,7 +1192,7 @@ impl SgTape {
 
         for (id, data) in attribute_list {
             if let Err(err) = write_mam_attribute(&mut self.file, id, data) {
-                log::warn!("could not set MAM Attribute {id:x}: {err}");
+                log::info!("could not set MAM Attribute {id:x}: {err}");
             }
         }
     }
@@ -1201,7 +1201,7 @@ impl SgTape {
     fn clear_mam_attributes(&mut self) {
         for attr in [0x08_00, 0x08_01, 0x08_02, 0x08_03, 0x08_08] {
             if let Err(err) = write_mam_attribute(&mut self.file, attr, b"") {
-                log::warn!("could not clear MAM attribute {attr:x}: {err}");
+                log::info!("could not clear MAM attribute {attr:x}: {err}");
             }
         }
     }
