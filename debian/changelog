@@ -1,3 +1,61 @@
+rust-proxmox-backup (4.2.3-1) trixie; urgency=medium
+
+  * css: remove x-grid-row-loading class, replace it with non-blurry SVG
+    variant from proxmox-widget-toolkit
+
+  * pbs-client: add backoff log throttle, to ensure progress and similar output
+    appears quickly initially, but does not create overly long logs
+
+  * client: report progress during restore
+
+  * api: journal: adopt proxmox-syslog-api and stream the output, making the
+    implementation consistent with the one from Proxmox Datacenter Manager
+
+  * ui: enable the structured journal view and per-service logs, including
+    colored output and filtering capabilities
+
+  * ui: always use arrays for 'delete' property, instead of manually converting
+
+  * fix #5971: tape: don't warn on custom MAM attribute write failures
+
+  * fix #7175: api: time: use timedatectl instead of /etc/timezone
+
+  * fix #7187: report: add ethtool output for physical interfaces
+
+  * prune jobs: schedule jobs that do not prune anything, but warn during their
+    execution. such jobs allow testing scheduling options, but make no sense
+    for production use.
+
+  * fix #6691: allow search by comment in datastore content, make search
+    case-insensitive and correctly reset content view after empty searches
+
+  * ui: datastore: disable various action tooltips for actions which cannot be
+    triggered
+
+  * ldap: escape the user-provided user name when using it in the LDAP search
+    filter that looks up the user DN.
+
+  * ldap sync: log which user properties change when synchronizing an existing
+    user, instead of only reporting that the user was updated.
+
+  * api schema/section config: add support for declaring deprecated property
+    aliases, to allow renaming properties without showing the old name in the
+    documentation
+
+  * rest server: accept deprecated property aliases in JSON request bodies by
+    rewriting them to the canonical name before verification and dispatch, like
+    the CLI and query-string handling already do.
+
+  * fix #7690: fs: replace_file: close the temporary file before renaming or
+    unlinking it, fixing the replacement on WORM file systems and avoiding
+    leftover .fuse_hidden files on FUSE mounts.
+
+  * fs: make_tmp_file: append the temporary suffix instead of replacing the
+    file extension, keeping the original file name intact for easier
+    debugging of leftover temporary files.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 14 Jul 2026 12:54:15 +0200
+
 rust-proxmox-backup (4.2.2-1) trixie; urgency=medium
 
   * api: backup: run synchronous chunk-insert operations off the asynchronous
