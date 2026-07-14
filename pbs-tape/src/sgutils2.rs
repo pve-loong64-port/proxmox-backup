@@ -900,20 +900,6 @@ pub fn sense_err_is_invalid_command(err: &SenseInfo) -> bool {
     err.sense_key == SENSE_KEY_ILLEGAL_REQUEST && err.asc == 0x20 && err.ascq == 0x00
 }
 
-/// True if the given sense info is REWIND OPERATION IN PROGRESS, i.e. the
-/// drive is still rewinding.
-/// <https://www.t10.org/lists/asc-num.htm#ASC_00>
-pub fn sense_err_is_rewind_in_progress(err: &SenseInfo) -> bool {
-    err.asc == 0x00 && err.ascq == 0x1A
-}
-
-/// True if the given sense info is LOGICAL UNIT IS IN PROCESS OF BECOMING
-/// READY, i.e. the drive is not ready yet but expected to become ready.
-/// <https://www.t10.org/lists/asc-num.htm#ASC_04>
-pub fn sense_err_is_becoming_ready(err: &SenseInfo) -> bool {
-    err.sense_key == SENSE_KEY_NOT_READY && err.asc == 0x04 && err.ascq == 0x01
-}
-
 /// Run SCSI Mode Sense - try Mode Sense(10) first, fallback to Mode Sense(6)
 ///
 /// Warning: P needs to be repr(C, packed)]
