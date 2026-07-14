@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use anyhow::{Error, bail, format_err};
+use proxmox_sys::command::run_command;
 use serde_json::{Value, json};
 
 use proxmox_router::{Permission, Router};
@@ -25,56 +26,19 @@ fn get_timezone() -> Result<String, Error> {
 }
 
 fn timedatectl_get_timezone() -> Result<String, Error> {
-    let output = Command::new("timedatectl")
-        .args(["show", "--property=Timezone", "--value"])
-        .output()
-        .map_err(|err| format_err!("failed to execute timedatectl show - {err}"))?;
+    let mut command = Command::new("timedatectl");
+    command.args(["show", "--property=Timezone", "--value"]);
 
-    if !output.status.success() {
-        if let Some(code) = output.status.code() {
-            let msg = String::from_utf8(output.stderr)
-                .map(|s| {
-                    if s.is_empty() {
-                        String::from("no error message")
-                    } else {
-                        s
-                    }
-                })
-                .unwrap_or_else(|_| String::from("non utf8 error message (suppressed)"));
-            bail!("timedatectl show failed with status code {code} - {msg}",);
-        } else {
-            bail!("timedatectl terminated by signal",);
-        }
-    }
-
-    let timezone = String::from_utf8(output.stdout)
-        .map_err(|err| format_err!("non utf8 timezone from timedatectl - {err}"))?;
+    let timezone = run_command(command, None)?;
 
     Ok(timezone)
 }
 
 fn timedatectl_set_timezone(timezone: &str) -> Result<(), Error> {
-    let output = Command::new("timedatectl")
-        .args(["set-timezone", timezone])
-        .output()
-        .map_err(|err| format_err!("failed to execute timedatectl set-timezone - {err}"))?;
+    let mut command = Command::new("timedatectl");
+    command.args(["set-timezone", timezone]);
 
-    if !output.status.success() {
-        if let Some(code) = output.status.code() {
-            let msg = String::from_utf8(output.stderr)
-                .map(|s| {
-                    if s.is_empty() {
-                        String::from("no error message")
-                    } else {
-                        s
-                    }
-                })
-                .unwrap_or_else(|_| String::from("non utf8 error message (suppressed)"));
-            bail!("timedatectl set-timezone failed with status code {code} - {msg}",);
-        } else {
-            bail!("timedatectl terminated by signal",);
-        }
-    }
+    run_command(command, None)?;
 
     Ok(())
 }
