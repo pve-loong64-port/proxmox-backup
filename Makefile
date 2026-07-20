@@ -3,7 +3,7 @@ include /usr/share/rustc/architecture.mk
 include defines.mk
 
 PACKAGE := proxmox-backup
-ARCH := $(DEB_BUILD_ARCH)
+ARCH := $(DEB_HOST_ARCH)
 export DEB_HOST_RUST_TYPE
 
 SUBDIRS := etc www docs templates
