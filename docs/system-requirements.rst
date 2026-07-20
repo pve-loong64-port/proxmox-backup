@@ -40,8 +40,8 @@ Recommended Server System Requirements
 
 * Backup storage:
 
-  * Prefer fast storage that delivers high IOPS for random IO workloads; use
-    only enterprise SSDs for best results.
+  * Prefer fast local storage that delivers high IOPS for random IO workloads;
+    use only enterprise SSDs for best results.
   * If HDDs are used: Using a metadata cache is highly recommended, for example,
     add a ZFS :ref:`special device mirror <local_zfs_special_device>`.
 
