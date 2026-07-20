@@ -140,6 +140,30 @@ You can access this repository by adding the following stanza to
   Components: pbs-test
   Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
+.. _package_repositories_dbgsym:
+
+`Proxmox Backup`_ Debug Symbol Repository
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Debug symbol packages, named ``<package>-dbgsym``, contain the detached debug
+information for the matching binary package. They are not needed for normal
+operation, but let tools such as ``gdb``, ``systemd-coredump`` or ``crash``
+produce useful backtraces when analyzing a crash or hang. They are provided in a
+dedicated repository, separate from the regular ones, for the Debian Bookworm
+and Trixie based Proxmox Backup releases (and newer).
+
+.. code-block:: debian.sources
+  :caption: sources.list entry for ``pbs-dbgsym``
+
+  Types: deb
+  URIs: https://dbgsym.proxmox.com/debian/pbs
+  Suites: trixie
+  Components: pbs-dbgsym
+  Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+
+After enabling the repository, install the ``-dbgsym`` package that matches the
+binary you want to debug.
+
 .. _package_repositories_client_only:
 
 Proxmox Backup Client-only Repository
