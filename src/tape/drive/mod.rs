@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use anyhow::{Error, bail, format_err};
 use nix::fcntl::OFlag;
-use nix::sys::stat::Mode;
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::info;
@@ -604,17 +603,11 @@ fn open_device_lock(device_path: &str) -> Result<std::fs::File, Error> {
     let mut path = std::path::PathBuf::from(crate::tape::DRIVE_LOCK_DIR);
     path.push(lock_name);
 
-    let user = pbs_config::backup_user()?;
-    let options = CreateOptions::new()
-        .perm(Mode::from_bits_truncate(0o660))
-        .owner(user.uid)
-        .group(user.gid);
-
     atomic_open_or_create_file(
         path,
         OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_APPEND,
         &[],
-        options,
+        proxmox_product_config::lockfile_create_options(),
         false,
     )
 }
