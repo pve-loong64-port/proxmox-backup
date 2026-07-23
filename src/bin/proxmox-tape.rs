@@ -1116,12 +1116,11 @@ fn main() {
     let mut rpcenv = CliEnvironment::new();
     rpcenv.set_auth_id(Some(String::from("root@pam")));
 
-    if let Err(err) = proxmox_lang::try_block!({
-        proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
-        Ok::<(), Error>(())
+    if let Err(err) = pbs_config::backup_user().and_then(|api_user| {
+        pbs_config::priv_user().map(|priv_user| proxmox_product_config::init(api_user, priv_user))
     }) {
-        eprintln!("Failed on product config init: {err}");
-        std::process::exit(-1);
+        eprintln!("failed to initialize product config: {err}");
+        std::process::exit(1);
     }
 
     proxmox_async::runtime::main(run_async_cli_command(cmd_def, rpcenv));
