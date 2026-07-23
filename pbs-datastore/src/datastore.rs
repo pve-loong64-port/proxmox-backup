@@ -2678,8 +2678,8 @@ impl DataStore {
         // Check object is actually a chunk
         let path = Path::new::<str>(object_key);
         // file_name() should always be Some, as objects will have a filename
-        let digest = path.file_name()?;
-        let bytes = digest.as_bytes();
+        let file_name = path.file_name()?;
+        let bytes = file_name.as_bytes();
         let bad_ext_len = ".0.bad".len();
         let bad_chunk = if bytes.len() == 64 + bad_ext_len {
             true
@@ -2693,19 +2693,15 @@ impl DataStore {
         }
 
         // Safe since contains valid ascii hexdigits only as checked above.
-        let digest_str = digest.to_string_lossy();
+        let digest_str = file_name.to_string_lossy();
         let hexdigit_prefix = unsafe { digest_str.get_unchecked(0..4) };
         let mut chunk_path = self.base_path();
         chunk_path.push(".chunks");
         chunk_path.push(hexdigit_prefix);
-        chunk_path.push(digest);
-        if bad_chunk {
-            let extension = unsafe { digest_str.get_unchecked(64..64 + bad_ext_len) };
-            chunk_path.push(extension);
-        }
+        chunk_path.push(file_name);
 
         let mut digest_bytes = [0u8; 32];
-        let digest = digest.as_bytes();
+        let digest = file_name.as_bytes();
         // safe to unwrap as already checked above
         hex::decode_to_slice(&digest[..64], &mut digest_bytes).unwrap();
 
