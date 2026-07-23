@@ -23,16 +23,10 @@ pub fn generate_csrf_key() -> Result<(), Error> {
 
     let key = HMACKey::generate()?.to_base64()?;
 
-    use nix::sys::stat::Mode;
-    let backup_user = pbs_config::backup_user()?;
-
     replace_file(
         &path,
         key.as_bytes(),
-        CreateOptions::new()
-            .perm(Mode::from_bits_truncate(0o0640))
-            .owner(nix::unistd::ROOT)
-            .group(backup_user.gid),
+        proxmox_product_config::privileged_create_options(),
         true,
     )?;
 
@@ -60,15 +54,10 @@ pub fn generate_auth_key() -> Result<(), Error> {
         true,
     )?;
 
-    let backup_user = pbs_config::backup_user()?;
-
     replace_file(
         &public_path,
         &key.public_key_to_pem()?,
-        CreateOptions::new()
-            .perm(Mode::from_bits_truncate(0o0640))
-            .owner(nix::unistd::ROOT)
-            .group(backup_user.gid),
+        proxmox_product_config::privileged_create_options(),
         true,
     )?;
 
@@ -122,11 +111,7 @@ pub fn store_ldap_bind_password(
     let mut data = proxmox_sys::fs::file_get_json(LDAP_PASSWORDS_FILENAME, Some(json!({})))?;
     data[realm] = password.into();
 
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0600);
-    let options = proxmox_sys::fs::CreateOptions::new()
-        .perm(mode)
-        .owner(nix::unistd::ROOT)
-        .group(nix::unistd::Gid::from_raw(0));
+    let options = proxmox_product_config::secret_create_options();
 
     let data = serde_json::to_vec_pretty(&data)?;
     proxmox_sys::fs::replace_file(LDAP_PASSWORDS_FILENAME, &data, options, true)?;
@@ -142,11 +127,7 @@ pub fn remove_ldap_bind_password(realm: &str, _domain_lock: &BackupLockGuard) ->
         map.remove(realm);
     }
 
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0600);
-    let options = proxmox_sys::fs::CreateOptions::new()
-        .perm(mode)
-        .owner(nix::unistd::ROOT)
-        .group(nix::unistd::Gid::from_raw(0));
+    let options = proxmox_product_config::secret_create_options();
 
     let data = serde_json::to_vec_pretty(&data)?;
     proxmox_sys::fs::replace_file(LDAP_PASSWORDS_FILENAME, &data, options, true)?;
