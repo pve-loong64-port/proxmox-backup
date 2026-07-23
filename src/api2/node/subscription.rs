@@ -22,15 +22,6 @@ const PRODUCT_URL: &str = "https://www.proxmox.com/en/proxmox-backup-server/pric
 const APT_AUTH_FN: &str = "/etc/apt/auth.conf.d/pbs.conf";
 const APT_AUTH_URL: &str = "enterprise.proxmox.com/debian/pbs";
 
-pub fn subscription_file_opts() -> Result<CreateOptions, Error> {
-    let backup_user = pbs_config::backup_user()?;
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0640);
-    Ok(CreateOptions::new()
-        .perm(mode)
-        .owner(nix::unistd::ROOT)
-        .group(backup_user.gid))
-}
-
 fn apt_auth_file_opts() -> CreateOptions {
     let mode = nix::sys::stat::Mode::from_bits_truncate(0o0600);
     CreateOptions::new().perm(mode).owner(nix::unistd::ROOT)
@@ -58,7 +49,7 @@ fn check_and_write_subscription(key: String, server_id: String) -> Result<(), Er
 
     proxmox_subscription::files::write_subscription(
         PROXMOX_BACKUP_SUBSCRIPTION_FN,
-        subscription_file_opts()?,
+        proxmox_product_config::privileged_create_options(),
         &info,
     )
     .map_err(|e| format_err!("Error writing updated subscription status - {}", e))?;

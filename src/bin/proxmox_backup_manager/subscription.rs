@@ -5,7 +5,7 @@ use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_schema::api;
 use proxmox_subscription::{ProductType, SubscriptionInfo};
 
-use proxmox_backup::api2::{self, node::subscription::subscription_file_opts};
+use proxmox_backup::api2;
 
 use pbs_buildcfg::PROXMOX_BACKUP_SUBSCRIPTION_FN;
 
@@ -62,7 +62,7 @@ pub fn set_offline_subscription_key(data: String) -> Result<(), Error> {
     info.check_server_id();
     proxmox_subscription::files::write_subscription(
         PROXMOX_BACKUP_SUBSCRIPTION_FN,
-        subscription_file_opts()?,
+        proxmox_product_config::privileged_create_options(),
         &info,
     )?;
     Ok(())
