@@ -6,11 +6,12 @@ use std::sync::{Arc, LazyLock, RwLock};
 
 use anyhow::{Error, bail};
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::{ApiStringFormat, ApiType, Schema, StringSchema};
 
 use pbs_api_types::{Authid, ROLE_NAME_NO_ACCESS, Role, Userid};
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 /// Map of pre-defined [Roles](Role) to their associated
 /// [privileges](pbs_api_types::PRIVILEGES) combination and description.
@@ -767,7 +768,7 @@ pub fn save_config(acl: &AclTree) -> Result<(), Error> {
 
     acl.write_config(&mut raw)?;
 
-    replace_backup_config(ACL_CFG_FILENAME, &raw)
+    replace_privileged_config(ACL_CFG_FILENAME, &raw)
 }
 
 #[cfg(test)]

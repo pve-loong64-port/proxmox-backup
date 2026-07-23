@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use anyhow::Error;
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
@@ -45,7 +46,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(REMOTE_CFG_FILENAME, config)?;
-    crate::replace_backup_config(REMOTE_CFG_FILENAME, raw.as_bytes())
+    replace_privileged_config(REMOTE_CFG_FILENAME, raw.as_bytes())
 }
 
 // shell completion helper

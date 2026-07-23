@@ -11,6 +11,7 @@ use openssl::x509::X509Builder;
 use std::path::Path;
 
 use proxmox_lang::try_block;
+use proxmox_product_config::replace_privileged_config;
 
 use pbs_api_types::{PamRealmConfig, PbsRealmConfig};
 use pbs_buildcfg::{self, configdir};
@@ -186,9 +187,9 @@ pub(crate) fn set_proxy_certificate(cert_pem: &[u8], key_pem: &[u8]) -> Result<(
     let cert_path = Path::new(configdir!("/proxy.pem"));
 
     create_configdir()?;
-    pbs_config::replace_backup_config(key_path, key_pem)
+    replace_privileged_config(key_path, key_pem)
         .map_err(|err| format_err!("error writing certificate private key - {}", err))?;
-    pbs_config::replace_backup_config(cert_path, cert_pem)
+    replace_privileged_config(cert_path, cert_pem)
         .map_err(|err| format_err!("error writing certificate file - {}", err))?;
 
     Ok(())

@@ -16,10 +16,11 @@ use std::sync::LazyLock;
 
 use anyhow::{Error, bail};
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 use pbs_api_types::{DRIVE_NAME_SCHEMA, LtoTapeDrive, ScsiTapeChanger, VirtualTapeDrive};
 
@@ -77,7 +78,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 /// Save the configuration file
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(DRIVE_CFG_FILENAME, config)?;
-    replace_backup_config(DRIVE_CFG_FILENAME, raw.as_bytes())
+    replace_privileged_config(DRIVE_CFG_FILENAME, raw.as_bytes())
 }
 
 /// Check if the specified drive name exists in the config.

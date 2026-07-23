@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use anyhow::Error;
 use std::sync::LazyLock;
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use pbs_api_types::{JOB_ID_SCHEMA, PruneJobConfig};
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -43,7 +44,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(PRUNE_CFG_FILENAME, config)?;
-    replace_backup_config(PRUNE_CFG_FILENAME, raw.as_bytes())
+    replace_privileged_config(PRUNE_CFG_FILENAME, raw.as_bytes())
 }
 
 // shell completion helper

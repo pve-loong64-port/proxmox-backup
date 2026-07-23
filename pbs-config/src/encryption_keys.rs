@@ -6,6 +6,7 @@ use nix::{sys::stat::Mode, unistd::Uid};
 use serde::Deserialize;
 
 use pbs_api_types::{CRYPT_KEY_ID_SCHEMA, CryptKey, KeyInfo};
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::ApiType;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 use proxmox_sys::fs::CreateOptions;
@@ -13,7 +14,7 @@ use proxmox_sys::fs::CreateOptions;
 use pbs_buildcfg::configdir;
 use pbs_key_config::KeyConfig;
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -57,7 +58,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 /// Save given key configuration to file.
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(ENCRYPTION_KEYS_CFG_FILENAME, config)?;
-    replace_backup_config(ENCRYPTION_KEYS_CFG_FILENAME, raw.as_bytes())
+    replace_privileged_config(ENCRYPTION_KEYS_CFG_FILENAME, raw.as_bytes())
 }
 
 /// Shell completion helper to complete encryption key id's as found in the config.
@@ -189,7 +190,7 @@ pub fn delete_key(id: &str, mut config: SectionConfigData) -> Result<bool, Error
 
             let raw = CONFIG.write(ENCRYPTION_KEYS_CFG_FILENAME, &config)?;
             // drops config lock
-            replace_backup_config(ENCRYPTION_KEYS_CFG_FILENAME, raw.as_bytes())?;
+            replace_privileged_config(ENCRYPTION_KEYS_CFG_FILENAME, raw.as_bytes())?;
 
             std::fs::remove_file(key_path)?;
             return Ok(true);

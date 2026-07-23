@@ -8,10 +8,11 @@ use proxmox_schema::{ApiType, Schema};
 
 use pbs_api_types::{TRAFFIC_CONTROL_ID_SCHEMA, TrafficControlRule};
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use crate::ConfigVersionCache;
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 /// Static [`SectionConfig`] to access parser/writer functions.
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
@@ -52,7 +53,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 /// Save the configuration file
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(TRAFFIC_CONTROL_CFG_FILENAME, config)?;
-    replace_backup_config(TRAFFIC_CONTROL_CFG_FILENAME, raw.as_bytes())?;
+    replace_privileged_config(TRAFFIC_CONTROL_CFG_FILENAME, raw.as_bytes())?;
 
     // increase traffic control version
     // We use this in TrafficControlCache

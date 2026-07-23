@@ -3,13 +3,14 @@ use std::sync::LazyLock;
 
 use anyhow::Error;
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_s3_client::{S3_CLIENT_ID_SCHEMA, S3ClientConf};
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use pbs_buildcfg::configdir;
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -47,7 +48,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 /// Save given s3 client configuration to file.
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(S3_CFG_FILENAME, config)?;
-    replace_backup_config(S3_CFG_FILENAME, raw.as_bytes())?;
+    replace_privileged_config(S3_CFG_FILENAME, raw.as_bytes())?;
     Ok(())
 }
 

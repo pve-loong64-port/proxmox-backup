@@ -3,6 +3,7 @@ use std::sync::{Arc, LazyLock, RwLock};
 
 use anyhow::{Error, bail};
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::*;
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
@@ -10,7 +11,7 @@ use pbs_api_types::{ApiToken, Authid, User, Userid};
 
 use crate::ConfigVersionCache;
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -122,7 +123,7 @@ pub fn cached_config() -> Result<Arc<SectionConfigData>, Error> {
 
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(USER_CFG_FILENAME, config)?;
-    replace_backup_config(USER_CFG_FILENAME, raw.as_bytes())?;
+    replace_privileged_config(USER_CFG_FILENAME, raw.as_bytes())?;
 
     // increase user version
     // We use this in CachedUserInfo

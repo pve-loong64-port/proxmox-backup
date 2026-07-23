@@ -18,9 +18,9 @@ use serde::{Deserialize, Serialize};
 use proxmox_sys::fs::file_read_optional_string;
 
 use pbs_api_types::Fingerprint;
-use pbs_config::{open_backup_lockfile, replace_backup_config};
+use pbs_config::open_backup_lockfile;
 use pbs_key_config::KeyConfig;
-use proxmox_product_config::replace_secret_config;
+use proxmox_product_config::{replace_privileged_config, replace_secret_config};
 
 mod hex_key {
     use hex::FromHex;
@@ -149,7 +149,7 @@ pub fn save_key_configs(map: HashMap<Fingerprint, KeyConfig>) -> Result<(), Erro
     }
 
     let raw = serde_json::to_string_pretty(&list)?;
-    replace_backup_config(TAPE_KEY_CONFIG_FILENAME, raw.as_bytes())
+    replace_privileged_config(TAPE_KEY_CONFIG_FILENAME, raw.as_bytes())
 }
 
 /// Insert a new key

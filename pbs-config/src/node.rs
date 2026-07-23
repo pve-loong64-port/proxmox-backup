@@ -5,6 +5,7 @@ use openssl::ssl::{SslAcceptor, SslMethod};
 
 use pbs_api_types::NodeConfig;
 use proxmox_http::ProxyConfig;
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::ApiType;
 
 use pbs_buildcfg::configdir;
@@ -46,7 +47,7 @@ pub fn save_config(config: &NodeConfig) -> Result<(), Error> {
     }
 
     let raw = crate::key_value::to_bytes(config, &NodeConfig::API_SCHEMA)?;
-    crate::replace_backup_config(CONF_FILE, &raw)
+    replace_privileged_config(CONF_FILE, &raw)
 }
 
 pub fn node_http_proxy_config() -> Result<Option<ProxyConfig>, Error> {

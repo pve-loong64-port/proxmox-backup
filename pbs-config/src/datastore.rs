@@ -3,12 +3,13 @@ use std::sync::LazyLock;
 
 use anyhow::Error;
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::{AllOfSchema, ApiType};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use pbs_api_types::{DATASTORE_SCHEMA, DataStoreConfig, DatastoreBackendConfig, DatastoreTuning};
 
-use crate::{BackupLockGuard, ConfigVersionCache, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, ConfigVersionCache, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -45,7 +46,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(DATASTORE_CFG_FILENAME, config)?;
-    replace_backup_config(DATASTORE_CFG_FILENAME, raw.as_bytes())?;
+    replace_privileged_config(DATASTORE_CFG_FILENAME, raw.as_bytes())?;
 
     // used in pbs-datastore
     let version_cache = ConfigVersionCache::new()?;

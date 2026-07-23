@@ -3,12 +3,13 @@ use std::sync::LazyLock;
 
 use anyhow::Error;
 
+use proxmox_product_config::replace_privileged_config;
 use proxmox_schema::{ApiType, Schema};
 use proxmox_section_config::{SectionConfig, SectionConfigData, SectionConfigPlugin};
 
 use pbs_api_types::{JOB_ID_SCHEMA, SyncJobConfig};
 
-use crate::{BackupLockGuard, open_backup_lockfile, replace_backup_config};
+use crate::{BackupLockGuard, open_backup_lockfile};
 
 pub static CONFIG: LazyLock<SectionConfig> = LazyLock::new(init);
 
@@ -45,7 +46,7 @@ pub fn config() -> Result<(SectionConfigData, [u8; 32]), Error> {
 
 pub fn save_config(config: &SectionConfigData) -> Result<(), Error> {
     let raw = CONFIG.write(SYNC_CFG_FILENAME, config)?;
-    replace_backup_config(SYNC_CFG_FILENAME, raw.as_bytes())
+    replace_privileged_config(SYNC_CFG_FILENAME, raw.as_bytes())
 }
 
 // shell completion helper

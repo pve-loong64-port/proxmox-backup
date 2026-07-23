@@ -121,24 +121,6 @@ pub fn open_backup_lockfile<P: AsRef<std::path::Path>>(
     })
 }
 
-/// Atomically write data to file owned by "root:backup" with permission "0640"
-///
-/// Only the superuser can write those files, but group 'backup' can read them.
-pub fn replace_backup_config<P: AsRef<std::path::Path>>(path: P, data: &[u8]) -> Result<(), Error> {
-    let backup_user = backup_user()?;
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0640);
-    // set the correct owner/group/permissions while saving file
-    // owner(rw) = root, group(r)= backup
-    let options = proxmox_sys::fs::CreateOptions::new()
-        .perm(mode)
-        .owner(nix::unistd::ROOT)
-        .group(backup_user.gid);
-
-    proxmox_sys::fs::replace_file(path, data, options, true)?;
-
-    Ok(())
-}
-
 /// Detect modified configuration files
 ///
 /// This function fails with a reasonable error message if checksums do not match.
