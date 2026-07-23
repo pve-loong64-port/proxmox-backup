@@ -4,6 +4,7 @@ use anyhow::{Error, bail, format_err};
 use hex::FromHex;
 use nix::unistd::{Gid, Group, Uid, User};
 
+use proxmox_product_config::lockfile_create_options;
 use proxmox_sys::fs::DirLockGuard;
 
 pub use pbs_buildcfg::{BACKUP_GROUP_NAME, BACKUP_USER_NAME};
@@ -106,11 +107,9 @@ pub fn open_backup_lockfile<P: AsRef<std::path::Path>>(
     timeout: Option<std::time::Duration>,
     exclusive: bool,
 ) -> Result<BackupLockGuard, Error> {
-    let user = backup_user()?;
-    let options = proxmox_sys::fs::CreateOptions::new()
-        .perm(nix::sys::stat::Mode::from_bits_truncate(0o660))
-        .owner(user.uid)
-        .group(user.gid);
+    // TODO: Replace whole helper with proxmox_product_config::open_api_lockfile() when
+    // dropping _legacy_dir in in PBS5.
+    let options = lockfile_create_options();
 
     let timeout = timeout.unwrap_or(std::time::Duration::new(10, 0));
 
