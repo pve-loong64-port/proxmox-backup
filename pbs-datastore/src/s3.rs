@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Error, bail, format_err};
+use hex::FromHex;
 
 use proxmox_s3_client::{DeleteObjectError, S3ObjectKey};
 
@@ -46,6 +47,16 @@ pub fn object_key_from_digest_with_suffix(
     let digest_prefix = &object_key[..4];
     let object_key_string = format!(".chunks/{digest_prefix}/{object_key}{suffix}");
     S3ObjectKey::try_from(object_key_string.as_str())
+}
+
+/// Extract filename, digest, and suffix from the last part of an S3ObjectKey.
+pub(crate) fn digest_from_object_key(key: &S3ObjectKey) -> Option<(&str, [u8; 32], &str)> {
+    let filename = key.rsplit('/').next()?;
+    let (hex_digest, suffix) = filename.split_at_checked(64)?;
+
+    let digest = FromHex::from_hex(hex_digest).ok()?;
+
+    Some((filename, digest, suffix))
 }
 
 /// Log errors from delete objects api calls
@@ -96,7 +107,6 @@ fn test_object_key_from_path_incorrect_filename() {
 
 #[test]
 fn test_object_key_from_digest() {
-    use hex::FromHex;
     let digest =
         <[u8; 32]>::from_hex("bb9f8df61474d25e71fa00722318cd387396ca1736605e1248821cc0de3d3af8")
             .unwrap();
@@ -108,7 +118,6 @@ fn test_object_key_from_digest() {
 
 #[test]
 fn test_object_key_from_digest_with_suffix() {
-    use hex::FromHex;
     let digest =
         <[u8; 32]>::from_hex("bb9f8df61474d25e71fa00722318cd387396ca1736605e1248821cc0de3d3af8")
             .unwrap();
@@ -122,9 +131,33 @@ fn test_object_key_from_digest_with_suffix() {
 
 #[test]
 fn test_object_key_from_digest_with_invalid_suffix() {
-    use hex::FromHex;
     let digest =
         <[u8; 32]>::from_hex("bb9f8df61474d25e71fa00722318cd387396ca1736605e1248821cc0de3d3af8")
             .unwrap();
     assert!(object_key_from_digest_with_suffix(&digest, "/.0.bad").is_err());
+}
+
+#[test]
+fn test_digest_from_object_key() {
+    let hex = "bb9f8df61474d25e71fa00722318cd387396ca1736605e1248821cc0de3d3af8";
+    let digest = <[u8; 32]>::from_hex(hex).unwrap();
+    let k = |s: &str| S3ObjectKey::try_from(s).unwrap();
+
+    assert_eq!(digest_from_object_key(&k(&hex[1..])), None);
+    let invalid_hex = hex.replace("b", "X");
+    assert_eq!(digest_from_object_key(&k(&invalid_hex)), None);
+
+    assert_eq!(digest_from_object_key(&k(hex)), Some((hex, digest, "")));
+
+    let k1 = object_key_from_digest_with_suffix(&digest, "suffix1").unwrap();
+    assert_eq!(
+        digest_from_object_key(&k1),
+        Some((format!("{hex}suffix1").as_str(), digest, "suffix1"))
+    );
+
+    let k2 = S3ObjectKey::try_from(format!(".chunks/bb9f/{hex}.0.bad").as_str()).unwrap();
+    assert_eq!(
+        digest_from_object_key(&k2),
+        Some((format!("{hex}.0.bad").as_str(), digest, ".0.bad"))
+    );
 }

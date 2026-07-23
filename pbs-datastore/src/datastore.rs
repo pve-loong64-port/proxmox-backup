@@ -48,7 +48,7 @@ use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
 use crate::index::IndexFile;
-use crate::s3::S3_CONTENT_PREFIX;
+use crate::s3::{S3_CONTENT_PREFIX, digest_from_object_key};
 use crate::task_tracking::{self, update_active_operations};
 use crate::{DataBlob, LocalDatastoreLruCache};
 
@@ -2675,36 +2675,22 @@ impl DataStore {
         &self,
         object_key: &S3ObjectKey,
     ) -> Option<(PathBuf, [u8; 32], bool)> {
-        // Check object is actually a chunk
-        let path = Path::new::<str>(object_key);
-        // file_name() should always be Some, as objects will have a filename
-        let file_name = path.file_name()?;
-        let bytes = file_name.as_bytes();
-        let bad_chunk = if is_bad_chunk_suffix(&bytes[64..]) {
+        let (file_name, digest, suffix) = digest_from_object_key(object_key)?;
+
+        let bad_chunk = if is_bad_chunk_suffix(suffix.as_bytes()) {
             true
-        } else if bytes.len() == 64 {
+        } else if suffix.is_empty() {
             false
         } else {
             return None; // unexpected suffix
         };
-        if !bytes.iter().take(64).all(u8::is_ascii_hexdigit) {
-            return None;
-        }
 
-        // Safe since contains valid ascii hexdigits only as checked above.
-        let digest_str = file_name.to_string_lossy();
-        let hexdigit_prefix = unsafe { digest_str.get_unchecked(0..4) };
         let mut chunk_path = self.base_path();
         chunk_path.push(".chunks");
-        chunk_path.push(hexdigit_prefix);
+        chunk_path.push(&file_name[..4]);
         chunk_path.push(file_name);
 
-        let mut digest_bytes = [0u8; 32];
-        let digest = file_name.as_bytes();
-        // safe to unwrap as already checked above
-        hex::decode_to_slice(&digest[..64], &mut digest_bytes).unwrap();
-
-        Some((chunk_path, digest_bytes, bad_chunk))
+        Some((chunk_path, digest, bad_chunk))
     }
 
     pub fn try_shared_chunk_store_lock(&self) -> Result<ProcessLockSharedGuard, Error> {
