@@ -4,10 +4,18 @@
 
 use anyhow::Error;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use pbs_api_types::{MediaSetPolicy, RetentionPolicy};
 
 use crate::tape::{Inventory, MediaPool};
+
+static PROXMOX_PRODUCT_CONFIG_INIT_FOR_TESTS: LazyLock<()> = LazyLock::new(|| {
+    proxmox_product_config::init(
+        pbs_config::backup_user().unwrap(),
+        pbs_config::priv_user().unwrap(),
+    );
+});
 
 fn create_testdir(name: &str) -> Result<PathBuf, Error> {
     let mut testdir: PathBuf = String::from("./target/testout").into();
@@ -22,6 +30,8 @@ fn create_testdir(name: &str) -> Result<PathBuf, Error> {
 
 #[test]
 fn test_alloc_writable_media_1() -> Result<(), Error> {
+    LazyLock::force(&PROXMOX_PRODUCT_CONFIG_INIT_FOR_TESTS);
+
     let testdir = create_testdir("test_alloc_writable_media_1")?;
 
     let mut ctime = 0;
@@ -48,6 +58,8 @@ fn test_alloc_writable_media_1() -> Result<(), Error> {
 
 #[test]
 fn test_alloc_writable_media_2() -> Result<(), Error> {
+    LazyLock::force(&PROXMOX_PRODUCT_CONFIG_INIT_FOR_TESTS);
+
     let testdir = create_testdir("test_alloc_writable_media_2")?;
 
     let mut inventory = Inventory::load(&testdir)?;
@@ -85,6 +97,8 @@ fn test_alloc_writable_media_2() -> Result<(), Error> {
 
 #[test]
 fn test_alloc_writable_media_3() -> Result<(), Error> {
+    LazyLock::force(&PROXMOX_PRODUCT_CONFIG_INIT_FOR_TESTS);
+
     let testdir = create_testdir("test_alloc_writable_media_3")?;
 
     let mut inventory = Inventory::load(&testdir)?;
@@ -133,6 +147,8 @@ fn test_alloc_writable_media_3() -> Result<(), Error> {
 
 #[test]
 fn test_alloc_writable_media_4() -> Result<(), Error> {
+    LazyLock::force(&PROXMOX_PRODUCT_CONFIG_INIT_FOR_TESTS);
+
     let testdir = create_testdir("test_alloc_writable_media_4")?;
 
     let mut inventory = Inventory::load(&testdir)?;

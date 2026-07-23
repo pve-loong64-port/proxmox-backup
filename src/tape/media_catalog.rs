@@ -10,7 +10,7 @@ use endian_trait::Endian;
 use proxmox_sys::fs::read_subdir;
 
 use proxmox_io::{ReadExt, WriteExt};
-use proxmox_sys::fs::{CreateOptions, create_path, fchown};
+use proxmox_sys::fs::{create_path, fchown};
 use proxmox_uuid::Uuid;
 
 use pbs_api_types::{BackupDir, BackupNamespace, parse_ns_and_snapshot, print_ns_and_snapshot};
@@ -168,13 +168,7 @@ impl MediaCatalog {
     }
 
     fn create_basedir<P: AsRef<Path>>(base_path: P) -> Result<(), Error> {
-        let backup_user = pbs_config::backup_user()?;
-        let mode = nix::sys::stat::Mode::from_bits_truncate(0o0640);
-        let opts = CreateOptions::new()
-            .perm(mode)
-            .owner(backup_user.uid)
-            .group(backup_user.gid);
-
+        let opts = proxmox_product_config::default_create_options();
         create_path(base_path, None, Some(opts))
             .map_err(|err: Error| format_err!("unable to create media catalog dir - {}", err))?;
         Ok(())
@@ -200,7 +194,7 @@ impl MediaCatalog {
                 .create(create)
                 .open(&path)?;
 
-            let backup_user = pbs_config::backup_user()?;
+            let backup_user = proxmox_product_config::get_api_user();
             fchown(
                 file.as_raw_fd(),
                 Some(backup_user.uid),
@@ -261,7 +255,7 @@ impl MediaCatalog {
             return Ok(file);
         }
 
-        let backup_user = pbs_config::backup_user()?;
+        let backup_user = proxmox_product_config::get_api_user();
         fchown(
             file.as_raw_fd(),
             Some(backup_user.uid),
