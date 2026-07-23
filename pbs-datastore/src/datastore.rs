@@ -488,14 +488,15 @@ impl DataStore {
 
                 let (config, _config_digest) = pbs_config::s3::config()?;
                 let config: S3ClientConf = config.lookup(S3_CFG_TYPE_ID, s3_client_id)?;
+                let backup_user = proxmox_product_config::get_api_user();
                 let rate_limiter_options = S3RateLimiterOptions {
                     id: s3_client_id.to_string(),
-                    user: pbs_config::backup_user()?,
+                    user: backup_user.clone(),
                     base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
                 };
                 let request_counter_config = S3RequestCounterConfig {
                     id: format!("{s3_client_id}-{bucket}-{}", self.name()),
-                    user: pbs_config::backup_user()?,
+                    user: backup_user.clone(),
                     base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
                 };
 
@@ -819,8 +820,9 @@ impl DataStore {
                 .ok_or(format_err!("missing s3 bucket"))?,
             config.name,
         );
+        let backup_user = proxmox_product_config::get_api_user();
         let request_counters =
-            SharedRequestCounters::open_shared_memory_mapped(path, pbs_config::backup_user()?)?;
+            SharedRequestCounters::open_shared_memory_mapped(path, backup_user.clone())?;
         Ok(request_counters)
     }
 
@@ -2653,7 +2655,7 @@ impl DataStore {
             let mut path = self.base_path();
             path.push(".gc-status");
 
-            let backup_user = pbs_config::backup_user()?;
+            let backup_user = proxmox_product_config::get_api_user();
             let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
             // set the correct owner/group/permissions while saving file
             // owner(rw) = backup, group(r)= backup
@@ -3164,7 +3166,7 @@ impl DataStore {
     // Fetch the contents (metadata, no chunks) of the datastore from the S3 object store to the
     // provided temporaray directory
     async fn fetch_tmp_contents(&self, tmp_base: &Path, s3_client: &S3Client) -> Result<(), Error> {
-        let backup_user = pbs_config::backup_user().context("failed to get backup user")?;
+        let backup_user = proxmox_product_config::get_api_user();
         let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
         let file_create_options = CreateOptions::new()
             .perm(mode)
@@ -3317,14 +3319,15 @@ impl DataStore {
         let client_config: S3ClientConf = config
             .lookup(S3_CFG_TYPE_ID, s3_client_id)
             .with_context(|| format!("no '{s3_client_id}' in config"))?;
+        let backup_user = proxmox_product_config::get_api_user();
         let rate_limiter_options = S3RateLimiterOptions {
             id: s3_client_id.to_string(),
-            user: pbs_config::backup_user()?,
+            user: backup_user.clone(),
             base_path: S3_CLIENT_RATE_LIMITER_BASE_PATH.into(),
         };
         let request_counter_config = S3RequestCounterConfig {
             id: format!("{s3_client_id}-{bucket}-{}", datastore_config.name),
-            user: pbs_config::backup_user()?,
+            user: backup_user.clone(),
             base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
         };
 
