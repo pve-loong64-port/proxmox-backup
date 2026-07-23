@@ -164,6 +164,7 @@ pub fn get_versions() -> Result<Vec<APTUpdateInfo>, Error> {
         "libjs-extjs",
         "proxmox-backup-docs",
         "proxmox-backup-client",
+        "proxmox-enterprise-support-keyring",
         "proxmox-mail-forward",
         "proxmox-mini-journalreader",
         "proxmox-offline-mirror-helper",
