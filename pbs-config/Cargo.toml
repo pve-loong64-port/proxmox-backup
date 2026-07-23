@@ -23,6 +23,7 @@ proxmox-http.workspace = true
 proxmox-lang.workspace = true
 proxmox-notify.workspace = true
 proxmox-router = { workspace = true, default-features = false }
+proxmox-product-config.workspace = true
 proxmox-s3-client.workspace = true
 proxmox-schema.workspace = true
 proxmox-section-config.workspace = true

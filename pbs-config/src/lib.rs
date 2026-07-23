@@ -139,23 +139,6 @@ pub fn replace_backup_config<P: AsRef<std::path::Path>>(path: P, data: &[u8]) ->
     Ok(())
 }
 
-/// Atomically write data to file owned by "root:root" with permission "0600"
-///
-/// Only the superuser can read and write those files.
-pub fn replace_secret_config<P: AsRef<std::path::Path>>(path: P, data: &[u8]) -> Result<(), Error> {
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0600);
-    // set the correct owner/group/permissions while saving file
-    // owner(rw) = root, group(r)= root
-    let options = proxmox_sys::fs::CreateOptions::new()
-        .perm(mode)
-        .owner(nix::unistd::ROOT)
-        .group(nix::unistd::Gid::from_raw(0));
-
-    proxmox_sys::fs::replace_file(path, data, options, true)?;
-
-    Ok(())
-}
-
 /// Detect modified configuration files
 ///
 /// This function fails with a reasonable error message if checksums do not match.

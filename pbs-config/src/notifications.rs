@@ -35,7 +35,10 @@ pub fn config() -> Result<Config, Error> {
 pub fn save_config(config: Config) -> Result<(), Error> {
     let (cfg, priv_cfg) = config.write()?;
     crate::replace_backup_config(NOTIFICATION_CONFIG_PATH, cfg.as_bytes())?;
-    crate::replace_secret_config(NOTIFICATION_PRIV_CONFIG_PATH, priv_cfg.as_bytes())?;
+    proxmox_product_config::replace_secret_config(
+        NOTIFICATION_PRIV_CONFIG_PATH,
+        priv_cfg.as_bytes(),
+    )?;
 
     Ok(())
 }

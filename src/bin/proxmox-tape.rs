@@ -1116,5 +1116,13 @@ fn main() {
     let mut rpcenv = CliEnvironment::new();
     rpcenv.set_auth_id(Some(String::from("root@pam")));
 
+    if let Err(err) = proxmox_lang::try_block!({
+        proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
+        Ok::<(), Error>(())
+    }) {
+        eprintln!("Failed on product config init: {err}");
+        std::process::exit(-1);
+    }
+
     proxmox_async::runtime::main(run_async_cli_command(cmd_def, rpcenv));
 }
