@@ -43,7 +43,7 @@ use proxmox_section_config::SectionConfigData;
 use crate::backup_info::{
     BackupDir, BackupGroup, BackupInfo, OLD_LOCKING, PROTECTED_MARKER_FILENAME,
 };
-use crate::chunk_store::ChunkStore;
+use crate::chunk_store::{ChunkStore, is_bad_chunk_suffix};
 use crate::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 use crate::fixed_index::{FixedIndexReader, FixedIndexWriter};
 use crate::hierarchy::{ListGroups, ListGroupsType, ListNamespaces, ListNamespacesRecursive};
@@ -2680,13 +2680,12 @@ impl DataStore {
         // file_name() should always be Some, as objects will have a filename
         let file_name = path.file_name()?;
         let bytes = file_name.as_bytes();
-        let bad_ext_len = ".0.bad".len();
-        let bad_chunk = if bytes.len() == 64 + bad_ext_len {
+        let bad_chunk = if is_bad_chunk_suffix(&bytes[64..]) {
             true
         } else if bytes.len() == 64 {
             false
         } else {
-            return None;
+            return None; // unexpected suffix
         };
         if !bytes.iter().take(64).all(u8::is_ascii_hexdigit) {
             return None;

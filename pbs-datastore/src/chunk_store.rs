@@ -360,13 +360,7 @@ impl ChunkStore {
                             }
 
                             // i-th bad chunk
-                            if bytes.len() == 64 + ".i.bad".len()
-                                && bytes[64] == b'.'
-                                && bytes[65] >= b'0'
-                                && bytes[65] <= b'9'
-                                && bytes[66] == b'.'
-                                && bytes.ends_with(b"bad")
-                            {
+                            if is_bad_chunk_suffix(&bytes[64..]) {
                                 return Some((Ok(entry), percentage, ChunkExt::Bad));
                             }
 
@@ -1025,6 +1019,19 @@ enum ChunkExt {
 impl ChunkExt {
     fn bad_chunk_filename(digest_str: &str, counter: usize) -> String {
         format!("{digest_str}.{counter}.bad")
+    }
+}
+
+pub(crate) fn is_bad_chunk_suffix(s: &[u8]) -> bool {
+    s.len() == ".i.bad".len() && s[0] == b'.' && s[1].is_ascii_digit() && &s[2..] == b".bad"
+}
+
+#[test]
+fn test_is_bad_chunk_suffix() {
+    assert!(is_bad_chunk_suffix(".0.bad".as_bytes()));
+    assert!(is_bad_chunk_suffix(".9.bad".as_bytes()));
+    for s in [".10.bad", ".a.bad", ".bad", "0.bad", ""] {
+        assert!(!is_bad_chunk_suffix(s.as_bytes()));
     }
 }
 
