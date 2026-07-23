@@ -60,16 +60,17 @@ fn main() -> Result<(), Error> {
 
     proxmox_backup::tools::setup_safe_path_env();
 
-    let backup_uid = pbs_config::backup_user()?.uid;
-    let backup_gid = pbs_config::backup_group()?.gid;
+    let backup_user = pbs_config::backup_user()?;
+    let backup_group = pbs_config::backup_group()?;
     let running_uid = nix::unistd::Uid::effective();
     let running_gid = nix::unistd::Gid::effective();
 
-    if running_uid != backup_uid || running_gid != backup_gid {
+    if running_uid != backup_user.uid || running_gid != backup_group.gid {
         bail!(
             "proxy not running as backup user or group (got uid {running_uid} gid {running_gid})"
         );
     }
+    proxmox_product_config::init(backup_user, pbs_config::priv_user()?);
 
     proxmox_async::runtime::main(run())
 }
@@ -188,7 +189,6 @@ async fn run() -> Result<(), Error> {
     proxmox_backup::auth_helpers::setup_auth_context(false);
     proxmox_backup::server::notifications::init()?;
     metric_collection::init()?;
-    proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
     proxmox_acme_api::init(configdir!("/acme"), false)?;
 
     let mut indexpath = PathBuf::from(pbs_buildcfg::JS_DIR);

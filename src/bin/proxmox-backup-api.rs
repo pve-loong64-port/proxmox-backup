@@ -48,6 +48,9 @@ async fn run() -> Result<(), Error> {
         .tasklog_pbs()
         .init()?;
 
+    let backup_user = pbs_config::backup_user()?;
+    proxmox_product_config::init(backup_user.clone(), pbs_config::priv_user()?);
+
     config::create_configdir()?;
 
     config::update_self_signed_cert(false)?;
@@ -75,10 +78,8 @@ async fn run() -> Result<(), Error> {
 
     proxmox_backup::auth_helpers::setup_auth_context(true);
     proxmox_backup::server::notifications::init()?;
-    let backup_user = pbs_config::backup_user()?;
     let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
 
-    proxmox_product_config::init(backup_user.clone(), pbs_config::priv_user()?);
     proxmox_acme_api::init(configdir!("/acme"), true)?;
 
     let dir_opts = CreateOptions::new()
