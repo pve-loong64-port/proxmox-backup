@@ -48,11 +48,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Error, bail, format_err};
-use nix::sys::stat::Mode;
 
-use proxmox_sys::fs::{CreateOptions, open_file_locked};
-
-use pbs_config::backup_user;
+use proxmox_sys::fs::open_file_locked;
 
 use crate::backup_info::DATASTORE_LOCKS_DIR;
 
@@ -78,11 +75,7 @@ fn ensure_parent(path: &Path) -> Result<(), Error> {
 
 fn open_locked_exclusive(path: &Path, timeout: Duration) -> Result<File, Error> {
     ensure_parent(path)?;
-    let user = backup_user()?;
-    let options = CreateOptions::new()
-        .perm(Mode::from_bits_truncate(0o660))
-        .owner(user.uid)
-        .group(user.gid);
+    let options = proxmox_product_config::lockfile_create_options();
     open_file_locked(path, timeout, true, options)
         .with_context(|| format!("failed to acquire exclusive move-journal lock at {path:?}"))
 }

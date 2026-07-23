@@ -35,14 +35,9 @@ struct TaskOperations {
 }
 
 fn open_lock_file(name: &str) -> Result<(std::fs::File, CreateOptions), Error> {
-    let user = pbs_config::backup_user()?;
-
     let lock_path = PathBuf::from(format!("{}/{}.lock", crate::ACTIVE_OPERATIONS_DIR, name));
 
-    let options = CreateOptions::new()
-        .group(user.gid)
-        .owner(user.uid)
-        .perm(nix::sys::stat::Mode::from_bits_truncate(0o660));
+    let options = proxmox_product_config::lockfile_create_options();
 
     let timeout = std::time::Duration::new(10, 0);
 
