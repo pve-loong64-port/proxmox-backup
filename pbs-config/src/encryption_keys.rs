@@ -107,7 +107,7 @@ pub fn store_key(id: &str, key: &KeyConfig) -> Result<(), Error> {
         bail!("key with id '{id}' already exists.");
     }
 
-    let backup_user = crate::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let dir_options = CreateOptions::new()
         .perm(Mode::from_bits_truncate(0o0750))
         .owner(Uid::from_raw(0))

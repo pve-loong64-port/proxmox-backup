@@ -92,7 +92,7 @@ impl ConfigVersionCache {
 
     // Actual work of `new`:
     fn open() -> Result<Arc<Self>, Error> {
-        let user = crate::backup_user()?;
+        let user = proxmox_product_config::get_api_user();
 
         let dir_opts = CreateOptions::new()
             .perm(Mode::from_bits_truncate(0o770))

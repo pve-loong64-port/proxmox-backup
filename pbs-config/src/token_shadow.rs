@@ -9,7 +9,6 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_value};
 
-use proxmox_sys::fs::CreateOptions;
 use proxmox_time::epoch_i64;
 
 use pbs_api_types::Authid;
@@ -59,12 +58,7 @@ fn read_file() -> Result<HashMap<Authid, String>, Error> {
 }
 
 fn write_file(data: HashMap<Authid, String>) -> Result<(), Error> {
-    let backup_user = crate::backup_user()?;
-    let options = CreateOptions::new()
-        .perm(nix::sys::stat::Mode::from_bits_truncate(0o0640))
-        .owner(backup_user.uid)
-        .group(backup_user.gid);
-
+    let options = proxmox_product_config::default_create_options();
     let json = serde_json::to_vec(&data)?;
     proxmox_sys::fs::replace_file(CONF_FILE, &json, options, true)
 }
