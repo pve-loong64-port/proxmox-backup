@@ -4,7 +4,6 @@ use serde_json::json;
 use proxmox_notify::context::pbs::PBS_CONTEXT;
 use proxmox_router::{ApiHandler, RpcEnvironment, cli::*};
 use proxmox_subscription::SubscriptionStatus;
-use proxmox_sys::fs::CreateOptions;
 
 use pbs_buildcfg::configdir;
 use proxmox_backup::api2;
@@ -91,16 +90,15 @@ async fn check_acme_certificates(rpcenv: &mut dyn RpcEnvironment) -> Result<(), 
 }
 
 async fn run(rpcenv: &mut dyn RpcEnvironment) -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
-    let file_opts = CreateOptions::new()
-        .owner(backup_user.uid)
-        .group(backup_user.gid);
+    proxmox_product_config::init(pbs_config::backup_user()?, pbs_config::priv_user()?);
     proxmox_rest_server::init_worker_tasks(
         pbs_buildcfg::PROXMOX_BACKUP_LOG_DIR_M!().into(),
-        file_opts,
+        proxmox_product_config::default_create_options(),
     )?;
 
-    let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(backup_user.gid);
+    let mut command_sock = proxmox_daemon::command_socket::CommandSocket::new(
+        proxmox_product_config::get_api_user().gid,
+    );
     proxmox_rest_server::register_task_control_commands(&mut command_sock)?;
     command_sock.spawn(proxmox_rest_server::last_worker_future())?;
 
