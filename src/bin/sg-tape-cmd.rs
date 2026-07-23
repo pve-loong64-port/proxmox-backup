@@ -129,8 +129,9 @@ fn main() -> Result<(), Error> {
         .init()?;
 
     // check if we are user root or backup
-    let backup_uid = pbs_config::backup_user()?.uid;
-    let backup_gid = pbs_config::backup_group()?.gid;
+    let backup_user = pbs_config::backup_user()?;
+    let backup_uid = backup_user.uid;
+    let backup_gid = backup_user.gid;
     let running_uid = nix::unistd::Uid::current();
     let running_gid = nix::unistd::Gid::current();
 

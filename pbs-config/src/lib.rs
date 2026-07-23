@@ -2,12 +2,12 @@ use std::os::unix::prelude::AsRawFd;
 
 use anyhow::{Error, bail, format_err};
 use hex::FromHex;
-use nix::unistd::{Gid, Group, Uid, User};
+use nix::unistd::{Uid, User};
 
 use proxmox_product_config::lockfile_create_options;
 use proxmox_sys::fs::DirLockGuard;
 
-pub use pbs_buildcfg::{BACKUP_GROUP_NAME, BACKUP_USER_NAME};
+pub use pbs_buildcfg::BACKUP_USER_NAME;
 
 pub mod acl;
 mod cached_user_info;
@@ -41,16 +41,6 @@ pub fn backup_user() -> Result<nix::unistd::User, Error> {
     } else {
         User::from_name(BACKUP_USER_NAME)?
             .ok_or_else(|| format_err!("Unable to lookup '{}' user.", BACKUP_USER_NAME))
-    }
-}
-
-/// Return Group info for the 'backup' group (``getgrnam(3)``)
-pub fn backup_group() -> Result<nix::unistd::Group, Error> {
-    if cfg!(test) {
-        Ok(Group::from_gid(Gid::current())?.expect("current group does not exist"))
-    } else {
-        Group::from_name(BACKUP_GROUP_NAME)?
-            .ok_or_else(|| format_err!("Unable to lookup '{}' group.", BACKUP_GROUP_NAME))
     }
 }
 

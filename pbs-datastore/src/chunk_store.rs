@@ -750,12 +750,14 @@ impl ChunkStore {
             .parent()
             .ok_or_else(|| format_err!("unable to get chunk dir"))?;
 
-        let mut create_options = CreateOptions::new();
-        if nix::unistd::Uid::effective().is_root() {
-            let uid = pbs_config::backup_user()?.uid;
-            let gid = pbs_config::backup_group()?.gid;
-            create_options = create_options.owner(uid).group(gid);
-        }
+        let create_options = if nix::unistd::Uid::effective().is_root() {
+            // Overwrite the mode default for backwards compatibility
+            proxmox_product_config::default_create_options()
+                .perm(nix::sys::stat::Mode::from_bits_truncate(0o644))
+        } else {
+            CreateOptions::new()
+        };
+
         proxmox_sys::fs::replace_file(
             &chunk_path,
             raw_data,
@@ -807,12 +809,13 @@ impl ChunkStore {
 
     /// Helper to generate new empty marker file
     fn create_marker_file(path: &Path) -> Result<(), Error> {
-        let mut create_options = CreateOptions::new();
-        if nix::unistd::Uid::effective().is_root() {
-            let uid = pbs_config::backup_user()?.uid;
-            let gid = pbs_config::backup_group()?.gid;
-            create_options = create_options.owner(uid).group(gid);
-        }
+        let create_options = if nix::unistd::Uid::effective().is_root() {
+            // Overwrite the mode default for backwards compatibility
+            proxmox_product_config::default_create_options()
+                .perm(nix::sys::stat::Mode::from_bits_truncate(0o644))
+        } else {
+            CreateOptions::new()
+        };
         proxmox_sys::fs::replace_file(path, &[], create_options, false)
     }
 
@@ -898,8 +901,9 @@ impl ChunkStore {
     fn check_permissions<T: AsRef<Path>>(path: T, file_mode: u32) -> Result<(), Error> {
         match nix::sys::stat::stat(path.as_ref()) {
             Ok(stat) => {
-                if stat.st_uid != u32::from(pbs_config::backup_user()?.uid)
-                    || stat.st_gid != u32::from(pbs_config::backup_group()?.gid)
+                let backup_user = proxmox_product_config::get_api_user();
+                if stat.st_uid != u32::from(backup_user.uid)
+                    || stat.st_gid != u32::from(backup_user.gid)
                     || stat.st_mode & 0o777 != file_mode
                 {
                     bail!(

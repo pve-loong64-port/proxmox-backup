@@ -61,11 +61,10 @@ fn main() -> Result<(), Error> {
     proxmox_backup::tools::setup_safe_path_env();
 
     let backup_user = pbs_config::backup_user()?;
-    let backup_group = pbs_config::backup_group()?;
     let running_uid = nix::unistd::Uid::effective();
     let running_gid = nix::unistd::Gid::effective();
 
-    if running_uid != backup_user.uid || running_gid != backup_group.gid {
+    if running_uid != backup_user.uid || running_gid != backup_user.gid {
         bail!(
             "proxy not running as backup user or group (got uid {running_uid} gid {running_gid})"
         );
