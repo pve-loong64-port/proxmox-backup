@@ -196,7 +196,7 @@ pub(crate) fn do_create_datastore(
                 message: None,
             }))?;
         }
-        let backup_user = pbs_config::backup_user()?;
+        let backup_user = proxmox_product_config::get_api_user();
         ChunkStore::create(
             &datastore.name,
             path.clone(),

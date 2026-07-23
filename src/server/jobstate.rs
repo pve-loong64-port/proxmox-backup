@@ -87,7 +87,7 @@ const JOB_STATE_BASEDIR: &str = concat!(PROXMOX_BACKUP_STATE_DIR_M!(), "/jobstat
 
 /// Create jobstate stat dir with correct permission
 pub fn create_jobstate_dir() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
 
     let opts = CreateOptions::new()
         .owner(backup_user.uid)
@@ -323,7 +323,7 @@ impl Job {
         let serialized = serde_json::to_string(&self.state)?;
         let path = get_path(&self.jobtype, &self.jobname);
 
-        let backup_user = pbs_config::backup_user()?;
+        let backup_user = proxmox_product_config::get_api_user();
         let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
         // set the correct owner/group/permissions while saving file
         // owner(rw) = backup, group(r)= backup

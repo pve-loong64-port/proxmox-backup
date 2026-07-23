@@ -23,7 +23,7 @@ static METRIC_CACHE: OnceLock<SharedCache> = OnceLock::new();
 
 /// Initialize the metric cache.
 pub(super) fn init() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let file_opts = CreateOptions::new()
         .owner(backup_user.uid)
         .group(backup_user.gid)

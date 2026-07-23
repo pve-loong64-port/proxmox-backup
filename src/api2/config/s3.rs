@@ -346,7 +346,7 @@ pub async fn list_buckets(
     let empty_prefix = String::new();
     let request_counter_config = S3RequestCounterConfig {
         id,
-        user: pbs_config::backup_user()?,
+        user: proxmox_product_config::get_api_user().clone(),
         base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
     };
     let options = S3ClientOptions::from_config(

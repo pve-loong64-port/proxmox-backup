@@ -2442,7 +2442,7 @@ fn setup_mounted_device(datastore: &DataStoreConfig, tmp_mount_path: &str) -> Re
         "{tmp_mount_path}/{}",
         datastore.path.trim_start_matches('/')
     );
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let options = CreateOptions::new()
         .owner(backup_user.uid)
         .group(backup_user.gid);

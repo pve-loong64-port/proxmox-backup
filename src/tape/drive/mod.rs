@@ -549,7 +549,7 @@ pub fn set_tape_device_state(drive: &str, state: &str) -> Result<(), Error> {
     let mut path = PathBuf::from(crate::tape::DRIVE_STATE_DIR);
     path.push(drive);
 
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let mode = nix::sys::stat::Mode::from_bits_truncate(0o0644);
     let options = CreateOptions::new()
         .perm(mode)

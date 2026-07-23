@@ -38,7 +38,7 @@ pub fn init() -> Result<(), Error> {
 /// Create the directory which will be used to temporarily store notifications
 /// which were sent from an unprivileged process.
 pub fn create_spool_dir() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let opts = CreateOptions::new()
         .owner(backup_user.uid)
         .group(backup_user.gid);
@@ -118,7 +118,7 @@ fn send_notification(notification: Notification) -> Result<(), Error> {
         let ser = serde_json::to_vec(&notification)?;
         let path = Path::new(SPOOL_DIR).join(format!("{id}.json", id = notification.id()));
 
-        let backup_user = pbs_config::backup_user()?;
+        let backup_user = proxmox_product_config::get_api_user();
         let opts = CreateOptions::new()
             .owner(backup_user.uid)
             .group(backup_user.gid);

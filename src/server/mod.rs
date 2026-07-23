@@ -63,7 +63,7 @@ pub(crate) async fn notify_datastore_removed() -> Result<(), Error> {
 /// This exists to fixate the permissions for the run *base* directory while allowing intermediate
 /// directories after it to have different permissions.
 pub fn create_run_dir() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let opts = CreateOptions::new()
         .owner(backup_user.uid)
         .group(backup_user.gid);
@@ -72,7 +72,7 @@ pub fn create_run_dir() -> Result<(), Error> {
 }
 
 pub fn create_state_dir() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let opts = CreateOptions::new()
         .owner(backup_user.uid)
         .group(backup_user.gid);
@@ -86,7 +86,7 @@ pub fn create_state_dir() -> Result<(), Error> {
 
 /// Create active operations dir with correct permission.
 pub fn create_active_operations_dir() -> Result<(), Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
     let mode = nix::sys::stat::Mode::from_bits_truncate(0o0750);
     let options = CreateOptions::new()
         .perm(mode)

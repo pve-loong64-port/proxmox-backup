@@ -59,7 +59,7 @@ pub async fn check(
     };
     let request_counter_config = S3RequestCounterConfig {
         id: request_counter_id,
-        user: pbs_config::backup_user()?,
+        user: proxmox_product_config::get_api_user().clone(),
         base_path: S3_CLIENT_REQUEST_COUNTER_BASE_PATH.into(),
     };
 
@@ -147,7 +147,7 @@ pub async fn reset_counters(
         bail!("Cannot find s3 counters file '{path:?}'");
     }
 
-    let user = pbs_config::backup_user()?;
+    let user = proxmox_product_config::get_api_user().clone();
     let request_counters = SharedRequestCounters::open_shared_memory_mapped(path, user)
         .context("failed to open shared request counters")?;
     request_counters.reset(Ordering::Release);

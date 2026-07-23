@@ -34,7 +34,7 @@ fn get_cache() -> Result<&'static Cache, Error> {
 ///
 /// Note: Only a single process must do this (proxmox-backup-proxy)
 pub(super) fn init() -> Result<&'static Cache, Error> {
-    let backup_user = pbs_config::backup_user()?;
+    let backup_user = proxmox_product_config::get_api_user();
 
     let file_options = CreateOptions::new()
         .owner(backup_user.uid)

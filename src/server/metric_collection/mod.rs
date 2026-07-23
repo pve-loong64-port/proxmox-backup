@@ -250,7 +250,7 @@ fn collect_s3_stats(
     let s3_stats = match counters.entry(path.clone()) {
         Entry::Occupied(o) => load_s3_statistics(o.get()),
         Entry::Vacant(v) => {
-            let user = pbs_config::backup_user()?;
+            let user = proxmox_product_config::get_api_user().clone();
             let counters = SharedRequestCounters::open_shared_memory_mapped(path, user)?;
             let s3_stats = load_s3_statistics(&counters);
             v.insert(counters);

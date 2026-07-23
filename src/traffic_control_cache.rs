@@ -114,7 +114,7 @@ fn create_limiter(
     burst: u64,
 ) -> Result<SharedRateLimit, Error> {
     if use_shared_memory {
-        let user = pbs_config::backup_user()?;
+        let user = proxmox_product_config::get_api_user().clone();
         let base_path = pbs_buildcfg::rundir!("/shmem/tbf");
         let limiter = SharedRateLimiter::mmap_shmem(name, rate, burst, user, base_path)?;
         Ok(Arc::new(limiter))
