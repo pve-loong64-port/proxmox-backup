@@ -177,11 +177,7 @@ impl Inventory {
             // We cannot use chown inside test environment (no permissions)
             CreateOptions::new().perm(mode)
         } else {
-            let backup_user = pbs_config::backup_user()?;
-            CreateOptions::new()
-                .perm(mode)
-                .owner(backup_user.uid)
-                .group(backup_user.gid)
+            proxmox_product_config::default_create_options()
         };
 
         replace_file(&self.inventory_path, raw.as_bytes(), options, true)?;

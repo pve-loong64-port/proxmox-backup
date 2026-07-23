@@ -3,8 +3,6 @@ use std::path::Path;
 
 use anyhow::{Error, bail, format_err};
 
-use proxmox_sys::fs::CreateOptions;
-
 use crate::tape::{MediaCatalog, MediaId};
 
 /// Returns a list of (store, snapshot) for a given MediaId
@@ -93,13 +91,7 @@ fn write_snapshot_cache<P: AsRef<Path>>(
         }
     }
 
-    let backup_user = pbs_config::backup_user()?;
-    let mode = nix::sys::stat::Mode::from_bits_truncate(0o0640);
-    let options = CreateOptions::new()
-        .perm(mode)
-        .owner(backup_user.uid)
-        .group(backup_user.gid);
-
+    let options = proxmox_product_config::default_create_options();
     proxmox_sys::fs::replace_file(cache_path, data.as_bytes(), options, false)?;
 
     Ok(list)
