@@ -979,25 +979,12 @@ pub(crate) async fn push_group(
 }
 
 async fn load_previous_snapshot_known_chunks(
-    params: &PushParameters,
     upload_options: &UploadOptions,
     backup_writer: &BackupWriter,
     archive_name: &BackupArchiveName,
     known_chunks: Arc<Mutex<HashSet<[u8; 32]>>>,
 ) {
     if let Some(manifest) = upload_options.previous_manifest.as_ref() {
-        if let Some((_id, crypt_config)) = &params.crypt_config {
-            // no fingerprint in previous manifest -> no reuse possible
-            let Ok(Some(fingerprint)) = manifest.fingerprint() else {
-                return;
-            };
-
-            if *fingerprint.bytes() != crypt_config.fingerprint() {
-                // key mismatch -> no reuse possible
-                return;
-            }
-        }
-
         // Add known chunks, ignore errors since archive might not be present and it is better
         // to proceed on unrelated errors than to fail here.
         match archive_name.archive_type() {
@@ -1128,18 +1115,73 @@ pub(crate) async fn push_snapshot(
     .await
     .with_context(|| prefix.to_string())?;
 
-    let mut previous_manifest = None;
     // Use manifest of previous snapshots in group on target for chunk upload deduplication
-    if fetch_previous_manifest {
-        match backup_writer.download_previous_manifest(false).await {
-            Ok(manifest) => previous_manifest = Some(Arc::new(manifest)),
+    let previous_manifest = if !fetch_previous_manifest {
+        None
+    } else {
+        let result = backup_writer
+            .download_previous_manifest(false)
+            .await
+            .context("failed to download")
+            .and_then(|manifest| {
+                let fingerprint = manifest
+                    .fingerprint()
+                    .context("failed getting fingerprint")?;
+
+                let Some(manifest_key_fp) = fingerprint else {
+                    if encrypt_using_key.is_none() {
+                        return Ok(Arc::new(manifest));
+                    }
+                    bail!("previous snapshot not encrypted");
+                };
+
+                let signed_only = manifest
+                    .files()
+                    .iter()
+                    .all(|f| f.chunk_crypt_mode() == CryptMode::None);
+
+                let Some((_key_id, crypt_config)) = &encrypt_using_key else {
+                    if signed_only {
+                        return Ok(Arc::new(manifest));
+                    }
+                    bail!("previous snapshot encrypted but no encryption key configured");
+                };
+
+                if *manifest_key_fp.bytes() == crypt_config.fingerprint() {
+                    if let Some(expected_signature) = &manifest.signature {
+                        let calculated_signature = manifest
+                            .signature(crypt_config)
+                            .context("signature calculation failed")?;
+                        if hex::encode(calculated_signature) == *expected_signature {
+                            return Ok(Arc::new(manifest));
+                        }
+                        bail!("signature mismatch with configured encryption key");
+                    }
+                    bail!("previous snapshots manifest not signed with configured encryption key");
+                }
+                bail!(
+                    "encryption key of previous snapshot does not match configured encryption key"
+                );
+            });
+
+        match result {
+            Ok(prev) => {
+                log_sender
+                    .log(
+                        Level::INFO,
+                        format!("{prefix}: Reusing previous manifest for deduplication"),
+                    )
+                    .await?;
+                Some(prev)
+            }
             Err(err) => {
                 log_sender
                     .log(
                         Level::INFO,
-                        format!("{prefix}: Could not download previous manifest - {err}"),
+                        format!("{prefix}: Skip reuse of previous manifest - {err:#}"),
                     )
-                    .await?
+                    .await?;
+                None
             }
         }
     };
@@ -1184,7 +1226,6 @@ pub(crate) async fn push_snapshot(
             };
 
             load_previous_snapshot_known_chunks(
-                params,
                 &upload_options,
                 &backup_writer,
                 &archive_name,
