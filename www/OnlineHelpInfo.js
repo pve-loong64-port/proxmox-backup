@@ -83,6 +83,22 @@ const proxmoxOnlineHelpInfo = {
     "link": "/docs/file-formats.html#ppxar-format",
     "title": "Proxmox File Archive Format - Payload (``.ppxar``)"
   },
+  "pcat1-format": {
+    "link": "/docs/file-formats.html#pcat1-format",
+    "title": "Proxmox Catalog File Format (``.pcat1``)"
+  },
+  "pcat1-catalog-data": {
+    "link": "/docs/file-formats.html#pcat1-catalog-data",
+    "title": "Catalog Data Tables"
+  },
+  "pcat1-entry-layout": {
+    "link": "/docs/file-formats.html#pcat1-entry-layout",
+    "title": "Catalog Table Entries"
+  },
+  "pcat1-entry-types": {
+    "link": "/docs/file-formats.html#pcat1-entry-types",
+    "title": "Entry Types:"
+  },
   "data-blob-format": {
     "link": "/docs/file-formats.html#data-blob-format",
     "title": "Data Blob Format (``.blob``)"
@@ -158,6 +174,10 @@ const proxmoxOnlineHelpInfo = {
   "sysadmin-package-repos-enterprise": {
     "link": "/docs/installation.html#sysadmin-package-repos-enterprise",
     "title": "`Proxmox Backup`_ Enterprise Repository"
+  },
+  "package-repositories-dbgsym": {
+    "link": "/docs/installation.html#package-repositories-dbgsym",
+    "title": "`Proxmox Backup`_ Debug Symbol Repository"
   },
   "package-repositories-client-only": {
     "link": "/docs/installation.html#package-repositories-client-only",
