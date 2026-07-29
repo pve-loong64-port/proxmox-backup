@@ -1069,7 +1069,7 @@ async fn create_backup(
     };
 
     let previous_manifest = if download_previous_manifest {
-        match client.download_previous_manifest().await {
+        match client.download_previous_manifest(true).await {
             Ok(previous_manifest) => {
                 match previous_manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref)) {
                     Ok(()) => Some(Arc::new(previous_manifest)),

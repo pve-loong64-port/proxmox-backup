@@ -1131,7 +1131,7 @@ pub(crate) async fn push_snapshot(
     let mut previous_manifest = None;
     // Use manifest of previous snapshots in group on target for chunk upload deduplication
     if fetch_previous_manifest {
-        match backup_writer.download_previous_manifest().await {
+        match backup_writer.download_previous_manifest(false).await {
             Ok(manifest) => previous_manifest = Some(Arc::new(manifest)),
             Err(err) => {
                 log_sender

@@ -737,8 +737,14 @@ impl BackupWriter {
         })
     }
 
-    /// Download backup manifest (index.json) of last backup
-    pub async fn download_previous_manifest(&self) -> Result<BackupManifest, Error> {
+    /// Download backup manifest (index.json) of last backup.
+    ///
+    /// If `check_signature` is set and the writer stores a crypt config,
+    /// also checks the manifest's signature.
+    pub async fn download_previous_manifest(
+        &self,
+        check_signature: bool,
+    ) -> Result<BackupManifest, Error> {
         let mut raw_data = Vec::with_capacity(64 * 1024);
 
         let param = json!({ "archive-name": MANIFEST_BLOB_NAME.to_string() });
@@ -750,10 +756,13 @@ impl BackupWriter {
         // manifest blobs are never encrypted and no expected digest available
         let data = blob.decode(None, None)?;
 
-        let manifest =
-            BackupManifest::from_data(&data[..], self.crypt_config.as_ref().map(Arc::as_ref))?;
+        let crypt_config = if check_signature {
+            self.crypt_config.as_ref().map(Arc::as_ref)
+        } else {
+            None
+        };
 
-        Ok(manifest)
+        BackupManifest::from_data(&data[..], crypt_config)
     }
 
     // We have no `self` here for `h2` and `verbose`, the only other arg "common" with 1 other
