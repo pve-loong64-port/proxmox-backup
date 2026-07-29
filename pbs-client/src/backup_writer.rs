@@ -747,8 +747,8 @@ impl BackupWriter {
             .await?;
 
         let blob = DataBlob::load_from_reader(&mut &raw_data[..])?;
-        // no expected digest available
-        let data = blob.decode(self.crypt_config.as_ref().map(Arc::as_ref), None)?;
+        // manifest blobs are never encrypted and no expected digest available
+        let data = blob.decode(None, None)?;
 
         let manifest =
             BackupManifest::from_data(&data[..], self.crypt_config.as_ref().map(Arc::as_ref))?;
