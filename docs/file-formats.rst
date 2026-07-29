@@ -61,49 +61,48 @@ All headers are stored as little-endian.
 Proxmox Catalog File Format (``.pcat1``)
 ----------------------------------------
 
-The asterisk notation indicates variable-length integers:
-
-* **u64\***: Unsigned variable-length integer. Each encoded byte is 8 bits wide. Bit 7, the most significant bit, is the continuation
-  flag. Bits 0 through 6 carry value bits. The first encoded byte stores the lowest order 7 value bits, the second encoded byte
-  stores the next 7 value bits, and so on.
-
-* **i64\***: Signed variable-length integer. Each nonzero encoded byte is 8 bits wide. Bit 7, the most significant bit, is the
-  continuation flag. Bits 0 through 6 carry value bits. The first encoded byte stores the lowest-order 7 value bits, the second
-  encoded byte stores the next 7 value bits, and so on. Non-negative values end with a byte whose continuation flag is clear.
-  Negative values end with an additional 0x00 terminator byte.
+The catalog file uses the following structure:
 
 .. list-table::
    :widths: auto
 
    * - ``MAGIC: [u8; 8]``
      - ``[145, 253, 96, 249, 196, 103, 88, 213]``.
-   * - [Catalog Data]
-     - Raw catalog data. This includes TABLE_LENGTH, ENTRY_COUNT and ENTRIES. See ``Catalog Data`` :ref:`contents <catalog-data>`.
+   * - ``CATALOG_DATA``
+     - Catalog data table. See ``Catalog Data`` :ref:`contents <catalog-data>`.
    * - ...
-     - Further concatenation of catalog data. 
+     - More catalog data tables.
    * - ``ROOT_START_OFFSET: u64``
      - Points at the start of the '/' catalog entry. Stored as **little-endian**.
 
-Catalog Data:
-
 .. _catalog-data:
+
+Catalog Data Tables
+~~~~~~~~~~~~~~~~~~~
+
+Each table represents the contents of a single directory.
 
 .. list-table::
    :widths: auto
 
    * - ``TABLE_LENGTH: u64*``
-     - Total length of the contents inside the Directory.
+     - Total length of the contents inside this table.
    * - ``ENTRY_COUNT: u64*``
-     - Number of entries present inside the Directory.
+     - Number of entries present in the table.
    * - ``ENTRIES``
-     - Concatenated ``ENTRY`` structures (see the ``ENTRY`` :ref:`layout <entry-layout>` .) Repeated ``ENTRY_COUNT`` times.
+     - Concatenated ``ENTRY_COUNT`` ``ENTRY`` structures (see the ``ENTRY`` :ref:`layout <entry-layout>` .).
 
 .. _entry-layout:
 
-Except for files and directories, no additional payload is stored beyond the name and its length inside an ENTRY.
-The ``offset_back`` stores the backward byte distance from the start of the parent directory table to the start of the
-referenced child directory table. The reader can then compute the start offset of the child directory table as
-``parent_table_start - offset_back``.
+Catalog Table Entries
+~~~~~~~~~~~~~~~~~~~~~
+
+Each entry consists of the length and value of its name. Additional, ``file`
+and ``directory`` type entries contain a ``PAYLOAD`` field. For directory
+entries, the ``offset_back`` payload stores the backward byte distance from the
+start of the parent directory table to the start of the referenced child
+directory table. The start offset of the child directory table can be computed
+as ``parent_table_start - offset_back``.
   
 .. list-table::
    :widths: auto
@@ -119,9 +118,11 @@ referenced child directory table. The reader can then compute the start offset o
 
        * **Directory ('d')**: ``offset_back: u64*`` (Child-to-Parent offset distance.)
        * **File ('f')**: ``size: u64*`` followed by ``mtime: i64*``
+
 .. _entry-types:
 
 Entry Types:
+~~~~~~~~~~~~
 
 .. list-table::
    :widths: auto
@@ -142,6 +143,21 @@ Entry Types:
      - FIFO
    * - ``s``
      - Socket
+
+Variable Length Encoding:
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The asterisk notation indicates variable-length integers:
+
+* **u64\***: Unsigned variable-length integer. Each encoded byte is 8 bits wide. Bit 7, the most significant bit, is the continuation
+  flag. Bits 0 through 6 carry value bits. The first encoded byte stores the lowest order 7 value bits, the second encoded byte
+  stores the next 7 value bits, and so on.
+
+* **i64\***: Signed variable-length integer. Each nonzero encoded byte is 8 bits wide. Bit 7, the most significant bit, is the
+  continuation flag. Bits 0 through 6 carry value bits. The first encoded byte stores the lowest-order 7 value bits, the second
+  encoded byte stores the next 7 value bits, and so on. Non-negative values end with a byte whose continuation flag is clear.
+  Negative values end with an additional 0x00 terminator byte.
+
 
 .. _data-blob-format:
 
