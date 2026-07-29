@@ -167,17 +167,11 @@ impl DataBlob {
 
     /// Get the encryption mode for this blob.
     pub fn crypt_mode(&self) -> Result<CryptMode, Error> {
-        let magic = self.magic();
-
-        Ok(
-            if magic == &UNCOMPRESSED_BLOB_MAGIC_1_0 || magic == &COMPRESSED_BLOB_MAGIC_1_0 {
-                CryptMode::None
-            } else if magic == &ENCR_COMPR_BLOB_MAGIC_1_0 || magic == &ENCRYPTED_BLOB_MAGIC_1_0 {
-                CryptMode::Encrypt
-            } else {
-                bail!("Invalid blob magic number.");
-            },
-        )
+        match *self.magic() {
+            UNCOMPRESSED_BLOB_MAGIC_1_0 | COMPRESSED_BLOB_MAGIC_1_0 => Ok(CryptMode::None),
+            ENCR_COMPR_BLOB_MAGIC_1_0 | ENCRYPTED_BLOB_MAGIC_1_0 => Ok(CryptMode::Encrypt),
+            _ => bail!("Invalid blob magic number."),
+        }
     }
 
     /// Decode blob data
