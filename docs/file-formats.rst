@@ -69,13 +69,13 @@ The catalog file uses the following structure:
    * - ``MAGIC: [u8; 8]``
      - ``[145, 253, 96, 249, 196, 103, 88, 213]``.
    * - ``CATALOG_DATA``
-     - Catalog data table. See ``Catalog Data`` :ref:`contents <catalog-data>`.
+     - Catalog data table. See ``Catalog Data`` :ref:`contents <pcat1-catalog-data>`.
    * - ...
      - More catalog data tables.
    * - ``ROOT_START_OFFSET: u64``
      - Points at the start of the '/' catalog entry. Stored as **little-endian**.
 
-.. _catalog-data:
+.. _pcat1-catalog-data:
 
 Catalog Data Tables
 ~~~~~~~~~~~~~~~~~~~
@@ -90,9 +90,9 @@ Each table represents the contents of a single directory.
    * - ``ENTRY_COUNT: u64*``
      - Number of entries present in the table.
    * - ``ENTRIES``
-     - Concatenated ``ENTRY_COUNT`` ``ENTRY`` structures (see the ``ENTRY`` :ref:`layout <entry-layout>` .).
+     - Concatenated ``ENTRY_COUNT`` ``ENTRY`` structures (see the ``ENTRY`` :ref:`layout <pcat1-entry-layout>` .).
 
-.. _entry-layout:
+.. _pcat1-entry-layout:
 
 Catalog Table Entries
 ~~~~~~~~~~~~~~~~~~~~~
@@ -108,7 +108,7 @@ as ``parent_table_start - offset_back``.
    :widths: auto
 
    * - ``ENTRY_TYPE: u8``
-     - The type of entry (see entry :ref:`types <entry-types>`).
+     - The type of entry (see entry :ref:`types <pcat1-entry-types>`).
    * - ``NAME_LENGTH: u64*``
      - Length of file or directory name. Stored as variable length encoded u64.
    * - ``NAME: [u8]``
@@ -119,7 +119,7 @@ as ``parent_table_start - offset_back``.
        * **Directory ('d')**: ``offset_back: u64*`` (Child-to-Parent offset distance.)
        * **File ('f')**: ``size: u64*`` followed by ``mtime: i64*``
 
-.. _entry-types:
+.. _pcat1-entry-types:
 
 Entry Types:
 ~~~~~~~~~~~~
