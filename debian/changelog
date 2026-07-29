@@ -1,3 +1,37 @@
+rust-proxmox-backup (4.2.4-1) trixie; urgency=medium
+
+  * docs: document the debug symbol repository
+
+  * datastore: fix wrong local path used for S3 bad chunk handling during
+    garbage collection
+
+  * refactor file creation/mode/ownership helpers to proxmox-product-config
+    crate
+
+  * fix #7642: avoid expensive user lookups on file locking by caching the
+    backup user/group ID
+
+  * depend on proxmox-enterprise-support-keyring, and track its version in the
+    package version API endpoint
+
+  * fix #5748: docs: add `catalog.pcat1` format specification
+
+  * docs: system requirements: document we recommend local storage
+
+  * S3: fix #6841: allow configuring request rate limits by updating to
+    proxmox-s3-client 1.4.1. these rate limits are split into active and
+    passive methods, allowing separate handling of POST/PUT/DELETE and GET/HEAD
+    request limits.
+
+  * S3: config: allow editing the use-node-config flag that controls whether
+    requests S3 endpoints honor the node's proxy settings or not
+
+  * sync: push: gracefully handle previous manifest signature mismatches, which
+    can happen when enabling or disabling push-encryption on an already synced
+    backup group
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 29 Jul 2026 15:08:15 +0200
+
 rust-proxmox-backup (4.2.3-1) trixie; urgency=medium
 
   * css: remove x-grid-row-loading class, replace it with non-blurry SVG
