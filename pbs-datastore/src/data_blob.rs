@@ -180,33 +180,33 @@ impl DataBlob {
         config: Option<&CryptConfig>,
         digest: Option<&[u8; 32]>,
     ) -> Result<Vec<u8>, Error> {
-        let magic = self.magic();
+        let magic = *self.magic();
 
-        if magic == &UNCOMPRESSED_BLOB_MAGIC_1_0 {
-            let data_start = std::mem::size_of::<DataBlobHeader>();
-            let data = self.raw_data[data_start..].to_vec();
-            if let Some(digest) = digest {
-                Self::verify_digest(&data, None, digest)?;
+        let (data, crypt_config) = match magic {
+            UNCOMPRESSED_BLOB_MAGIC_1_0 => {
+                let data_start = std::mem::size_of::<DataBlobHeader>();
+                let data = self.raw_data[data_start..].to_vec();
+                (data, None)
             }
-            Ok(data)
-        } else if magic == &COMPRESSED_BLOB_MAGIC_1_0 {
-            let data_start = std::mem::size_of::<DataBlobHeader>();
-            let mut reader = &self.raw_data[data_start..];
-            let data = zstd::stream::decode_all(&mut reader)?;
-            // zstd::block::decompress is about 10% slower
-            // let data = zstd::block::decompress(&self.raw_data[data_start..], MAX_BLOB_SIZE)?;
-            if let Some(digest) = digest {
-                Self::verify_digest(&data, None, digest)?;
+            COMPRESSED_BLOB_MAGIC_1_0 => {
+                let data_start = std::mem::size_of::<DataBlobHeader>();
+                let mut reader = &self.raw_data[data_start..];
+                let data = zstd::stream::decode_all(&mut reader)?;
+                // zstd::block::decompress is about 10% slower
+                // let data = zstd::block::decompress(&self.raw_data[data_start..], MAX_BLOB_SIZE)?;
+                (data, None)
             }
-            Ok(data)
-        } else if magic == &ENCR_COMPR_BLOB_MAGIC_1_0 || magic == &ENCRYPTED_BLOB_MAGIC_1_0 {
-            let header_len = std::mem::size_of::<EncryptedDataBlobHeader>();
-            let head = unsafe {
-                (&self.raw_data[..header_len]).read_le_value::<EncryptedDataBlobHeader>()?
-            };
+            ENCR_COMPR_BLOB_MAGIC_1_0 | ENCRYPTED_BLOB_MAGIC_1_0 => {
+                let header_len = std::mem::size_of::<EncryptedDataBlobHeader>();
+                let head = unsafe {
+                    (&self.raw_data[..header_len]).read_le_value::<EncryptedDataBlobHeader>()?
+                };
 
-            if let Some(config) = config {
-                let data = if magic == &ENCR_COMPR_BLOB_MAGIC_1_0 {
+                let Some(config) = config else {
+                    bail!("unable to decrypt blob - missing CryptConfig");
+                };
+
+                let data = if magic == ENCR_COMPR_BLOB_MAGIC_1_0 {
                     Self::decode_compressed_chunk(
                         config,
                         &self.raw_data[header_len..],
@@ -221,16 +221,16 @@ impl DataBlob {
                         &head.tag,
                     )?
                 };
-                if let Some(digest) = digest {
-                    Self::verify_digest(&data, Some(config), digest)?;
-                }
-                Ok(data)
-            } else {
-                bail!("unable to decrypt blob - missing CryptConfig");
+                (data, Some(config))
             }
-        } else {
-            bail!("Invalid blob magic number.");
+            _ => bail!("Invalid blob magic number."),
+        };
+
+        if let Some(digest) = digest {
+            Self::verify_digest(&data, crypt_config, digest)?;
         }
+
+        Ok(data)
     }
 
     /// Load data blob via given sync ``reader`` and verify its CRC
