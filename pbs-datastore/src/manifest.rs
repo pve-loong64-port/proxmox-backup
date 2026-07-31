@@ -332,3 +332,72 @@ fn test_manifest_signature() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_valid_manifest_archive_name_parsing() {
+    let manifest = r#"{
+        "backup-id": "106",
+        "backup-time": 1784959639,
+        "backup-type": "ct",
+        "files": [
+            {
+                "crypt-mode": "none",
+                "csum": "dfd15388c674e215e8c1d615aabb1c1a080f8354950d8c88b6892a665b9f3c94",
+                "filename": "pct.conf.blob",
+                "size": 265
+            },
+            {
+                "crypt-mode": "none",
+                "csum": "47205270a0df24cb62793a0e405879cb509593874f09475c8695ccf52666f953",
+                "filename": "root.ppxar.didx",
+                "size": 48945669473
+            },
+            {
+                "crypt-mode": "none",
+                "csum": "e50c7ef54384cbe6dd79cbeef05d0a2f0978fe3182cb65235a8e83756bc1884d",
+                "filename": "root.mpxar.didx",
+                "size": 34225163
+            }
+        ]
+    }"#;
+
+    let json: Value = serde_json::from_slice(manifest.as_bytes()).unwrap();
+    assert!(serde_json::from_value::<BackupManifest>(json).is_ok());
+}
+
+#[test]
+fn test_invalid_manifest_archive_name_parsing() {
+    let invalid_manifests = [
+        r#"{
+        "backup-id": "106",
+        "backup-time": 1784959639,
+        "backup-type": "ct",
+        "files": [
+            {
+                "crypt-mode": "none",
+                "csum": "dfd15388c674e215e8c1d615aabb1c1a080f8354950d8c88b6892a665b9f3c94",
+                "filename": "../../pct.conf.blob",
+                "size": 265
+            }
+        ]
+    }"#,
+        r#"{
+        "backup-id": "106",
+        "backup-time": 1784959639,
+        "backup-type": "ct",
+        "files": [
+            {
+                "crypt-mode": "none",
+                "csum": "47205270a0df24cb62793a0e405879cb509593874f09475c8695ccf52666f953",
+                "filename": "root.pxar",
+                "size": 48945669473
+            }
+        ]
+    }"#,
+    ];
+
+    for invalid_manifest in invalid_manifests {
+        let json: Value = serde_json::from_slice(invalid_manifest.as_bytes()).unwrap();
+        assert!(serde_json::from_value::<BackupManifest>(json).is_err());
+    }
+}
