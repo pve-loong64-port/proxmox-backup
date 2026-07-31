@@ -1,17 +1,13 @@
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::ops::Range;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Context;
 
 use anyhow::{Error, bail, format_err};
-use nix::sys::stat::{SFlag, fstat};
 
-use proxmox_io::ReadExt;
-use proxmox_sys::mmap::Mmap;
 use proxmox_uuid::Uuid;
 use pxar::accessor::{MaybeReady, ReadAt, ReadAtOperation};
 
@@ -19,6 +15,7 @@ use pbs_tools::lru_cache::LruCache;
 
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
+use crate::index_mmap::IndexMmap;
 use crate::read_chunk::ReadChunk;
 
 /// Header format definition for dynamic index files (`.dixd`)
@@ -76,9 +73,8 @@ impl DynamicEntry {
 }
 
 pub struct DynamicIndexReader {
+    mmap: IndexMmap<DynamicIndexHeader, DynamicEntry>,
     _file: File,
-    pub size: usize,
-    index: Mmap<DynamicEntry>,
     pub uuid: [u8; 16],
     pub ctime: i64,
     pub index_csum: [u8; 32],
@@ -93,55 +89,28 @@ impl DynamicIndexReader {
     }
 
     pub fn index(&self) -> &[DynamicEntry] {
-        &self.index
+        self.mmap.index()
     }
 
-    pub fn new(mut file: std::fs::File) -> Result<Self, Error> {
-        let stat = fstat(file.as_raw_fd()).map_err(|e| format_err!("fstat failed - {e}"))?;
-        if (stat.st_mode & SFlag::S_IFMT.bits()) != SFlag::S_IFREG.bits() {
-            bail!("not a regular file");
-        }
+    pub fn new(file: File) -> Result<Self, Error> {
+        let mmap = unsafe { IndexMmap::map_read(&file)? };
 
-        // FIXME: This is NOT OUR job! Check the callers of this method and remove this!
-        file.seek(SeekFrom::Start(0))?;
-
-        let header_size = std::mem::size_of::<DynamicIndexHeader>();
-
-        let size = stat.st_size as usize;
-
-        if size < header_size {
-            bail!("index too small ({})", stat.st_size);
-        }
-
-        let header: Box<DynamicIndexHeader> = unsafe { file.read_host_value_boxed()? };
+        let header: &DynamicIndexHeader = mmap.header();
 
         if header.magic != file_formats::DYNAMIC_SIZED_CHUNK_INDEX_1_0 {
             bail!("got unknown magic number");
         }
 
-        let index_size = stat.st_size as usize - header_size;
-        let index_count = index_size / 40;
-        if index_count * 40 != index_size {
-            bail!("got unexpected file size");
+        if mmap.index().is_empty() {
+            bail!("index must not be empty");
         }
-
-        let index = unsafe {
-            Mmap::map_fd(
-                &file,
-                header_size as u64,
-                index_count,
-                nix::sys::mman::ProtFlags::PROT_READ,
-                nix::sys::mman::MapFlags::MAP_PRIVATE,
-            )?
-        };
 
         Ok(Self {
             _file: file,
-            size,
-            index,
             ctime: i64::from_le(header.ctime),
             uuid: header.uuid,
             index_csum: header.index_csum,
+            mmap,
         })
     }
 
@@ -244,7 +213,7 @@ impl IndexFile for DynamicIndexReader {
     }
 
     fn index_size(&self) -> usize {
-        self.size
+        self.mmap.size()
     }
 
     fn chunk_from_offset(&self, offset: u64) -> Option<(usize, u64)> {
@@ -622,7 +591,7 @@ mod tests {
         check_error_contains(DynamicIndexReader::open(&path), "No such file or directory");
 
         fs::write(&path, []).unwrap();
-        check_error_contains(DynamicIndexReader::open(&path), "index too small (0)");
+        check_error_contains(DynamicIndexReader::open(&path), "file too small (0)");
 
         let mut data = vec![0; size_of::<DynamicIndexHeader>()];
 
@@ -631,14 +600,14 @@ mod tests {
 
         data[..8].copy_from_slice(&file_formats::DYNAMIC_SIZED_CHUNK_INDEX_1_0);
         fs::write(&path, &data).unwrap();
-        check_error_contains(
-            DynamicIndexReader::open(&path),
-            "mapped length must not be zero",
-        );
+        check_error_contains(DynamicIndexReader::open(&path), "index must not be empty");
 
         data.extend_from_slice(&[0, 1, 2]);
         fs::write(&path, &data).unwrap();
-        check_error_contains(DynamicIndexReader::open(&path), "got unexpected file size");
+        check_error_contains(
+            DynamicIndexReader::open(&path),
+            "index size is not divisible by element size: 3",
+        );
 
         data.extend(3u8..80);
         fs::write(&path, &data).unwrap();
