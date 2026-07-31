@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use proxmox_http::Body;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 
-use pbs_api_types::Authid;
+use pbs_api_types::{Authid, BackupArchiveName};
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::dynamic_index::DynamicIndexWriter;
 use pbs_datastore::fixed_index::FixedIndexWriter;
@@ -56,7 +56,7 @@ impl std::ops::Add for UploadStatistic {
 }
 
 struct DynamicWriterState {
-    name: String,
+    name: BackupArchiveName,
     index: DynamicIndexWriter,
     offset: u64,
     chunk_count: u64,
@@ -65,7 +65,7 @@ struct DynamicWriterState {
 }
 
 struct FixedWriterState {
-    name: String,
+    name: BackupArchiveName,
     index: FixedIndexWriter,
     size: Option<u64>,
     chunk_size: u32,
@@ -321,7 +321,7 @@ impl BackupEnvironment {
     pub fn register_dynamic_writer(
         &self,
         index: DynamicIndexWriter,
-        name: String,
+        name: BackupArchiveName,
     ) -> Result<usize, Error> {
         let mut state = self.state.lock().unwrap();
 
@@ -348,7 +348,7 @@ impl BackupEnvironment {
     pub fn register_fixed_writer(
         &self,
         index: FixedIndexWriter,
-        name: String,
+        name: BackupArchiveName,
         size: Option<u64>,
         chunk_size: u32,
         incremental: bool,
@@ -451,7 +451,7 @@ impl BackupEnvironment {
 
     fn log_upload_stat(
         &self,
-        archive_name: &str,
+        archive_name: &BackupArchiveName,
         csum: &[u8; 32],
         uuid: &[u8; 16],
         size: u64,
@@ -555,7 +555,7 @@ impl BackupEnvironment {
         // For S3 backends, upload the index file to the object store after closing
         if proxmox_async::runtime::block_on(
             self.backend
-                .upload_index_to_backend(&self.backup_dir, &writer_name),
+                .upload_index_to_backend(&self.backup_dir, writer_name.as_ref()),
         )
         .context("failed to upload dynamic index to backend")?
         {
@@ -671,7 +671,7 @@ impl BackupEnvironment {
         // For S3 backends, upload the index file to the object store after closing
         if proxmox_async::runtime::block_on(
             self.backend
-                .upload_index_to_backend(&self.backup_dir, &writer_name),
+                .upload_index_to_backend(&self.backup_dir, writer_name.as_ref()),
         )
         .context("failed to upload fixed index to backend")?
         {
@@ -688,18 +688,22 @@ impl BackupEnvironment {
         Ok(())
     }
 
-    pub fn add_blob(&self, file_name: &str, data: Vec<u8>) -> Result<(), Error> {
+    pub fn add_blob(&self, archive_name: &BackupArchiveName, data: Vec<u8>) -> Result<(), Error> {
         let mut path = self.datastore.base_path();
         path.push(self.backup_dir.relative_path());
-        path.push(file_name);
+        path.push(archive_name.as_ref());
 
         let blob_len = data.len();
         let orig_len = data.len(); // fixme:
 
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
-        self.datastore
-            .add_blob(file_name, self.backup_dir.clone(), blob, &self.backend)?;
+        self.datastore.add_blob(
+            archive_name.as_ref(),
+            self.backup_dir.clone(),
+            blob,
+            &self.backend,
+        )?;
         self.log(format!(
             "add blob {path:?} ({orig_len} bytes, comp: {blob_len})"
         ));

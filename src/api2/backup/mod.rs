@@ -22,8 +22,8 @@ use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{
     ArchiveType, Authid, BACKUP_ARCHIVE_NAME_SCHEMA, BACKUP_ID_SCHEMA, BACKUP_NAMESPACE_SCHEMA,
-    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, BackupNamespace, BackupType, CHUNK_DIGEST_SCHEMA,
-    DATASTORE_SCHEMA, Operation, PRIV_DATASTORE_BACKUP, VerifyState,
+    BACKUP_TIME_SCHEMA, BACKUP_TYPE_SCHEMA, BackupArchiveName, BackupNamespace, BackupType,
+    CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA, Operation, PRIV_DATASTORE_BACKUP, VerifyState,
 };
 use pbs_config::CachedUserInfo;
 use pbs_datastore::index::IndexFile;
@@ -430,18 +430,18 @@ fn create_dynamic_index(
 ) -> Result<Value, Error> {
     let env: &BackupEnvironment = rpcenv.as_ref();
 
-    let name = required_string_param(&param, "archive-name")?.to_owned();
+    let name = required_string_param(&param, "archive-name")?;
+    let archive_name = BackupArchiveName::try_from(name)?;
 
-    let archive_name = name.clone();
     if !archive_name.ends_with(".didx") {
-        bail!("wrong archive extension: '{}'", archive_name);
+        bail!("wrong archive extension: '{}'", archive_name.as_ref());
     }
 
     let mut path = env.backup_dir.relative_path();
-    path.push(archive_name);
+    path.push(archive_name.as_ref());
 
     let index = env.datastore.create_dynamic_writer(&path)?;
-    let wid = env.register_dynamic_writer(index, name)?;
+    let wid = env.register_dynamic_writer(index, archive_name)?;
 
     env.log(format!("created new dynamic index {wid} ({path:?})"));
 
@@ -480,17 +480,17 @@ fn create_fixed_index(
 ) -> Result<Value, Error> {
     let env: &BackupEnvironment = rpcenv.as_ref();
 
-    let name = required_string_param(&param, "archive-name")?.to_owned();
+    let name = required_string_param(&param, "archive-name")?;
+    let archive_name = BackupArchiveName::try_from(name)?;
     let size = param["size"].as_u64();
     let reuse_csum = param["reuse-csum"].as_str();
 
-    let archive_name = name.clone();
     if !archive_name.ends_with(".fidx") {
-        bail!("wrong archive extension: '{}'", archive_name);
+        bail!("wrong archive extension: '{}'", archive_name.as_ref());
     }
 
     let mut path = env.backup_dir.relative_path();
-    path.push(&archive_name);
+    path.push(archive_name.as_ref());
 
     let chunk_size = 4096 * 1024; // todo: ??
 
@@ -512,7 +512,7 @@ fn create_fixed_index(
         };
 
         let mut last_path = last_backup.backup_dir.relative_path();
-        last_path.push(&archive_name);
+        last_path.push(archive_name.as_ref());
 
         let index = match env.datastore.open_fixed_reader(last_path) {
             Ok(index) => index,
@@ -548,7 +548,7 @@ fn create_fixed_index(
         writer.clone_data_from(&reader)?;
     }
 
-    let wid = env.register_fixed_writer(writer, name, size, chunk_size, incremental)?;
+    let wid = env.register_fixed_writer(writer, archive_name, size, chunk_size, incremental)?;
 
     env.log(format!("created new fixed index {wid} ({path:?})"));
 

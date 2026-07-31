@@ -15,7 +15,7 @@ use proxmox_router::{ApiHandler, ApiMethod, ApiResponseFuture, RpcEnvironment};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 
-use pbs_api_types::{BACKUP_ARCHIVE_NAME_SCHEMA, CHUNK_DIGEST_SCHEMA};
+use pbs_api_types::{BACKUP_ARCHIVE_NAME_SCHEMA, BackupArchiveName, CHUNK_DIGEST_SCHEMA};
 use pbs_datastore::DataBlob;
 use pbs_datastore::file_formats::{DataBlobHeader, EncryptedDataBlobHeader};
 use pbs_tools::json::{required_integer_param, required_string_param};
@@ -314,7 +314,8 @@ fn upload_blob(
     rpcenv: Box<dyn RpcEnvironment>,
 ) -> ApiResponseFuture {
     async move {
-        let file_name = required_string_param(&param, "file-name")?.to_owned();
+        let file_name = required_string_param(&param, "file-name")?;
+        let archive_name = BackupArchiveName::try_from(file_name)?;
         let encoded_size = required_integer_param(&param, "encoded-size")? as usize;
 
         let env: &BackupEnvironment = rpcenv.as_ref();
@@ -333,7 +334,7 @@ fn upload_blob(
             );
         }
 
-        env.add_blob(&file_name, data.to_vec())?;
+        env.add_blob(&archive_name, data.to_vec())?;
 
         Ok(env.format_response(Ok(Value::Null)))
     }
