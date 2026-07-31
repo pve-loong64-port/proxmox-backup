@@ -689,10 +689,6 @@ impl BackupEnvironment {
     }
 
     pub fn add_blob(&self, archive_name: &BackupArchiveName, data: Vec<u8>) -> Result<(), Error> {
-        let mut path = self.datastore.base_path();
-        path.push(self.backup_dir.relative_path());
-        path.push(archive_name.as_ref());
-
         let blob_len = data.len();
         let orig_len = data.len(); // fixme:
 
@@ -704,14 +700,20 @@ impl BackupEnvironment {
             blob,
             &self.backend,
         )?;
-        self.log(format!(
-            "add blob {path:?} ({orig_len} bytes, comp: {blob_len})"
-        ));
 
         let mut state = self.state.lock().unwrap();
         state.file_counter += 1;
         state.backup_size += orig_len as u64;
         state.backup_stat.size += blob_len as u64;
+        drop(state);
+
+        let mut path = self.datastore.base_path();
+        path.push(self.backup_dir.relative_path());
+        path.push(archive_name.as_ref());
+
+        self.log(format!(
+            "add blob {path:?} ({orig_len} bytes, comp: {blob_len})"
+        ));
 
         Ok(())
     }
