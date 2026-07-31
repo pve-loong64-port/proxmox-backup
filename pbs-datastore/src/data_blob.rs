@@ -324,6 +324,11 @@ impl DataBlob {
         Ok(())
     }
 
+    /// Compute the sha256 digest on the raw blob data
+    pub fn csum(&self) -> [u8; 32] {
+        openssl::sha::sha256(&self.raw_data)
+    }
+
     fn verify_digest(
         data: &[u8],
         config: Option<&CryptConfig>,

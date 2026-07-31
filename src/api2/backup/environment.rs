@@ -97,6 +97,7 @@ struct SharedBackupState {
     backup_stat: UploadStatistic,
     backup_lock_guards: BackupLockGuards,
     manifest: Option<BackupManifest>,
+    uploaded_archives: HashMap<String, [u8; 32]>,
 }
 
 pub struct BackupLockGuards {
@@ -177,6 +178,7 @@ impl BackupEnvironment {
             backup_stat: UploadStatistic::new(),
             backup_lock_guards,
             manifest: None,
+            uploaded_archives: HashMap::new(),
         };
 
         let backend = datastore.backend()?;
@@ -559,6 +561,9 @@ impl BackupEnvironment {
             );
         }
 
+        state
+            .uploaded_archives
+            .insert(writer_name.to_string(), csum);
         state.file_counter += 1;
         state.backup_size += size;
         state.backup_stat = state.backup_stat + upload_stat;
@@ -668,6 +673,9 @@ impl BackupEnvironment {
             );
         }
 
+        state
+            .uploaded_archives
+            .insert(writer_name.to_string(), csum);
         state.file_counter += 1;
         state.backup_size += size;
         state.backup_stat = state.backup_stat + upload_stat;
@@ -710,8 +718,10 @@ impl BackupEnvironment {
 
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
+        let blob_csum = blob.csum();
 
-        if *archive_name == *MANIFEST_BLOB_NAME {
+        let is_manifest = *archive_name == *MANIFEST_BLOB_NAME;
+        if is_manifest {
             let manifest = BackupManifest::try_from(blob).map_err(|err| {
                 self.log(format!(
                     "add manifest blob failed ({orig_len} bytes, comp: {blob_len}): {err}"
@@ -729,6 +739,12 @@ impl BackupEnvironment {
         }
 
         let mut state = self.state.lock().unwrap();
+        // skip the manifest, it must not be able to list itself as one of its own archives
+        if !is_manifest {
+            state
+                .uploaded_archives
+                .insert(archive_name.to_string(), blob_csum);
+        }
         state.file_counter += 1;
         state.backup_size += orig_len as u64;
         state.backup_stat.size += blob_len as u64;
@@ -781,6 +797,18 @@ impl BackupEnvironment {
 
         // check for valid manifest and store stats
         manifest.unprotected["chunk_upload_stats"] = stats;
+
+        for file_info in manifest.files() {
+            let archive_name = file_info.filename.as_ref();
+            match state.uploaded_archives.get(archive_name) {
+                Some(csum) => {
+                    if *csum != file_info.csum {
+                        bail!("manifest contains '{archive_name}' with checksum mismatch");
+                    }
+                }
+                None => bail!("manifest contains '{archive_name}' not uploaded during backup"),
+            }
+        }
 
         let manifest_blob = manifest.to_data_blob()?;
 
