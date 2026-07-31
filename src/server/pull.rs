@@ -448,7 +448,7 @@ async fn pull_single_archive<'a>(
         .await?;
 
     if reader
-        .load_file_into(archive_name.as_ref(), &tmp_path)
+        .load_file_into(archive_name, &tmp_path)
         .await
         .with_context(|| archive_prefix.clone())?
         .is_none()
@@ -659,7 +659,7 @@ async fn pull_snapshot<'a>(
     let mut tmp_manifest_name = manifest_name.clone();
     tmp_manifest_name.set_extension("tmp");
     let Some(mut tmp_manifest_file) = reader
-        .load_file_into(MANIFEST_BLOB_NAME.as_ref(), &tmp_manifest_name)
+        .load_file_into(&MANIFEST_BLOB_NAME, &tmp_manifest_name)
         .await
         .with_context(|| prefix.clone())?
     else {
