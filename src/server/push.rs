@@ -1257,9 +1257,7 @@ pub(crate) async fn push_snapshot(
                         .await?
                     } else {
                         let file = std::fs::File::open(&path)?;
-                        backup_writer
-                            .upload_blob(file, archive_name.as_ref())
-                            .await?
+                        backup_writer.upload_blob(file, archive_name).await?
                     };
                     target_manifest.add_file(
                         archive_name,
@@ -1403,11 +1401,7 @@ pub(crate) async fn push_snapshot(
             .with_context(|| prefix.to_string())?;
         } else {
             backup_writer
-                .upload_blob_from_file(
-                    &client_log_path,
-                    client_log_name.as_ref(),
-                    upload_options.clone(),
-                )
+                .upload_blob_from_file(&client_log_path, client_log_name, upload_options.clone())
                 .await
                 .with_context(|| prefix.to_string())?;
         }
@@ -1428,7 +1422,7 @@ pub(crate) async fn push_snapshot(
     let backup_stats = backup_writer
         .upload_blob_from_data(
             manifest_string.into_bytes(),
-            MANIFEST_BLOB_NAME.as_ref(),
+            &MANIFEST_BLOB_NAME,
             UploadOptions {
                 compress: true,
                 encrypt: false,
@@ -1462,7 +1456,7 @@ async fn reencode_encrypted_and_upload_blob<P: AsRef<Path>>(
     let data_blob = DataBlob::load_from_async_reader(&mut file).await?;
     let raw_data = data_blob.decode(None, None)?;
     backup_writer
-        .upload_blob_from_data(raw_data, archive_name.as_ref(), upload_options.clone())
+        .upload_blob_from_data(raw_data, archive_name, upload_options.clone())
         .await
 }
 

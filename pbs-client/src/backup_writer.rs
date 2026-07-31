@@ -215,7 +215,7 @@ impl BackupWriter {
     pub async fn upload_blob<R: std::io::Read>(
         &self,
         mut reader: R,
-        file_name: &str,
+        archive_name: &BackupArchiveName,
     ) -> Result<BackupStats, Error> {
         let start_time = Instant::now();
         let mut raw_data = Vec::new();
@@ -223,7 +223,7 @@ impl BackupWriter {
         reader.read_to_end(&mut raw_data)?;
 
         let csum = openssl::sha::sha256(&raw_data);
-        let param = json!({"encoded-size": raw_data.len(), "file-name": file_name });
+        let param = json!({"encoded-size": raw_data.len(), "file-name": archive_name.as_ref() });
         let size = raw_data.len() as u64;
         let _value = self
             .h2
@@ -246,7 +246,7 @@ impl BackupWriter {
     pub async fn upload_blob_from_data(
         &self,
         data: Vec<u8>,
-        file_name: &str,
+        archive_name: &BackupArchiveName,
         options: UploadOptions,
     ) -> Result<BackupStats, Error> {
         let start_time = Instant::now();
@@ -262,7 +262,7 @@ impl BackupWriter {
         let size = raw_data.len() as u64;
 
         let csum = openssl::sha::sha256(&raw_data);
-        let param = json!({"encoded-size": size, "file-name": file_name });
+        let param = json!({"encoded-size": size, "file-name": archive_name.as_ref() });
         let _value = self
             .h2
             .upload(
@@ -284,7 +284,7 @@ impl BackupWriter {
     pub async fn upload_blob_from_file<P: AsRef<std::path::Path>>(
         &self,
         src_path: P,
-        file_name: &str,
+        archive_name: &BackupArchiveName,
         options: UploadOptions,
     ) -> Result<BackupStats, Error> {
         let src_path = src_path.as_ref();
@@ -299,7 +299,7 @@ impl BackupWriter {
             .await
             .map_err(|err| format_err!("unable to read file {:?} - {}", src_path, err))?;
 
-        self.upload_blob_from_data(contents, file_name, options)
+        self.upload_blob_from_data(contents, archive_name, options)
             .await
     }
 

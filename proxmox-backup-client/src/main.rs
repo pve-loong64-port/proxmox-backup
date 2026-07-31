@@ -1122,7 +1122,7 @@ async fn create_backup(
 
                 log_file("config file", &filename, target.as_ref());
                 let stats = client
-                    .upload_blob_from_file(&filename, target.as_ref(), upload_options)
+                    .upload_blob_from_file(&filename, &target, upload_options)
                     .await?;
                 manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
             }
@@ -1136,7 +1136,7 @@ async fn create_backup(
 
                 log_file("log file", &filename, target.as_ref());
                 let stats = client
-                    .upload_blob_from_file(&filename, target.as_ref(), upload_options)
+                    .upload_blob_from_file(&filename, &target, upload_options)
                     .await?;
                 manifest.add_file(&target, stats.size, stats.csum, crypto.mode)?;
             }
@@ -1318,7 +1318,7 @@ async fn create_backup(
             ..UploadOptions::default()
         };
         let stats = client
-            .upload_blob_from_data(rsa_encrypted_key, ENCRYPTED_KEY_BLOB_NAME.as_ref(), options)
+            .upload_blob_from_data(rsa_encrypted_key, &ENCRYPTED_KEY_BLOB_NAME, options)
             .await?;
         manifest.add_file(
             &ENCRYPTED_KEY_BLOB_NAME,
@@ -1341,7 +1341,7 @@ async fn create_backup(
         ..UploadOptions::default()
     };
     client
-        .upload_blob_from_data(manifest.into_bytes(), MANIFEST_BLOB_NAME.as_ref(), options)
+        .upload_blob_from_data(manifest.into_bytes(), &MANIFEST_BLOB_NAME, options)
         .await?;
 
     client.finish().await?;
