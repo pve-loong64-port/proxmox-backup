@@ -1410,15 +1410,15 @@ pub(crate) async fn push_snapshot(
     // Rewrite manifest for pushed snapshot, recreating manifest from source on target,
     // needs to update all relevant info for new manifest.
     target_manifest.unprotected = source_manifest.unprotected.clone();
-    let manifest_string = if let Some((_id, crypt_config)) = &encrypt_using_key {
+    if let Some((_id, crypt_config)) = &encrypt_using_key {
         let sync_source_signature = source_manifest.signature(crypt_config)?;
         target_manifest.set_sync_source_signature(&sync_source_signature)?;
-        target_manifest.to_string(Some(crypt_config))?
     } else {
         target_manifest.signature = source_manifest.signature.clone();
-        let manifest_json = serde_json::to_value(target_manifest)?;
-        serde_json::to_string_pretty(&manifest_json)?
     };
+    // FIXME: replace me with to_data_blob once there is an upload_blob
+    let manifest_string =
+        target_manifest.to_string(encrypt_using_key.map(|(_, config)| config).as_deref())?;
     let backup_stats = backup_writer
         .upload_blob_from_data(
             manifest_string.into_bytes(),
