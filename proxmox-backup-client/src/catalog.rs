@@ -98,7 +98,7 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
 
             for archive in &metadata_archives {
                 let (reader, archive_size) = get_remote_pxar_reader(
-                    &archive.as_str().try_into()?,
+                    &archive.as_ref().try_into()?,
                     client.clone(),
                     &manifest,
                     crypt_config.clone(),

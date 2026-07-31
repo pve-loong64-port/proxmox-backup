@@ -20,10 +20,10 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
 use pbs_api_types::{
-    ArchiveType, Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace,
-    CLIENT_LOG_BLOB_NAME, CryptMode, Fingerprint, GroupFilter, MANIFEST_BLOB_NAME,
-    MAX_NAMESPACE_DEPTH, Operation, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, RateLimitConfig,
-    Remote, SnapshotListItem, VerifyState, print_store_and_ns,
+    ArchiveType, Authid, BackupDir, BackupGroup, BackupNamespace, CLIENT_LOG_BLOB_NAME, CryptMode,
+    Fingerprint, GroupFilter, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, Operation,
+    PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP, RateLimitConfig, Remote, SnapshotListItem,
+    VerifyState, print_store_and_ns,
 };
 use pbs_client::BackupRepository;
 use pbs_config::CachedUserInfo;
@@ -431,7 +431,7 @@ async fn pull_single_archive<'a>(
 ) -> Result<SyncStats, Error> {
     let archive_name = &archive_info.filename;
     let mut path = snapshot.full_path();
-    path.push(archive_name);
+    path.push(archive_name.to_string());
 
     let mut tmp_path = path.clone();
     tmp_path.set_extension("tmp");
@@ -448,7 +448,7 @@ async fn pull_single_archive<'a>(
         .await?;
 
     if reader
-        .load_file_into(archive_name, &tmp_path)
+        .load_file_into(archive_name.as_ref(), &tmp_path)
         .await
         .with_context(|| archive_prefix.clone())?
         .is_none()
@@ -464,7 +464,7 @@ async fn pull_single_archive<'a>(
 
     let add_to_decrypted_manifest = |csum, size| {
         if let Some(new_manifest) = new_manifest {
-            let name = archive_name.as_str().try_into()?;
+            let name = archive_name.as_ref().try_into()?;
             // size is identical to original, encrypted index
             new_manifest
                 .lock()
@@ -476,7 +476,7 @@ async fn pull_single_archive<'a>(
         }
     };
 
-    match ArchiveType::from_path(archive_name)? {
+    match archive_name.archive_type() {
         ArchiveType::DynamicIndex => {
             let index = DynamicIndexReader::new(tmpfile).map_err(|err| {
                 format_err!("{archive_prefix}: unable to read dynamic index {tmp_path:?} - {err}")
@@ -606,7 +606,7 @@ async fn pull_single_archive<'a>(
     }
 
     backend
-        .upload_index_to_backend(snapshot, archive_name)
+        .upload_index_to_backend(snapshot, archive_name.as_ref())
         .await
         .with_context(|| archive_prefix.clone())?;
 
@@ -788,19 +788,15 @@ async fn pull_snapshot<'a>(
 
     for item in manifest.files() {
         let mut path = snapshot.full_path();
-        path.push(&item.filename);
+        path.push(item.filename.as_ref());
 
         if !corrupt && path.exists() {
-            let filename: BackupArchiveName = item
-                .filename
-                .as_str()
-                .try_into()
-                .with_context(|| prefix.clone())?;
+            let filename = &item.filename;
             match filename.archive_type() {
                 ArchiveType::DynamicIndex => {
                     let index = DynamicIndexReader::open(&path).with_context(|| prefix.clone())?;
                     let (csum, size) = index.compute_csum();
-                    match manifest.verify_file(&filename, &csum, size) {
+                    match manifest.verify_file(filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             log_sender
@@ -815,7 +811,7 @@ async fn pull_snapshot<'a>(
                 ArchiveType::FixedIndex => {
                     let index = FixedIndexReader::open(&path).with_context(|| prefix.clone())?;
                     let (csum, size) = index.compute_csum();
-                    match manifest.verify_file(&filename, &csum, size) {
+                    match manifest.verify_file(filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             log_sender
@@ -830,7 +826,7 @@ async fn pull_snapshot<'a>(
                 ArchiveType::Blob => {
                     let mut tmpfile = std::fs::File::open(&path).with_context(|| prefix.clone())?;
                     let (csum, size) = sha256(&mut tmpfile).with_context(|| prefix.clone())?;
-                    match manifest.verify_file(&filename, &csum, size) {
+                    match manifest.verify_file(filename, &csum, size) {
                         Ok(_) => continue,
                         Err(err) => {
                             log_sender
@@ -1286,20 +1282,19 @@ async fn pull_group(
                 Some(verify_state) if verify_state.state == VerifyState::Failed => (),
                 _ => {
                     for file in manifest.files() {
-                        let index: Box<dyn IndexFile> = match ArchiveType::from_path(&file.filename)
-                        {
-                            Ok(ArchiveType::FixedIndex) => {
+                        let index: Box<dyn IndexFile> = match file.filename.archive_type() {
+                            ArchiveType::FixedIndex => {
                                 let mut path = info.backup_dir.full_path();
-                                path.push(&file.filename);
+                                path.push(file.filename.as_ref());
                                 let index =
                                     params.target.store.open_fixed_reader(&path).with_context(
                                         || format!("failed loading fixed index {path:?}"),
                                     )?;
                                 Box::new(index)
                             }
-                            Ok(ArchiveType::DynamicIndex) => {
+                            ArchiveType::DynamicIndex => {
                                 let mut path = info.backup_dir.full_path();
-                                path.push(&file.filename);
+                                path.push(file.filename.as_ref());
                                 let index = params
                                     .target
                                     .store

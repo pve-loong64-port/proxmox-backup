@@ -755,7 +755,7 @@ pub fn get_pxar_archive_names(
     if manifest
         .files()
         .iter()
-        .any(|fileinfo| fileinfo.filename == archive_name.as_ref())
+        .any(|fileinfo| fileinfo.filename == *archive_name)
     {
         // check if already given as one of split archive name variants
         if let Some(base) = filename

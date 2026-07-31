@@ -1222,9 +1222,9 @@ pub(crate) async fn push_snapshot(
 
     for entry in source_manifest.files() {
         let mut path = backup_dir.full_path();
-        path.push(&entry.filename);
+        path.push(entry.filename.as_ref());
         if path.try_exists()? {
-            let archive_name = BackupArchiveName::from_path(&entry.filename)?;
+            let archive_name = &entry.filename;
             log_sender
                 .log(
                     Level::INFO,
@@ -1241,7 +1241,7 @@ pub(crate) async fn push_snapshot(
             load_previous_snapshot_known_chunks(
                 &upload_options,
                 &backup_writer,
-                &archive_name,
+                archive_name,
                 known_chunks.clone(),
             )
             .await;
@@ -1251,7 +1251,7 @@ pub(crate) async fn push_snapshot(
                     let backup_stats = if encrypt_using_key.is_some() {
                         reencode_encrypted_and_upload_blob(
                             path,
-                            &archive_name,
+                            archive_name,
                             &backup_writer,
                             &upload_options,
                         )
@@ -1263,7 +1263,7 @@ pub(crate) async fn push_snapshot(
                             .await?
                     };
                     target_manifest.add_file(
-                        &archive_name,
+                        archive_name,
                         backup_stats.size,
                         backup_stats.csum,
                         target_crypt_mode,
@@ -1295,7 +1295,7 @@ pub(crate) async fn push_snapshot(
                         .chunk_reader(None, source_crypt_mode)
                         .context("failed to get chunk reader")?;
                     let upload_stats = push_index(
-                        &archive_name,
+                        archive_name,
                         index,
                         chunk_reader,
                         &backup_writer,
@@ -1309,7 +1309,7 @@ pub(crate) async fn push_snapshot(
                     .with_context(|| archive_prefix.clone())?;
                     target_manifest
                         .add_file(
-                            &archive_name,
+                            archive_name,
                             upload_stats.size,
                             upload_stats.csum,
                             target_crypt_mode,
@@ -1343,7 +1343,7 @@ pub(crate) async fn push_snapshot(
                         .with_context(|| archive_prefix.clone())?;
                     let size = index.index_bytes();
                     let upload_stats = push_index(
-                        &archive_name,
+                        archive_name,
                         index,
                         chunk_reader,
                         &backup_writer,
@@ -1357,7 +1357,7 @@ pub(crate) async fn push_snapshot(
                     .with_context(|| archive_prefix.clone())?;
                     target_manifest
                         .add_file(
-                            &archive_name,
+                            archive_name,
                             upload_stats.size,
                             upload_stats.csum,
                             target_crypt_mode,

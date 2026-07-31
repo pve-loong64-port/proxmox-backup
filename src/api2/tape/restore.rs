@@ -1063,9 +1063,9 @@ fn restore_snapshots_to_tmpdir(
 
                 for item in manifest.files() {
                     let mut archive_path = tmp_path.to_owned();
-                    archive_path.push(&item.filename);
+                    archive_path.push(item.filename.as_ref());
 
-                    let index: Box<dyn IndexFile> = match ArchiveType::from_path(&item.filename)? {
+                    let index: Box<dyn IndexFile> = match item.filename.archive_type() {
                         ArchiveType::DynamicIndex => {
                             Box::new(DynamicIndexReader::open(&archive_path)?)
                         }

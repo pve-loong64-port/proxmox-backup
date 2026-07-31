@@ -96,7 +96,7 @@ impl VerifyWorker {
     }
 
     fn verify_blob(backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
-        let blob = backup_dir.load_blob(&info.filename)?;
+        let blob = backup_dir.load_blob(info.filename.as_ref())?;
 
         let raw_size = blob.raw_size();
         if raw_size != info.size {
@@ -334,7 +334,7 @@ impl VerifyWorker {
 
     fn verify_fixed_index(&self, backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
         let mut path = backup_dir.relative_path();
-        path.push(&info.filename);
+        path.push(info.filename.as_ref());
 
         let index = self.datastore.open_fixed_reader(&path)?;
 
@@ -352,7 +352,7 @@ impl VerifyWorker {
 
     fn verify_dynamic_index(&self, backup_dir: &BackupDir, info: &FileInfo) -> Result<(), Error> {
         let mut path = backup_dir.relative_path();
-        path.push(&info.filename);
+        path.push(info.filename.as_ref());
 
         let index = self.datastore.open_dynamic_reader(&path)?;
 
@@ -442,7 +442,7 @@ impl VerifyWorker {
         for info in manifest.files() {
             let result = proxmox_lang::try_block!({
                 info!("  check {}", info.filename);
-                match ArchiveType::from_path(&info.filename)? {
+                match info.filename.archive_type() {
                     ArchiveType::FixedIndex => self.verify_fixed_index(backup_dir, info),
                     ArchiveType::DynamicIndex => self.verify_dynamic_index(backup_dir, info),
                     ArchiveType::Blob => Self::verify_blob(backup_dir, info),

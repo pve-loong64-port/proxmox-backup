@@ -18,7 +18,8 @@ fn empty_value() -> Value {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct FileInfo {
-    pub filename: String,
+    #[serde(deserialize_with = "pbs_api_types::BackupArchiveName::deserialize_strict")]
+    pub filename: BackupArchiveName,
     #[serde(default = "crypt_mode_none")] // to be compatible with < 0.8.0 backups
     pub crypt_mode: CryptMode,
     pub size: u64,
@@ -71,7 +72,7 @@ impl BackupManifest {
         crypt_mode: CryptMode,
     ) -> Result<(), Error> {
         self.files.push(FileInfo {
-            filename: filename.to_string(),
+            filename: filename.clone(),
             size,
             csum,
             crypt_mode,
@@ -84,10 +85,7 @@ impl BackupManifest {
     }
 
     pub fn lookup_file_info(&self, name: &BackupArchiveName) -> Result<&FileInfo, Error> {
-        let info = self
-            .files
-            .iter()
-            .find(|item| item.filename == name.as_ref());
+        let info = self.files.iter().find(|item| item.filename == *name);
 
         match info {
             None => bail!("manifest does not contain file '{}'", name),

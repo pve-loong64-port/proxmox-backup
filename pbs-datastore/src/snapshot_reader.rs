@@ -79,7 +79,7 @@ impl SnapshotReader {
 
         let mut file_list = vec![MANIFEST_BLOB_NAME.to_string()];
         for item in manifest.files() {
-            file_list.push(item.filename.clone());
+            file_list.push(item.filename.to_string());
         }
         if client_log_path.exists() {
             file_list.push(CLIENT_LOG_BLOB_NAME.to_string());

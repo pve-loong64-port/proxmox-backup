@@ -226,7 +226,7 @@ async fn start_vm(cid_request: i32, details: &SnapRestoreDetails) -> Result<VMSt
         .manifest
         .files()
         .iter()
-        .map(|file| file.filename.clone())
+        .map(|file| file.filename.to_string())
         .filter(|name| name.ends_with(".img.fidx"));
     let (pid, cid) =
         super::qemu_helper::start_vm((cid_request.abs() & 0xFFFF) as u16, details, files, &ticket)

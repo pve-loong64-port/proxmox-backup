@@ -420,7 +420,7 @@ impl BackupWriter {
             if !manifest
                 .files()
                 .iter()
-                .any(|file| file.filename == archive_name.as_ref())
+                .any(|file| file.filename == *archive_name)
             {
                 info!(
                     "Previous manifest does not contain an archive called '{archive_name}', skipping download.."

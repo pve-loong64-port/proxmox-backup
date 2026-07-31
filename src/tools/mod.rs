@@ -63,7 +63,7 @@ pub(crate) fn read_backup_index(
     let mut result = Vec::new();
     for item in manifest.files() {
         result.push(BackupContent {
-            filename: item.filename.clone(),
+            filename: item.filename.to_string(),
             crypt_mode: Some(item.crypt_mode),
             size: Some(item.size),
         });

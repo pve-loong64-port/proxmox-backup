@@ -1029,7 +1029,7 @@ impl BackupDir {
         wanted_files.insert(MANIFEST_BLOB_NAME.to_string());
         wanted_files.insert(CLIENT_LOG_BLOB_NAME.to_string());
         manifest.files().iter().for_each(|item| {
-            wanted_files.insert(item.filename.clone());
+            wanted_files.insert(item.filename.to_string());
         });
 
         for item in proxmox_sys::fs::read_subdir(libc::AT_FDCWD, &full_path)?.flatten() {
