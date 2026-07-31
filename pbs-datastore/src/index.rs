@@ -20,9 +20,14 @@ impl ChunkReadInfo {
 pub trait IndexFile {
     fn index_count(&self) -> usize;
     fn index_digest(&self, pos: usize) -> Option<&[u8; 32]>;
+
+    /// The total size of the referenced backup content.
     fn index_bytes(&self) -> u64;
+
     fn chunk_info(&self, pos: usize) -> Option<ChunkReadInfo>;
     fn index_ctime(&self) -> i64;
+
+    /// The size of the index file including the header.
     fn index_size(&self) -> usize;
 
     /// Get the chunk index and the relative offset within it for a byte offset
