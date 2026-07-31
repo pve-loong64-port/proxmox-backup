@@ -1008,9 +1008,7 @@ impl BackupDir {
 
         update_fn(&mut manifest);
 
-        let manifest = serde_json::to_value(manifest)?;
-        let manifest = serde_json::to_string_pretty(&manifest)?;
-        let blob = DataBlob::encode(manifest.as_bytes(), None, true)?;
+        let blob = manifest.to_data_blob()?;
         let raw_data = blob.raw_data();
 
         if let DatastoreBackend::S3(s3_client) = backend {
