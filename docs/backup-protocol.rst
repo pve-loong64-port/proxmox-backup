@@ -40,8 +40,11 @@ Upload Blobs
 Blobs are uploaded using ``POST /blob``. The HTTP body contains the
 data encoded as :ref:`Data Blob <data-blob-format>`.
 
-The file name must end with ``.blob``, and is automatically added
-to the backup manifest, following the call to ``POST /finish``.
+The file name must end with ``.blob`` and must be added to the backup
+manifest, which is uploaded as a dedicated ``index.json.blob`` before
+the call to ``POST /finish``. Blobs not uploaded as part of the
+backup protocol, for example client logs, are not tracked by the
+manifest.
 
 
 Upload Chunks
@@ -65,8 +68,9 @@ chunks with ``POST /fixed_chunk``, and append them to the index with
 ``PUT /fixed_index``. When finished, you need to close the index using
 ``POST /fixed_close``.
 
-The file name needs to end with ``.fidx``, and is automatically added
-to the backup manifest, following the call to ``POST /finish``.
+The file name needs to end with ``.fidx``, and must be added to the
+backup manifest, which is uploaded as a dedicated ``index.json.blob``
+before the call to ``POST /finish``.
 
 
 Upload Dynamic Indexes
@@ -82,15 +86,17 @@ upload chunks with ``POST /dynamic_chunk``, and append them to the index with
 ``PUT /dynamic_index``. When finished, you need to close the index using
 ``POST /dynamic_close``.
 
-The filename needs to end with ``.didx``, and is automatically added
-to the backup manifest, following the call to ``POST /finish``.
+The filename needs to end with ``.didx``, and must be added to the backup
+manifest, which is uploaded as a dedicated ``index.json.blob`` before the
+call to ``POST /finish``.
 
 
 Finish Backup
 ~~~~~~~~~~~~~
 
-Once you have uploaded all data, you need to call ``POST /finish``. This
-commits all data and ends the backup protocol.
+Once you have uploaded all data, you need to call ``POST /finish``.
+This commits all data, verifies and persists the manifest and ends the
+backup protocol.
 
 
 Restore/Reader Protocol API
