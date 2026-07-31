@@ -1,17 +1,14 @@
 use std::fs::File;
-use std::io::{Seek, SeekFrom};
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 
 use anyhow::{Context, Error, bail, format_err};
-use nix::sys::stat::{SFlag, fstat};
 
-use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
 
 use crate::file_formats;
 use crate::index::{ChunkReadInfo, IndexFile};
+use crate::index_mmap::IndexMmap;
 
 /// Chunk size for fixed index files.
 ///
@@ -37,26 +34,13 @@ proxmox_lang::static_assert_size!(FixedIndexHeader, 4096);
 // split image into fixed size chunks
 
 pub struct FixedIndexReader {
+    mmap: IndexMmap<FixedIndexHeader, [u8; 32]>,
     _file: File,
     pub chunk_size: usize,
     pub size: u64,
-    index_length: usize,
-    index: *mut u8,
     pub uuid: [u8; 16],
     pub ctime: i64,
     pub index_csum: [u8; 32],
-}
-
-// `index` is mmap()ed which cannot be thread-local so should be sendable
-unsafe impl Send for FixedIndexReader {}
-unsafe impl Sync for FixedIndexReader {}
-
-impl Drop for FixedIndexReader {
-    fn drop(&mut self) {
-        if let Err(err) = self.unmap() {
-            log::error!("Unable to unmap file - {}", err);
-        }
-    }
 }
 
 impl FixedIndexReader {
@@ -67,24 +51,10 @@ impl FixedIndexReader {
             .map_err(|err| format_err!("Unable to open fixed index {:?} - {}", path, err))
     }
 
-    pub fn new(mut file: std::fs::File) -> Result<Self, Error> {
-        let stat = fstat(file.as_raw_fd()).map_err(|e| format_err!("fstat failed - {e}"))?;
-        if (stat.st_mode & SFlag::S_IFMT.bits()) != SFlag::S_IFREG.bits() {
-            bail!("not a regular file");
-        }
+    pub fn new(file: File) -> Result<Self, Error> {
+        let mmap = unsafe { IndexMmap::map_read(&file)? };
 
-        file.seek(SeekFrom::Start(0))?;
-
-        let header_size = std::mem::size_of::<FixedIndexHeader>();
-
-        let stat_size = usize::try_from(stat.st_size)
-            .map_err(|_| format_err!("unexpected file size: {}", stat.st_size))?;
-
-        let Some(index_size) = stat_size.checked_sub(header_size) else {
-            bail!("index too small ({stat_size})");
-        };
-
-        let header: Box<FixedIndexHeader> = unsafe { file.read_host_value_boxed()? };
+        let header: &FixedIndexHeader = mmap.header();
 
         if header.magic != file_formats::FIXED_SIZED_CHUNK_INDEX_1_0 {
             bail!("got unknown magic number");
@@ -106,66 +76,38 @@ impl FixedIndexReader {
             bail!("index length does not fit in usize: ceil({size} / {chunk_size})");
         };
 
-        if index_length.checked_mul(32) != Some(index_size) {
-            bail!("unexpected index size: {index_size} != 32 * ceil({size} / {chunk_size})");
+        let expected_index_size = size_of_val(mmap.index());
+        if index_length.checked_mul(32) != Some(expected_index_size) {
+            bail!(
+                "unexpected index size: {expected_index_size} != 32 * ceil({size} / {chunk_size})"
+            );
+        }
+
+        if mmap.index().is_empty() {
+            bail!("index must not be empty");
         }
 
         let chunk_size = usize::try_from(chunk_size)?;
-
-        let data = unsafe {
-            nix::sys::mman::mmap(
-                None,
-                std::num::NonZeroUsize::new(index_size)
-                    .ok_or_else(|| format_err!("invalid index size"))?,
-                nix::sys::mman::ProtFlags::PROT_READ,
-                nix::sys::mman::MapFlags::MAP_PRIVATE,
-                &file,
-                header_size as i64,
-            )
-        }?
-        .as_ptr()
-        .cast::<u8>();
 
         Ok(Self {
             _file: file,
             chunk_size,
             size,
-            index_length,
-            index: data,
             ctime,
             uuid: header.uuid,
             index_csum: header.index_csum,
+            mmap,
         })
-    }
-
-    fn unmap(&mut self) -> Result<(), Error> {
-        let Some(index) = NonNull::new(self.index as *mut std::ffi::c_void) else {
-            return Ok(());
-        };
-
-        let index_size = self.index_length * 32;
-
-        if let Err(err) = unsafe { nix::sys::mman::munmap(index, index_size) } {
-            bail!("unmap file failed - {}", err);
-        }
-
-        self.index = std::ptr::null_mut();
-
-        Ok(())
     }
 }
 
 impl IndexFile for FixedIndexReader {
     fn index_count(&self) -> usize {
-        self.index_length
+        self.mmap.index().len()
     }
 
     fn index_digest(&self, pos: usize) -> Option<&[u8; 32]> {
-        if pos >= self.index_length {
-            None
-        } else {
-            Some(unsafe { &*(self.index.add(pos * 32) as *const [u8; 32]) })
-        }
+        self.mmap.index().get(pos)
     }
 
     fn index_bytes(&self) -> u64 {
@@ -189,7 +131,7 @@ impl IndexFile for FixedIndexReader {
     }
 
     fn index_size(&self) -> usize {
-        size_of::<FixedIndexHeader>() + self.index_length * 32
+        self.mmap.size()
     }
 
     fn compute_csum(&self) -> ([u8; 32], u64) {
@@ -649,7 +591,7 @@ mod tests {
         check_error_contains(FixedIndexReader::open(&path), "No such file or directory");
 
         fs::write(&path, []).unwrap();
-        check_error_contains(FixedIndexReader::open(&path), "index too small (0)");
+        check_error_contains(FixedIndexReader::open(&path), "file too small (0)");
 
         let mut data = vec![0; size_of::<FixedIndexHeader>()];
 
@@ -666,7 +608,7 @@ mod tests {
         let chunk_size = 4096 * 1024u64;
         data[72..][..8].copy_from_slice(&chunk_size.to_le_bytes());
         fs::write(&path, &data).unwrap();
-        check_error_contains(FixedIndexReader::open(&path), "invalid index size"); // 0
+        check_error_contains(FixedIndexReader::open(&path), "index must not be empty");
 
         let size = chunk_size + 1;
         data[64..][..8].copy_from_slice(&size.to_le_bytes());
@@ -674,7 +616,7 @@ mod tests {
         fs::write(&path, &data).unwrap();
         check_error_contains(
             FixedIndexReader::open(&path),
-            "got unexpected file size (64 != 3)",
+            "index size is not divisible by element size: 3",
         );
 
         data.extend(3u8..32);

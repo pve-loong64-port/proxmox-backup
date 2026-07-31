@@ -202,6 +202,7 @@ pub mod task_tracking;
 
 pub mod dynamic_index;
 pub mod fixed_index;
+mod index_mmap;
 
 pub use backup_info::{BackupDir, BackupGroup, BackupInfo};
 pub use checksum_reader::ChecksumReader;
