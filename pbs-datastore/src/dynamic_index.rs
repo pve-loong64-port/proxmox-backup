@@ -147,18 +147,18 @@ impl DynamicIndexReader {
 
     #[inline]
     pub fn chunk_end(&self, pos: usize) -> u64 {
-        if pos >= self.index.len() {
+        if pos >= self.index().len() {
             panic!("chunk index out of range");
         }
-        self.index[pos].end()
+        self.index()[pos].end()
     }
 
     #[inline]
     fn chunk_digest(&self, pos: usize) -> &[u8; 32] {
-        if pos >= self.index.len() {
+        if pos >= self.index().len() {
             panic!("chunk index out of range");
         }
-        &self.index[pos].digest
+        &self.index()[pos].digest
     }
 
     pub fn binary_search(
@@ -189,11 +189,11 @@ impl DynamicIndexReader {
 
 impl IndexFile for DynamicIndexReader {
     fn index_count(&self) -> usize {
-        self.index.len()
+        self.index().len()
     }
 
     fn index_digest(&self, pos: usize) -> Option<&[u8; 32]> {
-        if pos >= self.index.len() {
+        if pos >= self.index().len() {
             None
         } else {
             Some(self.chunk_digest(pos))
@@ -201,10 +201,10 @@ impl IndexFile for DynamicIndexReader {
     }
 
     fn index_bytes(&self) -> u64 {
-        if self.index.is_empty() {
+        if self.index().is_empty() {
             0
         } else {
-            self.chunk_end(self.index.len() - 1)
+            self.chunk_end(self.index().len() - 1)
         }
     }
 
@@ -222,20 +222,20 @@ impl IndexFile for DynamicIndexReader {
     }
 
     fn chunk_info(&self, pos: usize) -> Option<ChunkReadInfo> {
-        if pos >= self.index.len() {
+        if pos >= self.index().len() {
             return None;
         }
         let start = if pos == 0 {
             0
         } else {
-            self.index[pos - 1].end()
+            self.index()[pos - 1].end()
         };
 
-        let end = self.index[pos].end();
+        let end = self.index()[pos].end();
 
         Some(ChunkReadInfo {
             range: start..end,
-            digest: self.index[pos].digest,
+            digest: self.index()[pos].digest,
         })
     }
 
@@ -248,7 +248,7 @@ impl IndexFile for DynamicIndexReader {
     }
 
     fn chunk_from_offset(&self, offset: u64) -> Option<(usize, u64)> {
-        let end_idx = self.index.len() - 1;
+        let end_idx = self.index().len() - 1;
         let end = self.chunk_end(end_idx);
         let found_idx = self.binary_search(0, 0, end_idx, end, offset);
         let found_idx = match found_idx {
