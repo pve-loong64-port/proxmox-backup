@@ -304,6 +304,7 @@ fn inspect_file(
             json!({
                 "size": index.index_size(),
                 "ctime": ctime_str,
+                "referenced-bytes": index.index_bytes(),
                 "chunk-digests": chunk_digests
             })
         }
@@ -314,6 +315,9 @@ fn inspect_file(
 
     if output_format == "text" {
         println!("size: {}", val["size"]);
+        if let Some(count) = val["referenced-bytes"].as_number() {
+            println!("referenced bytes: {count}");
+        }
         if let Some(encryption) = val["encryption"].as_str() {
             println!("encryption: {encryption}");
         }
