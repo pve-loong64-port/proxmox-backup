@@ -195,7 +195,7 @@ impl IndexFile for FixedIndexReader {
     }
 
     fn index_size(&self) -> usize {
-        self.size as usize
+        size_of::<FixedIndexHeader>() + self.index_length * 32
     }
 
     fn compute_csum(&self) -> ([u8; 32], u64) {
@@ -694,7 +694,7 @@ mod tests {
         fs::write(&path, &data).unwrap();
         let reader = FixedIndexReader::open(&path).unwrap();
         assert_eq!(reader.index_bytes(), size);
-        assert_eq!(reader.index_size(), size as usize);
+        assert_eq!(reader.index_size(), 4096 + 64);
         assert_eq!(reader.chunk_size, chunk_size as usize);
         assert_eq!(reader.index_count(), 2);
         assert_eq!(
