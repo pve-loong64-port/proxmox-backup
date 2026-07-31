@@ -12,11 +12,11 @@ use serde_json::{Value, json};
 use proxmox_http::Body;
 use proxmox_router::{RpcEnvironment, RpcEnvironmentType};
 
-use pbs_api_types::{Authid, BackupArchiveName};
+use pbs_api_types::{Authid, BackupArchiveName, MANIFEST_BLOB_NAME};
 use pbs_datastore::backup_info::{BackupDir, BackupInfo};
 use pbs_datastore::dynamic_index::DynamicIndexWriter;
 use pbs_datastore::fixed_index::FixedIndexWriter;
-use pbs_datastore::{DataBlob, DataStore, DatastoreBackend};
+use pbs_datastore::{BackupManifest, DataBlob, DataStore, DatastoreBackend};
 use proxmox_rest_server::{WorkerTask, formatter::*};
 
 use crate::backup::VerifyWorker;
@@ -96,6 +96,7 @@ struct SharedBackupState {
     backup_size: u64, // sums up size of all files
     backup_stat: UploadStatistic,
     backup_lock_guards: BackupLockGuards,
+    manifest: Option<BackupManifest>,
 }
 
 pub struct BackupLockGuards {
@@ -175,6 +176,7 @@ impl BackupEnvironment {
             backup_size: 0,
             backup_stat: UploadStatistic::new(),
             backup_lock_guards,
+            manifest: None,
         };
 
         let backend = datastore.backend()?;
@@ -375,6 +377,20 @@ impl BackupEnvironment {
         );
 
         Ok(uid)
+    }
+
+    /// Register a manifest associated with the backup snapshot for given backup session.
+    ///
+    /// Do not fully trust clients, verify the manifest consistency on backup finish.
+    /// FIXME: PBS 5: do not allow for multiple manifest uploads.
+    pub fn register_manifest(&self, manifest: BackupManifest) -> Result<(), Error> {
+        let mut state = self.state.lock().unwrap();
+
+        state.ensure_unfinished()?;
+
+        state.manifest = Some(manifest);
+
+        Ok(())
     }
 
     /// Append chunk to dynamic writer
@@ -694,12 +710,23 @@ impl BackupEnvironment {
 
         // always verify blob/CRC at server side
         let blob = DataBlob::load_from_reader(&mut &data[..])?;
-        self.datastore.add_blob(
-            archive_name.as_ref(),
-            self.backup_dir.clone(),
-            blob,
-            &self.backend,
-        )?;
+
+        if *archive_name == *MANIFEST_BLOB_NAME {
+            let manifest = BackupManifest::try_from(blob).map_err(|err| {
+                self.log(format!(
+                    "add manifest blob failed ({orig_len} bytes, comp: {blob_len}): {err}"
+                ));
+                err
+            })?;
+            self.register_manifest(manifest)?;
+        } else {
+            self.datastore.add_blob(
+                archive_name.as_ref(),
+                self.backup_dir.clone(),
+                blob,
+                &self.backend,
+            )?;
+        }
 
         let mut state = self.state.lock().unwrap();
         state.file_counter += 1;
@@ -746,7 +773,16 @@ impl BackupEnvironment {
         state.backup_lock_guards.previous_snapshot.take();
         state.backup_lock_guards.chunk_store.take();
 
+        let Some(mut manifest) = state.manifest.take() else {
+            bail!("no backup manifest uploaded");
+        };
+
         let stats = serde_json::to_value(state.backup_stat)?;
+
+        // check for valid manifest and store stats
+        manifest.unprotected["chunk_upload_stats"] = stats;
+
+        let manifest_blob = manifest.to_data_blob()?;
 
         // make sure no other api calls can modify the backup state anymore
         state.finished = BackupState::Finishing;
@@ -754,12 +790,14 @@ impl BackupEnvironment {
         // never hold mutex guard during s3 upload due to possible deadlocks
         drop(state);
 
-        // check for valid manifest and store stats
-        self.backup_dir
-            .update_manifest(&self.backend, |manifest| {
-                manifest.unprotected["chunk_upload_stats"] = stats;
-            })
-            .map_err(|err| format_err!("unable to update manifest blob - {err}"))?;
+        self.datastore
+            .add_blob(
+                MANIFEST_BLOB_NAME.as_ref(),
+                self.backup_dir.clone(),
+                manifest_blob,
+                &self.backend,
+            )
+            .map_err(|err| format_err!("unable to persist manifest blob: {err}"))?;
 
         let mut state = self.state.lock().unwrap();
         if state.finished != BackupState::Finishing {
