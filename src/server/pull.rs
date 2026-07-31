@@ -875,8 +875,8 @@ async fn pull_snapshot<'a>(
             new_manifest.set_sync_source_signature(expected.bytes())?;
         }
 
-        let manifest_string = new_manifest.to_string(None)?;
-        let manifest_blob = DataBlob::encode(manifest_string.as_bytes(), None, true)?;
+        // keep signature
+        let manifest_blob = new_manifest.to_data_blob(None)?;
         // update contents to be uploaded to backend
         manifest_data = manifest_blob.raw_data().to_vec();
 

@@ -155,6 +155,13 @@ impl BackupManifest {
         Ok(manifest)
     }
 
+    /// Encodes the manifest as pretty printed json inside a data blob.
+    pub fn to_data_blob(&self, crypt_config: Option<&CryptConfig>) -> Result<DataBlob, Error> {
+        // serialize with crypt_config to create signature
+        // but encode without since manifests are never encrypted
+        DataBlob::encode(self.to_string(crypt_config)?.as_bytes(), None, true)
+    }
+
     pub fn fingerprint(&self) -> Result<Option<Fingerprint>, Error> {
         match &self.unprotected["key-fingerprint"] {
             Value::Null => Ok(None),
@@ -270,13 +277,6 @@ impl BackupManifest {
         };
 
         Ok(Some(Deserialize::deserialize(value)?))
-    }
-
-    /// Consumes the manifest encoding it as pretty printed json inside a data blob.
-    pub fn to_data_blob(self) -> Result<DataBlob, Error> {
-        let manifest = serde_json::to_value(self)?;
-        let manifest = serde_json::to_string_pretty(&manifest)?;
-        DataBlob::encode(manifest.as_bytes(), None, true)
     }
 }
 

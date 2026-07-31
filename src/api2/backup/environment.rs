@@ -810,7 +810,8 @@ impl BackupEnvironment {
             }
         }
 
-        let manifest_blob = manifest.to_data_blob()?;
+        // keep existing signature
+        let manifest_blob = manifest.to_data_blob(None)?;
 
         // make sure no other api calls can modify the backup state anymore
         state.finished = BackupState::Finishing;
