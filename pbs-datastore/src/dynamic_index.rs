@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::task::Context;
 
 use anyhow::{Error, bail, format_err};
+use nix::sys::stat::{SFlag, fstat};
 
 use proxmox_io::ReadExt;
 use proxmox_sys::mmap::Mmap;
@@ -96,16 +97,15 @@ impl DynamicIndexReader {
     }
 
     pub fn new(mut file: std::fs::File) -> Result<Self, Error> {
+        let stat = fstat(file.as_raw_fd()).map_err(|e| format_err!("fstat failed - {e}"))?;
+        if (stat.st_mode & SFlag::S_IFMT.bits()) != SFlag::S_IFREG.bits() {
+            bail!("not a regular file");
+        }
+
         // FIXME: This is NOT OUR job! Check the callers of this method and remove this!
         file.seek(SeekFrom::Start(0))?;
 
         let header_size = std::mem::size_of::<DynamicIndexHeader>();
-
-        let rawfd = file.as_raw_fd();
-        let stat = match nix::sys::stat::fstat(rawfd) {
-            Ok(stat) => stat,
-            Err(err) => bail!("fstat failed - {}", err),
-        };
 
         let size = stat.st_size as usize;
 
@@ -611,11 +611,11 @@ mod tests {
 
         check_error_contains(
             DynamicIndexReader::open(Path::new("/dev/stdin")),
-            "Illegal seek",
+            "not a regular file",
         );
         check_error_contains(
             DynamicIndexReader::open(Path::new("/dev/zero")),
-            "index too small (0)",
+            "not a regular file",
         );
 
         let path = dir.path().join("file");

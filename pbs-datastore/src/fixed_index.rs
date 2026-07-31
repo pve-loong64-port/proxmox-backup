@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 
 use anyhow::{Context, Error, bail, format_err};
+use nix::sys::stat::{SFlag, fstat};
 
 use proxmox_io::ReadExt;
 use proxmox_uuid::Uuid;
@@ -67,14 +68,14 @@ impl FixedIndexReader {
     }
 
     pub fn new(mut file: std::fs::File) -> Result<Self, Error> {
+        let stat = fstat(file.as_raw_fd()).map_err(|e| format_err!("fstat failed - {e}"))?;
+        if (stat.st_mode & SFlag::S_IFMT.bits()) != SFlag::S_IFREG.bits() {
+            bail!("not a regular file");
+        }
+
         file.seek(SeekFrom::Start(0))?;
 
         let header_size = std::mem::size_of::<FixedIndexHeader>();
-
-        let stat = match nix::sys::stat::fstat(file.as_raw_fd()) {
-            Ok(stat) => stat,
-            Err(err) => bail!("fstat failed - {}", err),
-        };
 
         let stat_size = usize::try_from(stat.st_size)
             .map_err(|_| format_err!("unexpected file size: {}", stat.st_size))?;
@@ -644,11 +645,11 @@ mod tests {
 
         check_error_contains(
             FixedIndexReader::open(Path::new("/dev/stdin")),
-            "Illegal seek",
+            "not a regular file",
         );
         check_error_contains(
             FixedIndexReader::open(Path::new("/dev/zero")),
-            "index too small (0)",
+            "not a regular file",
         );
 
         let path = dir.path().join("file");
