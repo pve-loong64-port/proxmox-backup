@@ -586,3 +586,80 @@ impl<R: ReadChunk> ReadAt for LocalDynamicReadAt<R> {
         panic!("LocalDynamicReadAt::start_read_at returned Pending");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use openssl::sha::sha256;
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[track_caller]
+    fn check_error_contains<T>(result: Result<T, Error>, substring: &str) {
+        let error = result.map(|_| ()).unwrap_err().to_string();
+        assert!(
+            error.contains(substring),
+            "'{error}' does not contain '{substring}'"
+        );
+    }
+
+    #[test]
+    fn test_index_reader() {
+        let dir = TempDir::new().unwrap();
+
+        check_error_contains(
+            DynamicIndexReader::open(Path::new("/dev/stdin")),
+            "Illegal seek",
+        );
+        check_error_contains(
+            DynamicIndexReader::open(Path::new("/dev/zero")),
+            "index too small (0)",
+        );
+
+        let path = dir.path().join("file");
+        check_error_contains(DynamicIndexReader::open(&path), "No such file or directory");
+
+        fs::write(&path, []).unwrap();
+        check_error_contains(DynamicIndexReader::open(&path), "index too small (0)");
+
+        let mut data = vec![0; size_of::<DynamicIndexHeader>()];
+
+        fs::write(&path, &data).unwrap();
+        check_error_contains(DynamicIndexReader::open(&path), "got unknown magic number");
+
+        data[..8].copy_from_slice(&file_formats::DYNAMIC_SIZED_CHUNK_INDEX_1_0);
+        fs::write(&path, &data).unwrap();
+        check_error_contains(
+            DynamicIndexReader::open(&path),
+            "mapped length must not be zero",
+        );
+
+        data.extend_from_slice(&[0, 1, 2]);
+        fs::write(&path, &data).unwrap();
+        check_error_contains(DynamicIndexReader::open(&path), "got unexpected file size");
+
+        data.extend(3u8..80);
+        fs::write(&path, &data).unwrap();
+        let reader = DynamicIndexReader::open(&path).unwrap();
+        let size = u64::from_le_bytes(std::array::from_fn(|i| i as u8 + 40));
+        assert_eq!(reader.index_bytes(), size);
+        assert_eq!(reader.index_size(), 4096 + 80);
+        assert_eq!(reader.index_count(), 2);
+        assert_eq!(
+            reader.index_digest(0),
+            Some(&std::array::from_fn(|i| i as u8 + 8))
+        );
+        assert_eq!(
+            reader.index_digest(1),
+            Some(&std::array::from_fn(|i| i as u8 + 48))
+        );
+        assert_eq!(
+            reader.compute_csum(),
+            (sha256(&data[size_of::<DynamicIndexHeader>()..]), size,)
+        );
+
+        dir.close().unwrap();
+    }
+}
