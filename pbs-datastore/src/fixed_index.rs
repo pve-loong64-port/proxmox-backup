@@ -173,18 +173,11 @@ impl IndexFile for FixedIndexReader {
     }
 
     fn chunk_info(&self, pos: usize) -> Option<ChunkReadInfo> {
-        if pos >= self.index_length {
-            return None;
-        }
+        let digest = self.index_digest(pos)?;
 
         let start = (pos * self.chunk_size) as u64;
-        let mut end = start + self.chunk_size as u64;
+        let end = (start + self.chunk_size as u64).min(self.size);
 
-        if end > self.size {
-            end = self.size;
-        }
-
-        let digest = self.index_digest(pos).unwrap();
         Some(ChunkReadInfo {
             range: start..end,
             digest: *digest,
