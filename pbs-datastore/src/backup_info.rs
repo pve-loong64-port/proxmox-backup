@@ -15,8 +15,9 @@ use proxmox_sys::fs::{CreateOptions, lock_dir_noblock, lock_dir_noblock_shared, 
 use proxmox_systemd::escape_unit;
 
 use pbs_api_types::{
-    ArchiveType, Authid, BACKUP_DATE_REGEX, BackupGroupDeleteStats, BackupNamespace, BackupType,
-    CLIENT_LOG_BLOB_NAME, GroupFilter, MANIFEST_BLOB_NAME, VerifyState,
+    ArchiveType, Authid, BACKUP_DATE_REGEX, BackupArchiveName, BackupGroupDeleteStats,
+    BackupNamespace, BackupType, CLIENT_LOG_BLOB_NAME, GroupFilter, MANIFEST_BLOB_NAME,
+    VerifyState,
 };
 use pbs_config::{BackupLockGuard, open_backup_lockfile};
 
@@ -652,6 +653,14 @@ impl BackupDir {
             DataBlob::load_from_reader(&mut file)
         })
         .map_err(|err| format_err!("unable to load blob '{:?}' - {}", path, err))
+    }
+
+    /// Generate the full archive file path with given archive name including server side type
+    /// extension for this snapshot's backup dir.
+    pub fn full_archive_path(&self, archive_name: &BackupArchiveName) -> PathBuf {
+        let mut path = self.full_path();
+        path.push(archive_name.as_ref());
+        path
     }
 
     /// Returns the filename to lock a manifest

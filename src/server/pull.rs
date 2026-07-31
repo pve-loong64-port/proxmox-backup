@@ -430,8 +430,7 @@ async fn pull_single_archive<'a>(
     new_manifest: Option<Arc<Mutex<BackupManifest>>>,
 ) -> Result<SyncStats, Error> {
     let archive_name = &archive_info.filename;
-    let mut path = snapshot.full_path();
-    path.push(archive_name.to_string());
+    let path = snapshot.full_archive_path(archive_name);
 
     let mut tmp_path = path.clone();
     tmp_path.set_extension("tmp");
@@ -650,11 +649,8 @@ async fn pull_snapshot<'a>(
     }
 
     let mut sync_stats = SyncStats::default();
-    let mut manifest_name = snapshot.full_path();
-    manifest_name.push(MANIFEST_BLOB_NAME.as_ref());
-
-    let mut client_log_name = snapshot.full_path();
-    client_log_name.push(CLIENT_LOG_BLOB_NAME.as_ref());
+    let manifest_name = snapshot.full_archive_path(&MANIFEST_BLOB_NAME);
+    let client_log_name = snapshot.full_archive_path(&CLIENT_LOG_BLOB_NAME);
 
     let mut tmp_manifest_name = manifest_name.clone();
     tmp_manifest_name.set_extension("tmp");
@@ -787,9 +783,7 @@ async fn pull_snapshot<'a>(
     };
 
     for item in manifest.files() {
-        let mut path = snapshot.full_path();
-        path.push(item.filename.as_ref());
-
+        let path = snapshot.full_archive_path(&item.filename);
         if !corrupt && path.exists() {
             let filename = &item.filename;
             match filename.archive_type() {
@@ -1284,8 +1278,7 @@ async fn pull_group(
                     for file in manifest.files() {
                         let index: Box<dyn IndexFile> = match file.filename.archive_type() {
                             ArchiveType::FixedIndex => {
-                                let mut path = info.backup_dir.full_path();
-                                path.push(file.filename.as_ref());
+                                let path = info.backup_dir.full_archive_path(&file.filename);
                                 let index =
                                     params.target.store.open_fixed_reader(&path).with_context(
                                         || format!("failed loading fixed index {path:?}"),
@@ -1293,8 +1286,7 @@ async fn pull_group(
                                 Box::new(index)
                             }
                             ArchiveType::DynamicIndex => {
-                                let mut path = info.backup_dir.full_path();
-                                path.push(file.filename.as_ref());
+                                let path = info.backup_dir.full_archive_path(&file.filename);
                                 let index = params
                                     .target
                                     .store

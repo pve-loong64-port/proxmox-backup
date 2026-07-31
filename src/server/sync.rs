@@ -264,8 +264,7 @@ impl SyncSourceReader for LocalSourceReader {
             .truncate(true)
             .read(true)
             .open(into)?;
-        let mut from_path = self.dir.full_path();
-        from_path.push(archive_name.as_ref());
+        let from_path = self.dir.full_archive_path(archive_name);
         let data = match std::fs::read(&from_path) {
             Ok(data) => data,
             // mirror the RemoteSourceReader's HTTP 404 path: a file vanishing between
@@ -285,8 +284,7 @@ impl SyncSourceReader for LocalSourceReader {
         crypt_config: Option<Arc<CryptConfig>>,
         log_sender: Arc<LogLineSender>,
     ) -> Result<(), Error> {
-        let mut from_path = self.dir.full_path();
-        from_path.push(CLIENT_LOG_BLOB_NAME.as_ref());
+        let from_path = self.dir.full_archive_path(&CLIENT_LOG_BLOB_NAME);
         // be silent if there is no log, matching the remote source reader's behavior
         if !from_path.exists() {
             return Ok(());

@@ -1221,8 +1221,7 @@ pub(crate) async fn push_snapshot(
     let mut target_manifest = BackupManifest::new(snapshot.clone());
 
     for entry in source_manifest.files() {
-        let mut path = backup_dir.full_path();
-        path.push(entry.filename.as_ref());
+        let path = backup_dir.full_archive_path(&entry.filename);
         if path.try_exists()? {
             let archive_name = &entry.filename;
             log_sender
@@ -1390,9 +1389,8 @@ pub(crate) async fn push_snapshot(
 
     // Fetch client log from source and push to target
     // this has to be handled individually since the log is never part of the manifest
-    let mut client_log_path = backup_dir.full_path();
     let client_log_name = &CLIENT_LOG_BLOB_NAME;
-    client_log_path.push(client_log_name.as_ref());
+    let client_log_path = backup_dir.full_archive_path(client_log_name);
     if client_log_path.is_file() {
         if encrypt_using_key.is_some() {
             reencode_encrypted_and_upload_blob(
