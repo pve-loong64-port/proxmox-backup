@@ -27,6 +27,23 @@ fn apt_auth_file_opts() -> CreateOptions {
     CreateOptions::new().perm(mode).owner(nix::unistd::ROOT)
 }
 
+/// arm64 subscription keys carry an explicit '-arm-' marker that x86 keys lack, so a key is bound
+/// to the architecture it was issued for. Returns an error if `key` is for a different architecture
+/// than this host. The daemon is compiled for the host it runs on, so the host architecture is
+/// known at compile time and no runtime `dpkg` query is needed.
+pub fn check_key_arch(key: &str) -> Result<(), Error> {
+    let key_is_arm64 = key.contains("-arm-");
+    let host_is_arm64 = cfg!(target_arch = "aarch64");
+    if key_is_arm64 != host_is_arm64 {
+        let key_arch = if key_is_arm64 { "arm64" } else { "amd64" };
+        let host_arch = if host_is_arm64 { "arm64" } else { "amd64" };
+        bail!(
+            "subscription key is for the '{key_arch}' architecture, but this host is '{host_arch}'"
+        );
+    }
+    Ok(())
+}
+
 fn check_and_write_subscription(key: String, server_id: String) -> Result<(), Error> {
     let proxy_config = if let Ok((node_config, _digest)) = node::config() {
         node_config.http_proxy()
@@ -130,6 +147,10 @@ pub fn check_subscription(params: UpdateSubscription) -> Result<(), Error> {
         }
     }
 
+    if !key.is_empty() {
+        check_key_arch(&key)?;
+    }
+
     check_and_write_subscription(key, server_id)
 }
 
@@ -151,7 +172,7 @@ pub fn get_subscription(
     _param: Value,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<SubscriptionInfo, Error> {
-    let info = match proxmox_subscription::files::read_subscription(
+    let mut info = match proxmox_subscription::files::read_subscription(
         PROXMOX_BACKUP_SUBSCRIPTION_FN,
         &[proxmox_subscription::files::DEFAULT_SIGNING_KEY],
     ) {
@@ -171,6 +192,15 @@ pub fn get_subscription(
             }
         }
     };
+
+    // an offline key can be written directly and a key file can be copied between hosts, so flag a
+    // stored key that does not match this host's architecture, mirroring the reject on 'set'.
+    if let Some(key) = info.key.as_deref() {
+        if let Err(err) = check_key_arch(key) {
+            info.status = SubscriptionStatus::Invalid;
+            info.message = Some(err.to_string());
+        }
+    }
 
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let user_info = CachedUserInfo::new()?;
@@ -212,6 +242,10 @@ pub fn set_subscription(params: SetSubscription) -> Result<(), Error> {
     pbs_api_types::SUBSCRIPTION_KEY_SCHEMA
         .parse_simple_value(&params.key)
         .map_err(|err| format_err!("invalid subscription key: {err}"))?;
+
+    // a key is bound to the architecture it was issued for, so reject a mismatched one
+    check_key_arch(&params.key)?;
+
     let server_id = proxmox_subscription::get_hardware_address_candidates()?
         .first()
         .ok_or_else(|| format_err!("Failed to generate serverid"))?

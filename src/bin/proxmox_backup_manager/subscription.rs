@@ -57,6 +57,10 @@ pub fn set_offline_subscription_key(data: String) -> Result<(), Error> {
         bail!("Subscription is not a PBS subscription ({product_type})!");
     }
 
+    if let Some(key) = info.key.as_deref() {
+        api2::node::subscription::check_key_arch(key)?;
+    }
+
     info.check_signature(&[proxmox_subscription::files::DEFAULT_SIGNING_KEY]);
     info.check_age(false);
     info.check_server_id();
