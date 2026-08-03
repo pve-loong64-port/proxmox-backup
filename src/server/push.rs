@@ -1144,6 +1144,18 @@ pub(crate) async fn push_snapshot(
                     if signed_only {
                         return Ok(Arc::new(manifest));
                     }
+
+                    // allow reuse for client side encrypted snapshots with matching key
+                    if let Some(source_key_fp) = source_manifest
+                        .fingerprint()
+                        .context("failed getting fingerprint on source")?
+                    {
+                        if manifest_key_fp == source_key_fp {
+                            return Ok(Arc::new(manifest));
+                        }
+                        bail!("previous snapshot encrypted using different key");
+                    };
+
                     bail!("previous snapshot encrypted but no encryption key configured");
                 };
 
