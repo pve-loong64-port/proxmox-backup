@@ -1234,7 +1234,7 @@ pub(crate) async fn push_snapshot(
             let archive_prefix = format!("{prefix}/{archive_name}");
             let crypt_mode = match &encrypt_using_key {
                 Some(_) => CryptMode::Encrypt,
-                None => entry.chunk_crypt_mode(),
+                None => entry.crypt_mode,
             };
 
             load_previous_snapshot_known_chunks(
@@ -1291,7 +1291,7 @@ pub(crate) async fn push_snapshot(
                     let index =
                         DynamicIndexReader::open(&path).with_context(|| prefix.to_string())?;
                     let chunk_reader = reader
-                        .chunk_reader(None, entry.chunk_crypt_mode())
+                        .chunk_reader(None, entry.crypt_mode)
                         .context("failed to get chunk reader")?;
                     let upload_stats = push_index(
                         &archive_name,
@@ -1337,7 +1337,7 @@ pub(crate) async fn push_snapshot(
                     let index =
                         FixedIndexReader::open(&path).with_context(|| prefix.to_string())?;
                     let chunk_reader = reader
-                        .chunk_reader(None, entry.chunk_crypt_mode())
+                        .chunk_reader(None, entry.crypt_mode)
                         .context("failed to get chunk reader")
                         .with_context(|| archive_prefix.clone())?;
                     let size = index.index_bytes();
