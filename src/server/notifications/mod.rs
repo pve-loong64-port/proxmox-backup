@@ -565,7 +565,7 @@ pub fn send_certificate_renewal_mail(result: &Result<(), Error>) -> Result<(), E
     };
 
     let notification = Notification::from_template(
-        Severity::Info,
+        Severity::Error,
         "acme-err",
         serde_json::to_value(template_data)?,
         metadata,
