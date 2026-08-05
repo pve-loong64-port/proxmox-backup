@@ -100,7 +100,7 @@ proxmox-time = "2"
 proxmox-upgrade-checks = "1.1"
 proxmox-uuid = { version = "1", features = [ "serde" ] }
 proxmox-worker-task = "1"
-pbs-api-types = "1.0.16"
+pbs-api-types = "1.0.20"
 
 # other proxmox crates
 pathpatterns = "1"
