@@ -119,6 +119,8 @@ pub fn check_subscription(params: UpdateSubscription) -> Result<(), Error> {
     };
 
     let key = if let Some(key) = info.key.as_ref() {
+        // must run before the early return for a still-active subscription further below
+        check_key_arch(key)?;
         // always update apt auth if we have a key to ensure user can access enterprise repo
         proxmox_subscription::files::update_apt_auth(
             APT_AUTH_FN,
@@ -145,10 +147,6 @@ pub fn check_subscription(params: UpdateSubscription) -> Result<(), Error> {
         if info.status == SubscriptionStatus::Active {
             return Ok(());
         }
-    }
-
-    if !key.is_empty() {
-        check_key_arch(&key)?;
     }
 
     check_and_write_subscription(key, server_id)
