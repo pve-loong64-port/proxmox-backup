@@ -1,3 +1,38 @@
+rust-proxmox-backup (4.2.5-1) trixie; urgency=medium
+
+  * backup: harden the handling of client supplied backup manifests:
+    - only accept archive names that are plain file names carrying a server
+      side type extension. A crafted name in a manifest could previously make
+      a sync job read or write outside of the snapshot directory, running as
+      the unprivileged 'backup' user. Reaching this needed a manifest from a
+      configured sync remote or from a client that already had backup access
+      to the datastore.
+    - keep an uploaded manifest in memory and only persist it on backup
+      finish, checking that every archive it lists was really uploaded during
+      that session and that the checksums match the ones computed server
+      side. A client uploading a manifest that references archives it did not
+      upload now gets an error on finish instead of such a snapshot being
+      created.
+
+  * fix #7878: sync: push: reuse the manifest of a previous snapshot on a
+    non-encrypting push if the source snapshot was encrypted with a matching
+    key, restoring chunk reuse and thus avoiding needlessly long sync runs.
+
+  * sync: push: keep the sign-only crypt mode of a source archive instead of
+    reducing it to unencrypted when pushing without server side encryption.
+
+  * subscription: reject a subscription key issued for a different
+    architecture than the host, as arm64 keys carry an explicit marker, so a
+    wrong key fails fast instead of only erroring during the online check.
+
+  * update to proxmox-upgrade-checks 1.1, which accepts the 7.0 kernel, tells
+    a bookworm backport apart from a trixie build and fixes the dkms check.
+
+  * docs: clarify in the backup protocol description that the manifest is
+    uploaded by the client and only persisted on backup finish.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 05 Aug 2026 18:25:37 +0200
+
 rust-proxmox-backup (4.2.4-1) trixie; urgency=medium
 
   * docs: document the debug symbol repository
