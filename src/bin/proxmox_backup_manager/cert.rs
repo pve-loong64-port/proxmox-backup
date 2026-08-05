@@ -56,6 +56,8 @@ fn cert_info() -> Result<(), Error> {
     },
 )]
 /// Update node certificates and generate all needed files/directories.
+/// If either the authentication key or CSRF secret key does not exist, each will be generated.
+/// These two keys will go into effect the next time the `proxmox-backup.service` is started.
 fn update_certs(force: Option<bool>) -> Result<(), Error> {
     config::create_configdir()?;
 
