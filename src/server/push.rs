@@ -1232,7 +1232,7 @@ pub(crate) async fn push_snapshot(
                 )
                 .await?;
             let archive_prefix = format!("{prefix}/{archive_name}");
-            let crypt_mode = match &encrypt_using_key {
+            let target_crypt_mode = match encrypt_using_key.as_ref() {
                 Some(_) => CryptMode::Encrypt,
                 None => entry.crypt_mode,
             };
@@ -1265,7 +1265,7 @@ pub(crate) async fn push_snapshot(
                         &archive_name,
                         backup_stats.size,
                         backup_stats.csum,
-                        crypt_mode,
+                        target_crypt_mode,
                     )?;
                     log_sender
                         .log(
@@ -1311,7 +1311,7 @@ pub(crate) async fn push_snapshot(
                             &archive_name,
                             upload_stats.size,
                             upload_stats.csum,
-                            crypt_mode,
+                            target_crypt_mode,
                         )
                         .with_context(|| archive_prefix.clone())?;
                     log_sender
@@ -1359,7 +1359,7 @@ pub(crate) async fn push_snapshot(
                             &archive_name,
                             upload_stats.size,
                             upload_stats.csum,
-                            crypt_mode,
+                            target_crypt_mode,
                         )
                         .with_context(|| archive_prefix.clone())?;
                     log_sender
