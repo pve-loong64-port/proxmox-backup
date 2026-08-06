@@ -1995,6 +1995,19 @@ mod tests {
         Ok(())
     }
 
+    // Use ./target/ instead of tempfile / std::env::temp_dir to keep the test
+    // runnable in build environments where /tmp may not be writable.
+    fn create_testdir(name: &str) -> Result<PathBuf, Error> {
+        let mut testdir: PathBuf = String::from("./target/testout").into();
+        testdir.push(std::module_path!());
+        testdir.push(name);
+
+        let _ = std::fs::remove_dir_all(&testdir);
+        let _ = std::fs::create_dir_all(&testdir);
+
+        Ok(testdir)
+    }
+
     #[test]
     fn test_create_archive_with_reference() -> Result<(), Error> {
         let euid = unsafe { libc::geteuid() };
@@ -2005,11 +2018,7 @@ mod tests {
             return Ok(());
         }
 
-        let mut testdir = PathBuf::from("./target/testout");
-        testdir.push(std::module_path!());
-
-        let _ = std::fs::remove_dir_all(&testdir);
-        let _ = std::fs::create_dir_all(&testdir);
+        let mut testdir = create_testdir("test_create_archive_with_reference")?;
 
         prepare(testdir.as_path())?;
 
@@ -2142,11 +2151,8 @@ mod tests {
     fn lookup_dynamic_entries_pins_chunk_identity() {
         use pbs_datastore::dynamic_index::{DynamicIndexReader, DynamicIndexWriter};
 
-        // Use ./target/ instead of tempfile / std::env::temp_dir to keep the test
-        // runnable in build environments where /tmp may not be writable.
-        let mut testdir = PathBuf::from("./target/testout");
-        testdir.push(std::module_path!());
-        let _ = std::fs::create_dir_all(&testdir);
+        let testdir = create_testdir("lookup_dynamic_entries_pins_chunk_identity")
+            .expect("Should be able to create test dir");
         let path = testdir.join("lookup_dynamic_entries.didx");
         let _ = std::fs::remove_file(&path);
 
