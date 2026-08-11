@@ -9,6 +9,7 @@ use pbs_api_types::{NODE_SCHEMA, PRIV_SYS_AUDIT};
 use crate::server::generate_report;
 
 #[api(
+    protected: true,
     input: {
         properties: {
             node: {
