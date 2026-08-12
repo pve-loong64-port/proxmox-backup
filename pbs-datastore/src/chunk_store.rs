@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -10,7 +11,6 @@ use tracing::{info, warn};
 
 use pbs_api_types::{DatastoreFSyncLevel, GarbageCollectionStatus};
 use pbs_config::BackupLockGuard;
-use proxmox_io::ReadExt;
 use proxmox_s3_client::S3Client;
 use proxmox_sys::fs::{CreateOptions, create_dir, create_path, file_type_from_file_stat};
 use proxmox_sys::process_locker::{
@@ -708,8 +708,11 @@ impl ChunkStore {
                 }
             } else if chunk.is_encrypted() {
                 // incoming chunk is encrypted, possible attack or hash collision!
-                let mut existing_file = std::fs::File::open(&chunk_path)?;
-                let magic = existing_file.read_exact_allocated(8)?;
+
+                let mut magic = [0u8; 8];
+                std::fs::File::open(&chunk_path)
+                    .and_then(|mut f| f.read_exact(&mut magic))
+                    .map_err(|e| format_err!("Failed to read magic number from header of existing chunk '{digest_str}' on store '{name}: {e}"))?;
 
                 // going from unencrypted to encrypted can never be right, since the digest
                 // includes data derived from the encryption key
