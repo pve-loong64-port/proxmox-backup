@@ -718,15 +718,16 @@ impl ChunkStore {
                 // includes data derived from the encryption key
                 if magic == UNCOMPRESSED_BLOB_MAGIC_1_0 || magic == COMPRESSED_BLOB_MAGIC_1_0 {
                     bail!(
-                        "Overwriting unencrypted chunk '{digest_str}' on store '{name}' with encrypted chunk with same digest not allowed!"
+                        "Cannot overwrite existing unencrypted chunk '{digest_str}' on store '{name}' with encrypted chunk."
                     );
                 }
 
                 // if both chunks are uncompressed and encrypted and have the same digest, but
                 // their sizes are different, one of them *must* be invalid
                 if magic == ENCRYPTED_BLOB_MAGIC_1_0 && !chunk.is_compressed() {
+                    // gc is also mentioned because verification doesn't check unreferenced chunks
                     bail!(
-                        "Overwriting existing (encrypted) chunk '{digest_str}' on store '{name}' is not allowed!"
+                        "Found existing encrypted chunk '{digest_str}' of different size on store '{name}'. Verify and garbage-collect the full datastore to clean up possibly corrupted chunks.",
                     )
                 }
 
