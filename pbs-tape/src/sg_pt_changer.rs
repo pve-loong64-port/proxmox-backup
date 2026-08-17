@@ -23,7 +23,7 @@ const SCSI_VOLUME_TAG_LEN: usize = 36;
 
 /// Initialize element status (Inventory)
 pub fn initialize_element_status<F: AsRawFd>(file: &mut F) -> Result<(), Error> {
-    let mut sg_raw = SgRaw::new(file, 64)?;
+    let mut sg_raw = SgRaw::new(file, 0)?;
 
     // like mtx(1), set a very long timeout (30 minutes)
     sg_raw.set_timeout(30 * 60);
@@ -181,7 +181,7 @@ pub fn load_slot(file: &mut File, from_slot: u64, drivenum: u64) -> Result<(), E
         drive_element_address,
     );
 
-    let mut sg_raw = SgRaw::new(file, 64)?;
+    let mut sg_raw = SgRaw::new(file, 0)?;
     sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw
@@ -205,7 +205,7 @@ pub fn unload(file: &mut File, to_slot: u64, drivenum: u64) -> Result<(), Error>
         target_element_address,
     );
 
-    let mut sg_raw = SgRaw::new(file, 64)?;
+    let mut sg_raw = SgRaw::new(file, 0)?;
     sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw
@@ -233,7 +233,7 @@ pub fn transfer_medium<F: AsRawFd>(
         target_element_address,
     );
 
-    let mut sg_raw = SgRaw::new(file, 64)?;
+    let mut sg_raw = SgRaw::new(file, 0)?;
     sg_raw.set_timeout(SCSI_CHANGER_MOVE_MEDIUM_TIMEOUT);
 
     sg_raw.do_command(&cmd).map_err(|err| {

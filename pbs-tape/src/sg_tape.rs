@@ -254,7 +254,7 @@ impl SgTape {
     /// Tape).
     #[allow(clippy::vec_init_then_push)]
     pub fn erase_media(&mut self, fast: bool) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.push(0x19);
@@ -302,7 +302,7 @@ impl SgTape {
         } else {
             self.rewind()?;
 
-            let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+            let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
             sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
             let mut cmd = Vec::new();
 
@@ -332,7 +332,7 @@ impl SgTape {
 
     /// Lock/Unlock drive door
     pub fn set_medium_removal(&mut self, allow: bool) -> Result<(), ScsiError> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.extend([0x1E, 0, 0, 0]);
@@ -349,7 +349,7 @@ impl SgTape {
     }
 
     pub fn rewind(&mut self) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.extend([0x01, 0, 0, 0, 0, 0]); // REWIND
@@ -372,7 +372,7 @@ impl SgTape {
         // Special case for position 1, because LOCATE 0 does not work
         if position == 1 {
             self.rewind()?;
-            let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+            let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
             sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
             sg_raw
                 .do_command(SPACE_ONE_FILEMARK)
@@ -380,7 +380,7 @@ impl SgTape {
             return Ok(());
         }
 
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
 
         // Note: LOCATE(16) works for LTO4 or newer
@@ -518,7 +518,7 @@ impl SgTape {
     }
 
     pub fn move_to_eom(&mut self, write_missing_eof: bool) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.extend([0x11, 0x03, 0, 0, 0, 0]); // SPACE(6) move to EOD
@@ -535,7 +535,7 @@ impl SgTape {
     }
 
     fn space(&mut self, count: isize, blocks: bool) -> Result<(), ScsiError> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
 
@@ -580,7 +580,7 @@ impl SgTape {
     }
 
     pub fn eject(&mut self) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.extend([0x1B, 0, 0, 0, 0, 0]); // LODA/UNLOAD HOLD=0, LOAD=0
@@ -593,7 +593,7 @@ impl SgTape {
     }
 
     pub fn load(&mut self) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(Self::SCSI_TAPE_DEFAULT_TIMEOUT);
         let mut cmd = Vec::new();
         cmd.extend([0x1B, 0, 0, 0, 0b0000_0001, 0]); // LODA/UNLOAD HOLD=0, LOAD=1
@@ -610,7 +610,7 @@ impl SgTape {
             proxmox_lang::io_bail!("write_filemarks failed: got strange count '{count}'");
         }
 
-        let mut sg_raw = SgRaw::new(&mut self.file, 16).map_err(|err| {
+        let mut sg_raw = SgRaw::new(&mut self.file, 0).map_err(|err| {
             proxmox_lang::io_format_err!("write_filemarks failed (alloc) - {err}")
         })?;
 
@@ -646,7 +646,7 @@ impl SgTape {
     }
 
     pub fn test_unit_ready(&mut self) -> Result<(), Error> {
-        let mut sg_raw = SgRaw::new(&mut self.file, 16)?;
+        let mut sg_raw = SgRaw::new(&mut self.file, 0)?;
         sg_raw.set_timeout(30); // use short timeout
         let mut cmd = Vec::new();
         cmd.extend([0x00, 0, 0, 0, 0, 0]); // TEST UNIT READY

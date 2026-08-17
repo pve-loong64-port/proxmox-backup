@@ -604,13 +604,15 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
     }
 
     /// Run the specified RAW SCSI command
+    ///
+    /// The transfer buffer passed to [`SgRaw::new`] is used as data-in buffer.
+    /// Commands without a data transfer phase must be run with a buffer size of
+    /// zero, so that no transfer is set up at all and the returned slice stays
+    /// empty. Otherwise such a command asks the device for data it never sends,
+    /// which some devices reject outright.
     pub fn do_command(&mut self, cmd: &[u8]) -> Result<&[u8], ScsiError> {
         if !unsafe { sg_is_scsi_cdb(cmd.as_ptr(), cmd.len() as c_int) } {
             return Err(format_err!("no valid SCSI command").into());
-        }
-
-        if self.buffer.len() < 16 {
-            return Err(format_err!("input buffer too small").into());
         }
 
         let mut ptvp = self.create_scsi_pt_obj()?;
@@ -618,6 +620,11 @@ impl<'a, F: AsRawFd> SgRaw<'a, F> {
         unsafe { set_scsi_pt_cdb(ptvp.as_mut_ptr(), cmd.as_ptr(), cmd.len() as c_int) };
 
         self.do_scsi_pt_checked(&mut ptvp)?;
+
+        if self.buffer.is_empty() {
+            // no data transfer was set up, so there is nothing to read
+            return Ok(&[]);
+        }
 
         let resid = unsafe { get_scsi_pt_resid(ptvp.as_ptr()) } as usize;
         if resid > self.buffer.len() {
