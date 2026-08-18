@@ -11,7 +11,7 @@ use proxmox_schema::{ApiStringFormat, ApiType, Schema, StringSchema};
 
 use pbs_api_types::{Authid, ROLE_NAME_NO_ACCESS, Role, Userid};
 
-use crate::{BackupLockGuard, open_backup_lockfile};
+use crate::{BackupLockGuard, ConfigVersionCache, open_backup_lockfile};
 
 /// Map of pre-defined [Roles](Role) to their associated
 /// [privileges](pbs_api_types::PRIVILEGES) combination and description.
@@ -768,7 +768,14 @@ pub fn save_config(acl: &AclTree) -> Result<(), Error> {
 
     acl.write_config(&mut raw)?;
 
-    replace_privileged_config(ACL_CFG_FILENAME, &raw)
+    replace_privileged_config(ACL_CFG_FILENAME, &raw)?;
+
+    // increase acl version
+    // We use this in CachedUserInfo
+    let version_cache = ConfigVersionCache::new()?;
+    version_cache.increase_acl_cache_generation();
+
+    Ok(())
 }
 
 #[cfg(test)]

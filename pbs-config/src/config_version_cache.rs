@@ -29,6 +29,8 @@ struct ConfigVersionCacheDataInner {
     datastore_generation: AtomicUsize,
     // Token shadow (token.shadow) generation/version.
     token_shadow_generation: AtomicUsize,
+    // ACL (acl.cfg) cache generation/version.
+    acl_cache_generation: AtomicUsize,
     // Add further atomics here
 }
 
@@ -176,5 +178,21 @@ impl ConfigVersionCache {
             .data()
             .token_shadow_generation
             .fetch_add(1, Ordering::AcqRel)
+    }
+
+    /// Returns the acl cache generation number.
+    pub fn acl_cache_generation(&self) -> usize {
+        self.shmem
+            .data()
+            .acl_cache_generation
+            .load(Ordering::Acquire)
+    }
+
+    /// Increase the acl cache generation number.
+    pub fn increase_acl_cache_generation(&self) {
+        self.shmem
+            .data()
+            .acl_cache_generation
+            .fetch_add(1, Ordering::AcqRel);
     }
 }

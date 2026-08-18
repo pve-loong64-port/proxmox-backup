@@ -23,6 +23,7 @@ struct ConfigCache {
     data: Option<Arc<CachedUserInfo>>,
     last_update: i64,
     last_user_cache_generation: usize,
+    last_acl_cache_generation: usize,
 }
 
 static CACHED_CONFIG: LazyLock<RwLock<ConfigCache>> = LazyLock::new(|| {
@@ -30,6 +31,7 @@ static CACHED_CONFIG: LazyLock<RwLock<ConfigCache>> = LazyLock::new(|| {
         data: None,
         last_update: 0,
         last_user_cache_generation: 0,
+        last_acl_cache_generation: 0,
     })
 });
 
@@ -40,11 +42,13 @@ impl CachedUserInfo {
 
         let version_cache = ConfigVersionCache::new()?;
         let user_cache_generation = version_cache.user_cache_generation();
+        let acl_cache_generation = version_cache.acl_cache_generation();
 
         {
             // limit scope
             let cache = CACHED_CONFIG.read().unwrap();
             if (user_cache_generation == cache.last_user_cache_generation)
+                && (acl_cache_generation == cache.last_acl_cache_generation)
                 && ((now - cache.last_update) < 5)
             {
                 if let Some(ref config) = cache.data {
@@ -61,6 +65,7 @@ impl CachedUserInfo {
         let mut cache = CACHED_CONFIG.write().unwrap();
         cache.last_update = now;
         cache.last_user_cache_generation = user_cache_generation;
+        cache.last_acl_cache_generation = acl_cache_generation;
         cache.data = Some(config.clone());
 
         Ok(config)
