@@ -610,6 +610,7 @@ pub fn list_tasks(
             (Some(state), Some(filters)) if !filters.contains(&tasktype(state)) => {
                 continue;
             }
+            (None, _) if errors => continue,
             (None, Some(_)) => continue,
             _ => {}
         }
