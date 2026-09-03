@@ -1273,7 +1273,12 @@ async fn pull_group(
             })?;
 
             match manifest.verify_state()? {
-                Some(verify_state) if verify_state.state == VerifyState::Failed => (),
+                Some(verify_state) if verify_state.state == VerifyState::Failed => {
+                    bail!(
+                        "cannot safely reuse chunks of snapshot {}, verify state failed",
+                        info.backup_dir.backup_time_string(),
+                    );
+                }
                 _ => {
                     for file in manifest.files() {
                         let index: Box<dyn IndexFile> = match file.filename.archive_type() {
