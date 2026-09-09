@@ -97,13 +97,13 @@ Each table represents the contents of a single directory.
 Catalog Table Entries
 ~~~~~~~~~~~~~~~~~~~~~
 
-Each entry consists of the length and value of its name. Additional, ``file`
+Each entry consists of the length and value of its name. Additionally, ``file``
 and ``directory`` type entries contain a ``PAYLOAD`` field. For directory
 entries, the ``offset_back`` payload stores the backward byte distance from the
 start of the parent directory table to the start of the referenced child
 directory table. The start offset of the child directory table can be computed
 as ``parent_table_start - offset_back``.
-  
+
 .. list-table::
    :widths: auto
 
