@@ -88,6 +88,9 @@ pub use snapshot::*;
 mod task;
 pub use task::*;
 
+#[cfg(test)]
+mod tests;
+
 fn record_repository(repo: &BackupRepository) {
     let base = match BaseDirectories::with_prefix("proxmox-backup") {
         Ok(v) => v,
@@ -1075,10 +1078,14 @@ async fn create_backup(
     let previous_manifest = if download_previous_manifest {
         match client.download_previous_manifest(true).await {
             Ok(previous_manifest) => {
-                match previous_manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref)) {
+                match check_previous_manifest(
+                    &previous_manifest,
+                    crypt_config.as_deref(),
+                    crypto.mode,
+                ) {
                     Ok(()) => Some(Arc::new(previous_manifest)),
                     Err(err) => {
-                        log::error!("Couldn't re-use previous manifest - {}", err);
+                        log::info!("Not reusing previous manifest for deduplication: {err}");
                         None
                     }
                 }
@@ -1355,6 +1362,38 @@ async fn create_backup(
     log::info!("Duration: {:.2}s", elapsed.as_secs_f64());
     log::info!("End Time: {}", strftime_local("%c", epoch_i64())?);
     Ok(Value::Null)
+}
+
+fn check_previous_manifest(
+    manifest: &BackupManifest,
+    crypt_config: Option<&CryptConfig>,
+    crypt_mode: CryptMode,
+) -> Result<(), Error> {
+    for file in manifest.files() {
+        if file.filename.archive_type() != ArchiveType::Blob
+            && (file.chunk_crypt_mode() == CryptMode::Encrypt) != (crypt_mode == CryptMode::Encrypt)
+        {
+            bail!(
+                "previous archive '{}' has a different chunk encryption mode; \
+                 switching between encrypted and unencrypted backups requires uploading the data",
+                file.filename,
+            );
+        }
+    }
+
+    // Plain and sign-only backups share chunk digests. Stopping signing does not require the old
+    // key for deduplication, since upload_stream computes the digests again from local contents.
+    if crypt_config.is_some() {
+        manifest.check_fingerprint(crypt_config)?;
+    }
+
+    if manifest.files().iter().any(|file| {
+        file.filename.archive_type() != ArchiveType::Blob && file.crypt_mode != crypt_mode
+    }) {
+        log::info!("Reusing unencrypted chunks across a signing mode change");
+    }
+
+    Ok(())
 }
 
 async fn prepare_reference(

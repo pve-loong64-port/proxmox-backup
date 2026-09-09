@@ -44,6 +44,9 @@ use super::sync::{
 use crate::api2::config::remote;
 use crate::server::sync::SharedGroupProgress;
 
+#[cfg(test)]
+mod tests;
+
 /// Target for backups to be pushed to
 pub(crate) struct PushTarget {
     // Remote as found in remote.cfg
@@ -978,6 +981,35 @@ pub(crate) async fn push_group(
     Ok(stats)
 }
 
+fn check_previous_chunk_modes(
+    previous: &BackupManifest,
+    source: &BackupManifest,
+    encrypt: bool,
+) -> Result<(), Error> {
+    for file in source.files() {
+        if file.filename.archive_type() == ArchiveType::Blob {
+            continue;
+        }
+        let Ok(previous_file) = previous.lookup_file_info(&file.filename) else {
+            continue;
+        };
+        let target_mode = if encrypt {
+            CryptMode::Encrypt
+        } else {
+            file.chunk_crypt_mode()
+        };
+        if previous_file.chunk_crypt_mode() != target_mode {
+            bail!(
+                "previous archive '{}' has a different chunk encryption mode; \
+                 switching between encrypted and unencrypted backups requires uploading the data",
+                file.filename,
+            );
+        }
+    }
+
+    Ok(())
+}
+
 async fn load_previous_snapshot_known_chunks(
     upload_options: &UploadOptions,
     backup_writer: &BackupWriter,
@@ -1124,6 +1156,11 @@ pub(crate) async fn push_snapshot(
             .await
             .context("failed to download")
             .and_then(|manifest| {
+                check_previous_chunk_modes(
+                    &manifest,
+                    &source_manifest,
+                    encrypt_using_key.is_some(),
+                )?;
                 let fingerprint = manifest
                     .fingerprint()
                     .context("failed getting fingerprint")?;
