@@ -1014,7 +1014,11 @@ async fn create_backup(
 
             let (key, created, fingerprint) =
                 decrypt_key(&key_with_source.key, &get_encryption_key_password)?;
-            log::info!("Encryption key fingerprint: {}", fingerprint);
+            if crypto.mode == CryptMode::SignOnly {
+                log::info!("Signing backup with key fingerprint: {fingerprint}");
+            } else {
+                log::info!("Encrypting backup with key fingerprint: {fingerprint}");
+            }
 
             let crypt_config = CryptConfig::new(key)?;
 
