@@ -640,6 +640,19 @@ backup.
 
   # proxmox-backup-client restore host/elsa/2019-12-03T09:35:01Z root.pxar /target/path/
 
+When an encryption key is configured, including a default key, the backup
+manifest must have a valid signature. This protects both encrypted and
+sign-only backups against tampering on the server.
+
+To read a genuinely unsigned backup while a key is configured, explicitly add
+``--ignore-missing-signature``. The command warns that the backup's integrity
+cannot be verified. This option only accepts a missing signature, not an invalid
+one. It is also available for catalog inspection, mounting and mapping backups,
+``proxmox-file-restore``, and ``proxmox-backup-debug diff archive``.
+
+For scripted restores, opt out only for backups you know are unsigned. Do not
+automatically retry signature failures with this option.
+
 To get the contents of any archive, you can restore the ``index.json`` file in the
 repository to the target path '-'. This will dump the contents to the standard output.
 

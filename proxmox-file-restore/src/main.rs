@@ -27,8 +27,8 @@ use pbs_client::tools::{
     complete_group_or_snapshot, complete_repository, connect, extract_repository_from_value,
     has_pxar_filename_extension,
     key_source::{
-        KEYFD_SCHEMA, KEYFILE_SCHEMA, crypto_parameters_keep_fd, format_key_source,
-        get_encryption_key_password,
+        IGNORE_MISSING_SIGNATURE_SCHEMA, KEYFD_SCHEMA, KEYFILE_SCHEMA, crypto_parameters_keep_fd,
+        format_key_source, get_encryption_key_password,
     },
     optional_ns_param,
 };
@@ -105,6 +105,7 @@ async fn list_files(
     crypt_config: Option<Arc<CryptConfig>>,
     keyfile: Option<String>,
     driver: Option<BlockDriverType>,
+    ignore_missing_signature: bool,
 ) -> Result<Vec<ArchiveEntry>, Error> {
     let client = connect(&repo)?;
     let client = BackupReader::start(
@@ -117,7 +118,7 @@ async fn list_files(
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest(false).await?;
+    let (manifest, _) = client.download_manifest(ignore_missing_signature).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     match path {
@@ -241,6 +242,10 @@ async fn list_files(
                 type: CryptMode,
                 optional: true,
             },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
+                optional: true,
+            },
             "driver": {
                 type: BlockDriverType,
                 optional: true,
@@ -296,10 +301,21 @@ async fn list(
         None => None,
     };
 
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+
     let result = if let Some(timeout) = timeout {
         match tokio::time::timeout(
             std::time::Duration::from_secs(timeout),
-            list_files(repo, ns, snapshot, path, crypt_config, keyfile, driver),
+            list_files(
+                repo,
+                ns,
+                snapshot,
+                path,
+                crypt_config,
+                keyfile,
+                driver,
+                ignore_missing_signature,
+            ),
         )
         .await
         {
@@ -307,7 +323,17 @@ async fn list(
             Err(_) => Err(http_err!(SERVICE_UNAVAILABLE, "list not finished in time")),
         }
     } else {
-        list_files(repo, ns, snapshot, path, crypt_config, keyfile, driver).await
+        list_files(
+            repo,
+            ns,
+            snapshot,
+            path,
+            crypt_config,
+            keyfile,
+            driver,
+            ignore_missing_signature,
+        )
+        .await
     };
 
     let output_format = get_output_format(&param);
@@ -400,6 +426,10 @@ async fn list(
                 type: CryptMode,
                 optional: true,
             },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
+                optional: true,
+            },
             verbose: {
                 type: Boolean,
                 description: "Print verbose information",
@@ -449,6 +479,8 @@ async fn extract(
         }
     };
 
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+
     let client = connect(&repo)?;
     let client = BackupReader::start(
         &client,
@@ -459,7 +491,7 @@ async fn extract(
         true,
     )
     .await?;
-    let (manifest, _) = client.download_manifest(false).await?;
+    let (manifest, _) = client.download_manifest(ignore_missing_signature).await?;
 
     match path {
         ExtractPath::Pxar(archive_name, path) => {

@@ -18,10 +18,10 @@ use pxar::accessor::aio::Accessor;
 use crate::helper;
 use crate::{
     BackupDir, BackupTargetArgs, BufferedDynamicReader, CatalogReader, DynamicIndexReader,
-    IndexFile, KEYFD_SCHEMA, Shell, complete_backup_snapshot, complete_group_or_snapshot,
-    complete_namespace, complete_pxar_archive_name, complete_repository, connect,
-    crypto_parameters, decrypt_key, dir_or_last_from_group, extract_repository_from_value,
-    format_key_source, optional_ns_param, record_repository,
+    IGNORE_MISSING_SIGNATURE_SCHEMA, IndexFile, KEYFD_SCHEMA, Shell, complete_backup_snapshot,
+    complete_group_or_snapshot, complete_namespace, complete_pxar_archive_name,
+    complete_repository, connect, crypto_parameters, decrypt_key, dir_or_last_from_group,
+    extract_repository_from_value, format_key_source, optional_ns_param, record_repository,
 };
 
 #[api(
@@ -42,6 +42,10 @@ use crate::{
             },
             "keyfd": {
                 schema: KEYFD_SCHEMA,
+                optional: true,
+            },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
                 optional: true,
             },
         }
@@ -81,7 +85,8 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest(false).await?;
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+    let (manifest, _) = client.download_manifest(ignore_missing_signature).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     let file_info = match manifest.lookup_file_info(&CATALOG_NAME) {
@@ -175,6 +180,10 @@ async fn dump_catalog(param: Value) -> Result<Value, Error> {
                 schema: KEYFD_SCHEMA,
                 optional: true,
             },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
+                optional: true,
+            },
          },
     },
 )]
@@ -217,7 +226,8 @@ async fn catalog_shell(param: Value) -> Result<(), Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest(false).await?;
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+    let (manifest, _) = client.download_manifest(ignore_missing_signature).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     if let Err(_err) = manifest.lookup_file_info(&CATALOG_NAME) {

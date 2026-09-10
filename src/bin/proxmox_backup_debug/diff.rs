@@ -15,7 +15,8 @@ use proxmox_schema::api;
 
 use pbs_api_types::{BackupArchiveName, BackupNamespace, BackupPart};
 use pbs_client::tools::key_source::{
-    KEYFD_SCHEMA, crypto_parameters, format_key_source, get_encryption_key_password,
+    IGNORE_MISSING_SIGNATURE_SCHEMA, KEYFD_SCHEMA, crypto_parameters, format_key_source,
+    get_encryption_key_password,
 };
 use pbs_client::tools::{
     complete_archive_name, complete_group_or_snapshot, connect, extract_repository_from_value,
@@ -81,6 +82,10 @@ pub fn diff_commands() -> CommandLineInterface {
                 schema: KEYFD_SCHEMA,
                 optional: true,
             },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
+                optional: true,
+            },
             "compare-content": {
                 optional: true,
                 type: bool,
@@ -129,6 +134,7 @@ async fn diff_archive_cmd(
         repo,
         crypt_config,
         namespace,
+        ignore_missing_signature: param["ignore-missing-signature"].as_bool().unwrap_or(false),
     };
 
     let output_params = OutputParams { color };
@@ -233,6 +239,7 @@ struct RepoParams {
     repo: BackupRepository,
     crypt_config: Option<Arc<CryptConfig>>,
     namespace: BackupNamespace,
+    ignore_missing_signature: bool,
 }
 
 struct OutputParams {
@@ -246,7 +253,9 @@ async fn open_dynamic_index(
 ) -> Result<(DynamicIndexReader, Accessor), Error> {
     let backup_reader = create_backup_reader(snapshot, params).await?;
 
-    let (manifest, _) = backup_reader.download_manifest(false).await?;
+    let (manifest, _) = backup_reader
+        .download_manifest(params.ignore_missing_signature)
+        .await?;
     manifest.check_fingerprint(params.crypt_config.as_ref().map(Arc::as_ref))?;
 
     let index = backup_reader
@@ -877,6 +886,28 @@ mod tests {
 
             Poll::Ready(res.map(|_| ()))
         }
+    }
+
+    #[test]
+    fn test_ignore_missing_signature_parameter() -> Result<(), Error> {
+        let parameters = &API_METHOD_DIFF_ARCHIVE_CMD.parameters;
+        let defaults = parameters.parse_parameter_strings(&[], false)?;
+        assert!(
+            !defaults["ignore-missing-signature"]
+                .as_bool()
+                .unwrap_or(false)
+        );
+        for ignore_missing_signature in [false, true] {
+            let parsed = parameters.parse_parameter_strings(
+                &[(
+                    "ignore-missing-signature".to_string(),
+                    ignore_missing_signature.to_string(),
+                )],
+                false,
+            )?;
+            assert_eq!(parsed["ignore-missing-signature"], ignore_missing_signature);
+        }
+        Ok(())
     }
 
     #[test]

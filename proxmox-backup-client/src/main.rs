@@ -41,8 +41,9 @@ use pbs_client::tools::{
     complete_pxar_archive_name, complete_repository, connect, connect_rate_limited,
     extract_repository_from_value,
     key_source::{
-        KEYFD_SCHEMA, KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA, MASTER_PUBKEY_FILE_SCHEMA,
-        crypto_parameters, format_key_source, get_encryption_key_password,
+        IGNORE_MISSING_SIGNATURE_SCHEMA, KEYFD_SCHEMA, KEYFILE_SCHEMA, MASTER_PUBKEY_FD_SCHEMA,
+        MASTER_PUBKEY_FILE_SCHEMA, crypto_parameters, format_key_source,
+        get_encryption_key_password,
     },
     raise_nofile_limit, remove_repository_from_value,
 };
@@ -1665,6 +1666,10 @@ We do not extract '.pxar' archives when writing to standard output.
                 type: CryptMode,
                 optional: true,
             },
+            "ignore-missing-signature": {
+                schema: IGNORE_MISSING_SIGNATURE_SCHEMA,
+                optional: true,
+            },
             "ignore-acls": {
                 type: Boolean,
                 description: "ignore acl settings",
@@ -1786,6 +1791,8 @@ async fn restore(
         }
     };
 
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+
     let client = BackupReader::start(
         &client,
         crypt_config.clone(),
@@ -1796,7 +1803,7 @@ async fn restore(
     )
     .await?;
 
-    let (manifest, backup_index_data) = client.download_manifest(false).await?;
+    let (manifest, backup_index_data) = client.download_manifest(ignore_missing_signature).await?;
 
     if archive_name == *ENCRYPTED_KEY_BLOB_NAME && crypt_config.is_none() {
         log::info!(

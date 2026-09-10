@@ -32,6 +32,13 @@ pub const MASTER_PUBKEY_FD_SCHEMA: Schema =
         .minimum(0)
         .schema();
 
+pub const IGNORE_MISSING_SIGNATURE_SCHEMA: Schema = BooleanSchema::new(
+    "Read a backup whose manifest has no signature even though an encryption key is configured. \
+     The backup's integrity cannot be verified in that case.",
+)
+.default(false)
+.schema();
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum KeySource {
     DefaultKey,

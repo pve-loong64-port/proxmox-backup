@@ -19,7 +19,8 @@ use proxmox_sortable_macro::sortable;
 
 use pbs_api_types::{ArchiveType, BackupArchiveName};
 use pbs_client::tools::key_source::{
-    crypto_parameters, format_key_source, get_encryption_key_password,
+    IGNORE_MISSING_SIGNATURE_SCHEMA, crypto_parameters, format_key_source,
+    get_encryption_key_password,
 };
 use pbs_client::{BackupReader, BackupTargetArgs, RemoteChunkReader};
 use pbs_datastore::cached_chunk_reader::CachedChunkReader;
@@ -61,6 +62,11 @@ const API_METHOD_MOUNT: ApiMethod = ApiMethod::new_full(
                         &StringSchema::new("Path to encryption key.").schema()
                     ),
                     (
+                        "ignore-missing-signature",
+                        true,
+                        &IGNORE_MISSING_SIGNATURE_SCHEMA
+                    ),
+                    (
                         "verbose",
                         true,
                         &BooleanSchema::new("Verbose output and stay in foreground.")
@@ -95,6 +101,11 @@ const API_METHOD_MAP: ApiMethod = ApiMethod::new_full(
                         "keyfile",
                         true,
                         &StringSchema::new("Path to encryption key.").schema()
+                    ),
+                    (
+                        "ignore-missing-signature",
+                        true,
+                        &IGNORE_MISSING_SIGNATURE_SCHEMA
                     ),
                     (
                         "verbose",
@@ -255,7 +266,8 @@ async fn mount_do(param: Value, pipe: Option<OwnedFd>) -> Result<Value, Error> {
     )
     .await?;
 
-    let (manifest, _) = client.download_manifest(false).await?;
+    let ignore_missing_signature = param["ignore-missing-signature"].as_bool().unwrap_or(false);
+    let (manifest, _) = client.download_manifest(ignore_missing_signature).await?;
     manifest.check_fingerprint(crypt_config.as_ref().map(Arc::as_ref))?;
 
     let daemonize = || -> Result<(), Error> {
