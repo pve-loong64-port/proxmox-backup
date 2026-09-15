@@ -1077,7 +1077,7 @@ async fn create_backup(
     };
 
     let previous_manifest = if download_previous_manifest {
-        match client.download_previous_manifest(true).await {
+        match client.download_previous_manifest(false).await {
             Ok(previous_manifest) => {
                 match check_previous_manifest(
                     &previous_manifest,
@@ -1384,8 +1384,8 @@ fn check_previous_manifest(
 
     // Plain and sign-only backups share chunk digests. Stopping signing does not require the old
     // key for deduplication, since upload_stream computes the digests again from local contents.
-    if crypt_config.is_some() {
-        manifest.check_fingerprint(crypt_config)?;
+    if let Some(crypt_config) = crypt_config {
+        manifest.check_signature(crypt_config, crypt_mode != CryptMode::Encrypt)?;
     }
 
     if manifest.files().iter().any(|file| {

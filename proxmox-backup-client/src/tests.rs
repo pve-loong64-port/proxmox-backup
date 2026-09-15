@@ -86,7 +86,13 @@ fn metadata_reference_requires_authentication() -> Result<(), Error> {
         previous.unprotected = serde_json::json!({});
         let data = previous.to_string(None)?;
         let previous = BackupManifest::from_data(data.as_bytes(), Some(&key), true)?;
-        assert!(check_previous_manifest(&previous, Some(&key), mode).is_ok());
+        if mode == CryptMode::Encrypt {
+            // manifest lacking signature is not okay if we are encrypting
+            assert!(check_previous_manifest(&previous, Some(&key), mode).is_err());
+        } else {
+            // but it is if we are only signing
+            assert!(check_previous_manifest(&previous, Some(&key), mode).is_ok());
+        }
         // Untrusted payload digests must not be copied into the new signed backup, even when the
         // reference claims matching crypt modes and metadata. Ordinary deduplication can still run.
         assert!(previous_reference_archives(&target, &previous, Some(&key), mode).is_err());
