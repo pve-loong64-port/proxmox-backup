@@ -50,7 +50,7 @@ fn check_backup_permission(
 
     user_info.check_privs(auth_id, &["datastore", store], PRIV_DATASTORE_READ, false)?;
 
-    user_info.check_privs(auth_id, &["tape", "drive", drive], PRIV_TAPE_WRITE, false)?;
+    user_info.check_privs(auth_id, &["tape", "device", drive], PRIV_TAPE_WRITE, false)?;
 
     user_info.check_privs(auth_id, &["tape", "pool", pool], PRIV_TAPE_WRITE, false)?;
 
@@ -244,7 +244,7 @@ pub fn do_tape_backup_job(
     access: {
         // Note: parameters are from job config, so we need to test inside function body
         description: "The user needs Tape.Write privilege on /tape/pool/{pool} \
-                      and /tape/drive/{drive}, Datastore.Read privilege on /datastore/{store}.",
+                      and /tape/device/{drive}, Datastore.Read privilege on /datastore/{store}.",
         permission: &Permission::Anybody,
     },
 )]
@@ -292,7 +292,7 @@ pub fn run_tape_backup_job(id: String, rpcenv: &mut dyn RpcEnvironment) -> Resul
     access: {
         // Note: parameters are no uri parameter, so we need to test inside function body
         description: "The user needs Tape.Write privilege on /tape/pool/{pool} \
-                      and /tape/drive/{drive}, Datastore.Read privilege on /datastore/{store}.",
+                      and /tape/device/{drive}, Datastore.Read privilege on /datastore/{store}.",
         permission: &Permission::Anybody,
     },
 )]
