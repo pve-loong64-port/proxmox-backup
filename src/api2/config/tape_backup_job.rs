@@ -12,6 +12,7 @@ use pbs_api_types::{
 
 use pbs_config::CachedUserInfo;
 
+use crate::api2::tape::check_tape_backup_permission;
 use crate::tape::assert_datastore_type;
 
 #[api(
@@ -70,9 +71,13 @@ pub fn list_tape_backup_jobs(
 /// Create a new tape backup job.
 pub fn create_tape_backup_job(
     job: TapeBackupJobConfig,
-    _rpcenv: &mut dyn RpcEnvironment,
+    rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
     assert_datastore_type(&job.setup.store)?;
+
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+
+    check_tape_backup_permission(&auth_id, &job.setup)?;
 
     let _lock = pbs_config::tape_job::lock()?;
 
@@ -182,6 +187,7 @@ pub fn update_tape_backup_job(
     update: TapeBackupJobConfigUpdater,
     delete: Option<Vec<DeletableProperty>>,
     digest: Option<String>,
+    rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<(), Error> {
     if let Some(store) = &update.setup.store {
         assert_datastore_type(store)?;
@@ -271,6 +277,10 @@ pub fn update_tape_backup_job(
     if update.setup.worker_threads.is_some() {
         data.setup.worker_threads = update.setup.worker_threads;
     }
+
+    // scheduled runs use root@pam, so the modifying user must be able to run the resulting job
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    check_tape_backup_permission(&auth_id, &data.setup)?;
 
     let schedule_changed = data.schedule != update.schedule;
     if update.schedule.is_some() {
