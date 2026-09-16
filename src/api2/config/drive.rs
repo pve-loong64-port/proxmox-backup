@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
+use proxmox_section_config::SectionConfigData;
 
 use pbs_api_types::{
     Authid, DRIVE_NAME_SCHEMA, LtoTapeDrive, LtoTapeDriveUpdater, PRIV_TAPE_AUDIT,
@@ -12,6 +13,29 @@ use pbs_api_types::{
 use pbs_config::CachedUserInfo;
 
 use pbs_tape::linux_list_drives::{check_drive_path, lto_tape_device_list};
+
+fn check_drive_in_use(
+    new_drive: &LtoTapeDrive,
+    section_config: &SectionConfigData,
+) -> Result<(), Error> {
+    let existing: Vec<LtoTapeDrive> = section_config.convert_to_typed_array("lto")?;
+
+    for drive in existing {
+        if drive.name == new_drive.name {
+            continue;
+        }
+        if drive.path == new_drive.path {
+            param_bail!(
+                "path",
+                "Path '{}' already used in drive '{}'",
+                new_drive.path,
+                drive.name
+            );
+        }
+    }
+
+    Ok(())
+}
 
 #[api(
     protected: true,
@@ -41,18 +65,7 @@ pub fn create_drive(config: LtoTapeDrive) -> Result<(), Error> {
 
     check_drive_path(&lto_drives, &config.path)?;
 
-    let existing: Vec<LtoTapeDrive> = section_config.convert_to_typed_array("lto")?;
-
-    for drive in existing {
-        if drive.path == config.path {
-            param_bail!(
-                "path",
-                "Path '{}' already used in drive '{}'",
-                config.path,
-                drive.name
-            );
-        }
-    }
+    check_drive_in_use(&config, &section_config)?;
 
     section_config.set_data(&config.name, "lto", &config)?;
 
@@ -207,6 +220,7 @@ pub fn update_drive(
         check_drive_path(&lto_drives, &path)?;
         data.path = path;
     }
+    check_drive_in_use(&data, &config)?;
 
     if let Some(changer) = update.changer {
         let _: ScsiTapeChanger = config.lookup("changer", &changer)?;
