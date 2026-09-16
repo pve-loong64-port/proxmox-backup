@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use proxmox_router::{Permission, Router, RpcEnvironment, http_bail};
 use proxmox_schema::{api, param_bail};
+use proxmox_section_config::SectionConfigData;
 
 use pbs_api_types::{
     Authid, CHANGER_NAME_SCHEMA, LtoTapeDrive, PRIV_TAPE_AUDIT, PRIV_TAPE_MODIFY,
@@ -11,6 +12,25 @@ use pbs_api_types::{
 };
 use pbs_config::CachedUserInfo;
 use pbs_tape::linux_list_drives::{check_drive_path, linux_tape_changer_list};
+
+fn check_changer_in_use(
+    name: &str,
+    path: &str,
+    section_config: &SectionConfigData,
+) -> Result<(), Error> {
+    let existing: Vec<ScsiTapeChanger> = section_config.convert_to_typed_array("changer")?;
+
+    for changer in existing {
+        if changer.name == name {
+            continue;
+        }
+        if changer.path == path {
+            param_bail!("path", "Path '{path}' already in use by '{}'", changer.name);
+        }
+    }
+
+    Ok(())
+}
 
 #[api(
     protected: true,
@@ -40,18 +60,7 @@ pub fn create_changer(config: ScsiTapeChanger) -> Result<(), Error> {
 
     check_drive_path(&linux_changers, &config.path)?;
 
-    let existing: Vec<ScsiTapeChanger> = section_config.convert_to_typed_array("changer")?;
-
-    for changer in existing {
-        if changer.path == config.path {
-            param_bail!(
-                "path",
-                "Path '{}' already in use by '{}'",
-                config.path,
-                changer.name
-            );
-        }
-    }
+    check_changer_in_use(&config.name, &config.path, &section_config)?;
 
     section_config.set_data(&config.name, "changer", &config)?;
 
@@ -202,6 +211,7 @@ pub fn update_changer(
     if let Some(path) = update.path {
         let changers = linux_tape_changer_list();
         check_drive_path(&changers, &path)?;
+        check_changer_in_use(&name, &path, &config)?;
         data.path = path;
     }
 
