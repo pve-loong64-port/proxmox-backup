@@ -1,3 +1,27 @@
+rust-proxmox-backup (4.2.6-1) trixie; urgency=medium
+
+  * backup-manager cli: document that `cert update` create auth and csrf key if
+    they are missing
+
+  * notifications: use `Severity::Error` for acme renewal failures
+
+  * config: invalidate CachedUserInfo after ACL changes, to reduce the time it
+    takes for ACL changes to become active
+
+  * fix #7911: api: report: mark endpoint as protected, since it calls commands
+    that require root privileges
+
+  * client: improve handling of encryption/signing key configuration and
+    manifest signature state
+    - backup: change misleading log message in sign-only mode
+    - manifest: reject unsigned manifests when a key is set
+    - reuse chunks across compatible crypt modes, e.g. when transitioning from
+    unsigned to signed
+    - restore: allow explicitly trusting unsigned backups, even if the client
+      has a key configured
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 16 Sep 2026 10:57:10 +0200
+
 rust-proxmox-backup (4.2.5-1) trixie; urgency=medium
 
   * backup: harden the handling of client supplied backup manifests:
