@@ -37,6 +37,38 @@ fn check_drive_in_use(
     Ok(())
 }
 
+fn check_unique_drive_changer_assignment(
+    new_drive: &LtoTapeDrive,
+    section_config: &SectionConfigData,
+) -> Result<(), Error> {
+    let Some(new_changer) = new_drive.changer.as_ref() else {
+        return Ok(());
+    };
+
+    let new_drive_num = new_drive.changer_drivenum.unwrap_or(0);
+
+    let existing: Vec<LtoTapeDrive> = section_config.convert_to_typed_array("lto")?;
+
+    for drive in existing {
+        if drive.name == new_drive.name {
+            continue;
+        }
+        let Some(changer) = drive.changer.as_ref() else {
+            continue;
+        };
+        let drive_num = drive.changer_drivenum.unwrap_or(0);
+        if changer == new_changer && drive_num == new_drive_num {
+            param_bail!(
+                "changer_drivenum",
+                "Changer drive number '{drive_num}' already used in drive '{}'",
+                drive.name
+            );
+        }
+    }
+
+    Ok(())
+}
+
 #[api(
     protected: true,
     input: {
@@ -66,6 +98,8 @@ pub fn create_drive(config: LtoTapeDrive) -> Result<(), Error> {
     check_drive_path(&lto_drives, &config.path)?;
 
     check_drive_in_use(&config, &section_config)?;
+
+    check_unique_drive_changer_assignment(&config, &section_config)?;
 
     section_config.set_data(&config.name, "lto", &config)?;
 
@@ -240,6 +274,8 @@ pub fn update_drive(
             data.changer_drivenum = Some(changer_drivenum);
         }
     }
+
+    check_unique_drive_changer_assignment(&data, &config)?;
 
     config.set_data(&name, "lto", &data)?;
 
