@@ -21,10 +21,10 @@ use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupDir, BackupNamespace, CryptMode, DATASTORE_MAP_ARRAY_SCHEMA,
-    DATASTORE_MAP_LIST_SCHEMA, DRIVE_NAME_SCHEMA, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
-    NotificationMode, Operation, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY, PRIV_TAPE_READ,
-    TAPE_RESTORE_NAMESPACE_SCHEMA, TAPE_RESTORE_SNAPSHOT_SCHEMA, TapeRestoreNamespace, UPID_SCHEMA,
-    Userid, parse_ns_and_snapshot, print_ns_and_snapshot,
+    DATASTORE_MAP_LIST_SCHEMA, DATASTORE_SCHEMA, DRIVE_NAME_SCHEMA, MANIFEST_BLOB_NAME,
+    MAX_NAMESPACE_DEPTH, NotificationMode, Operation, PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_MODIFY,
+    PRIV_TAPE_READ, TAPE_RESTORE_NAMESPACE_SCHEMA, TAPE_RESTORE_SNAPSHOT_SCHEMA,
+    TapeRestoreNamespace, UPID_SCHEMA, Userid, parse_ns_and_snapshot, print_ns_and_snapshot,
 };
 use pbs_client::pxar::tools::handle_root_with_optional_format_version_prelude;
 use pbs_config::CachedUserInfo;
@@ -638,7 +638,7 @@ fn restore_list_worker(
     let catalog = get_media_set_catalog(&inventory, &media_set_uuid)?;
 
     let mut datastore_locks = Vec::new();
-    let mut snapshot_file_hash: BTreeMap<Uuid, Vec<u64>> = BTreeMap::new();
+    let mut snapshot_file_hash: BTreeMap<Uuid, Vec<(u64, String)>> = BTreeMap::new();
     let mut skipped = Vec::new();
 
     let res = proxmox_lang::try_block!({
@@ -739,7 +739,7 @@ fn restore_list_worker(
             let file_list = snapshot_file_hash
                 .entry(media_id.label.uuid.clone())
                 .or_default();
-            file_list.push(file_num);
+            file_list.push((file_num, snapshot.to_string()));
 
             info!(
                 "found snapshot {snapshot} on {}: file {file_num}",
@@ -874,7 +874,7 @@ fn restore_list_worker(
                             &datastore,
                             &snapshot,
                             &media_set_uuid,
-                        );
+                        )?;
 
                         for entry in std::fs::read_dir(tmp_path)? {
                             let entry = entry?;
@@ -966,22 +966,41 @@ fn media_set_tmpdir(datastore: &DataStore, media_set_uuid: &Uuid) -> PathBuf {
     path
 }
 
+fn check_path(path: &Path, base: &Path) -> Result<(), Error> {
+    if !path.starts_with(base) {
+        bail!("path outside the basedir detected");
+    }
+
+    if path
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        bail!("invalid path detected");
+    }
+
+    Ok(())
+}
+
 fn snapshot_tmpdir(
     source_datastore: &str,
     datastore: &DataStore,
     snapshot: &str,
     media_set_uuid: &Uuid,
-) -> PathBuf {
-    let mut path = media_set_tmpdir(datastore, media_set_uuid);
+) -> Result<PathBuf, Error> {
+    let base = media_set_tmpdir(datastore, media_set_uuid);
+    let mut path = base.clone();
     path.push(source_datastore);
     path.push(snapshot);
-    path
+
+    check_path(&path, &base)?;
+
+    Ok(path)
 }
 
 fn restore_snapshots_to_tmpdir(
     worker: Arc<WorkerTask>,
     store_map: &DataStoreMap,
-    file_list: &[u64],
+    file_list: &[(u64, String)],
     mut drive: Box<dyn TapeDriver>,
     media_id: &MediaId,
     media_set_uuid: &Uuid,
@@ -1008,7 +1027,7 @@ fn restore_snapshots_to_tmpdir(
         }
     }
 
-    for file_num in file_list {
+    for (file_num, snapshot_name) in file_list {
         let current_file_number = drive.current_file_number()?;
         if current_file_number != *file_num {
             info!("was at file {current_file_number}, moving to {file_num}");
@@ -1034,7 +1053,14 @@ fn restore_snapshots_to_tmpdir(
                     })?;
 
                 let source_datastore = archive_header.store;
+                let _ = DATASTORE_SCHEMA
+                    .parse_simple_value(&source_datastore)
+                    .map_err(|err| format_err!("invalid source datastore name: {err}"))?;
+
                 let snapshot = archive_header.snapshot;
+                if &snapshot != snapshot_name {
+                    bail!("unexpected snapshot name (expected {snapshot_name}, got {snapshot})");
+                }
 
                 info!("File {file_num}: snapshot archive {source_datastore}:{snapshot}",);
 
@@ -1054,7 +1080,7 @@ fn restore_snapshots_to_tmpdir(
                     &target_datastore,
                     &snapshot,
                     media_set_uuid,
-                );
+                )?;
                 std::fs::create_dir_all(&tmp_path)?;
 
                 let chunks = chunks_list.entry(source_datastore).or_default();
@@ -1064,6 +1090,7 @@ fn restore_snapshots_to_tmpdir(
                 for item in manifest.files() {
                     let mut archive_path = tmp_path.to_owned();
                     archive_path.push(item.filename.as_ref());
+                    check_path(&archive_path, &tmp_path)?;
 
                     let index: Box<dyn IndexFile> = match item.filename.archive_type() {
                         ArchiveType::DynamicIndex => {
