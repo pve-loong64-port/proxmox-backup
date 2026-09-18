@@ -1,9 +1,18 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::{Error, bail, format_err};
 use hex::FromHex;
 
+use pbs_api_types::{BackupArchiveName, BackupGroup, BackupNamespace};
 use proxmox_s3_client::{DeleteObjectError, S3ObjectKey};
+
+use crate::{
+    backup_info::PROTECTED_MARKER_FILENAME,
+    datastore::{GROUP_NOTES_FILE_NAME, GROUP_OWNER_FILE_NAME, NAMESPACE_MARKER_FILENAME},
+};
 
 /// Object key prefix to group regular datastore contents (not chunks)
 pub const S3_CONTENT_PREFIX: &str = ".cnt";
@@ -59,6 +68,97 @@ pub(crate) fn digest_from_object_key(key: &S3ObjectKey) -> Option<(&str, [u8; 32
     Some((filename, digest, suffix))
 }
 
+/// Extract file path relative to datastore base from object key. Key is expected to follow the
+/// same component layout and naming restrictions as for datastores and be an object pointing
+/// to a file.
+/// Object keys ending with a slash, including the bare content prefix, are interpreted as directory
+/// and return `None`.
+///
+/// Errors if the provided object key does not match a valid pattern for a datastore path.
+pub(crate) fn content_filepath_from_object_key(
+    key: &S3ObjectKey,
+    store_cnt_prefix: &str,
+) -> Result<Option<PathBuf>, Error> {
+    let key = key.to_string();
+    let key = key
+        .strip_prefix(store_cnt_prefix)
+        .ok_or_else(|| format_err!("failed to strip store context prefix"))?;
+
+    if key.starts_with('/') {
+        bail!("unexpected leading slash");
+    }
+
+    if key.is_empty() || key.ends_with('/') {
+        // interpreted as directory, empty if the key is the content prefix itself
+        return Ok(None);
+    }
+
+    let (mut prefix, filename) = key
+        .rsplit_once('/')
+        .ok_or_else(|| format_err!("unexpected path without directory components"))?;
+
+    let mut namespace = BackupNamespace::root();
+    // inside content prefix, must be followed by components for valid namespaces
+    while let Some(remaining) = prefix.strip_prefix("ns/") {
+        match remaining.split_once('/') {
+            Some((name, remaining)) => {
+                // checks nesting level limit and format
+                namespace.push(name.to_string())?;
+                prefix = remaining;
+            }
+            None => {
+                // checks nesting level limit and format
+                namespace.push(remaining.to_string())?;
+                if filename == NAMESPACE_MARKER_FILENAME {
+                    // valid namespace with marker object, done
+                    return Ok(Some(PathBuf::from(key)));
+                }
+                bail!("unexpected file object in namespace");
+            }
+        }
+    }
+
+    // inside valid namespace, must be at least a backup group
+    let (backup_type, prefix) = prefix
+        .split_once('/')
+        .ok_or_else(|| format_err!("failed to split backup-type of group"))?;
+
+    let prefix = match prefix.split_once('/') {
+        Some((backup_id, prefix)) => {
+            BackupGroup::from_str(&format!("{backup_type}/{backup_id}"))?;
+            prefix
+        }
+        None => {
+            // already at final directory component, prefix == backup_id
+            BackupGroup::from_str(&format!("{backup_type}/{prefix}"))?;
+            if filename == GROUP_OWNER_FILE_NAME || filename == GROUP_NOTES_FILE_NAME {
+                // valid (optionally namespaced) group path with owner or group note filename
+                return Ok(Some(PathBuf::from(key)));
+            } else {
+                bail!("unexpected file object in group");
+            }
+        }
+    };
+
+    // inside valid group but not note or owner file, must be final snapshot directory component
+    if prefix.contains('/') {
+        bail!("unexpected sub-directory component in snapshot");
+    }
+
+    if proxmox_time::parse_rfc3339(prefix).is_err() {
+        bail!("invalid snapshot component");
+    }
+
+    // inside valid snapshot, must be protected marker or a valid archive name
+    if filename == PROTECTED_MARKER_FILENAME {
+        return Ok(Some(PathBuf::from(key)));
+    }
+
+    let _archive_name = BackupArchiveName::try_from_strict(filename)?;
+
+    Ok(Some(PathBuf::from(key)))
+}
+
 /// Log errors from delete objects api calls
 pub(crate) fn log_s3_delete_objects_errors(errors: &[DeleteObjectError]) {
     for error in errors {
@@ -73,6 +173,131 @@ pub(crate) fn log_s3_delete_objects_errors(errors: &[DeleteObjectError]) {
             error.message.as_deref().unwrap_or("None"),
         );
     }
+}
+
+#[test]
+fn test_content_filepath_from_object_key() {
+    let k = |s: &str| S3ObjectKey::try_from(s).unwrap();
+    let store_cnt_prefix = "store/.cnt/";
+
+    content_filepath_from_object_key(&k("store/.cnt/ns/test/vm/100/owner"), store_cnt_prefix)
+        .unwrap();
+    content_filepath_from_object_key(&k("store/.cnt/ns/test/vm/100/notes"), store_cnt_prefix)
+        .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/vm/100/2025-07-14T14:20:02Z/.protected"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/vm/100/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/ct/100/2025-07-14T14:20:02Z/test.pxar.didx"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/host/myhost/2025-07-14T14:20:02Z/test.pxar.didx"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/ns/test/vm/100/2025-07-14T14:20:02Z/.protected"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(
+        &k("store/.cnt/ns/test/vm/100/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+        store_cnt_prefix,
+    )
+    .unwrap();
+    content_filepath_from_object_key(&k("store/.cnt/ns/test/.namespace"), store_cnt_prefix)
+        .unwrap();
+
+    assert_eq!(
+        content_filepath_from_object_key(&k("store/.cnt/ns/test/"), store_cnt_prefix).unwrap(),
+        None
+    );
+
+    assert!(content_filepath_from_object_key(&k(""), store_cnt_prefix).is_err());
+    assert_eq!(
+        content_filepath_from_object_key(&k("store/.cnt/"), store_cnt_prefix).unwrap(),
+        None
+    );
+    assert!(
+        content_filepath_from_object_key(&k("store/.cnt/standalone-file"), store_cnt_prefix)
+            .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/t/ns/t/ns/t/ns/t/ns/t/ns/t/ns/t/ns/t"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/vm/100/2025-07-14T14:20:02Z/drive-scsci0.img"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/vm/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/vm/100/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(&k("store/.cnt/vm/100/.protected"), store_cnt_prefix)
+            .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/invalid$namespace/vm/100/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/test/invalid/100/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/test/vm/invalid$/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/test/vm/100/2025-07-14T14:20:02Z/invalid-%-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
+    assert!(
+        content_filepath_from_object_key(
+            &k("store/.cnt/ns/test/../vm/100/2025-07-14T14:20:02Z/drive-scsci0.img.fidx"),
+            store_cnt_prefix
+        )
+        .is_err()
+    );
 }
 
 #[test]

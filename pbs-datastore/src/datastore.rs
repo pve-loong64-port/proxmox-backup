@@ -80,8 +80,8 @@ pub const GROUP_OWNER_FILE_NAME: &str = "owner";
 pub const S3_DATASTORE_IN_USE_MARKER: &str = ".in-use";
 /// Base directory for storing shared memory mapped s3 request counters
 pub const S3_CLIENT_REQUEST_COUNTER_BASE_PATH: &str = "/var/lib/proxmox-backup/s3-statistics";
+pub(crate) const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 const S3_CLIENT_RATE_LIMITER_BASE_PATH: &str = pbs_buildcfg::rundir!("/s3/shmem/tbf");
-const NAMESPACE_MARKER_FILENAME: &str = ".namespace";
 // s3 put request times out after upload_size / 1 Kib/s, so about 2.3 hours for 8 MiB
 const CHUNK_LOCK_TIMEOUT: Duration = Duration::from_secs(3 * 60 * 60);
 // s3 deletion batch size to avoid 1024 open files soft limit
@@ -3192,19 +3192,21 @@ impl DataStore {
                 .await
                 .context("failed to list object")?;
 
-            let objects_to_fetch: Vec<S3ObjectKey> = list_objects_result
-                .contents
-                .into_iter()
-                .map(|item| item.key)
-                .collect();
+            for object in list_objects_result.contents {
+                let object_path =
+                    match crate::s3::content_filepath_from_object_key(&object.key, &store_prefix) {
+                        Ok(Some(path)) => path,
+                        Ok(None) => {
+                            info!("Skipping directory object {}", object.key);
+                            continue;
+                        }
+                        Err(err) => bail!(
+                            "Failed to parse filepath from object key {}: {err}",
+                            object.key
+                        ),
+                    };
 
-            for object_key in objects_to_fetch {
-                let object_path = format!("{object_key}");
-                let object_path = object_path.strip_prefix(&store_prefix).with_context(|| {
-                    format!("failed to strip store context prefix {store_prefix} for {object_key}")
-                })?;
-
-                let file_path = tmp_base.join(object_path);
+                let file_path = tmp_base.join(&object_path);
                 if let Some(parent) = file_path.parent() {
                     proxmox_sys::fs::create_path(
                         parent,
@@ -3214,11 +3216,11 @@ impl DataStore {
                 }
 
                 if object_path.ends_with(NAMESPACE_MARKER_FILENAME) {
-                    info!("Created namespace {object_path}");
+                    info!("Created namespace {object_path:?}");
                     continue;
                 }
 
-                info!("Fetching object {object_path}");
+                info!("Fetching object {object_path:?}");
 
                 let mut target_file = tokio::fs::OpenOptions::new()
                     .write(true)
@@ -3230,9 +3232,9 @@ impl DataStore {
                     .with_context(|| format!("failed to create target file {file_path:?}"))?;
 
                 if let Some(response) = s3_client
-                    .get_object(object_key)
+                    .get_object(object.key)
                     .await
-                    .with_context(|| format!("failed to fetch object {object_path}"))?
+                    .with_context(|| format!("failed to fetch object {object_path:?}"))?
                 {
                     let data = response
                         .content
@@ -3251,7 +3253,7 @@ impl DataStore {
                         .await
                         .context("failed to flush target file")?;
                 } else {
-                    bail!("failed to download {object_path}, not found");
+                    bail!("failed to download {object_path:?}, not found");
                 }
             }
 
