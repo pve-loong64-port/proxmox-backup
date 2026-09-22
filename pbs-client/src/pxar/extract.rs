@@ -691,7 +691,7 @@ impl Extractor {
         let parent = self.parent_fd()?;
         let mut oflags = OFlag::O_CREAT | OFlag::O_WRONLY | OFlag::O_CLOEXEC;
         if overwrite {
-            oflags |= OFlag::O_TRUNC;
+            oflags |= OFlag::O_TRUNC | OFlag::O_NOFOLLOW;
         } else {
             oflags |= OFlag::O_EXCL;
         }
@@ -757,7 +757,7 @@ impl Extractor {
         let parent = self.parent_fd()?;
         let mut oflags = OFlag::O_CREAT | OFlag::O_WRONLY | OFlag::O_CLOEXEC;
         if overwrite {
-            oflags |= OFlag::O_TRUNC;
+            oflags |= OFlag::O_TRUNC | OFlag::O_NOFOLLOW;
         } else {
             oflags |= OFlag::O_EXCL;
         }
