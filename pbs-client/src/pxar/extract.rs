@@ -5,14 +5,14 @@ use std::ffi::{CStr, CString, OsStr, OsString};
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Error, bail, format_err};
 use bitflags::bitflags;
 use nix::dir::Dir;
-use nix::fcntl::OFlag;
+use nix::fcntl::{OFlag, OpenHow, ResolveFlag};
 use nix::sys::stat::Mode;
 
 use pathpatterns::{MatchEntry, MatchList, MatchType};
@@ -618,13 +618,36 @@ impl Extractor {
     pub fn extract_hardlink(&mut self, file_name: &CStr, link: &OsStr) -> Result<(), Error> {
         crate::pxar::tools::assert_relative_path(link)?;
 
+        let link = Path::new(link);
+        let target_name = link
+            .file_name()
+            .with_context(|| format!("invalid hardlink target {link:?}"))?;
+        let target_name = CString::new(target_name.as_bytes())?;
+
         let parent = self.parent_fd()?;
         let root = self.dir_stack.root_dir_fd()?;
-        let target = CString::new(link.as_bytes())?;
+
+        // Only resolve the directory, linkat() without AT_EMPTY_PATH needs no CAP_DAC_READ_SEARCH
+        // and does not follow the final component.
+        let target_dir = match link.parent() {
+            Some(dir) if !dir.as_os_str().is_empty() => {
+                let how = OpenHow::new()
+                    .flags(OFlag::O_PATH | OFlag::O_DIRECTORY | OFlag::O_CLOEXEC)
+                    .resolve(ResolveFlag::RESOLVE_BENEATH | ResolveFlag::RESOLVE_NO_SYMLINKS);
+                let fd = nix::fcntl::openat2(root.as_raw_fd(), dir, how)
+                    .with_context(|| format!("failed to open hardlink target directory {dir:?}"))?;
+                Some(unsafe { OwnedFd::from_raw_fd(fd) })
+            }
+            _ => None,
+        };
+        let target_dir_fd = target_dir
+            .as_ref()
+            .map_or(root.as_raw_fd(), |fd| fd.as_raw_fd());
+
         let dolink = || {
             nix::unistd::linkat(
-                Some(root.as_raw_fd()),
-                target.as_c_str(),
+                Some(target_dir_fd),
+                target_name.as_c_str(),
                 Some(parent),
                 file_name,
                 nix::fcntl::AtFlags::empty(),
