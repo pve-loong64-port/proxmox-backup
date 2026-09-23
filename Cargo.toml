@@ -78,7 +78,7 @@ proxmox-openid = "1.0.3"
 proxmox-parallel-handler = "1"
 proxmox-product-config = "1"
 proxmox-rate-limiter = "1.0.0"
-proxmox-rest-server = { version = "1.0.5", features = [ "templates" ] }
+proxmox-rest-server = { version = "1.1.1", features = [ "templates" ] }
 # some use "cli", some use "cli" and "server", pbs-config uses nothing
 proxmox-router = { version = "3.2.2", default-features = false }
 proxmox-rrd = "1"
