@@ -1,3 +1,75 @@
+rust-proxmox-backup (4.2.7-1) trixie; urgency=medium
+
+  * docs: warn in the FAQ that `apt upgrade` can leave a partial upgrade, as
+    only `apt full-upgrade` can remove packages to satisfy dependencies. Also
+    fix a typo in the pcat1 file format description.
+
+  * openid auth: log the full error chain if getting the authorization URL
+    fails, to ease diagnosing connection problems.
+
+  * fix #7823: tape: do not announce a data-in transfer for SCSI commands
+    without a data phase, which targets such as SCST rejected with an
+    ILLEGAL REQUEST error.
+
+  * tape: configuration: also reject drive or changer device paths already
+    used by another entry of the same type on update. Enforce unique drive
+    numbers within each changer on creation and update. Existing duplicates
+    can block edits until they are resolved.
+
+  * tape: permissions:
+    - check '/tape/device/{drive}' for backup, restore and the drive list, as
+      grants on this documented path were previously ignored.
+    - require Datastore.Read on the datastore and Tape.Write on the media pool
+      and drive when creating or updating tape backup jobs. Scheduled jobs run
+      as root@pam, so job editors could otherwise get a datastore written to
+      tape without having read access to it.
+
+  * tape restore: validate the datastore name read from tape and require the
+    snapshot name to match the one selected for restore, so corrupt or crafted
+    media cannot place temporary files outside of the restore directory.
+
+  * s3: validate object keys against the datastore layout when refreshing the
+    contents from the bucket, instead of using them as file paths unchecked.
+    Directory marker objects returned by some providers are now skipped.
+
+  * client: pxar: harden restore and extraction against crafted archives that
+    could write or link files outside of the target directory. Symlinks are
+    no longer followed when entering existing directories or overwriting
+    files, also for symlinks already in the target, and hardlink targets must
+    resolve beneath the target directory without passing through symlinks.
+
+  * update proxmox-rest-server to 1.1.1:
+    - only abort a worker task if its whole UPID matches. Previously, users
+      allowed to stop their own tasks could stop others' tasks through a
+      crafted UPID.
+    - fix #6267: remove old task logs and archives again on busy systems.
+    - harden authentication: mask the credential check runtime in the delay
+      for failed logins, skip malformed cookie pairs and prefer a ticket over
+      an API token in the same request.
+    - accept quoted and unquoted Forwarded header addresses with optional
+      ports, use the last proxy element and reject unterminated quotes.
+    - honor zero deflate weights in Accept-Encoding, stop logging redirects
+      and unchanged responses as failures, and log client errors as warnings.
+    - run all API authentication and permission checks through one shared
+      code path.
+
+  * update proxmox-s3-client to 1.4.2: prevent the passive request limit from
+    overriding the active one, and name 'limit-active-requests' as the
+    replacement in the 'put-rate-limit' deprecation notice.
+
+  * update proxmox-network-api to 1.0.6:
+    - fix #7329: allow listing interfaces configured with the IPv6 'auto'
+      method.
+    - keep dhcp, auto and loopback methods on unrelated updates instead of
+      switching to manual, which could drop IPv6 settings.
+    - reject non-static methods while an address or gateway is set for the
+      same address family.
+
+  * update proxmox-rate-limiter to 1.0.1: prevent frequent refill updates from
+    stalling low-rate traffic, and fix opening the shared limiter on aarch64.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 23 Sep 2026 18:51:01 +0200
+
 rust-proxmox-backup (4.2.6-1) trixie; urgency=medium
 
   * backup-manager cli: document that `cert update` create auth and csrf key if
