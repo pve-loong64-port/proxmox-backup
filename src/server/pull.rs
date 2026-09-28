@@ -253,7 +253,7 @@ async fn pull_index_chunks<I: IndexFile>(
                             index.lock().unwrap().add_chunk(
                                 start_offset,
                                 size as u32,
-                                decrypted_digest,
+                                &decrypted_digest,
                             )?;
 
                             return Ok::<_, Error>(());
@@ -295,7 +295,7 @@ async fn pull_index_chunks<I: IndexFile>(
                             index
                                 .lock()
                                 .unwrap()
-                                .add_chunk(end_offset, decrypted_digest)?;
+                                .add_chunk(end_offset, &decrypted_digest)?;
 
                             return Ok::<_, Error>(());
                         }
@@ -1848,7 +1848,6 @@ async fn pull_ns(
 }
 
 struct EncounteredChunkInfo {
-    reusable: bool,
     touched: bool,
     decrypted_digest: Option<[u8; 32]>,
 }
@@ -1858,12 +1857,6 @@ struct EncounteredChunkInfo {
 /// during this sync.
 struct EncounteredChunks {
     chunk_set: HashMap<[u8; 32], EncounteredChunkInfo>,
-}
-
-/// Propertires of a reusable chunk
-struct ReusableEncounteredChunk<'a> {
-    touched: bool,
-    decrypted_digest: Option<&'a [u8; 32]>,
 }
 
 impl EncounteredChunks {
@@ -1876,19 +1869,8 @@ impl EncounteredChunks {
 
     /// Check if the current state allows to reuse this chunk and if so,
     /// if the chunk has already been touched.
-    fn check_reusable(&self, digest: &[u8; 32]) -> Option<ReusableEncounteredChunk<'_>> {
-        if let Some(chunk_info) = self.chunk_set.get(digest) {
-            if !chunk_info.reusable {
-                None
-            } else {
-                Some(ReusableEncounteredChunk {
-                    touched: chunk_info.touched,
-                    decrypted_digest: chunk_info.decrypted_digest.as_ref(),
-                })
-            }
-        } else {
-            None
-        }
+    fn check_reusable(&self, digest: &[u8; 32]) -> Option<&EncounteredChunkInfo> {
+        self.chunk_set.get(digest)
     }
 
     /// Mark chunk as reusable, inserting it as un-touched if not present.
@@ -1899,14 +1881,12 @@ impl EncounteredChunks {
         match self.chunk_set.entry(*digest) {
             Entry::Occupied(mut occupied) => {
                 let chunk_info = occupied.get_mut();
-                chunk_info.reusable = true;
                 if chunk_info.decrypted_digest.is_none() {
                     chunk_info.decrypted_digest = decrypted_digest;
                 }
             }
             Entry::Vacant(vacant) => {
                 vacant.insert(EncounteredChunkInfo {
-                    reusable: true,
                     touched: false,
                     decrypted_digest,
                 });
