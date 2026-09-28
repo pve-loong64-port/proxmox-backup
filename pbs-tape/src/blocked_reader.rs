@@ -119,6 +119,7 @@ impl<R: BlockRead> BlockedReader<R> {
                 proxmox_lang::io_bail!("got unexpected end of tape");
             }
             Err(BlockReadError::Error(err)) => Err(err),
+            Err(err) => proxmox_lang::io_bail!("{err}"),
         }
     }
 
@@ -139,6 +140,7 @@ impl<R: BlockRead> BlockedReader<R> {
             Err(BlockReadError::Error(err)) => {
                 return Err(err);
             }
+            Err(err) => proxmox_lang::io_bail!("{err}"),
         }
 
         let (size, found_end_marker) = Self::check_buffer(&self.buffer, self.seq_nr)?;

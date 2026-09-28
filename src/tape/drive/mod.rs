@@ -124,6 +124,7 @@ pub trait TapeDriver {
                 Err(BlockReadError::Error(err)) => {
                     return Err(err.into());
                 }
+                Err(err) => return Err(err.into()),
                 Ok(reader) => reader,
             };
 
@@ -158,6 +159,7 @@ pub trait TapeDriver {
             Err(BlockReadError::Error(err)) => {
                 return Err(err.into());
             }
+            Err(err) => return Err(err.into()),
             Ok(reader) => reader,
         };
 

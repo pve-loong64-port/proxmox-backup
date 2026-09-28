@@ -600,6 +600,7 @@ fn debug_scan(mut param: Value) -> Result<(), Error> {
             Err(BlockReadError::Error(err)) => {
                 return Err(err.into());
             }
+            Err(err) => return Err(err.into()),
             Ok(mut reader) => {
                 println!("got file number {file_number}");
 

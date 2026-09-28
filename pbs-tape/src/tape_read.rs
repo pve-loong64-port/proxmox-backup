@@ -29,6 +29,8 @@ pub enum BlockReadError {
     EndOfFile,
     #[error("end of data stream")]
     EndOfStream,
+    #[error("read failed - unexpected block len ({0} != {1})")]
+    InvalidBlockSize(usize, usize),
 }
 
 /// Read streams of blocks

@@ -1310,6 +1310,7 @@ pub fn restore_media(
             Err(BlockReadError::Error(err)) => {
                 return Err(err.into());
             }
+            Err(err) => return Err(err.into()),
             Ok(reader) => reader,
         };
 
@@ -1813,6 +1814,7 @@ pub fn fast_catalog_restore(
                 Err(BlockReadError::Error(err)) => {
                     return Err(err.into());
                 }
+                Err(err) => return Err(err.into()),
                 Ok(reader) => reader,
             };
 

@@ -505,7 +505,9 @@ pub fn label_media(
             drive.rewind()?;
 
             match drive.read_next_file() {
-                Ok(_reader) => bail!("media is not empty (format it first)"),
+                Ok(_) | Err(BlockReadError::InvalidBlockSize(_, _)) => {
+                    bail!("media is not empty (format it first)")
+                }
                 Err(BlockReadError::EndOfFile) => { /* EOF mark at BOT, assume tape is empty */ }
                 Err(BlockReadError::EndOfStream) => { /* tape is empty */ }
                 Err(err) => {

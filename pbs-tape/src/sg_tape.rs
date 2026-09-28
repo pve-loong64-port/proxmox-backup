@@ -840,11 +840,7 @@ impl SgTape {
         };
 
         if data.len() != transfer_len {
-            return Err(BlockReadError::Error(proxmox_lang::io_format_err!(
-                "read failed - unexpected block len ({} != {})",
-                data.len(),
-                buffer.len()
-            )));
+            return Err(BlockReadError::InvalidBlockSize(data.len(), buffer.len()));
         }
 
         Ok(transfer_len)
