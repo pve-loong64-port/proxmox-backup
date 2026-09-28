@@ -26,6 +26,7 @@ use pbs_api_types::{
     CHUNK_DIGEST_SCHEMA, DATASTORE_SCHEMA, Operation, PRIV_DATASTORE_BACKUP, VerifyState,
 };
 use pbs_config::CachedUserInfo;
+use pbs_datastore::fixed_index::FIXED_CHUNK_SIZE;
 use pbs_datastore::index::IndexFile;
 use pbs_datastore::{DataStore, PROXMOX_BACKUP_PROTOCOL_ID_V1};
 use pbs_tools::json::{required_array_param, required_integer_param, required_string_param};
@@ -492,7 +493,7 @@ fn create_fixed_index(
     let mut path = env.backup_dir.relative_path();
     path.push(archive_name.as_ref());
 
-    let chunk_size = 4096 * 1024; // todo: ??
+    let chunk_size = FIXED_CHUNK_SIZE;
 
     // do incremental backup if csum is set
     let mut reader = None;
