@@ -330,14 +330,14 @@ async fn pull_index_chunks<I: IndexFile>(
                                 target.cond_touch_chunk(&info.digest, false)
                             })?;
                             if chunk_exists {
-                                guard.mark_touched(&info.digest, None);
+                                guard.mark_touched(&info.digest)?;
                                 //info!("chunk {} exists {}", pos, hex::encode(digest));
                                 return Ok::<_, Error>(());
                             }
                         }
                         // mark before actually downloading the chunk, so this happens only once
                         guard.mark_reusable(&info.digest, None);
-                        guard.mark_touched(&info.digest, None);
+                        guard.mark_touched(&info.digest)?;
                     }
 
                     let chunk = chunk_reader.read_raw_chunk(&info.digest).await?;
@@ -1914,28 +1914,20 @@ impl EncounteredChunks {
         }
     }
 
-    /// Mark chunk as touched during this sync, inserting it as not reusable
-    /// but touched if not present.
+    /// Mark reusable chunk as touched during this sync.
     ///
-    /// If the mapping already contains the digest, set the decrypted digest only
-    /// if not already set previously.
-    fn mark_touched(&mut self, digest: &[u8; 32], decrypted_digest: Option<[u8; 32]>) {
+    /// Chunk must be marked as reusable first, otherwise this will error.
+    fn mark_touched(&mut self, digest: &[u8; 32]) -> Result<(), Error> {
         match self.chunk_set.entry(*digest) {
             Entry::Occupied(mut occupied) => {
                 let chunk_info = occupied.get_mut();
                 chunk_info.touched = true;
-                if chunk_info.decrypted_digest.is_none() {
-                    chunk_info.decrypted_digest = decrypted_digest;
-                }
             }
-            Entry::Vacant(vacant) => {
-                vacant.insert(EncounteredChunkInfo {
-                    reusable: false,
-                    touched: true,
-                    decrypted_digest,
-                });
+            Entry::Vacant(_vacant) => {
+                bail!("cannot mark non-reusable chunk as touched");
             }
         }
+        Ok(())
     }
 }
 
