@@ -69,11 +69,12 @@ impl FixedIndexReader {
             Err(err) => bail!("fstat failed - {}", err),
         };
 
-        let size = stat.st_size as usize;
+        let stat_size = usize::try_from(stat.st_size)
+            .map_err(|_| format_err!("unexpected file size: {}", stat.st_size))?;
 
-        if size < header_size {
-            bail!("index too small ({})", stat.st_size);
-        }
+        let Some(index_size) = stat_size.checked_sub(header_size) else {
+            bail!("index too small ({stat_size})");
+        };
 
         let header: Box<FixedIndexHeader> = unsafe { file.read_host_value_boxed()? };
 
@@ -89,16 +90,12 @@ impl FixedIndexReader {
             bail!("got non-power-of-two chunk size: {chunk_size}");
         }
 
-        let index_length = size.div_ceil(chunk_size) as usize;
-        let index_size = index_length * 32;
+        let Ok(index_length) = usize::try_from(size.div_ceil(chunk_size)) else {
+            bail!("index length does not fit in usize: ceil({size} / {chunk_size})");
+        };
 
-        let expected_index_size = (stat.st_size as usize) - header_size;
-        if index_size != expected_index_size {
-            bail!(
-                "got unexpected file size ({} != {})",
-                index_size,
-                expected_index_size
-            );
+        if index_length.checked_mul(32) != Some(index_size) {
+            bail!("unexpected index size: {index_size} != 32 * ceil({size} / {chunk_size})");
         }
 
         let chunk_size = usize::try_from(chunk_size)?;
@@ -589,6 +586,32 @@ mod tests {
     use super::*;
 
     const CS: u32 = 4096;
+
+    #[track_caller]
+    fn check_error_contains<T>(result: Result<T, Error>, substring: &str) {
+        let error = result.map(|_| ()).unwrap_err().to_string();
+        assert!(
+            error.contains(substring),
+            "'{error}' does not contain '{substring}'"
+        );
+    }
+
+    #[test]
+    fn test_no_overflow_in_index_size_check() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("overflow.fidx");
+
+        let mut buf = vec![0u8; 4096 + 32]; // (2^59+1) / 1 * 32 = 32 (mod 2^64)
+        buf[0..8].copy_from_slice(&crate::file_formats::FIXED_SIZED_CHUNK_INDEX_1_0);
+        buf[64..72].copy_from_slice(&576460752303423489u64.to_le_bytes()); // size = 2^59+1
+        buf[72..80].copy_from_slice(&1u64.to_le_bytes()); // chunk_size = 1
+        fs::write(&path, &buf).unwrap();
+
+        check_error_contains(
+            FixedIndexReader::open(&path),
+            "unexpected index size: 32 != 32 * ceil(576460752303423489 / 1)",
+        );
+    }
 
     #[test]
     fn test_empty() {
