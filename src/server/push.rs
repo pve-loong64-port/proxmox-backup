@@ -175,8 +175,8 @@ impl PushParameters {
         let group_filter = group_filter.unwrap_or_default();
 
         let crypt_config = if let Some(key_id) = &active_encryption_key {
-            let (crypt_config, fingerprint) =
-                crate::server::sync::check_privs_and_load_key_config(key_id, &local_user, true)?;
+            crate::server::sync::check_key_access(key_id, &local_user)?;
+            let (crypt_config, fingerprint) = crate::server::sync::load_key_config(key_id, true)?;
             info!("Loaded encryption key '{key_id}' with fingerprint '{fingerprint}'");
             Some((key_id.to_string(), crypt_config))
         } else {

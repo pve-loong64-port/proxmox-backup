@@ -69,7 +69,8 @@ fn sync_user_can_access_optional_key(
     fail_on_archived: bool,
 ) -> Result<(), Error> {
     if let Some(key_id) = key_id {
-        if crate::server::sync::check_privs_and_load_key_config(key_id, owner, fail_on_archived)
+        if crate::server::sync::check_key_access(key_id, owner)
+            .and_then(|_| crate::server::sync::load_key_config(key_id, fail_on_archived))
             .is_err()
         {
             bail!("no such key or cannot access key '{key_id}'");

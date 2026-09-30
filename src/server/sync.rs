@@ -919,20 +919,22 @@ pub(super) async fn decrypt_encrypted_data_blob<P: AsRef<Path> + Send + 'static>
     Ok((csum, size))
 }
 
-/// Helper to check if user has access to given encryption key and load it from config.
-pub(crate) fn check_privs_and_load_key_config(
-    key_id: &str,
-    user: &Authid,
-    fail_on_archived: bool,
-) -> Result<(Arc<CryptConfig>, Fingerprint), Error> {
+/// Helper to check if user has access to given encryption key.
+pub(crate) fn check_key_access(key_id: &str, user: &Authid) -> Result<(), Error> {
     let user_info = CachedUserInfo::new()?;
     user_info.check_privs(
         user,
         &["system", "encryption-keys", key_id],
         PRIV_SYS_MODIFY,
         true,
-    )?;
+    )
+}
 
+/// Helper to load encryption key from config.
+pub(crate) fn load_key_config(
+    key_id: &str,
+    fail_on_archived: bool,
+) -> Result<(Arc<CryptConfig>, Fingerprint), Error> {
     let key_config = pbs_config::encryption_keys::load_key_config(key_id, fail_on_archived)?;
     // pass empty passphrase to get raw key material of unprotected key
     let (enc_key, _created, fingerprint) = key_config.decrypt(&|| Ok(Vec::new()))?;
