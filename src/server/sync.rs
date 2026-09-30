@@ -23,9 +23,9 @@ use proxmox_sys::fs::{CreateOptions, replace_file};
 
 use pbs_api_types::{
     Authid, BackupArchiveName, BackupDir, BackupGroup, BackupNamespace, CLIENT_LOG_BLOB_NAME,
-    CryptMode, GroupListItem, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH, PRIV_DATASTORE_BACKUP,
-    PRIV_DATASTORE_READ, PRIV_SYS_MODIFY, SnapshotListItem, SyncDirection, SyncJobConfig,
-    VerifyState,
+    CryptMode, Fingerprint, GroupListItem, MANIFEST_BLOB_NAME, MAX_NAMESPACE_DEPTH,
+    PRIV_DATASTORE_BACKUP, PRIV_DATASTORE_READ, PRIV_SYS_MODIFY, SnapshotListItem, SyncDirection,
+    SyncJobConfig, VerifyState,
 };
 use pbs_client::{BackupReader, BackupRepository, HttpClient, RemoteChunkReader};
 use pbs_config::CachedUserInfo;
@@ -924,7 +924,7 @@ pub(crate) fn check_privs_and_load_key_config(
     key_id: &str,
     user: &Authid,
     fail_on_archived: bool,
-) -> Result<Arc<CryptConfig>, Error> {
+) -> Result<(Arc<CryptConfig>, Fingerprint), Error> {
     let user_info = CachedUserInfo::new()?;
     user_info.check_privs(
         user,
@@ -937,10 +937,8 @@ pub(crate) fn check_privs_and_load_key_config(
     // pass empty passphrase to get raw key material of unprotected key
     let (enc_key, _created, fingerprint) = key_config.decrypt(&|| Ok(Vec::new()))?;
 
-    info!("Loaded encryption key '{key_id}' with fingerprint '{fingerprint}'");
-
     let crypt_config = Arc::new(CryptConfig::new(enc_key)?);
-    Ok(crypt_config)
+    Ok((crypt_config, fingerprint))
 }
 
 /// Track group progress during parallel push/pull in sync jobs

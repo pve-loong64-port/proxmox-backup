@@ -143,8 +143,9 @@ impl PullParameters {
         let crypt_configs = if let Some(key_ids) = &decryption_keys {
             let mut crypt_configs = Vec::with_capacity(key_ids.len());
             for key_id in key_ids {
-                let crypt_config =
+                let (crypt_config, fingerprint) =
                     crate::server::sync::check_privs_and_load_key_config(key_id, &owner, false)?;
+                info!("Loaded decryption key '{key_id}' with fingerprint '{fingerprint}'");
                 crypt_configs.push((key_id.to_string(), crypt_config));
             }
             crypt_configs
