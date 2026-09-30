@@ -1,6 +1,9 @@
 use anyhow::Error;
-use pbs_api_types::{Authid, GarbageCollectionJobStatus};
+use pbs_api_types::{
+    Authid, GarbageCollectionJobStatus, PRIV_DATASTORE_AUDIT, PRIV_DATASTORE_BACKUP,
+};
 
+use pbs_config::CachedUserInfo;
 use proxmox_router::{ApiMethod, Permission, Router, RpcEnvironment};
 use proxmox_schema::api;
 
@@ -8,7 +11,7 @@ use pbs_api_types::DATASTORE_SCHEMA;
 
 use serde_json::Value;
 
-use crate::api2::admin::datastore::{garbage_collection_status, list_datastores_checked};
+use crate::api2::admin::datastore::{garbage_collection_status_unchecked, list_datastores_checked};
 
 #[api(
     input: {
@@ -39,11 +42,19 @@ pub fn list_all_gc_jobs(
     let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
 
     let gc_info = match store {
-        Some(store) => garbage_collection_status(store, _info, rpcenv).map(|info| vec![info])?,
+        Some(store) => {
+            let user_info = CachedUserInfo::new()?;
+            let privs = user_info.lookup_privs(&auth_id, &["datastore", &store]);
+            if privs & (PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_BACKUP) != 0 {
+                garbage_collection_status_unchecked(store).map(|info| vec![info])?
+            } else {
+                Vec::new()
+            }
+        }
         None => list_datastores_checked(&auth_id, false)?
             .into_iter()
             .map(|store_list_item| store_list_item.store)
-            .filter_map(|store| garbage_collection_status(store, _info, rpcenv).ok())
+            .filter_map(|store| garbage_collection_status_unchecked(store).ok())
             .collect::<Vec<_>>(),
     };
 

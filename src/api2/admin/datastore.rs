@@ -1252,6 +1252,12 @@ pub fn garbage_collection_status(
     _info: &ApiMethod,
     _rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<GarbageCollectionJobStatus, Error> {
+    garbage_collection_status_unchecked(store)
+}
+
+pub(crate) fn garbage_collection_status_unchecked(
+    store: String,
+) -> Result<GarbageCollectionJobStatus, Error> {
     let (config, _) = pbs_config::datastore::config()?;
     let store_config: DataStoreConfig = config.lookup("datastore", &store)?;
 
