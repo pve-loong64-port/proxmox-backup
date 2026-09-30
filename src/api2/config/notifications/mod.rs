@@ -8,9 +8,9 @@ use proxmox_router::{Router, SubdirMap};
 use proxmox_schema::api;
 use proxmox_sortable_macro::sortable;
 
-use crate::api2::admin::datastore::get_datastore_list;
-use pbs_api_types::PRIV_SYS_AUDIT;
+use pbs_api_types::{Authid, PRIV_SYS_AUDIT};
 
+use crate::api2::admin::datastore::list_datastores_checked;
 use crate::api2::admin::prune::list_prune_jobs;
 use crate::api2::admin::sync::{ListSyncDirection, list_config_sync_jobs};
 use crate::api2::admin::verify::list_verification_jobs;
@@ -114,12 +114,13 @@ pub fn get_fields() -> Result<Vec<MatchableField>, Error> {
 /// List all known, matchable metadata field values.
 pub fn get_values(
     param: Value,
-    info: &ApiMethod,
+    _info: &ApiMethod,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<MatchableValue>, Error> {
     let mut values = Vec::new();
 
-    let datastores = get_datastore_list(param.clone(), info, rpcenv)?;
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    let datastores = list_datastores_checked(&auth_id, true)?;
 
     for datastore in datastores {
         values.push(MatchableValue {

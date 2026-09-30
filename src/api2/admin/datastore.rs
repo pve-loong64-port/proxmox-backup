@@ -1322,21 +1322,31 @@ pub fn get_datastore_list(
     _info: &ApiMethod,
     rpcenv: &mut dyn RpcEnvironment,
 ) -> Result<Vec<DataStoreListItem>, Error> {
+    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
+    list_datastores_checked(&auth_id, true)
+}
+
+/// List datastore items if the given user has Datastore.Audit or Datastore.Backup
+/// privileges to do so. If `allow_ns_subpath` is set, user with sub-namespace
+/// privileges only will be able to list that datastore as well.
+pub(crate) fn list_datastores_checked(
+    auth_id: &Authid,
+    allow_ns_subpath: bool,
+) -> Result<Vec<DataStoreListItem>, Error> {
     let (config, _digest) = pbs_config::datastore::config()?;
 
-    let auth_id: Authid = rpcenv.get_auth_id().unwrap().parse()?;
     let user_info = CachedUserInfo::new()?;
 
     let mut list = Vec::new();
 
     for (store, (_, data)) in config.sections {
         let acl_path = &["datastore", &store];
-        let user_privs = user_info.lookup_privs(&auth_id, acl_path);
+        let user_privs = user_info.lookup_privs(auth_id, acl_path);
         let allowed = (user_privs & (PRIV_DATASTORE_AUDIT | PRIV_DATASTORE_BACKUP)) != 0;
 
         let mut allow_id = false;
-        if !allowed {
-            if let Ok(any_privs) = user_info.any_privs_below(&auth_id, acl_path, NS_PRIVS_OK) {
+        if !allowed && allow_ns_subpath {
+            if let Ok(any_privs) = user_info.any_privs_below(auth_id, acl_path, NS_PRIVS_OK) {
                 allow_id = any_privs;
             }
         }
