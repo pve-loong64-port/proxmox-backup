@@ -78,6 +78,34 @@ fn sync_user_can_access_optional_key(
     Ok(())
 }
 
+// Check sync job has access the local source datastore/namespace by given ACL path
+fn check_local_source_ns_privs(
+    auth_id: &Authid,
+    user_info: &CachedUserInfo,
+    job: &SyncJobConfig,
+    source_acl_path: &[&str],
+) -> bool {
+    let source_privs = user_info.lookup_privs(auth_id, source_acl_path);
+    // datastore is required to be accessible
+    if source_privs & PRIV_DATASTORE_AUDIT == 0 {
+        return false;
+    }
+
+    // check read from datastore/namespace, grants access independent of job ownership
+    if source_privs & PRIV_DATASTORE_READ != 0 {
+        return true;
+    }
+
+    // check datastore modify permission if user is not the owner of the sync job
+    // this implies permissions to change group ownership
+    if !is_correct_owner(auth_id, job) && source_privs & PRIV_DATASTORE_MODIFY == 0 {
+        return false;
+    }
+
+    // no read on full datastore/namespace, check backup access for owned backups
+    source_privs & PRIV_DATASTORE_BACKUP != 0
+}
+
 /// checks whether user can run the corresponding sync job, depending on sync direction
 ///
 /// namespace creation/deletion ACL and backup group ownership checks happen in the pull/push code
@@ -119,9 +147,15 @@ pub fn check_sync_job_modify_access(
                 // remote read access check
                 let remote_privs =
                     user_info.lookup_privs(auth_id, &["remote", remote, &job.remote_store]);
-                return remote_privs & PRIV_REMOTE_READ != 0;
+                remote_privs & PRIV_REMOTE_READ != 0
+            } else {
+                // local pull sync job
+                let source_acl_path = match &job.remote_ns {
+                    Some(source_ns) => source_ns.acl_path(&job.remote_store),
+                    None => vec!["datastore", &job.remote_store],
+                };
+                check_local_source_ns_privs(auth_id, user_info, job, &source_acl_path)
             }
-            true
         }
         SyncDirection::Push => {
             // Remote must always be present for sync in push direction, fail otherwise
@@ -143,26 +177,7 @@ pub fn check_sync_job_modify_access(
                 }
             }
 
-            let source_privs = user_info.lookup_privs(auth_id, &job.acl_path());
-            // only allow to modify jobs the user is also allowed to read
-            if source_privs & PRIV_DATASTORE_AUDIT == 0 {
-                return false;
-            }
-
-            // check user is allowed to read from (local) source datastore/namespace, independent
-            // of job ownership
-            if source_privs & PRIV_DATASTORE_READ != 0 {
-                return true;
-            }
-
-            // check datastore modify permission if user is not the owner of the sync job
-            // this implies permissions to change group ownership
-            if !is_correct_owner(auth_id, job) && source_privs & PRIV_DATASTORE_MODIFY == 0 {
-                return false;
-            }
-
-            // no read on full datastore, so check backup access for owned backups
-            source_privs & PRIV_DATASTORE_BACKUP != 0
+            check_local_source_ns_privs(auth_id, user_info, job, &job.acl_path())
         }
     }
 }
@@ -953,6 +968,17 @@ acl:1:/remote/remote1/remotestore1:write@pbs:RemoteSyncOperator
     ));
     job.owner = None;
     assert!(check_sync_job_modify_access(
+        &user_info,
+        &write_auth_id,
+        &job,
+    ));
+
+    // setting a local sync source datastore without user read access must fail,
+    // independent of job owner.
+    job.store = "localstore1".to_string();
+    job.remote_store = "localstore0".to_string();
+    job.owner = None;
+    assert!(!check_sync_job_modify_access(
         &user_info,
         &write_auth_id,
         &job,
