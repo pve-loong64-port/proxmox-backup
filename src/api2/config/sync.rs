@@ -66,10 +66,12 @@ fn is_correct_owner(auth_id: &Authid, job: &SyncJobConfig) -> bool {
 fn sync_user_can_access_optional_key(
     key_id: Option<&str>,
     owner: &Authid,
+    modifier: &Authid,
     fail_on_archived: bool,
 ) -> Result<(), Error> {
     if let Some(key_id) = key_id {
         if crate::server::sync::check_key_access(key_id, owner)
+            .and_then(|_| crate::server::sync::check_key_access(key_id, modifier))
             .and_then(|_| crate::server::sync::load_key_config(key_id, fail_on_archived))
             .is_err()
         {
@@ -292,10 +294,15 @@ pub fn create_sync_job(
         .unwrap_or_else(|| Authid::root_auth_id());
 
     if sync_direction == SyncDirection::Push {
-        sync_user_can_access_optional_key(config.active_encryption_key.as_deref(), owner, true)?;
+        sync_user_can_access_optional_key(
+            config.active_encryption_key.as_deref(),
+            owner,
+            &auth_id,
+            true,
+        )?;
     } else {
         for key in config.associated_key.as_deref().unwrap_or(&[]) {
-            sync_user_can_access_optional_key(Some(key), owner, false)?;
+            sync_user_can_access_optional_key(Some(key), owner, &auth_id, false)?;
         }
     }
 
@@ -591,11 +598,16 @@ pub fn update_sync_job(
         // must assure new owner can access pre-configured keys, other cases are
         // checked on respective key updates
         if update.active_encryption_key.is_none() {
-            sync_user_can_access_optional_key(data.active_encryption_key.as_deref(), owner, true)?;
+            sync_user_can_access_optional_key(
+                data.active_encryption_key.as_deref(),
+                owner,
+                &auth_id,
+                true,
+            )?;
         }
         if update.associated_key.is_none() {
             for key in data.associated_key.as_deref().unwrap_or(&[]) {
-                sync_user_can_access_optional_key(Some(key), owner, true)?;
+                sync_user_can_access_optional_key(Some(key), owner, &auth_id, true)?;
             }
         }
     }
@@ -646,7 +658,7 @@ pub fn update_sync_job(
             .owner
             .as_ref()
             .unwrap_or_else(|| Authid::root_auth_id());
-        sync_user_can_access_optional_key(Some(&active_encryption_key), owner, true)?;
+        sync_user_can_access_optional_key(Some(&active_encryption_key), owner, &auth_id, true)?;
 
         let associated_keys = if update.associated_key.is_some() {
             &mut update.associated_key
@@ -665,7 +677,7 @@ pub fn update_sync_job(
             .unwrap_or_else(|| Authid::root_auth_id());
         // Don't allow associating keys the local user/owner can't access
         for key in &associated_key {
-            sync_user_can_access_optional_key(Some(key), owner, false)?;
+            sync_user_can_access_optional_key(Some(key), owner, &auth_id, false)?;
         }
         data.associated_key = Some(associated_key);
     }
