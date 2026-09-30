@@ -229,6 +229,8 @@ pub fn update_prune_job(
 
     user_info.check_privs(&auth_id, &data.acl_path(), PRIV_DATASTORE_MODIFY, true)?;
 
+    let mut recheck_privs = false;
+
     if let Some(delete) = delete {
         for delete_prop in delete {
             match delete_prop {
@@ -240,6 +242,7 @@ pub fn update_prune_job(
                 }
                 DeletableProperty::Ns => {
                     data.options.ns = None;
+                    recheck_privs = true;
                 }
                 DeletableProperty::MaxDepth => {
                     data.options.max_depth = None;
@@ -266,7 +269,6 @@ pub fn update_prune_job(
         }
     }
 
-    let mut recheck_privs = false;
     if let Some(store) = update.store {
         // check new store with possibly new ns:
         recheck_privs = true;
