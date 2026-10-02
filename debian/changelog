@@ -1,3 +1,32 @@
+rust-proxmox-backup (4.2.8-1) trixie; urgency=medium
+
+  * tape: labeling: improve error message for tapes with existing data, making
+    the need for formatting them easier to understand.
+
+  * fix #8003: sync: pull: log skipped chunk reuse in case of failed
+    verification.  When the previous snapshot is marked as failed, the chunks
+    referenced by it are not reused, but this fact was not logged before.
+
+  * fix #6251: api: list tasks: skip running tasks when failed ones are
+    requested, since a task that is still running cannot have failed.
+
+  * sync: refactor and improve ACL checks when setting up local pull sync jobs,
+    encrypting or decrypting sync jobs and prune jobs.
+
+  * api: admin: add missing ACL check for GC status endpoint, correctly
+    limiting it to users with audit or backup privs.
+
+  * fixed index files: prevent out-of-bounds memory access in FixedIndexReader
+    and restrict fixed index files to a chunk size of 4MB in general. The
+    backup API only allowed creating fixed index files with such a chunk size
+    in the first place, now this is enforced across the board.
+
+  * sync: pull: refactor handling of reusable chunks to include checking of
+    chunk sizes, in addition to chunk digests. This prevents a misbehaving pull
+    source from potentially creating inconsistent index files on the target.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 02 Oct 2026 15:07:16 +0200
+
 rust-proxmox-backup (4.2.7-1) trixie; urgency=medium
 
   * docs: warn in the FAQ that `apt upgrade` can leave a partial upgrade, as
