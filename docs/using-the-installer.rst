@@ -187,6 +187,10 @@ that during installation you can either specify an IPv4 or IPv6 address, but not
 both. To configure a dual stack node, add additional IP addresses after the
 installation.
 
+The *Advanced Options* button lets you pin the names of the network interfaces,
+set up a bond as management interface, and tag the management network with a
+VLAN, see :ref:`advanced_network_options`.
+
 .. image:: images/screenshots/pbs-installer-progress.png
   :target: _images/pbs-installer-progress.png
   :align: left
@@ -311,6 +315,47 @@ lead to problems (see :ref:`ZFS swap notes <zfs_swap>`).
     swap partition). *hdsize* is only honored for bootable disks, that is only
     the first disk or mirror for RAID0, RAID1 or RAID10, and all disks in
     RAID-Z[123].
+
+.. _advanced_network_options:
+
+Advanced Network Configuration Options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The *Advanced Options* dialog of the network configuration step provides the
+following settings for the management network.
+
+- *Interface Name Pinning*
+
+    Assigns fixed names to the network interfaces, based on their MAC
+    addresses, so that the names do not change after kernel, firmware, or
+    hardware changes. By default, the interfaces are named ``nic0``, ``nic1``,
+    and so on, but you can enter other names.
+
+- *Management Bond*
+
+    Combines two or more of the *Bond Interfaces* into the bond ``bond0``,
+    which is then used as management interface instead of a single interface.
+    This keeps the host reachable if one of the interfaces or its link fails.
+    The *Bond Mode* defaults to *active-backup*, which works without any
+    configuration on the switch, while the *802.3ad* mode requires switch ports
+    configured for LACP. The *Hash Policy* applies to the *802.3ad* and
+    *balance-xor* modes, and the optional *Primary Interface* to the
+    *active-backup* mode, where it is preferred as the active interface.
+
+- *Management VLAN*
+
+    Tags the management network with the given *VLAN Tag*, for networks that
+    are only reachable tagged. The host address is then configured on the
+    interface ``vlan<tag>`` on top of the management interface or bond. Valid
+    tags are 2 to 4094. Leave the VLAN setup disabled for an untagged
+    management network, for example, if VLAN 1 is the untagged native VLAN of
+    the switch port.
+
+    The installer proposes the network settings it obtained via DHCP on the
+    untagged network. If the management network is only reachable tagged, boot
+    the installer with the ``proxmox-vlan=<tag>`` kernel parameter, so that it
+    obtains them on that VLAN and preselects its tag. See
+    :ref:`nomodeset_kernel_param` for how to add a kernel parameter.
 
 ZFS Performance Tips
 ^^^^^^^^^^^^^^^^^^^^
