@@ -102,8 +102,14 @@ trusted remote backup server.
 
 To set up sync jobs, the configuring user needs the following permissions:
 
-#. ``Remote.Read`` on the ``/remote/{remote}/{remote-store}`` path
-#. At least ``Datastore.Backup`` on the local target datastore (``/datastore/{store}``)
+* (Remote Source): ``Remote.Read`` on the ``/remote/{remote}/{remote-store}``
+  path for sync jobs when pulling from a remote datastore.
+* (Local Source):``Datastore.Audit`` on the local source datastore
+  ``/datastore/{store}`` and either ``Datastore.Read`` or access to owned backup
+  groups via ``Datastore.Backup``. For the latter case, if the configuring user
+  is not the owner of the sync job, ``Datastore.Modify`` is required as well as
+  this implies changing group ownership.
+* At least ``Datastore.Backup`` on the local target datastore (``/datastore/{store}``)
 
 .. note:: A sync job can only sync backup groups that the configured remote's
   user/API token can read. If a remote is configured with a user/API token that
