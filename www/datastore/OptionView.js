@@ -384,5 +384,13 @@ Ext.define('PBS.Datastore.Options', {
                 xtype: 'pbsThresholdResetScheduleEdit',
             },
         },
+        'max-snapshot-time-skew': {
+            required: true,
+            header: gettext('Maximum Snapshot Time Skew'),
+            renderer: (timespan) => timespan ?? gettext('Default (1 minute)'),
+            editor: {
+                xtype: 'pbsMaxSnapshotTimeSkewEdit',
+            },
+        },
     },
 });
