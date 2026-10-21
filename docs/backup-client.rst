@@ -861,7 +861,9 @@ of already covered backups. It will only consider older backups.
 
 Unfinished and incomplete backups will be removed by the prune command unless
 they are newer than the last successful backup. In this case, the last failed
-backup is retained.
+backup is retained. Snapshots whose timestamps are in the future relative to
+the system time of the PBS will be ignored and always kept when pruning, only
+applying retention options to older snapshots.
 
 .. code-block:: console
 

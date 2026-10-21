@@ -68,6 +68,9 @@ The following retention options are available for pruning:
 The retention options are processed in the order given above. Each option
 only covers backups within its time period. The next option does not take care
 of already covered backups. It will only consider older backups.
+Further, all snapshots whose timestamps are in the future relative to the system
+time of the PBS will be ignored and always kept, only applying retention options
+to older snapshots.
 
 Old unfinished or incomplete backups will be removed by the prune command,
 unless they are newer than the last successful backup. In this case, the last
