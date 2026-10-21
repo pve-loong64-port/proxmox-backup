@@ -440,6 +440,8 @@ pub enum DeletableProperty {
     NotificationThresholds,
     /// Delete the counter reset schedule.
     CounterResetSchedule,
+    /// Delete the maximum snapshot time skew property.
+    MaxSnapshotTimeSkew,
 }
 
 #[api(
@@ -545,6 +547,9 @@ pub fn update_datastore(
                 DeletableProperty::CounterResetSchedule => {
                     data.counter_reset_schedule = None;
                 }
+                DeletableProperty::MaxSnapshotTimeSkew => {
+                    data.max_snapshot_time_skew = None;
+                }
             }
         }
     }
@@ -644,6 +649,10 @@ pub fn update_datastore(
 
     if update.counter_reset_schedule.is_some() {
         data.counter_reset_schedule = update.counter_reset_schedule;
+    }
+
+    if update.max_snapshot_time_skew.is_some() {
+        data.max_snapshot_time_skew = update.max_snapshot_time_skew;
     }
 
     config.set_data(&name, "datastore", &data)?;
