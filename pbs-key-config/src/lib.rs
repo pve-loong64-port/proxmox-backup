@@ -14,6 +14,8 @@ use pbs_api_types::{Fingerprint, Kdf, KeyInfo};
 
 use pbs_tools::crypt_config::CryptConfig;
 
+const EXPECTED_KEY_LEN: usize = 32;
+
 /// Key derivation function configuration
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum KeyDerivationConfig {
@@ -34,7 +36,7 @@ pub enum KeyDerivationConfig {
 impl KeyDerivationConfig {
     /// Derive a key from provided passphrase
     pub fn derive_key(&self, passphrase: &[u8]) -> Result<[u8; 32], Error> {
-        let mut key = [0u8; 32];
+        let mut key = [0u8; EXPECTED_KEY_LEN];
 
         match self {
             KeyDerivationConfig::Scrypt { n, r, p, salt } => {
@@ -100,7 +102,7 @@ impl From<&KeyConfig> for KeyInfo {
 impl KeyConfig {
     /// Creates a new key using random data, protected by passphrase.
     pub fn new(passphrase: &[u8], kdf: Kdf) -> Result<([u8; 32], Self), Error> {
-        let mut key = [0u8; 32];
+        let mut key = [0u8; EXPECTED_KEY_LEN];
         proxmox_sys::linux::fill_with_random_data(&mut key)?;
         let key_config = Self::with_key(&key, passphrase, kdf)?;
         Ok((key, key_config))
@@ -175,6 +177,18 @@ impl KeyConfig {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<KeyConfig, Error> {
         let keydata = file_get_contents(path)?;
         let key_config: KeyConfig = serde_json::from_reader(&keydata[..])?;
+        if key_config.kdf.is_none() && key_config.data.len() != EXPECTED_KEY_LEN {
+            bail!(
+                "unexpected key length ({} != {EXPECTED_KEY_LEN})",
+                key_config.data.len()
+            )
+        } else if key_config.kdf.is_some() && key_config.data.len() < 32 {
+            bail!(
+                "unexpected short data for key ({} < 32)",
+                key_config.data.len()
+            );
+        }
+
         Ok(key_config)
     }
 
@@ -215,8 +229,12 @@ impl KeyConfig {
             raw_data.clone()
         };
 
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&key);
+        let result: [u8; EXPECTED_KEY_LEN] = key.as_slice().try_into().map_err(|_err| {
+            format_err!(
+                "unexpected key length {} (expected {EXPECTED_KEY_LEN})",
+                key.len(),
+            )
+        })?;
 
         let crypt_config = CryptConfig::new(result)?;
         let fingerprint = Fingerprint::new(crypt_config.fingerprint());
@@ -374,6 +392,19 @@ fn encrypt_decrypt_test() -> Result<(), Error> {
     assert_eq!(key.created, created);
     assert_eq!(key.data, decrypted);
     assert_eq!(key.fingerprint, Some(fingerprint));
+
+    Ok(())
+}
+
+#[test]
+fn plain_key_length_check() -> Result<(), Error> {
+    let key: [u8; 32] = [0x11; 32];
+    let empty_passphrase = || -> Result<Vec<u8>, Error> { Ok(Vec::new()) };
+
+    let mut key_config = KeyConfig::without_password(key).unwrap();
+    assert!(key_config.decrypt(&empty_passphrase).is_ok());
+    key_config.data = vec![0x11; 31]; // short raw key data
+    assert!(key_config.decrypt(&empty_passphrase).is_err());
 
     Ok(())
 }
