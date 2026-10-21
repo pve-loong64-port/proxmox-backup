@@ -32,9 +32,9 @@ use proxmox_worker_task::WorkerTaskContext;
 
 use pbs_api_types::{
     ArchiveType, Authid, BackupGroupDeleteStats, BackupNamespace, BackupType, ChunkOrder,
-    DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType, GarbageCollectionCacheStats,
-    GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode, MaintenanceType, Operation,
-    S3Statistics, UPID,
+    DEFAULT_SNAPSHOT_TIME_SKEW_SECS, DataStoreConfig, DatastoreBackendConfig, DatastoreBackendType,
+    GarbageCollectionCacheStats, GarbageCollectionStatus, MAX_NAMESPACE_DEPTH, MaintenanceMode,
+    MaintenanceType, Operation, S3Statistics, UPID,
 };
 use pbs_config::s3::S3_CFG_TYPE_ID;
 use pbs_config::{BackupLockGuard, ConfigVersionCache};
@@ -212,6 +212,7 @@ pub struct DataStoreImpl {
     config_generation: Option<usize>,
     request_counters: Option<Arc<SharedRequestCounters>>,
     thresholds_exceeded_callback: Option<ThresholdsExceededCallback>,
+    max_snapshot_time_skew: i64,
 }
 
 impl DataStoreImpl {
@@ -230,6 +231,7 @@ impl DataStoreImpl {
             config_generation: None,
             request_counters: None,
             thresholds_exceeded_callback: None,
+            max_snapshot_time_skew: i64::try_from(DEFAULT_SNAPSHOT_TIME_SKEW_SECS).unwrap(),
         })
     }
 }
@@ -792,6 +794,13 @@ impl DataStore {
             tuning.default_verification_readers,
         );
 
+        let max_snapshot_time_skew = if let Some(ts) = &config.max_snapshot_time_skew {
+            let ts: TimeSpan = ts.parse()?;
+            i64::try_from(ts.as_secs())?
+        } else {
+            i64::try_from(DEFAULT_SNAPSHOT_TIME_SKEW_SECS)?
+        };
+
         Ok(DataStoreImpl {
             chunk_store,
             gc_mutex: Mutex::new(None),
@@ -804,6 +813,7 @@ impl DataStore {
             config_generation: generation,
             request_counters,
             thresholds_exceeded_callback,
+            max_snapshot_time_skew,
         })
     }
 
@@ -1864,6 +1874,15 @@ impl DataStore {
         ns: &BackupNamespace,
         backup_dir: &pbs_api_types::BackupDir,
     ) -> Result<(PathBuf, bool, BackupLockGuard), Error> {
+        if backup_dir.time
+            > proxmox_time::epoch_i64().saturating_add(self.inner.max_snapshot_time_skew)
+        {
+            bail!(
+                "backup timestamp in the future, exceeding {} seconds time skew",
+                self.inner.max_snapshot_time_skew
+            );
+        }
+
         let backup_dir = self.backup_dir(ns.clone(), backup_dir.clone())?;
         let relative_path = backup_dir.relative_path();
 
