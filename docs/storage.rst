@@ -611,6 +611,10 @@ There are a few per-datastore options:
 * :ref:`Notification Thresholds (S3 datastores only) <s3_notification_thresholds>`
 * :ref:`Threshold Reset Schedule (S3 datastores only) <s3_notification_thresholds>`
 * Verification of incoming backups
+* Maximum allowed time skew for snapshot timestamps (<= 1 day, default: 1
+  minute). Does not allow for backup snapshot timestamps to be further in the
+  future than the configured value relative to the Proxmox Backup Sever system
+  time.
 
 .. _datastore_tuning_options:
 
