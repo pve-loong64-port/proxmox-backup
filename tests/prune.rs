@@ -334,3 +334,26 @@ fn test_prune_simple() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_prune_future_timestamp() -> Result<(), Error> {
+    let in_future = proxmox_time::epoch_to_rfc3339_utc(proxmox_time::epoch_i64() + 3600).unwrap();
+    let orig_list = vec![
+        create_info("host/elsa/2019-11-15T09:39:15Z", false),
+        create_info("host/elsa/2019-11-15T10:39:15Z", false),
+        create_info(&format!("host/elsa/{in_future}"), false),
+    ];
+
+    let mut options = PruneJobOptions::default();
+    options.keep.keep_last = Some(1);
+    let remove_list = get_prune_list(orig_list.clone(), false, &options);
+    let expect: Vec<PathBuf> = vec![PathBuf::from("host/elsa/2019-11-15T09:39:15Z")];
+    assert_eq!(remove_list, expect);
+
+    let mut options = PruneJobOptions::default();
+    options.keep.keep_hourly = Some(1);
+    let remove_list = get_prune_list(orig_list, false, &options);
+    let expect: Vec<PathBuf> = vec![PathBuf::from("host/elsa/2019-11-15T09:39:15Z")];
+    assert_eq!(remove_list, expect);
+    Ok(())
+}

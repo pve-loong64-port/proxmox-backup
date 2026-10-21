@@ -78,6 +78,7 @@ pub fn prune_datastore(
                     PruneMark::Keep => "keep",
                     PruneMark::KeepPartial => "keep partial",
                     PruneMark::Remove => "remove",
+                    PruneMark::TimestampInFuture => "keep since timestamp in future",
                 }
             );
             if !keep && !dry_run {
