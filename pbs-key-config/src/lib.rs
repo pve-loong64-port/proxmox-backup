@@ -125,10 +125,6 @@ impl KeyConfig {
 
     /// Creates a new instance, protect raw_key with passphrase.
     pub fn with_key(raw_key: &[u8; 32], passphrase: &[u8], kdf: Kdf) -> Result<Self, Error> {
-        if raw_key.len() != 32 {
-            bail!("got strange key length ({} != 32)", raw_key.len())
-        }
-
         let salt = proxmox_sys::linux::random_data(32)?;
 
         let kdf = match kdf {
