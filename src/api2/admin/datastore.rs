@@ -29,7 +29,6 @@ use proxmox_rrd_api_types::{RrdMode, RrdTimeframe};
 use proxmox_schema::*;
 use proxmox_sortable_macro::sortable;
 use proxmox_sys::fs::{CreateOptions, file_read_firstline, file_read_optional_string};
-use proxmox_time::CalendarEvent;
 use proxmox_worker_task::WorkerTaskContext;
 
 use pxar::EntryKind;
@@ -1270,42 +1269,21 @@ pub(crate) fn garbage_collection_status_unchecked(
     let datastore = DataStore::lookup_datastore(lookup_with(&store, Operation::Read))?;
     let status_in_memory = datastore.last_gc_status();
 
-    let mut last = proxmox_time::epoch_i64();
-
-    let jobtype = "garbage_collection";
+    let computed_schedule: JobScheduleStatus =
+        compute_schedule_status("garbage_collection", &store, info.schedule.as_deref())?;
 
     if let Some(ref upid) = status_in_memory.upid {
-        let computed_schedule: JobScheduleStatus =
-            compute_schedule_status(jobtype, &store, Some(upid))?;
-
         if let Some(endtime) = computed_schedule.last_run_endtime {
-            last = endtime;
             if let Ok(parsed_upid) = upid.parse::<UPID>() {
                 info.duration = Some(endtime - parsed_upid.starttime);
             }
         }
 
-        info.next_run = computed_schedule.next_run;
         info.last_run_endtime = computed_schedule.last_run_endtime;
         info.last_run_state = computed_schedule.last_run_state;
-    } else if let Err(err) = JobState::load(jobtype, &store) {
-        log::error!("could not open statefile for {store}: {err}");
     }
 
-    info.next_run = info
-        .schedule
-        .as_ref()
-        .and_then(|s| {
-            s.parse::<CalendarEvent>()
-                .map_err(|err| log::error!("{err}"))
-                .ok()
-        })
-        .and_then(|e| {
-            e.compute_next_event(last)
-                .map_err(|err| log::error!("{err}"))
-                .ok()
-        })
-        .and_then(|ne| ne);
+    info.next_run = computed_schedule.next_run;
 
     info.status = status_in_memory;
 
