@@ -1870,14 +1870,14 @@ impl DataStore {
         match std::fs::create_dir(backup_dir.full_path()) {
             Ok(_) => {
                 let guard = backup_dir.lock().with_context(|| {
-                    format!("while creating new locked snapshot '{backup_dir:?}'")
+                    format!("while creating new locked snapshot {relative_path:?}")
                 })?;
                 Ok((relative_path, true, guard))
             }
             Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
                 let guard = backup_dir
                     .lock()
-                    .with_context(|| format!("while creating locked snapshot '{backup_dir:?}'"))?;
+                    .with_context(|| format!("while creating locked snapshot {relative_path:?}"))?;
                 Ok((relative_path, false, guard))
             }
             Err(e) => Err(e.into()),
@@ -2838,7 +2838,10 @@ impl DataStore {
         }
 
         let _guard = backup_dir.lock().with_context(|| {
-            format!("while updating the protection status of snapshot '{backup_dir:?}'")
+            format!(
+                "while updating the protection status of snapshot {:?}",
+                backup_dir.relative_path()
+            )
         })?;
 
         let protected_path = backup_dir.protected_file();

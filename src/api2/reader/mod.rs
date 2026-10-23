@@ -131,12 +131,12 @@ fn upgrade_to_backup_reader_protocol(
         }
 
         if !backup_dir.full_path().exists() {
-            bail!("snapshot {} does not exist.", backup_dir.dir());
+            bail!("snapshot {:?} does not exist.", backup_dir.relative_path());
         }
 
         let _guard = backup_dir
             .lock_shared()
-            .with_context(|| format!("while reading snapshot '{backup_dir:?}'"))?;
+            .with_context(|| format!("while reading snapshot {:?}", backup_dir.relative_path()))?;
 
         let path = datastore.base_path();
 
