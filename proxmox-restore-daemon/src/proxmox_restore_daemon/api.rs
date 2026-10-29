@@ -114,7 +114,10 @@ fn get_dir_entry(path: &Path) -> Result<DirEntryAttribute, Error> {
             size: stat.st_size as u64,
             mtime: stat.st_mtime,
         },
-        libc::S_IFDIR => DirEntryAttribute::Directory { start: 0 },
+        libc::S_IFDIR => DirEntryAttribute::Directory {
+            start: 0,
+            reader_bounds: 0..0,
+        },
         _ => bail!("unsupported file type: {}", stat.st_mode),
     })
 }
@@ -219,7 +222,10 @@ fn list(
                 res.push(ArchiveEntry::new_with_size(
                     &c_path[..],
                     // this marks the beginning of a filesystem, i.e. '/', so this is a Directory
-                    Some(&DirEntryAttribute::Directory { start: 0 }),
+                    Some(&DirEntryAttribute::Directory {
+                        start: 0,
+                        reader_bounds: 0..0,
+                    }),
                     c.1,
                 ));
             }

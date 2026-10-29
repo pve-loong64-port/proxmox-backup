@@ -134,7 +134,10 @@ async fn list_files(
                 let path = format!("/{}", file.filename);
                 let attr = if file.filename.has_pxar_filename_extension() {
                     // a pxar file is a file archive, so it's root is also a directory root
-                    Some(&DirEntryAttribute::Directory { start: 0 })
+                    Some(&DirEntryAttribute::Directory {
+                        start: 0,
+                        reader_bounds: 0..0,
+                    })
                 } else {
                     None
                 };

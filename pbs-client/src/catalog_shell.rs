@@ -364,6 +364,7 @@ impl Shell {
             if let EntryKind::Directory = root_entry.kind() {
                 let entry_attr = DirEntryAttribute::Directory {
                     start: root_entry.entry_range_info().entry_range.start,
+                    reader_bounds: 0..0, // empty because start does not point into a catalog file
                 };
                 position.push(PathStackEntry {
                     catalog: catalog::DirEntry {

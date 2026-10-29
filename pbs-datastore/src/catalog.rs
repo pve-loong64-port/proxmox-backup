@@ -99,8 +99,17 @@ pub struct DirEntry {
 /// Used to specific additional attributes inside DirEntry
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DirEntryAttribute {
-    Directory { start: u64 },
-    File { size: u64, mtime: i64 },
+    Directory {
+        start: u64,
+        /// A range that encloses the entries of this directory and
+        /// all of its children. This is not part of the file format,
+        /// it is only used for parsing.
+        reader_bounds: Range<u64>,
+    },
+    File {
+        size: u64,
+        mtime: i64,
+    },
     Symlink,
     Hardlink,
     BlockDevice,
@@ -123,6 +132,8 @@ where
             ),
             EntryKind::Directory => DirEntryAttribute::Directory {
                 start: entry.entry_range_info().entry_range.start,
+                // empty because start does not point into a catalog file
+                reader_bounds: 0..0,
             },
             EntryKind::File { size, .. } => {
                 let mtime = match entry.metadata().mtime_as_duration() {
@@ -146,11 +157,21 @@ where
 }
 
 impl DirEntry {
-    fn new(etype: CatalogEntryType, name: Vec<u8>, start: u64, size: u64, mtime: i64) -> Self {
+    fn new(
+        etype: CatalogEntryType,
+        name: Vec<u8>,
+        start: u64,
+        size: u64,
+        mtime: i64,
+        reader_bounds: Range<u64>,
+    ) -> Self {
         match etype {
             CatalogEntryType::Directory => DirEntry {
                 name,
-                attr: DirEntryAttribute::Directory { start },
+                attr: DirEntryAttribute::Directory {
+                    start,
+                    reader_bounds,
+                },
             },
             CatalogEntryType::File => DirEntry {
                 name,
@@ -229,7 +250,7 @@ impl DirInfo {
         match entry {
             DirEntry {
                 name,
-                attr: DirEntryAttribute::Directory { start },
+                attr: DirEntryAttribute::Directory { start, .. },
             } => {
                 writer.write_all(&[CatalogEntryType::Directory as u8])?;
                 catalog_encode_u64(writer, name.len() as u64)?;
@@ -446,7 +467,10 @@ impl<W: Write> BackupCatalogWriter for CatalogWriter<W> {
         let name = name.to_bytes().to_vec();
         current.entries.push(DirEntry {
             name,
-            attr: DirEntryAttribute::Directory { start },
+            attr: DirEntryAttribute::Directory {
+                start,
+                reader_bounds: 0..0, // unused
+            },
         });
 
         Ok(())
@@ -547,16 +571,12 @@ impl<W: Write> BackupCatalogWriter for CatalogWriter<W> {
 /// Read Catalog files
 pub struct CatalogReader<R> {
     reader: R,
-    bounds: Option<Range<u64>>,
 }
 
 impl<R: Read + Seek> CatalogReader<R> {
     /// Create a new CatalogReader instance
     pub fn new(reader: R) -> Self {
-        Self {
-            reader,
-            bounds: None,
-        }
+        Self { reader }
     }
 
     /// Print whole catalog to stdout
@@ -564,9 +584,13 @@ impl<R: Read + Seek> CatalogReader<R> {
         let root = self.root()?;
         match root {
             DirEntry {
-                attr: DirEntryAttribute::Directory { start },
+                attr:
+                    DirEntryAttribute::Directory {
+                        start,
+                        reader_bounds,
+                    },
                 ..
-            } => self.dump_dir(std::path::Path::new("./"), start),
+            } => self.dump_dir(std::path::Path::new("./"), start, reader_bounds),
             _ => bail!("unexpected root entry type, not a directory!"),
         }
     }
@@ -587,28 +611,33 @@ impl<R: Read + Seek> CatalogReader<R> {
         if !bounds.contains(&start) {
             bail!("unexpected root directory start: {start} not in {bounds:?}");
         }
-        self.bounds = Some(bounds);
 
         Ok(DirEntry {
             name: b"".to_vec(),
-            attr: DirEntryAttribute::Directory { start },
+            attr: DirEntryAttribute::Directory {
+                start,
+                reader_bounds: bounds,
+            },
         })
     }
 
     /// Read all directory entries
     pub fn read_dir(&mut self, parent: &DirEntry) -> Result<Vec<DirEntry>, Error> {
-        let start = match parent.attr {
-            DirEntryAttribute::Directory { start } => start,
+        let (start, bounds) = match &parent.attr {
+            DirEntryAttribute::Directory {
+                start,
+                reader_bounds,
+            } => (*start, reader_bounds.clone()),
             _ => bail!("parent is not a directory - internal error"),
         };
 
-        let data = self.read_raw_dirinfo_block(start)?;
+        let data = self.read_raw_dirinfo_block(start, bounds.clone())?;
 
         let mut entry_list = Vec::new();
 
         DirInfo::parse(&data, |etype, name, offset, size, mtime| {
             let pos = subtract_offset(start, offset)?;
-            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime);
+            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime, bounds.start..start);
             entry_list.push(entry);
             Ok(true)
         })?;
@@ -649,12 +678,15 @@ impl<R: Read + Seek> CatalogReader<R> {
         parent: &DirEntry,
         filename: &[u8],
     ) -> Result<Option<DirEntry>, Error> {
-        let start = match parent.attr {
-            DirEntryAttribute::Directory { start } => start,
+        let (start, bounds) = match &parent.attr {
+            DirEntryAttribute::Directory {
+                start,
+                reader_bounds,
+            } => (*start, reader_bounds.clone()),
             _ => bail!("parent is not a directory - internal error"),
         };
 
-        let data = self.read_raw_dirinfo_block(start)?;
+        let data = self.read_raw_dirinfo_block(start, bounds.clone())?;
 
         let mut item = None;
         DirInfo::parse(&data, |etype, name, offset, size, mtime| {
@@ -664,7 +696,7 @@ impl<R: Read + Seek> CatalogReader<R> {
                 return Ok(true);
             }
 
-            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime);
+            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime, bounds.start..start);
             item = Some(entry);
             Ok(false) // stop parsing
         })?;
@@ -673,12 +705,7 @@ impl<R: Read + Seek> CatalogReader<R> {
     }
 
     /// Read the raw directory info block from current reader position.
-    fn read_raw_dirinfo_block(&mut self, start: u64) -> Result<Vec<u8>, Error> {
-        if self.bounds.is_none() {
-            let _ = self.root()?;
-        }
-        let bounds = self.bounds.clone().expect("initialized by self.root()");
-
+    fn read_raw_dirinfo_block(&mut self, start: u64, bounds: Range<u64>) -> Result<Vec<u8>, Error> {
         if !bounds.contains(&start) {
             bail!("directory start out of range: {start} not in {bounds:?}");
         }
@@ -697,8 +724,13 @@ impl<R: Read + Seek> CatalogReader<R> {
     }
 
     /// Print the content of a directory to stdout
-    pub fn dump_dir(&mut self, prefix: &std::path::Path, start: u64) -> Result<(), Error> {
-        let data = self.read_raw_dirinfo_block(start)?;
+    fn dump_dir(
+        &mut self,
+        prefix: &std::path::Path,
+        start: u64,
+        bounds: Range<u64>,
+    ) -> Result<(), Error> {
+        let data = self.read_raw_dirinfo_block(start, bounds.clone())?;
 
         DirInfo::parse(&data, |etype, name, offset, size, mtime| {
             let mut path = std::path::PathBuf::from(prefix);
@@ -709,7 +741,7 @@ impl<R: Read + Seek> CatalogReader<R> {
                 CatalogEntryType::Directory => {
                     log::info!("{} {:?}", etype, path);
                     let pos = subtract_offset(start, offset)?;
-                    self.dump_dir(&path, pos)?;
+                    self.dump_dir(&path, pos, bounds.start..start)?;
                 }
                 CatalogEntryType::File => {
                     let mut mtime_string = mtime.to_string();
@@ -1190,5 +1222,40 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_no_overlap_with_parent() {
+        let mut buffer = vec![];
+        let mut w = CatalogWriter::new(&mut buffer).unwrap();
+
+        w.start_directory(c"a").unwrap();
+        w.start_directory(c"b").unwrap();
+        w.end_directory().unwrap();
+        w.end_directory().unwrap();
+        w.finish().unwrap();
+
+        // size of magic and b
+        let a_size_index = 8 + 2;
+        assert_eq!(buffer[a_size_index], 5);
+
+        buffer[a_size_index] = 6;
+        let expected = "got large directory size: 6";
+
+        let mut reader = CatalogReader::new(Cursor::new(&buffer));
+        assert_eq!(reader.dump().unwrap_err().to_string(), expected);
+
+        let root = reader.root().unwrap();
+        let entries = reader.read_dir(&root).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            reader.read_dir(&entries[0]).unwrap_err().to_string(),
+            expected
+        );
+
+        assert_eq!(
+            reader.lookup_recursive(b"/a/b").unwrap_err().to_string(),
+            expected
+        );
     }
 }
