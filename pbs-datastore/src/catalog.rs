@@ -89,7 +89,7 @@ impl fmt::Display for CatalogEntryType {
 ///
 /// The ``attr`` property contain the exact type with type specific
 /// attributes.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DirEntry {
     pub name: Vec<u8>,
     pub attr: DirEntryAttribute,
@@ -999,5 +999,80 @@ impl ArchiveEntry {
                 _ => None,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn sanity_check() {
+        let mut buffer = vec![];
+
+        let mut writer = CatalogWriter::new(&mut buffer).unwrap();
+        writer.add_fifo(c"fifo").unwrap();
+        writer.start_directory(c"outer").unwrap();
+        writer.add_file(c"file", 123, -456).unwrap();
+        writer.add_socket(c"socket").unwrap();
+        writer.start_directory(c"inner").unwrap();
+        writer.add_symlink(c"symlink").unwrap();
+        writer.add_hardlink(c"hardlink").unwrap();
+        writer.start_directory(c"empty").unwrap();
+        writer.end_directory().unwrap();
+        writer.end_directory().unwrap();
+        writer.add_char_device(c"char device").unwrap();
+        writer.end_directory().unwrap();
+        writer.add_block_device(c"block device").unwrap();
+        writer.finish().unwrap();
+
+        let mut reader = CatalogReader::new(Cursor::new(buffer));
+        let root = reader.root().unwrap();
+
+        use pathpatterns::{MatchEntry, Pattern};
+        let match_list = vec![MatchEntry::include(Pattern::path("*").unwrap())];
+
+        let mut all = vec![];
+        reader
+            .find(&root, &mut vec![], &match_list, &mut |path| {
+                all.push(str::from_utf8(path).unwrap().to_string());
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            all,
+            [
+                "/fifo",
+                "/outer",
+                "/outer/file",
+                "/outer/socket",
+                "/outer/inner",
+                "/outer/inner/symlink",
+                "/outer/inner/hardlink",
+                "/outer/inner/empty",
+                "/outer/char device",
+                "/block device"
+            ]
+        );
+
+        assert_eq!(
+            &reader.lookup_recursive(b"/outer/file").unwrap().attr,
+            &DirEntryAttribute::File {
+                size: 123,
+                mtime: -456
+            }
+        );
+
+        assert!(
+            reader
+                .list_dir_contents(b"/outer/inner/empty")
+                .unwrap()
+                .is_empty()
+        );
+
+        // no easy way to capture the log output, but it should at least not panic
+        reader.dump().unwrap();
     }
 }
