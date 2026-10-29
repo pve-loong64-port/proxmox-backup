@@ -340,6 +340,10 @@ impl DirInfo {
             let cont = match etype {
                 CatalogEntryType::Directory => {
                     let offset = catalog_decode_u64(&mut cursor)?;
+                    // prevent infinite recursion
+                    if offset == 0 {
+                        bail!("directory cannot contain itself");
+                    }
                     callback(etype, name, offset, 0, 0)?
                 }
                 CatalogEntryType::File => {
@@ -1098,17 +1102,22 @@ mod tests {
         let offset_index = 8 + 2 + 5;
         assert_eq!(buffer[offset_index], 2);
 
-        let (offset, expected) = (11, "got wrong directory offset (11 > 10)");
+        for (offset, expected) in [
+            // no stack overflow from infinite recursion:
+            (0, "directory cannot contain itself"),
+            // no integer overflow on start - offset:
+            (11, "got wrong directory offset (11 > 10)"),
+        ] {
+            buffer[offset_index] = offset;
 
-        buffer[offset_index] = offset;
-
-        let mut reader = CatalogReader::new(Cursor::new(&buffer));
-        assert_eq!(reader.dump().unwrap_err().to_string(), expected);
-        let root = reader.root().unwrap();
-        assert_eq!(reader.read_dir(&root).unwrap_err().to_string(), expected);
-        assert_eq!(
-            reader.lookup_recursive(b"/A").unwrap_err().to_string(),
-            expected
-        );
+            let mut reader = CatalogReader::new(Cursor::new(&buffer));
+            assert_eq!(reader.dump().unwrap_err().to_string(), expected);
+            let root = reader.root().unwrap();
+            assert_eq!(reader.read_dir(&root).unwrap_err().to_string(), expected);
+            assert_eq!(
+                reader.lookup_recursive(b"/A").unwrap_err().to_string(),
+                expected
+            );
+        }
     }
 }
