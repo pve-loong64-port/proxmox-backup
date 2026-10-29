@@ -796,13 +796,10 @@ pub fn catalog_encode_i64<W: Write>(writer: &mut W, v: i64) -> Result<(), Error>
 #[allow(clippy::neg_multiply)]
 pub fn catalog_decode_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
     let mut v: u64 = 0;
-    let mut buf = [0u8];
+    let mut buf: [u8; 1] = [0u8];
 
     for i in 0..11 {
         // only allow 11 bytes (70 bits + sign marker)
-        if buf.is_empty() {
-            bail!("decode_i64 failed - unexpected EOB");
-        }
         reader.read_exact(&mut buf)?;
 
         let t = buf[0];
@@ -849,13 +846,10 @@ pub fn catalog_encode_u64<W: Write>(writer: &mut W, v: u64) -> Result<(), Error>
 /// but we currently only encode up to 64 bits
 pub fn catalog_decode_u64<R: Read>(reader: &mut R) -> Result<u64, Error> {
     let mut v: u64 = 0;
-    let mut buf = [0u8];
+    let mut buf: [u8; 1] = [0u8];
 
     for i in 0..10 {
         // only allow 10 bytes (70 bits)
-        if buf.is_empty() {
-            bail!("decode_u64 failed - unexpected EOB");
-        }
         reader.read_exact(&mut buf)?;
         let t = buf[0];
         if t < 128 {
