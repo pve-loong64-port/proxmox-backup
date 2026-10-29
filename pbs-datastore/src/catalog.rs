@@ -575,8 +575,14 @@ impl<R: Read + Seek> CatalogReader<R> {
         if magic != PROXMOX_CATALOG_FILE_MAGIC_1_0 {
             bail!("got unexpected magic number for catalog");
         }
-        self.reader.seek(SeekFrom::End(-8))?;
+        let max_end = self.reader.seek(SeekFrom::End(-8))?;
         let start = unsafe { self.reader.read_le_value::<u64>()? };
+
+        let bounds = (magic.len() as u64)..max_end;
+        if !bounds.contains(&start) {
+            bail!("unexpected root directory start: {start} not in {bounds:?}");
+        }
+
         Ok(DirEntry {
             name: b"".to_vec(),
             attr: DirEntryAttribute::Directory { start },
@@ -1117,6 +1123,24 @@ mod tests {
             assert_eq!(
                 reader.lookup_recursive(b"/A").unwrap_err().to_string(),
                 expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_root_offset_out_of_bounds() {
+        let mut buffer = vec![];
+        let mut w = CatalogWriter::new(&mut buffer).unwrap();
+        w.start_directory(c"A").unwrap();
+        w.end_directory().unwrap();
+        w.finish().unwrap();
+
+        for offset in [0, 7, buffer.len() as u64 - 8, u64::MAX] {
+            *buffer.last_chunk_mut().unwrap() = offset.to_le_bytes();
+            let mut reader = CatalogReader::new(Cursor::new(&buffer));
+            assert_eq!(
+                reader.root().unwrap_err().to_string(),
+                format!("unexpected root directory start: {offset} not in 8..16")
             );
         }
     }
