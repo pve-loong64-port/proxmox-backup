@@ -809,6 +809,13 @@ pub fn catalog_decode_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
                 return Ok(0);
             }
             return Ok(((v - 1) as i64 * -1) - 1); // also handles i64::MIN
+        } else if i == 10 {
+            // The 11th byte can only be zero because 70 bits are
+            // more than enough to store the magnitude of an i64.
+            //
+            // Attempting to shift by 70 would also panic in debug
+            // builds, or shift by 70 % 64 = 6 in release mode.
+            break;
         } else if t < 128 {
             v |= (t as u64) << (i * 7);
             return Ok(v as i64);
@@ -909,6 +916,9 @@ fn test_catalog_i64_encoder() {
     test_encode_decode(-(1 << 20) - 1);
     test_encode_decode(i64::MIN);
     test_encode_decode(i64::MAX);
+
+    // this used to panic in debug builds because it tried to shift by 70
+    assert!(catalog_decode_i64(&mut [0xff; 11].as_slice()).is_err());
 }
 
 #[test]
@@ -929,6 +939,14 @@ fn test_catalog_i64_compatibility() {
     test_encode_decode((1 << 20) - 1);
     test_encode_decode((1 << 50) - 1);
     test_encode_decode(u64::MAX);
+
+    for i in 0..10 {
+        test_encode_decode(i);
+        test_encode_decode(19283749 + i);
+        test_encode_decode(i64::MAX as u64 - i);
+        test_encode_decode(i64::MAX as u64 + i);
+        test_encode_decode(u64::MAX - i);
+    }
 }
 
 /// An entry in a hierarchy of files for restore and listing.
