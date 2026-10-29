@@ -591,7 +591,8 @@ impl<R: Read + Seek> CatalogReader<R> {
         let mut entry_list = Vec::new();
 
         DirInfo::parse(&data, |etype, name, offset, size, mtime| {
-            let entry = DirEntry::new(etype, name.to_vec(), start - offset, size, mtime);
+            let pos = subtract_offset(start, offset)?;
+            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime);
             entry_list.push(entry);
             Ok(true)
         })?;
@@ -641,11 +642,13 @@ impl<R: Read + Seek> CatalogReader<R> {
 
         let mut item = None;
         DirInfo::parse(&data, |etype, name, offset, size, mtime| {
+            let pos = subtract_offset(start, offset)?;
+
             if name != filename {
                 return Ok(true);
             }
 
-            let entry = DirEntry::new(etype, name.to_vec(), start - offset, size, mtime);
+            let entry = DirEntry::new(etype, name.to_vec(), pos, size, mtime);
             item = Some(entry);
             Ok(false) // stop parsing
         })?;
@@ -676,10 +679,7 @@ impl<R: Read + Seek> CatalogReader<R> {
             match etype {
                 CatalogEntryType::Directory => {
                     log::info!("{} {:?}", etype, path);
-                    if offset > start {
-                        bail!("got wrong directory offset ({} > {})", offset, start);
-                    }
-                    let pos = start - offset;
+                    let pos = subtract_offset(start, offset)?;
                     self.dump_dir(&path, pos)?;
                 }
                 CatalogEntryType::File => {
@@ -754,6 +754,12 @@ impl<R: Read + Seek> CatalogReader<R> {
 
         Ok(res)
     }
+}
+
+fn subtract_offset(start: u64, offset: u64) -> Result<u64, Error> {
+    start
+        .checked_sub(offset)
+        .ok_or_else(|| format_err!("got wrong directory offset ({offset} > {start})"))
 }
 
 /// Serialize i64 as short, variable length byte sequence
@@ -1074,5 +1080,35 @@ mod tests {
 
         // no easy way to capture the log output, but it should at least not panic
         reader.dump().unwrap();
+    }
+
+    #[test]
+    fn test_subdirectory_offset() {
+        let mut buffer = vec![];
+        let mut w = CatalogWriter::new(&mut buffer).unwrap();
+
+        w.start_directory(c"A").unwrap();
+        w.end_directory().unwrap();
+        w.finish().unwrap();
+
+        // 253, 96, 249, 196, 103, 88, 213, | magic
+        // 1, 0,                            | A
+        // 5, 1, 100, 1, 65, 2,             | /
+        // 10, 0, 0, 0, 0, 0, 0, 0,         | /.start
+        let offset_index = 8 + 2 + 5;
+        assert_eq!(buffer[offset_index], 2);
+
+        let (offset, expected) = (11, "got wrong directory offset (11 > 10)");
+
+        buffer[offset_index] = offset;
+
+        let mut reader = CatalogReader::new(Cursor::new(&buffer));
+        assert_eq!(reader.dump().unwrap_err().to_string(), expected);
+        let root = reader.root().unwrap();
+        assert_eq!(reader.read_dir(&root).unwrap_err().to_string(), expected);
+        assert_eq!(
+            reader.lookup_recursive(b"/A").unwrap_err().to_string(),
+            expected
+        );
     }
 }
