@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString, OsStr};
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::ops::Range;
 use std::os::unix::ffi::OsStrExt;
 
 use anyhow::{Error, bail, format_err};
@@ -546,12 +547,16 @@ impl<W: Write> BackupCatalogWriter for CatalogWriter<W> {
 /// Read Catalog files
 pub struct CatalogReader<R> {
     reader: R,
+    bounds: Option<Range<u64>>,
 }
 
 impl<R: Read + Seek> CatalogReader<R> {
     /// Create a new CatalogReader instance
     pub fn new(reader: R) -> Self {
-        Self { reader }
+        Self {
+            reader,
+            bounds: None,
+        }
     }
 
     /// Print whole catalog to stdout
@@ -582,6 +587,7 @@ impl<R: Read + Seek> CatalogReader<R> {
         if !bounds.contains(&start) {
             bail!("unexpected root directory start: {start} not in {bounds:?}");
         }
+        self.bounds = Some(bounds);
 
         Ok(DirEntry {
             name: b"".to_vec(),
@@ -668,13 +674,26 @@ impl<R: Read + Seek> CatalogReader<R> {
 
     /// Read the raw directory info block from current reader position.
     fn read_raw_dirinfo_block(&mut self, start: u64) -> Result<Vec<u8>, Error> {
+        if self.bounds.is_none() {
+            let _ = self.root()?;
+        }
+        let bounds = self.bounds.clone().expect("initialized by self.root()");
+
+        if !bounds.contains(&start) {
+            bail!("directory start out of range: {start} not in {bounds:?}");
+        }
         self.reader.seek(SeekFrom::Start(start))?;
-        let size = catalog_decode_u64(&mut self.reader)?;
+
+        let mut reader = self.reader.by_ref().take(bounds.end - start);
+
+        let size = catalog_decode_u64(&mut reader)?;
         if size < 1 {
-            bail!("got small directory size {}", size)
-        };
-        let data = self.reader.read_exact_allocated(size as usize)?;
-        Ok(data)
+            bail!("got small directory size: {}", size);
+        }
+        if size > reader.limit() {
+            bail!("got large directory size: {}", size);
+        }
+        Ok(reader.read_exact_allocated(size.try_into()?)?)
     }
 
     /// Print the content of a directory to stdout
@@ -1024,6 +1043,8 @@ mod tests {
 
     use super::*;
 
+    use crate::file_formats::PROXMOX_CATALOG_FILE_MAGIC_1_0;
+
     #[test]
     fn sanity_check() {
         let mut buffer = vec![];
@@ -1141,6 +1162,32 @@ mod tests {
             assert_eq!(
                 reader.root().unwrap_err().to_string(),
                 format!("unexpected root directory start: {offset} not in 8..16")
+            );
+        }
+    }
+
+    #[test]
+    fn test_not_out_of_memory_for_large_directory_size() {
+        for size in [
+            2,              // already points into trailer
+            20 * (1 << 40), // 20 TiB
+        ] {
+            let mut catalog = vec![];
+            catalog.extend_from_slice(&PROXMOX_CATALOG_FILE_MAGIC_1_0);
+            catalog_encode_u64(&mut catalog, size).unwrap();
+            catalog.push(0); // count
+            catalog.extend_from_slice(&8u64.to_le_bytes()); // trailer: root block is at offset 8
+
+            let mut reader = CatalogReader::new(Cursor::new(catalog));
+
+            let expected = format!("got large directory size: {size}");
+
+            assert_eq!(reader.dump().unwrap_err().to_string(), expected);
+            let root = reader.root().unwrap();
+            assert_eq!(reader.read_dir(&root).unwrap_err().to_string(), expected);
+            assert_eq!(
+                reader.lookup_recursive(b"/dummy").unwrap_err().to_string(),
+                expected
             );
         }
     }
