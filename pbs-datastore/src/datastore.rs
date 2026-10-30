@@ -2469,6 +2469,15 @@ impl DataStore {
         )
         .context("marking used chunks failed")?;
 
+        let phase2_start_time = proxmox_time::epoch_i64();
+        if phase2_start_time < phase1_start_time {
+            bail!(
+                "Unexpected system time drift detected, current time {} before start of phase 1 {}",
+                proxmox_time::epoch_to_rfc3339_utc(phase2_start_time)?,
+                proxmox_time::epoch_to_rfc3339_utc(phase1_start_time)?,
+            );
+        }
+
         info!("Start GC phase2 (sweep unused chunks)");
 
         if let Some(ref s3_client) = s3_client {
