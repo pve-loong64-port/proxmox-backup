@@ -98,10 +98,8 @@ impl<W: BlockWrite> BlockedWriter<W> {
 impl<W: BlockWrite> TapeWrite for BlockedWriter<W> {
     fn write_all(&mut self, mut data: &[u8]) -> Result<bool, std::io::Error> {
         while !data.is_empty() {
-            match self.write(data) {
-                Ok(n) => data = &data[n..],
-                Err(e) => return Err(e),
-            }
+            let n = self.write(data)?;
+            data = &data[n..]
         }
         Ok(self.logical_end_of_media)
     }
