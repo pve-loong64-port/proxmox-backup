@@ -489,7 +489,7 @@ impl Shell {
         accessor: &Accessor,
         follow_symlinks: &mut Option<usize>,
     ) -> Result<(), Error> {
-        if let Some(ref mut symlink_count) = follow_symlinks {
+        if let Some(symlink_count) = follow_symlinks {
             *symlink_count += 1;
             if *symlink_count > MAX_SYMLINK_COUNT {
                 bail!("too many levels of symbolic links");

@@ -59,7 +59,7 @@ impl MediaSet {
         match self.media_list.last() {
             None => None,
             Some(None) => None,
-            Some(Some(ref last_uuid)) => Some(last_uuid),
+            Some(Some(last_uuid)) => Some(last_uuid),
         }
     }
 

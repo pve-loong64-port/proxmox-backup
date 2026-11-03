@@ -362,7 +362,7 @@ fn keep_previous_key_as_associated(
 ) {
     if let Some(prev) = current_active {
         match associated_keys {
-            Some(ref mut keys) => {
+            Some(keys) => {
                 if !keys.contains(prev) {
                     keys.push(prev.clone());
                 }

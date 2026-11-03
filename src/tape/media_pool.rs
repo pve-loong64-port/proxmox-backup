@@ -325,7 +325,7 @@ impl MediaPool {
         let mut list = Vec::new();
         for opt_uuid in self.current_media_set.media_list().iter() {
             match opt_uuid {
-                Some(ref uuid) => list.push(uuid),
+                Some(uuid) => list.push(uuid),
                 None => bail!("current_media_list failed - media set is incomplete"),
             }
         }

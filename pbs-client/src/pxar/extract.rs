@@ -147,7 +147,7 @@ where
                 let mut prelude_file = open_options
                     .open(path)
                     .with_context(|| format!("error creating prelude file '{path:?}'"))?;
-                if let pxar::EntryKind::Prelude(ref prelude) = entry.kind() {
+                if let pxar::EntryKind::Prelude(prelude) = entry.kind() {
                     prelude_file.write_all(prelude.as_ref())?;
                 } else {
                     info!("unexpected entry kind for prelude");
