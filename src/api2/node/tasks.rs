@@ -179,10 +179,9 @@ pub fn tasktype(state: &TaskState) -> TaskStateType {
 }
 
 fn into_task_list_item(info: proxmox_rest_server::TaskListInfo) -> pbs_api_types::TaskListItem {
-    let (endtime, status) = info.state.map_or_else(
-        || (None, None),
-        |a| (Some(a.endtime()), Some(a.to_string())),
-    );
+    let (endtime, status) = info
+        .state
+        .map_or((None, None), |a| (Some(a.endtime()), Some(a.to_string())));
 
     pbs_api_types::TaskListItem {
         upid: info.upid_str,
