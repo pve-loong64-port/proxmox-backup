@@ -122,7 +122,6 @@ pbs-tools = { path = "pbs-tools" }
 # regular crates
 anyhow = "1.0"
 async-trait = "0.1.56"
-apt-pkg-native = "0.3.2"
 bitflags = "2.4"
 bytes = "1.0"
 cidr = "0.3"
@@ -131,11 +130,9 @@ const_format = "0.2"
 crossbeam-channel = "0.5"
 endian_trait = { version = "0.6", features = ["arrays"] }
 env_logger = "0.11"
-flate2 = "1.0"
 foreign-types = "0.3"
 futures = "0.3"
 h2 = { version = "0.4", features = [ "stream" ] }
-handlebars = "3.0"
 hex = "0.4.3"
 hickory-resolver = { version = "0.24.1", default-features = false, features = [ "system-config", "tokio-runtime" ] }
 http-body-util = "0.1"
@@ -155,8 +152,6 @@ regex = "1.5.5"
 rustyline = "14"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-siphasher = "0.3"
-syslog = "6"
 tar = "0.4"
 tempfile = "3.15.0"
 termcolor = "1.1.2"
@@ -201,7 +196,6 @@ regex.workspace = true
 rustyline.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-syslog.workspace = true
 termcolor.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = [ "fs", "io-util", "io-std", "macros", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "time" ] }
