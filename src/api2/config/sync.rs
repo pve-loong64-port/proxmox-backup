@@ -454,10 +454,10 @@ pub enum DeletableProperty {
 datastore, and Remote.Read on source remote. Additionally, remove_vanished requires \
 Datastore.Prune, and any owner other than the user themselves requires Datastore.Modify.\n\
 For sync jobs in push direction, user needs RemoteDatastore.Backup on remote datastore, and \
-Datastore.Audit, Datastore.Read and Datastore.Modify on the source datastore, the latter not \
-required sync job owned by user. Additionally, remove vanished requires RemoteDatastore.Modify.\n
-Modifications of the job are only allowed if the user already also has above privileges on job
-before modification.",
+Datastore.Audit, and either Datastore.Backup (user == owner) or either Datastore.Read or \
+Datastore.Modify (user != owner) on the source  datastore. Additionally, remove vanished \
+requires RemoteDatastore.Modify.\n These privilege requirements are checked against the old \
+and new job configuration.",
     },
 )]
 /// Update sync job config.
