@@ -207,7 +207,7 @@ pub fn list_permissions(
         path: &str,
     ) -> HashSet<String> {
         for (sub_path, child_node) in node.children {
-            let sub_path = format!("{}/{}", path, &sub_path);
+            let sub_path = format!("{}/{}", path, sub_path);
             paths = populate_acl_paths(paths, child_node, &sub_path);
             paths.insert(sub_path);
         }

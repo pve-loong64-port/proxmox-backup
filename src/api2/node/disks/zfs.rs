@@ -210,7 +210,7 @@ pub fn create_zpool(
         bail!("{:?} needs at least {} disks.", raidlevel, min_disks);
     }
 
-    let mount_point = format!("/mnt/datastore/{}", &name);
+    let mount_point = format!("/mnt/datastore/{}", name);
 
     // check if the default path does exist already and bail if it does
     // otherwise 'zpool create' aborts after partitioning, but before creating the pool

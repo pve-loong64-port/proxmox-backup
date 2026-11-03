@@ -676,7 +676,7 @@ pub fn update_datastore(
                     sock,
                     &format!(
                         "{{\"command\":\"update-datastore-cache\",\"args\":\"{}\"}}\n",
-                        &name
+                        name
                     ),
                 )
                 .await;

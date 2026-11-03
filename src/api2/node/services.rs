@@ -185,7 +185,7 @@ fn get_service_state(service: String, _param: Value) -> Result<Value, Error> {
 }
 
 fn run_service_command(service: &str, cmd: &str, auth_id: Authid) -> Result<Value, Error> {
-    let workerid = format!("srv{}", &cmd);
+    let workerid = format!("srv{}", cmd);
 
     let cmd = match cmd {
         "start" | "stop" | "restart" => cmd.to_string(),

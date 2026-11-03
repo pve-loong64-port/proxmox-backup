@@ -1453,7 +1453,7 @@ pub fn download_file(
             tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new())
                 .map_ok(|bytes| bytes.freeze())
                 .map_err(move |err| {
-                    eprintln!("error during streaming of '{:?}' - {}", &path, err);
+                    eprintln!("error during streaming of '{:?}' - {}", path, err);
                     err
                 });
         let body = Body::wrap_stream(payload);
@@ -2803,7 +2803,7 @@ async fn do_unmount(store: String, auth_id: Authid, to_stdout: bool) -> Result<V
             sock,
             &format!(
                 "{{\"command\":\"update-datastore-cache\",\"args\":\"{}\"}}\n",
-                &store
+                store
             ),
         )
         .await;

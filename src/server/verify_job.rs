@@ -22,7 +22,7 @@ pub fn do_verification_job(
     let ignore_verified_snapshots = verification_job.ignore_verified.unwrap_or(true);
 
     // FIXME encode namespace here for filter/ACL check?
-    let job_id = format!("{}:{}", &verification_job.store, job.jobname());
+    let job_id = format!("{}:{}", verification_job.store, job.jobname());
     let worker_type = job.jobtype().to_string();
     let upid_str = WorkerTask::new_thread(
         &worker_type,

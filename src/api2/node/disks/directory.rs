@@ -185,7 +185,7 @@ pub fn create_datastore_disk(
         bail!("disk '{}' is already in use.", disk);
     }
 
-    let mount_point = format!("{}/{}", DATASTORE_MOUNT_DIR, &name);
+    let mount_point = format!("{}/{}", DATASTORE_MOUNT_DIR, name);
     // check if the default path exists already.
     // bail if it is not empty or another filesystem mounted on top
     let default_path = std::path::PathBuf::from(&mount_point);
