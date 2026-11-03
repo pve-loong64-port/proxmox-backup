@@ -13,7 +13,11 @@ use openssl::x509::{GeneralName, X509};
 #[allow(non_camel_case_types)]
 type ASN1_TIME = <openssl::asn1::Asn1TimeRef as ForeignTypeRef>::CType;
 
-extern "C" {
+// SAFETY:
+// * The function signature matches the openssl C API.
+// * The symbol is guaranteed to be available because the openssl
+//   crate links against the native library.
+unsafe extern "C" {
     fn ASN1_TIME_to_tm(s: *const ASN1_TIME, tm: *mut libc::tm) -> libc::c_int;
 }
 

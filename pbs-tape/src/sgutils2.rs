@@ -363,8 +363,11 @@ pub const SCSI_PT_RESULT_SENSE: c_int = 2;
 pub const SCSI_PT_RESULT_TRANSPORT_ERR: c_int = 3;
 pub const SCSI_PT_RESULT_OS_ERR: c_int = 4;
 
+// SAFETY:
+// * We link against libsgutils2 because of the link attribute.
+// * The signatures match the C definitions in /usr/include/scsi/{sg_lib,sg_pt}.h
 #[link(name = "sgutils2")]
-extern "C" {
+unsafe extern "C" {
 
     #[allow(dead_code)]
     fn scsi_pt_open_device(device_name: *const c_char, read_only: bool, verbose: c_int) -> c_int;
@@ -398,8 +401,8 @@ extern "C" {
         asc: c_int,
         ascq: c_int,
         buff_len: c_int,
-        buffer: *mut c_char,
-    ) -> *const c_char;
+        buff: *mut c_char,
+    ) -> *mut c_char;
 }
 
 /// Safe interface to run RAW SCSI commands
@@ -413,6 +416,10 @@ pub struct SgRaw<'a, F> {
 /// Get the string associated with ASC/ASCQ values
 pub fn get_asc_ascq_string(asc: u8, ascq: u8) -> String {
     let mut buffer = [0u8; 1024];
+    // SAFETY:
+    // * asc and ascq are within the expected u8 range
+    // * The length fits into c_int without overflow.
+    // * as_mut_ptr returns writable memory of the corresponding length.
     let res = unsafe {
         sg_get_asc_ascq_str(
             asc as c_int,
@@ -427,6 +434,12 @@ pub fn get_asc_ascq_string(asc: u8, ascq: u8) -> String {
             // just to be safe
             bail!("unexpected NULL ptr");
         }
+        // SAFETY:
+        // * sg_get_asc_ascq_str wrote a zero terminated string into buffer.
+        // * It returns the pointer to the start of the buffer, which is not
+        //   null, and valid for reads, because it hasn't been invalidated
+        //   by another use of buffer.
+        // * buffer outlives the created CStr
         Ok(unsafe { CStr::from_ptr(res) }.to_str()?.to_owned())
     })
     .unwrap_or_else(|_err: Error| format!("ASC={asc:02x}x, ASCQ={ascq:02x}x"))
