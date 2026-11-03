@@ -78,7 +78,7 @@ pub enum BlockDriverType {
 }
 
 impl BlockDriverType {
-    fn resolve(&self) -> impl BlockRestoreDriver {
+    fn resolve(&self) -> impl BlockRestoreDriver + use<> {
         match self {
             BlockDriverType::Qemu => QemuBlockDriver {},
         }

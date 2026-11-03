@@ -1175,7 +1175,7 @@ impl H2Client {
         &self,
         request: Request<()>,
         data: Option<bytes::Bytes>,
-    ) -> impl Future<Output = Result<h2::client::ResponseFuture, Error>> {
+    ) -> impl Future<Output = Result<h2::client::ResponseFuture, Error>> + use<> {
         self.h2
             .clone()
             .ready()
