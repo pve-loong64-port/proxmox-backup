@@ -533,6 +533,9 @@ Ext.define('PBS.Utils', {
                 iconCls: 'fa-bell-o',
             },
         };
+
+        // Opt into the new matcher expressions
+        Proxmox.Schema.notificationMatcherExpressions = true;
     },
 
     // Convert an ArrayBuffer to a base64url encoded string.
