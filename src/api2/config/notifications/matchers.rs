@@ -40,6 +40,11 @@ pub fn list_matchers(
         properties: {
             name: {
                 schema: ENTITY_NAME_SCHEMA,
+            },
+            "migrate-to-expression": {
+                description: "Automatically translate existing 'match-*', 'invert-match' and 'mode' to an equivalent matching 'expression'",
+                optional: true,
+                default: false,
             }
         },
     },
@@ -49,9 +54,18 @@ pub fn list_matchers(
     },
 )]
 /// Get a notification matcher.
-pub fn get_matcher(name: String, rpcenv: &mut dyn RpcEnvironment) -> Result<MatcherConfig, Error> {
+pub fn get_matcher(
+    name: String,
+    migrate_to_expression: bool,
+    rpcenv: &mut dyn RpcEnvironment,
+) -> Result<MatcherConfig, Error> {
     let config = pbs_config::notifications::config()?;
-    let matcher = proxmox_notify::api::matcher::get_matcher(&config, &name)?;
+
+    let matcher = if migrate_to_expression {
+        proxmox_notify::api::matcher::get_matcher_as_expression(&config, &name)?
+    } else {
+        proxmox_notify::api::matcher::get_matcher(&config, &name)?
+    };
 
     rpcenv["digest"] = hex::encode(config.digest()).into();
 
