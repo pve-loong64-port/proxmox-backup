@@ -21,7 +21,7 @@ Ext.define('PBS.window.MaxSnapshotTimeSkewEdit', {
         name: 'max-snapshot-time-skew',
         fieldLabel: gettext('Max Snapshot Time Skew'),
         labelWidth: 160,
-        emptyText: gettext('Default (1 hour)'),
+        emptyText: gettext('Default (1 minute)'),
         deleteEmpty: true,
     },
 });
