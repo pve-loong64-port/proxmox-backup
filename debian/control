@@ -217,7 +217,7 @@ Depends: dmidecode,
          proxmox-enterprise-support-keyring,
          proxmox-mini-journalreader (>= 1.7),
          proxmox-termproxy (>= 2.0.3),
-         proxmox-widget-toolkit (>= 5.2.1),
+         proxmox-widget-toolkit (>= 5.2.12),
          pve-xtermjs (>= 4.7.0-1),
          sg3-utils,
          smartmontools,
@@ -228,6 +228,7 @@ Recommends: ifupdown2,
             proxmox-network-interface-pinning,
             proxmox-offline-mirror-helper,
             zfsutils-linux,
+Breaks: proxmox-mail-forward (<< 1.1.0),
 Description: Proxmox Backup Server daemon with tools and GUI
  This package contains the Proxmox Backup Server daemons and related
  tools. This includes a web-based graphical user interface.
