@@ -613,8 +613,7 @@ There are a few per-datastore options:
 * Verification of incoming backups
 * Maximum allowed time skew for snapshot timestamps (<= 1 day, default: 1
   minute). Does not allow for backup snapshot timestamps to be further in the
-  future than the configured value relative to the Proxmox Backup Sever system
-  time.
+  future than the configured value relative to the server's system time.
 
 .. _datastore_tuning_options:
 
