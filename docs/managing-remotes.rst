@@ -104,11 +104,11 @@ To set up sync jobs, the configuring user needs the following permissions:
 
 * (Remote Source): ``Remote.Read`` on the ``/remote/{remote}/{remote-store}``
   path for sync jobs when pulling from a remote datastore.
-* (Local Source):``Datastore.Audit`` on the local source datastore
-  ``/datastore/{store}`` and either ``Datastore.Read`` or access to owned backup
-  groups via ``Datastore.Backup``. For the latter case, if the configuring user
-  is not the owner of the sync job, ``Datastore.Modify`` is required as well as
-  this implies changing group ownership.
+* (Local Source): ``Datastore.Audit`` on the local source datastore
+  ``/datastore/{store}``. If the configuring user is not the owner of the sync
+  job, ``Datastore.Modify`` or ``Datastore.Read`` is required on the source
+  datastore. Otherwise, ``Datastore.Backup`` is enough to configure a sync job
+  limited to owned backup groups.
 * At least ``Datastore.Backup`` on the local target datastore (``/datastore/{store}``)
 
 .. note:: A sync job can only sync backup groups that the configured remote's
@@ -300,9 +300,11 @@ The following permissions are required for a sync job in push direction:
 
 #. ``Remote.Audit`` on ``/remote/{remote}`` and ``Remote.DatastoreBackup`` on
    ``/remote/{remote}/{remote-store}/{remote-ns}`` path or subnamespace.
-#. At least ``Datastore.Read`` and ``Datastore.Audit`` on the local source
-   datastore namespace (``/datastore/{store}/{ns}``) or ``Datastore.Backup`` if
-   owner of the sync job.
+#. ``Datastore.Audit`` on the local source datastore ``/datastore/{store}``. If
+   the configuring user is not the owner of the sync job, ``Datastore.Modify``
+   or ``Datastore.Read`` is required on the source datastore. Otherwise,
+   ``Datastore.Backup`` is enough to configure a sync job limited to owned
+   backup groups.
 #. ``Remote.DatastorePrune`` on ``/remote/{remote}/{remote-store}/{remote-ns}``
    path to remove vanished snapshots and groups. Make sure to use a dedicated
    remote for each sync job in push direction as noted above.
