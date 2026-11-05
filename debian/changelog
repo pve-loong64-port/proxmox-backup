@@ -1,3 +1,31 @@
+rust-proxmox-backup (4.2.10-1) trixie; urgency=medium
+
+  * ui: datastore.cfg: fix default value of max-snapshot-time-skew
+
+  * notification: update proxmox-notify, enable new matcher UI and update the
+    documentation to match. matcher rules can now be arbitrarily nested in a
+    rule tree, existing rules are converted.
+
+  * catalog: various cleanups and additional checks:
+    - handle malformed variable length i64
+    - harden handling of sub-directory offsets
+    - limit requested allocation size when reading dirinfo block
+
+  * update proxmox-io to 1.3, improving unsafe code and allocation error
+    handling
+
+  * tree-wide: various clippy fixes and code cleanup
+
+  * cargo: remove unused dependencies
+
+  * api: gc status: pass schedule instead of UPID to schedule helper
+
+  * pbs-key-config: return error instead of panicing on short decrypted keys
+
+  * docs: update sync job permission descriptions to align with recent changes
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 05 Nov 2026 11:44:00 +0100
+
 rust-proxmox-backup (4.2.9-1) trixie; urgency=medium
 
   * docs: installer: document the advanced network options
