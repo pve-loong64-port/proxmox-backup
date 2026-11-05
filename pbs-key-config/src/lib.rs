@@ -35,7 +35,7 @@ pub enum KeyDerivationConfig {
 
 impl KeyDerivationConfig {
     /// Derive a key from provided passphrase
-    pub fn derive_key(&self, passphrase: &[u8]) -> Result<[u8; 32], Error> {
+    pub fn derive_key(&self, passphrase: &[u8]) -> Result<[u8; EXPECTED_KEY_LEN], Error> {
         let mut key = [0u8; EXPECTED_KEY_LEN];
 
         match self {
@@ -101,7 +101,7 @@ impl From<&KeyConfig> for KeyInfo {
 
 impl KeyConfig {
     /// Creates a new key using random data, protected by passphrase.
-    pub fn new(passphrase: &[u8], kdf: Kdf) -> Result<([u8; 32], Self), Error> {
+    pub fn new(passphrase: &[u8], kdf: Kdf) -> Result<([u8; EXPECTED_KEY_LEN], Self), Error> {
         let mut key = [0u8; EXPECTED_KEY_LEN];
         proxmox_sys::linux::fill_with_random_data(&mut key)?;
         let key_config = Self::with_key(&key, passphrase, kdf)?;
@@ -109,7 +109,7 @@ impl KeyConfig {
     }
 
     /// Creates a new, unencrypted key.
-    pub fn without_password(raw_key: [u8; 32]) -> Result<Self, Error> {
+    pub fn without_password(raw_key: [u8; EXPECTED_KEY_LEN]) -> Result<Self, Error> {
         // always compute fingerprint
         let crypt_config = CryptConfig::new(raw_key)?;
         let fingerprint = Some(Fingerprint::new(crypt_config.fingerprint()));
@@ -126,7 +126,11 @@ impl KeyConfig {
     }
 
     /// Creates a new instance, protect raw_key with passphrase.
-    pub fn with_key(raw_key: &[u8; 32], passphrase: &[u8], kdf: Kdf) -> Result<Self, Error> {
+    pub fn with_key(
+        raw_key: &[u8; EXPECTED_KEY_LEN],
+        passphrase: &[u8],
+        kdf: Kdf,
+    ) -> Result<Self, Error> {
         let salt = proxmox_sys::linux::random_data(32)?;
 
         let kdf = match kdf {
@@ -182,9 +186,9 @@ impl KeyConfig {
                 "unexpected key length ({} != {EXPECTED_KEY_LEN})",
                 key_config.data.len()
             )
-        } else if key_config.kdf.is_some() && key_config.data.len() < 32 {
+        } else if key_config.kdf.is_some() && key_config.data.len() < EXPECTED_KEY_LEN {
             bail!(
-                "unexpected short data for key ({} < 32)",
+                "unexpected short data for key ({} < {EXPECTED_KEY_LEN})",
                 key_config.data.len()
             );
         }
@@ -196,7 +200,7 @@ impl KeyConfig {
     pub fn decrypt(
         &self,
         passphrase: &dyn Fn() -> Result<Vec<u8>, Error>,
-    ) -> Result<([u8; 32], i64, Fingerprint), Error> {
+    ) -> Result<([u8; EXPECTED_KEY_LEN], i64, Fingerprint), Error> {
         let raw_data = &self.data;
 
         let key = if let Some(ref kdf) = self.kdf {
@@ -310,7 +314,7 @@ impl KeyConfig {
 pub fn load_and_decrypt_key(
     path: &std::path::Path,
     passphrase: &dyn Fn() -> Result<Vec<u8>, Error>,
-) -> Result<([u8; 32], i64, Fingerprint), Error> {
+) -> Result<([u8; EXPECTED_KEY_LEN], i64, Fingerprint), Error> {
     decrypt_key(&file_get_contents(path)?, passphrase)
         .with_context(|| format!("failed to load decryption key from {path:?}"))
 }
@@ -319,7 +323,7 @@ pub fn load_and_decrypt_key(
 pub fn decrypt_key(
     mut keydata: &[u8],
     passphrase: &dyn Fn() -> Result<Vec<u8>, Error>,
-) -> Result<([u8; 32], i64, Fingerprint), Error> {
+) -> Result<([u8; EXPECTED_KEY_LEN], i64, Fingerprint), Error> {
     let key_config: KeyConfig = serde_json::from_reader(&mut keydata)?;
     key_config.decrypt(passphrase)
 }
@@ -344,7 +348,7 @@ pub fn rsa_decrypt_key_config(
     rsa: openssl::rsa::Rsa<openssl::pkey::Private>,
     key: &[u8],
     passphrase: &dyn Fn() -> Result<Vec<u8>, Error>,
-) -> Result<([u8; 32], i64, Fingerprint), Error> {
+) -> Result<([u8; EXPECTED_KEY_LEN], i64, Fingerprint), Error> {
     let mut buffer = vec![0u8; rsa.size() as usize];
     let decrypted = rsa
         .private_decrypt(key, &mut buffer, openssl::rsa::Padding::PKCS1)
